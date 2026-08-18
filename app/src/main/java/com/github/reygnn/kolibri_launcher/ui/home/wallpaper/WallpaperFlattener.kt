@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -55,10 +56,24 @@ class WallpaperFlattener @Inject constructor(
                     layout(0, 0, width, height)
                 }
                 // Same binder the live view uses -> identical decode/transform/blend
-                // logic, only with a software loader.
-                val binder = WallpaperViewBinder { uri -> loadSoftware(uri) }
+                // logic, only with a software loader. Track per-layer decode failures:
+                // a partial composite (one layer skipped) is a decodable-but-INCOMPLETE
+                // artifact, and it must NOT reach the cache (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC
+                // §3, all-or-nothing). parseWallpaperState already drops missing-file layers,
+                // so a null here is a TRANSIENT decode failure — returning null makes the warm
+                // skip caching and re-flatten on the next miss, exactly like the live path heals.
+                val anyLayerFailed = AtomicBoolean(false)
+                val binder = WallpaperViewBinder { uri ->
+                    loadSoftware(uri).also { if (it == null) anyLayerFailed.set(true) }
+                }
                 binder.bind(view, state)
-                view.composeToBitmap(width, height)
+                val composite = view.composeToBitmap(width, height)
+                if (anyLayerFailed.get()) {
+                    composite?.recycle()
+                    null
+                } else {
+                    composite
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

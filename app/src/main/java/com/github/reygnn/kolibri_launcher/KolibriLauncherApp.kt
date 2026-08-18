@@ -172,6 +172,14 @@ class KolibriLauncherApp : Application() {
         // to compare against.
         lastLocaleTags = resources.configuration.locales.toLanguageTags()
 
+        // v4 one-shot cleanup (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC §6): the on-disk composite
+        // tier was removed; delete its now-orphaned dir once, off-main. NOT a data migration —
+        // the composite is a derived artifact (Rule 5). deleteRecursively on a missing dir is a
+        // cheap no-op, so no "run once" flag is needed; it self-quiesces after the first launch.
+        applicationScope.launch {
+            runCatching { java.io.File(filesDir, "wallpaper_composite").deleteRecursively() }
+        }
+
         // Wire SystemWallpaperColorsSignal to WallpaperManager. Drives the
         // AppDrawer's AUTO surface mode (and any future surface that wants
         // to react to system-wallpaper colour-hint changes). Listener +

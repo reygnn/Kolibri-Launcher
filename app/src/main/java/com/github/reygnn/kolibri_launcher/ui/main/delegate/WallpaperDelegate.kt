@@ -130,7 +130,6 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -143,6 +142,10 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
+import android.graphics.Bitmap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
@@ -177,7 +180,7 @@ class WallpaperDelegate(
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val wallpaperFileManager: WallpaperFileManager,
     private val wallpaperFlattener: WallpaperFlattener,
-    private val compositeStore: WallpaperCompositeStore,
+    private val compositeCache: WallpaperCompositeCache,
     private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
@@ -263,28 +266,15 @@ class WallpaperDelegate(
     private var backfillInProgress = false
 
     /**
-     * Serializes composite regeneration across THIS delegate's callers — the
-     * edit-mode commit ([onCommitWallpaperEditMode]), the lazy backfill
-     * ([maybeBackfillComposite]) (AUDIT-20 F1), and the user clear ([onClearWallpaper])
-     * (AUDIT-20 F6). All flatten + write + persist / clear on the same delegate;
-     * without mutual exclusion they can run against the same
-     * `flattenedWallpaperPath == null` state at once, and one path's cleanup could
-     * unlink the file another just persisted → a dangling path → blank home across
-     * restarts, or a clear could race a backfill that then re-persists a removed
-     * wallpaper with an orphaned composite. Holding the lock over the whole
-     * flatten→write→save (and over the clear) keeps the latest-wins path check
-     * ([_wallpaperState] comparison) consistent with what actually landed on disk;
-     * pruning of superseded composites is deferred until after that check (F7).
-     *
-     * SCOPE (AUDIT-20 F8): this lock is app-layer and covers only the delegate's own
-     * callers. Two `:data` paths ALSO mutate the composite dir and cannot take it —
-     * `WallpaperRepositoryImpl.clearWallpaper` (reached from a backup restore) and
-     * `purgeRepository` (factory reset), both via `WallpaperCompositeStore.clear()`.
-     * Filesystem-level mutual exclusion against those is provided one layer down by
-     * `WallpaperCompositeStore`'s own `dirLock`; the residual cross-layer case — a
-     * restore/reset clear interleaving this delegate's write→persist→prune and
-     * stranding the persisted path — is not made atomic here but self-heals via the
-     * F2 path validation (`validatedCompositePath`).
+     * Serializes the in-memory composite warm ([warmComposite]) against the user clear
+     * ([onClearWallpaper]) on this delegate (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4). The warm
+     * ends in a cache `put`; the clear does a cache `invalidate` + optimistic NONE. Holding the
+     * lock across both keeps them mutually exclusive, so a clear can't land between a warm's
+     * flatten and its put and be immediately overwritten by a stale composite. Belt-and-braces
+     * on top of the warm's key-gated put (which already drops a put whose key is no longer
+     * current): a clear sets NONE, so a warm resuming on the lock fails its key gate and drops
+     * its bitmap. No disk, no pointer, no cross-module dir lock — the whole F1–F8 disk class is
+     * gone (the store was deleted); this lock now guards only the single in-memory resource.
      */
     private val compositeRegenLock = Mutex()
 
@@ -397,7 +387,7 @@ class WallpaperDelegate(
                     }
                 }
 
-                maybeBackfillComposite(state)
+                maybeWarmComposite(state)
             }
         }
     }
@@ -531,16 +521,28 @@ class WallpaperDelegate(
         compositeRegenLock.withLock {
             // clearAll does blocking disk I/O — hop off the main dispatcher.
             withContext(ioDispatcher) { wallpaperFileManager.clearAll() }
-            // Removes the DataStore keys AND the derived composite dir (AUDIT-20 F3).
+            // Removes the DataStore wallpaper keys.
             clearWallpaperUseCase()
-            // Optimistic in-memory NONE, mirroring onCancelWallpaperEditMode's
-            // synchronous restore: the observe flow re-emits NONE shortly (idempotent),
-            // but setting it now closes the window in which a regen resuming right after
-            // this lock releases would still read the pre-clear state.
+            // Drop the in-memory composite (v4 §3, was AUDIT-20 F3): nothing displays a
+            // composite after a clear, so the ~10 MB HARDWARE bitmap would otherwise stay
+            // resident. invalidate() only drops the reference (never recycles).
+            compositeCache.invalidate()
+            // Optimistic in-memory NONE, mirroring onCancelWallpaperEditMode's synchronous
+            // restore: the observe flow re-emits NONE shortly (idempotent), but setting it now
+            // closes the window in which a warm resuming right after this lock releases would
+            // still read the pre-clear state (its key-gated put then fails on NONE).
             _wallpaperState.value = WallpaperState.NONE
         }
         scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
     }
+
+    /**
+     * The display configuration changed (rotate / fold / multi-window resize), so the composite
+     * key's width/height changed and any cached composite is now wrong-resolution (v4 §3a/R2). A
+     * config change emits no new [WallpaperState], so this is the warm trigger for that case:
+     * re-evaluate the current state at the new metrics and warm on a miss.
+     */
+    fun onDisplayConfigChanged() = maybeWarmComposite(_wallpaperState.value)
 
     // ===========================================
     // EDIT MODE
@@ -591,80 +593,97 @@ class WallpaperDelegate(
             }
             // Option D: regenerate the flattened display composite for the committed
             // layers so drawer->home stops re-decoding every layer (§9.3).
-            regenerateFlattenedComposite(committedState)
+            maybeWarmComposite(committedState)
         }
     }
 
     /**
-     * Lazy composite backfill (Option D §9.6): an existing multi-layer wallpaper
-     * with no composite yet — set up before Option D, restored from backup, or the
-     * slot cleared — gets one generated in the BACKGROUND on first display, so
-     * drawer→home benefits without the user having to re-edit + save.
+     * Warms the in-memory composite cache (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4 §3/§3a):
+     * an existing multi-layer wallpaper whose composite is not cached yet — cold start,
+     * edit-commit (new key), backup restore, or a rotate/fold (new resolution) — gets one
+     * flattened in the BACKGROUND, so the next drawer->home is a ~0 ms one-texture hit.
      *
-     * Deliberately NOT at process start / in the launch hot path: the flatten
-     * re-decodes N layers (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.4a-adjacent), which
-     * would regress the very cold-start path the launch benchmark protects. It runs
-     * off-main via [regenerateFlattenedComposite] here, after the state has loaded,
-     * one at a time ([backfillInProgress]) and never during edit mode (the layers
-     * are mid-change and the commit path will flatten anyway). Fires again for a
-     * later composite-less state — e.g. a subsequent backup restore in the same
-     * (weeks-long) session — see the [backfillInProgress] KDoc.
+     * Deliberately NOT on the launch hot path: the flatten re-decodes N layers. Single-flighted
+     * ([backfillInProgress]) and skipped during edit mode (the layers are mid-change; the commit
+     * path warms). Gated on a cache MISS for the current key, so an already-warm state is a no-op.
+     * On completion it self-reschedules (spec S5) if the current state moved to a DIFFERENT
+     * multi-layer miss during the flatten — but never re-fires the SAME key, so a persistently
+     * failing (incomplete) flatten cannot loop.
      */
-    private fun maybeBackfillComposite(state: WallpaperState) {
+    private fun maybeWarmComposite(state: WallpaperState) {
         if (backfillInProgress) return
         if (_isWallpaperEditMode.value) return
-        if (!state.isMultiLayer || state.flattenedWallpaperPath != null) return
+        if (!state.isMultiLayer) return
+        val key = compositeKey(state)
+        if (compositeCache.get(key) != null) return
         backfillInProgress = true
-        scope.launchSafe("Error backfilling wallpaper composite") {
+        scope.launchSafe("Error warming wallpaper composite") {
             try {
-                regenerateFlattenedComposite(state)
+                warmComposite(state, key)
             } finally {
                 backfillInProgress = false
+                // Self-reschedule (S5): only if the current state is a DIFFERENT multi-layer
+                // miss — never the same key, so a failed/incomplete flatten does not loop.
+                val current = _wallpaperState.value
+                if (!_isWallpaperEditMode.value && current.isMultiLayer) {
+                    val currentKey = compositeKey(current)
+                    if (currentKey != key && compositeCache.get(currentKey) == null) {
+                        maybeWarmComposite(current)
+                    }
+                }
             }
         }
     }
 
     /**
-     * Flattens the committed multi-layer wallpaper into a single display composite
-     * (Option D §9.3) and persists its path on the state. No-op that clears the
-     * slot for single-layer / no wallpaper. Best-effort: a failed flatten leaves the
-     * state without a composite, and the drawer->home path falls back to the
-     * per-layer rebuild (§9.6).
+     * The composite cache key for [state] at the CURRENT display metrics. The one pinned metric
+     * source (spec §3a): both this warm-write side and the fragment's render-read side MUST read
+     * `context.resources.displayMetrics`, or the two keys diverge and the hit never lands.
      */
-    private suspend fun regenerateFlattenedComposite(state: WallpaperState) = compositeRegenLock.withLock {
-        if (!state.isMultiLayer) {
-            // compositeStore.clear() is blocking file I/O (listFiles() + delete()) —
-            // hop off the main dispatcher, matching the sibling clear() call sites in
-            // WallpaperRepositoryImpl.clearWallpaper / purgeRepository (AUDIT-20 F5).
-            withContext(ioDispatcher) { compositeStore.clear() }
-            return@withLock
-        }
-        // Pass explicit display dimensions (from the delegate's context) rather than
-        // relying on the flattener's context-based defaults — keeps the call
-        // unit-testable with a mocked flattener.
+    private fun compositeKey(state: WallpaperState): String {
+        val m = context.resources.displayMetrics
+        return WallpaperCompositeKey.of(state, m.widthPixels, m.heightPixels)
+    }
+
+    /**
+     * Flatten [state] (SOFTWARE) -> copy to HARDWARE -> key-gated cache put -> recycle the
+     * software temp (spec §3). A partial/incomplete flatten returns null from the flattener
+     * (all-or-nothing) and is not cached. The HARDWARE copy is the transition the deleted disk
+     * round-trip used to provide; it is the ~10 MB bitmap the cache holds and the view draws
+     * (never recycled). Serialized with [onClearWallpaper] via [compositeRegenLock] so a clear
+     * cannot interleave a warm's cache put.
+     */
+    private suspend fun warmComposite(state: WallpaperState, key: String) = compositeRegenLock.withLock {
         val metrics = context.resources.displayMetrics
-        val bitmap = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
+        val software = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
             ?: return@withLock
-        val path = try {
-            compositeStore.write(bitmap)
+        val hardware: Bitmap? = try {
+            withContext(ioDispatcher) { software.copy(Bitmap.Config.HARDWARE, /* isMutable = */ false) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // copy() of a full-screen composite is an allocation boundary (OOM). A failed copy
+            // just means no composite this time; the display stays on the per-layer path.
+            TimberWrapper.silentError(e, "Composite HARDWARE copy failed")
+            null
         } finally {
-            bitmap.recycle()
+            software.recycle()
         }
-        path ?: return@withLock
-        // No explicit cache invalidation needed: the composite path is versioned
-        // (WallpaperCompositeStore), so this new path is a fresh cache key — the
-        // display decodes it on a natural miss and the old entry is dropped (§9.4a).
-        // Latest-wins: only attach the path if the state has not changed since the
-        // commit (a newer edit / a clear would have superseded it and needs its own
-        // flatten). Pruning of older composites is deferred until AFTER this decision
-        // (AUDIT-20 F7): on a win we persist the path and drop every other composite;
-        // on a loss we drop only our OWN just-written file, so a superseded flatten
-        // never unlinks the composite the current state still references.
-        if (_wallpaperState.value == state) {
-            saveWallpaperStateUseCase(state.withFlattenedWallpaperPath(path))
-            compositeStore.prune(path)
-        } else {
-            compositeStore.delete(path)
+        hardware ?: return@withLock
+        // Key-gated put (spec §1): only cache if this key is still the current wallpaper's key.
+        // A warm that finishes after a clear (NONE, not multi-layer) or a supersede drops its
+        // bitmap (uncached -> GC) rather than stranding a stale ~10 MB entry.
+        val current = _wallpaperState.value
+        if (current.isMultiLayer && compositeKey(current) == key) {
+            compositeCache.put(
+                key,
+                DecodedWallpaperBitmap(
+                    bitmap = hardware,
+                    sampleSize = 1,
+                    originalWidth = metrics.widthPixels,
+                    originalHeight = metrics.heightPixels,
+                ),
+            )
         }
     }
 

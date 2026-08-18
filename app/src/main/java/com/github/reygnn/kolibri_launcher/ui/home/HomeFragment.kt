@@ -39,6 +39,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperRenderScheduler
@@ -502,6 +503,15 @@ class HomeFragment : Fragment() {
         // Invalidate the spacing cache so the next layout pass recomputes
         // margin / padding for the new configuration.
         lastSpacingInput = null
+        // v4 §3a/R2: display metrics changed -> the composite key changed, so any cached
+        // composite is now wrong-resolution and misses. Re-render the current state (a miss
+        // falls to the correct per-layer path) and request a warm at the new resolution; the
+        // next drawer->home is a fresh one-texture hit. No DataStore emission fires on a config
+        // change, so this is the trigger.
+        if (view != null) {
+            updateWallpaper(viewModel.wallpaperState.value)
+        }
+        viewModel.onDisplayConfigChanged()
     }
 
     // ============================================================================
@@ -1477,8 +1487,7 @@ class HomeFragment : Fragment() {
         // bitmap. With nothing on screen nothing queries the cache again, so the
         // entry would otherwise stay resident until a later fill or process death.
         // Covers both the user "remove wallpaper" path and a factory reset (which
-        // re-emits NONE without restarting the process). The on-disk composite is
-        // cleared separately by the repository's clear/purge paths.
+        // re-emits NONE without restarting the process). There is no on-disk composite in v4.
         if (!state.hasWallpaper) {
             compositeCache.invalidate()
         }
@@ -1524,46 +1533,40 @@ class HomeFragment : Fragment() {
      * normal single-image path (applySingleLayer).
      */
     private fun displayTargetFor(state: WallpaperState): WallpaperState {
-        val compositePath = state.flattenedWallpaperPath
-        return if (compositePath != null && renderingCompositeNow()) {
-            WallpaperState(imageUri = compositePath)
-        } else {
-            state
-        }
+        // v4 §3a: render the flattened composite as ONE texture by pointing the single-image
+        // path at its synthetic composite:// cache key — but ONLY on a cache hit. A miss falls
+        // through to the real multi-layer state (per-layer FullRebuild), which is correct at any
+        // resolution and drives the async warm.
+        val key = compositeCacheKeyIfHit(state) ?: return state
+        return WallpaperState(imageUri = key)
     }
 
     /**
-     * True when the wallpaper is being rendered as the flattened composite: DISPLAY
-     * mode + a multi-layer state that has a composite. In that state the ONLY bitmap
-     * the loader decodes is the composite, so it doubles as the cache gate — no
-     * fragile uri-vs-path string compare (which uri normalisation could break).
+     * The `composite://<key>` cache key for [state] IF a warmed composite is currently cached
+     * for it, else null. Display-mode multi-layer only. Uses the pinned metric source (§3a:
+     * `context.resources.displayMetrics`), identical to the delegate's warm-write side, so the
+     * read key matches the write key exactly.
      */
-    private fun renderingCompositeNow(): Boolean =
-        !viewModel.isWallpaperEditMode.value &&
-            viewModel.wallpaperState.value.let { it.isMultiLayer && it.flattenedWallpaperPath != null }
+    private fun compositeCacheKeyIfHit(state: WallpaperState): String? {
+        if (viewModel.isWallpaperEditMode.value) return null
+        if (!state.isMultiLayer) return null
+        val ctx = context ?: return null
+        val m = ctx.resources.displayMetrics
+        val key = WallpaperCompositeKey.of(state, m.widthPixels, m.heightPixels)
+        return if (compositeCache.get(key) != null) key else null
+    }
 
     /**
-     * True when the wallpaper is being rendered as a SINGLE image in display mode —
-     * a genuine single-layer wallpaper, OR a multi-layer one flattened to a
-     * composite. The cache gate (broader than [renderingCompositeNow], which only
-     * covers the composite): both cases decode exactly one bitmap via
-     * `applySingleLayer`, so both benefit from the ~0 ms drawer→home cache. A
-     * multi-layer state WITHOUT a composite renders per-layer (many decodes) and is
-     * excluded, as is edit mode.
-     *
-     * Requires [WallpaperState.hasWallpaper] (AUDIT-20 F9): the gate reads the LIVE
-     * state at decode-completion time, and this method reads it too. A composite
-     * decode can finish AFTER the wallpaper was cleared — the decode is a blocking
-     * call with no suspension point before the cache put, so a cancelled render still
-     * reaches it. Without the `hasWallpaper` guard the state is NONE (not multi-layer,
-     * so `!isMultiLayer` is true) and the put would re-insert the orphaned ~10 MB
-     * composite right after [updateWallpaper] invalidated the cache (F3). NONE ⇒ false
-     * closes that window.
+     * The decode-side cache PUT gate (v4 §3): true only for a genuine SINGLE-LAYER wallpaper in
+     * display mode. Only single-layer images are decoded-and-cached here (by `file://` URI); the
+     * multi-layer composite is produced and cached by the delegate's warm (never decoded from a
+     * file), so multi-layer is excluded. `hasWallpaper` keeps a decode finishing after a clear
+     * (NONE) from re-inserting a stale bitmap (AUDIT-20 F9).
      */
     private fun renderingSingleImageNow(): Boolean {
         if (viewModel.isWallpaperEditMode.value) return false
         val s = viewModel.wallpaperState.value
-        return s.hasWallpaper && (!s.isMultiLayer || s.flattenedWallpaperPath != null)
+        return s.hasWallpaper && !s.isMultiLayer
     }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
@@ -1575,9 +1578,13 @@ class HomeFragment : Fragment() {
         // treats null as "skip this layer", which is the right user-
         // visible behavior for any of those cases.
         val key = uri.toString()
-        // Option D §9.4: reuse the cached display composite across drawer→home
-        // instead of re-decoding it (~90 ms on the A36). The cache only ever holds
-        // the composite, so a per-layer edit uri simply misses and decodes normally.
+        // v4 §3a: a composite:// key is a SYNTHETIC key, not a file — resolve it from the
+        // in-memory cache ONLY, never openInputStream it. The delegate's warm populates it; a
+        // miss means "not warm yet" and the caller is already on the per-layer path.
+        if (key.startsWith(WallpaperCompositeKey.SCHEME)) {
+            return compositeCache.get(key)
+        }
+        // Single-layer / per-layer file:// image: reuse the cached decode across drawer->home.
         compositeCache.get(key)?.let { return it }
 
         return try {
@@ -1594,10 +1601,6 @@ class HomeFragment : Fragment() {
             // single-layer image self-invalidates (a new pick → new uri → new key).
             if (decoded != null && renderingSingleImageNow()) {
                 compositeCache.put(key, decoded)
-                // TEMP (remove later): a visual signal on each composite-cache FILL,
-                // to eyeball how often the cache is (re)populated. Posted to Main
-                // because this decode runs off the Main thread.
-                view?.post { showToastSafe("Wallpaper cache filled") }
             }
             decoded
         } catch (e: Throwable) {

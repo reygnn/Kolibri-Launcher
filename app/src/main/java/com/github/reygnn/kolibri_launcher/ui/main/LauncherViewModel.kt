@@ -21,7 +21,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperCompositeStore
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -139,7 +139,7 @@ class LauncherViewModel @Inject constructor(
     saveFabPositionUseCase: SaveFabPositionUseCase,
     wallpaperFileManager: WallpaperFileManager,
     wallpaperFlattener: WallpaperFlattener,
-    wallpaperCompositeStore: WallpaperCompositeStore,
+    wallpaperCompositeCache: WallpaperCompositeCache,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
@@ -232,7 +232,7 @@ class LauncherViewModel @Inject constructor(
         saveFabPositionUseCase = saveFabPositionUseCase,
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
-        compositeStore = wallpaperCompositeStore,
+        compositeCache = wallpaperCompositeCache,
         ioDispatcher = ioDispatcher,
         scope = delegateScope
     )
@@ -390,6 +390,7 @@ class LauncherViewModel @Inject constructor(
         captureSampleSize: Int? = null
     ) = wallpaperDelegate.onSaveWallpaperTransform(scale, translateX, translateY, captureSampleSize)
     fun onClearWallpaper() = wallpaperDelegate.onClearWallpaper()
+    fun onDisplayConfigChanged() = wallpaperDelegate.onDisplayConfigChanged()
     fun onSetWallpaperEditMode(enabled: Boolean) = wallpaperDelegate.onSetWallpaperEditMode(enabled)
     fun onToggleWallpaperEditMode() = wallpaperDelegate.onToggleWallpaperEditMode()
     fun onCommitWallpaperEditMode() = wallpaperDelegate.onCommitWallpaperEditMode()
