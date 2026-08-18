@@ -7,6 +7,8 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -38,6 +40,24 @@ import javax.inject.Inject
 class WallpaperCompositeStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
+    /**
+     * Serializes every composite-dir mutation at the STORE level, independent of
+     * which layer calls in (AUDIT-20 F8). The delegate's own regeneration callers
+     * are already serialized by its `compositeRegenLock`, but two `:data` paths
+     * mutate this dir WITHOUT that app-layer lock: [clear] reached from a backup
+     * restore (`BackupDataAssembler`) and from a factory reset (`purgeRepository`).
+     * This lock makes [write] / [prune] / [delete] / [clear] mutually exclusive so a
+     * restore/reset clear can never interleave the filesystem ops of an in-flight
+     * backfill write (a `listFiles()`+`delete()` racing an atomic rename). It does
+     * NOT make the delegate's higher-level flatten→persist→prune sequence atomic
+     * against such a clear — a clear landing between the delegate's [write] and
+     * [prune] still strands the just-persisted path, which self-heals via the F2
+     * path validation (`validatedCompositePath` nulls the missing path on the next
+     * read and the backfill re-arms). Cheap: composite mutations are rare (a commit,
+     * a backfill, a clear), never on a hot path.
+     */
+    private val dirLock = Mutex()
+
     private fun dir(): File =
         File(context.filesDir, COMPOSITE_DIR).also { if (!it.exists()) it.mkdirs() }
 
@@ -58,32 +78,34 @@ class WallpaperCompositeStore @Inject constructor(
      * path to a broken composite.
      */
     suspend fun write(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
-        var tmp: File? = null
-        try {
-            val dir = dir()
-            val file = File(dir, "$COMPOSITE_PREFIX${System.currentTimeMillis()}_${counter.getAndIncrement()}.webp")
-            tmp = File(dir, "${file.name}$TMP_SUFFIX")
-            val compressed = FileOutputStream(tmp).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
+        dirLock.withLock {
+            var tmp: File? = null
+            try {
+                val dir = dir()
+                val file = File(dir, "$COMPOSITE_PREFIX${System.currentTimeMillis()}_${counter.getAndIncrement()}.webp")
+                tmp = File(dir, "${file.name}$TMP_SUFFIX")
+                val compressed = FileOutputStream(tmp).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, out)
+                }
+                // F4: compress() can return false WITHOUT throwing — never persist a path
+                // to the partial file it leaves behind. Rename can also fail; either way
+                // the temp is dropped and any previous composite is left untouched.
+                if (!compressed || !tmp.renameTo(file)) {
+                    tmp.delete()
+                    return@withLock null
+                }
+                tmp = null // renamed into place; ownership transferred to `file`
+                Uri.fromFile(file).toString()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Throwable, not Exception: compress on a large composite can OOM
+                // (allocation boundary). Clean up the temp file; any older composite is
+                // left intact as the fallback.
+                tmp?.delete()
+                TimberWrapper.silentError(e, "Failed to write wallpaper composite")
+                null
             }
-            // F4: compress() can return false WITHOUT throwing — never persist a path
-            // to the partial file it leaves behind. Rename can also fail; either way
-            // the temp is dropped and any previous composite is left untouched.
-            if (!compressed || !tmp.renameTo(file)) {
-                tmp.delete()
-                return@withContext null
-            }
-            tmp = null // renamed into place; ownership transferred to `file`
-            Uri.fromFile(file).toString()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // Throwable, not Exception: compress on a large composite can OOM
-            // (allocation boundary). Clean up the temp file; any older composite is
-            // left intact as the fallback.
-            tmp?.delete()
-            TimberWrapper.silentError(e, "Failed to write wallpaper composite")
-            null
         }
     }
 
@@ -97,16 +119,18 @@ class WallpaperCompositeStore @Inject constructor(
      */
     suspend fun prune(keepUri: String): Unit = withContext(Dispatchers.IO) {
         val keepPath = Uri.parse(keepUri).path ?: return@withContext
-        try {
-            val keep = File(keepPath)
-            dir().listFiles { f -> f.name.startsWith(COMPOSITE_PREFIX) && f != keep }
-                ?.forEach { it.delete() }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // No suspension point in the try body (blocking file I/O only); the
-            // CancellationException arm mirrors write() for structural consistency.
-            TimberWrapper.silentError(e, "Failed to prune wallpaper composites")
+        dirLock.withLock {
+            try {
+                val keep = File(keepPath)
+                dir().listFiles { f -> f.name.startsWith(COMPOSITE_PREFIX) && f != keep }
+                    ?.forEach { it.delete() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // No suspension point in the try body (blocking file I/O only); the
+                // CancellationException arm mirrors write() for structural consistency.
+                TimberWrapper.silentError(e, "Failed to prune wallpaper composites")
+            }
         }
     }
 
@@ -117,22 +141,34 @@ class WallpaperCompositeStore @Inject constructor(
      */
     suspend fun delete(uri: String): Unit = withContext(Dispatchers.IO) {
         val path = Uri.parse(uri).path ?: return@withContext
+        dirLock.withLock {
+            try {
+                File(path).delete()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // No suspension point in the try body (blocking file I/O only); the
+                // CancellationException arm mirrors write() for structural consistency.
+                TimberWrapper.silentError(e, "Failed to delete wallpaper composite")
+            }
+        }
+    }
+
+    /**
+     * Deletes every composite file (factory reset / no wallpaper / backup restore).
+     * Idempotent. `suspend` so it takes [dirLock] (AUDIT-20 F8) — a restore/reset clear
+     * is thereby mutually exclusive with an in-flight backfill [write]. Callers invoke
+     * it from an IO context (the delegate and the repository both wrap in
+     * `withContext(ioDispatcher)`); the blocking [deleteAll] runs on that dispatcher.
+     */
+    suspend fun clear(): Unit = dirLock.withLock {
         try {
-            File(path).delete()
+            deleteAll()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             // No suspension point in the try body (blocking file I/O only); the
             // CancellationException arm mirrors write() for structural consistency.
-            TimberWrapper.silentError(e, "Failed to delete wallpaper composite")
-        }
-    }
-
-    /** Deletes every composite file (factory reset / no wallpaper). Idempotent. */
-    fun clear() {
-        try {
-            deleteAll()
-        } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to clear wallpaper composite")
         }
     }

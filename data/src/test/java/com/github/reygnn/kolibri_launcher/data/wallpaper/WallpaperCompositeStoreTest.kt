@@ -160,4 +160,19 @@ class WallpaperCompositeStoreTest {
 
         assertTrue(compositeFiles().isEmpty())
     }
+
+    @Test
+    fun `clear removes every composite, not just the latest`() = runTest {
+        // AUDIT-20 F8: clear() is the restore/reset path. write() no longer prunes
+        // (F7), so several composites can coexist; clear() must sweep all of them —
+        // and, being `suspend`, it now runs under the store's dirLock so it cannot
+        // interleave the filesystem ops of a concurrent write.
+        store.write(bitmap(success = true))
+        store.write(bitmap(success = true))
+        assertEquals("two composites present before clear", 2, compositeFiles().size)
+
+        store.clear()
+
+        assertTrue("clear sweeps every composite", compositeFiles().isEmpty())
+    }
 }

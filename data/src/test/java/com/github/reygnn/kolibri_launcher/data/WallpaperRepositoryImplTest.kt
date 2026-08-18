@@ -15,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.coVerify
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -396,7 +397,7 @@ class WallpaperRepositoryImplTest {
         manager.clearWallpaper()
         advanceUntilIdle()
 
-        verify(exactly = 1) { compositeStore.clear() }
+        coVerify(exactly = 1) { compositeStore.clear() }
     }
 
     @Test

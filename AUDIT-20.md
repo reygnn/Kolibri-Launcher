@@ -456,3 +456,121 @@ wie `write()` (Rule 11).
 (`fix/composite-lifecycle-clear-prune`, s. F6/F7): `write()` wurde in Create (kein Prune) +
 `prune`/`delete` (nach dem Guard) aufgeteilt, und `onClearWallpaper` läuft unter
 `compositeRegenLock` mit optimistischem NONE. **Alle drei Follow-up-Funde (F5–F7) gefixt.**
+
+---
+
+## 5. Dritter Review (2026-08-18, post-Fix @ `177d8ead`)
+
+> Dritter Durchlauf desselben Composite-Flatten-&-Cache-Pfads, **nachdem** F1–F7
+> gemerged waren. Methode: 5 parallele Review-Linsen (Concurrency/Lock,
+> Bitmap-/Memory-Lifecycle, Cache-Kohärenz/Persistenz, Flatten-Korrektheit +
+> Classifier, Regel-Konformität), jede mit adversarialer Verifikation; die beiden
+> überlebenden Funde danach selbst am Code nachgelesen (`renderingSingleImageNow`,
+> `compositeStore.clear`-Call-Sites, `dirLock`-Abwesenheit, `hasWallpaper`-Semantik).
+> Drei Linsen kamen **sauber** zurück (Memory/Bitmap-Lifecycle — never-recycle intakt,
+> Flatten-Parität, Regel-Konformität). Beide neuen Funde sind **dieselbe Klasse** wie
+> zuvor — Composite-Aufräumen, das einen in-flight Write/Decode rennt — auf zwei
+> Kanten, die die F1–F7-Fixes nicht abdeckten. Beide `low`, beide **gefixt** auf
+> `fix/composite-lifecycle-hardening-3`.
+
+| # | Cluster | Ort | Was | Severity | Verdict | Status |
+|---|---|---|---|---|---|---|
+| **F8** | Composite-Dir-Lifecycle | `WallpaperCompositeStore` (kein interner Lock) + `WallpaperRepositoryImpl.clearWallpaper` (`:390`) / `purgeRepository` (`:413`) | `compositeRegenLock` ist app-seitig und privat im Delegate; zwei `:data`-Caller mutieren das Composite-Dir **ohne** ihn — `clearWallpaper()` (aus `BackupDataAssembler` beim Restore) und `purgeRepository()` (Factory-Reset), beide via `compositeStore.clear()`. Der `@Singleton`-Store hat **keine** eigene Serialisierung → ein Restore/Reset-Clear kann die Dateisystem-Ops eines in-flight Backfill-`write` interleaven; die Lock-KDoc behauptet fälschlich „serializes **every** composite-dir mutation" | `low` | CONFIRMED | ✅ GEFIXT |
+| **F9** | Cache-Kohärenz | `HomeFragment.renderingSingleImageNow` (`:1554`) + `loadBitmapFromUri` (`:1586`) | Der Cache-PUT-Gate liest den **Live**-State zur Decode-Fertigstellung; für NONE liefert er `true` (`!isMultiLayer`). Ein Composite-Decode, der **nach** dem Wallpaper-Clear fertig wird (blockierender Decode, **kein** Suspension-Point vor dem `put`), re-inserted die verwaiste ~10 MB HARDWARE-Bitmap direkt **nachdem** `updateWallpaper` den Cache per F3-`invalidate()` geleert hat → F3 in diesem Race negiert | `low` | CONFIRMED | ✅ GEFIXT |
+
+---
+
+### F8 — `:data`-Clear/Purge umgeht `compositeRegenLock` · `low` · CONFIRMED
+
+`data/wallpaper/WallpaperCompositeStore.kt` (kein interner Lock) + `data/WallpaperRepositoryImpl.kt:390` (`clearWallpaper`) / `:413` (`purgeRepository`)
+
+`compositeRegenLock` ist ein privates `:app`-Feld von `WallpaperDelegate`; seine KDoc
+sagte „**serializes every composite-dir mutation across its callers**". Das ist
+überzogen: **zwei** `:data`-Pfade mutieren dasselbe Composite-Dir und können den
+App-Layer-Lock strukturell nicht nehmen — `WallpaperRepositoryImpl.clearWallpaper()`
+(erreicht aus `BackupDataAssembler:375` beim Backup-Restore) und `purgeRepository()`
+(aus `ResetRepositoryImpl:124` beim Factory-Reset), beide über
+`compositeStore.clear() → deleteAll()`. Der `@Singleton WallpaperCompositeStore` trug
+**keine** eigene Serialisierung (grep: null `Mutex`/`synchronized`), d. h. die
+Serialisierung lag **allein** im Delegate-Lock, den diese Caller nicht erreichen.
+
+**Failure-Szenario:** Multi-Layer-State mit `flattenedWallpaperPath == null` (frische
+Option-D-Installation / Post-Restore) → `maybeBackfillComposite` hält
+`compositeRegenLock`, ist mitten in `write` (Temp+Rename). Der Nutzer triggert einen
+Backup-Restore → `clearWallpaper() → compositeStore.clear() → deleteAll()` fegt das
+Composite-Dir, unserialisiert gegen den laufenden Backfill-`write`. Gewinnt der Backfill
+danach seinen latest-wins-Guard, persistiert er `path_P` und `prune(P)` behält eine
+bereits gelöschte Datei → DataStore zeigt ins Leere.
+
+Severity `low` und self-heilend: der **F2-Fix** (`validatedCompositePath` nullt den
+fehlenden Pfad beim nächsten Read, Backfill re-armt) verwandelt das in einen
+transienten Per-Layer-Fallback, keinen bleibenden Blank. Der schärfere Defekt ist die
+**falsche Lock-Zusage** in der KDoc.
+
+**Fix (UMGESETZT, `fix/composite-lifecycle-hardening-3`):** Ein store-interner
+`dirLock: Mutex` serialisiert jetzt **jede** Composite-Dir-Mutation
+(`write`/`prune`/`delete`/`clear`) **layer-agnostisch** — genau die Empfehlung des
+Funds. `clear()` wurde dafür `suspend` (alle drei Call-Sites laufen bereits in einem
+`withContext(ioDispatcher)`-Frame, die F5-Dispatch-Zusage bleibt). Damit kann ein
+Restore/Reset-Clear die Dateisystem-Ops eines in-flight `write` nicht mehr interleaven.
+Die Lock-KDoc im Delegate wurde korrigiert (Scope-Absatz): sie deckt nur die
+Delegate-eigenen Caller ab; die Dateisystem-Mutual-Exclusion gegen `:data` liefert eine
+Ebene tiefer der Store-`dirLock`, der residuale Cross-Layer-Fall (Clear zwischen Write
+und Prune) bleibt via F2 self-heilend. **Wichtig:** Der Store-Lock macht die
+Einzeloperationen exklusiv — er macht die Delegate-Sequenz write→persist→prune **nicht**
+atomar gegen einen Clear; das bleibt bewusst F2 überlassen. Test:
+`WallpaperCompositeStoreTest` — „clear removes every composite, not just the latest"
+(zwei Composites → `clear` → leer; pinnt das `suspend`-Clear).
+
+---
+
+### F9 — Cache-PUT re-füllt nach F3-`invalidate()` · `low` · CONFIRMED
+
+`app/ui/home/HomeFragment.kt:1586` (`loadBitmapFromUri`) + `:1554` (`renderingSingleImageNow`)
+
+Der Cache-`put` ist auf `renderingSingleImageNow()` gegated, das den **Live**-State
+`viewModel.wallpaperState.value` zur Decode-Fertigstellung liest — nicht den State, zu
+dem der dekodierte Key gehörte. Für NONE liefert es `true` (`!isMultiLayer` ist wahr, da
+NONE keine Layer hat). `loadBitmapFromUri` ist synchron: zwischen dem blockierenden
+Decode-Return und der `put`-Zeile liegt **kein** Suspension-Point, ein gecancelter Render
+erreicht das `put` also trotzdem.
+
+**Failure-Szenario:** Multi-Layer-Composite `P1` am Schirm, drawer→home startet den
+Decode von `P1` (~90 ms blockierend). Mitten im Decode entfernt der Nutzer das Wallpaper:
+`onClearWallpaper` setzt NONE, `updateWallpaper(NONE)` ruft `compositeCache.invalidate()`
+(F3), dann cancelt der Scheduler den `P1`-Decode. Der gecancelte Coroutine-Frame läuft
+den synchronen `loadBitmapFromUri` zu Ende: `renderingSingleImageNow()` liest jetzt
+NONE → `true` → `compositeCache.put(P1, bitmapP1)` **nach** dem `invalidate`. Die
+verwaiste ~10 MB HARDWARE-Bitmap bleibt resident bis zum nächsten `put` oder Prozess-Tod.
+Kein Falsch-Render (Versionierung garantiert, dass `P1` nie wieder als Inhalt ausgeliefert
+wird) — reiner Memory-Defekt, aber F3 ist im Race-Fenster still negiert.
+
+**Fix (UMGESETZT, `fix/composite-lifecycle-hardening-3`):** `renderingSingleImageNow()`
+verlangt jetzt zusätzlich `s.hasWallpaper` — NONE ⇒ `false`, das Fenster ist zu. Ein
+echtes Single-Layer- oder Composite-Wallpaper hat `hasWallpaper == true` und passiert das
+Gate unverändert. Ein-Zeilen-Guard; der Gate selbst ist privates View-Glue in
+`HomeFragment` und bleibt untestet (Rule 10, wie der F3-`invalidate`-Trigger) — die
+Cache-Logik (`WallpaperCompositeCache`) ist separat gepinnt.
+
+---
+
+### Gegengeprüft & erneut sauber (dritter Review)
+
+- **Bitmap-Lifecycle / never-recycle.** Cache/View/Binder/Flattener halten die Invariante;
+  das einzige `recycle()` (`WallpaperDelegate:641`) trifft das lokale SOFTWARE-Flatten-
+  Output, nie gecacht/gezeichnet; HARDWARE-Composite nur auf der Live-View,
+  `composeToBitmap` nur auf der detached Software-View; Allokationsgrenzen fangen `Throwable`.
+- **Flatten-Parität / Classifier.** `drawLayers` als Single-Source-of-Truth für
+  Alpha/BlendMode/Matrix über Live-`onDraw` **und** `composeToBitmap`; keine
+  Z-/Blend-/Transform-Divergenz. Luminanz-Math sauber.
+- **Regel-Konformität.** Kein bares `Timber.e` außerhalb der Crash-Infra; jeder breite
+  `Throwable`-Catch im Suspend-Frame trägt einen `CancellationException`-first-Arm oder
+  `no suspension point`-Marker (auch die neuen Store-`dirLock`-Bodies); Allokationsgrenzen
+  `Throwable`; Toast via `showToastSafe`.
+- **Cache-Kohärenz (Rest).** Versionierter Pfad-Key trägt weiter; kein Stale-Read, keine
+  Key-Verwechslung Composite↔Single-Layer außer dem F9-NONE-Fenster.
+
+**Zuschnitt:** F8 + F9 als **ein** Fix (`fix/composite-lifecycle-hardening-3`) — Store-
+`dirLock` + KDoc-Korrektur (F8), `hasWallpaper`-Gate (F9). **Beide dritten Funde (F8, F9)
+gefixt.** Der TEMP-Debug-Toast (`HomeFragment`, Commit `8faa14a3`) bleibt weiterhin bewusst
+ausgeklammert (s. o.).

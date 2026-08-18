@@ -1550,11 +1550,20 @@ class HomeFragment : Fragment() {
      * `applySingleLayer`, so both benefit from the ~0 ms drawer→home cache. A
      * multi-layer state WITHOUT a composite renders per-layer (many decodes) and is
      * excluded, as is edit mode.
+     *
+     * Requires [WallpaperState.hasWallpaper] (AUDIT-20 F9): the gate reads the LIVE
+     * state at decode-completion time, and this method reads it too. A composite
+     * decode can finish AFTER the wallpaper was cleared — the decode is a blocking
+     * call with no suspension point before the cache put, so a cancelled render still
+     * reaches it. Without the `hasWallpaper` guard the state is NONE (not multi-layer,
+     * so `!isMultiLayer` is true) and the put would re-insert the orphaned ~10 MB
+     * composite right after [updateWallpaper] invalidated the cache (F3). NONE ⇒ false
+     * closes that window.
      */
     private fun renderingSingleImageNow(): Boolean {
         if (viewModel.isWallpaperEditMode.value) return false
         val s = viewModel.wallpaperState.value
-        return !s.isMultiLayer || s.flattenedWallpaperPath != null
+        return s.hasWallpaper && (!s.isMultiLayer || s.flattenedWallpaperPath != null)
     }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {

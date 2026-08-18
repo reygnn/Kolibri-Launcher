@@ -263,8 +263,8 @@ class WallpaperDelegate(
     private var backfillInProgress = false
 
     /**
-     * Serializes every composite-dir mutation across its callers — the edit-mode
-     * commit ([onCommitWallpaperEditMode]), the lazy backfill
+     * Serializes composite regeneration across THIS delegate's callers — the
+     * edit-mode commit ([onCommitWallpaperEditMode]), the lazy backfill
      * ([maybeBackfillComposite]) (AUDIT-20 F1), and the user clear ([onClearWallpaper])
      * (AUDIT-20 F6). All flatten + write + persist / clear on the same delegate;
      * without mutual exclusion they can run against the same
@@ -275,6 +275,16 @@ class WallpaperDelegate(
      * flatten→write→save (and over the clear) keeps the latest-wins path check
      * ([_wallpaperState] comparison) consistent with what actually landed on disk;
      * pruning of superseded composites is deferred until after that check (F7).
+     *
+     * SCOPE (AUDIT-20 F8): this lock is app-layer and covers only the delegate's own
+     * callers. Two `:data` paths ALSO mutate the composite dir and cannot take it —
+     * `WallpaperRepositoryImpl.clearWallpaper` (reached from a backup restore) and
+     * `purgeRepository` (factory reset), both via `WallpaperCompositeStore.clear()`.
+     * Filesystem-level mutual exclusion against those is provided one layer down by
+     * `WallpaperCompositeStore`'s own `dirLock`; the residual cross-layer case — a
+     * restore/reset clear interleaving this delegate's write→persist→prune and
+     * stranding the persisted path — is not made atomic here but self-heals via the
+     * F2 path validation (`validatedCompositePath`).
      */
     private val compositeRegenLock = Mutex()
 

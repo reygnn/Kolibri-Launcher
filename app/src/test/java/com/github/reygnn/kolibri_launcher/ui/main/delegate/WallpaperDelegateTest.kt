@@ -1299,7 +1299,7 @@ class WallpaperDelegateTest {
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
 
-        verify { store.clear() }
+        coVerify { store.clear() }
         assertTrue(
             "compositeStore.clear() must run on the injected io dispatcher, not the main thread",
             io.count > countAfterStart
