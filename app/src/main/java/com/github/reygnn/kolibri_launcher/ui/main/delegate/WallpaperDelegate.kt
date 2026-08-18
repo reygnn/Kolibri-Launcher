@@ -733,9 +733,18 @@ class WallpaperDelegate(
             // TEMP (remove later): visual signal on each composite cache (re)fill — to gauge how
             // often a re-flatten is actually needed (cold start / edit-commit / rotate). The
             // resolution in the text distinguishes a rotate-triggered refill from the rest.
+            //
+            // A ONE-layer state reaches this path too: `isMultiLayer` is `layers.isNotEmpty()`,
+            // and removing layers in the editor never collapses back to the single-layer
+            // representation — so "Composite" would be a lie for what the user just saved. It
+            // reports as a single-layer fill instead, matching the wording of the decode-side
+            // fill in HomeFragment. Note the MECHANISM still differs: this one flattened the
+            // layer (decode -> compose -> HARDWARE copy) and cached it under a `composite://`
+            // key, while the HomeFragment twin merely cached a `file://` decode.
+            val what = if (state.layerCount == 1) "Single-layer" else "Composite"
             scope.sendEvent(
                 UiEvent.ShowToastFromString(
-                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
+                    "$what cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
                 )
             )
         }
