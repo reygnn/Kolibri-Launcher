@@ -114,6 +114,16 @@ class WallpaperBitmapLuminanceImpl @Inject constructor(
         data object LoadFailed : ComputeOutcome
     }
 
+    /**
+     * Luminance of an ALREADY-DECODED SOFTWARE bitmap (v4.3). The in-memory composite warm
+     * samples the SOFTWARE composite directly, so the AUTO classifier can classify the composite
+     * without an on-disk file (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4.3). Identical coverage gate +
+     * median WCAG as [compute] — same [classify] core — minus the decode and the URI memo: the
+     * caller owns [bitmap] and its recycle. MUST be a software bitmap (pixels are read; a HARDWARE
+     * bitmap would throw). Pure CPU (32×32 grid + median); callers wrap it off-main.
+     */
+    fun computeFromBitmap(bitmap: Bitmap): Float? = classify(bitmap)
+
     override suspend fun compute(uri: String): Float? = cacheMutex.withLock {
         if (hasCached && cachedUri == uri) {
             cachedResult

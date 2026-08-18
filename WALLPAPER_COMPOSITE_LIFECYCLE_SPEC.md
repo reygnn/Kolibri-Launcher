@@ -1,6 +1,6 @@
 # WALLPAPER_COMPOSITE_LIFECYCLE_SPEC
 
-> **Status: DESIGN (2026-08-18, v4.2 — in-memory memo, classifier re-shelved).** Supersedes the
+> **Status: DESIGN (2026-08-18, v4.3 — in-memory memo + composite-luminance signal).** Supersedes the
 > disk designs (v1 disk-ownership, v3.x immutable disk tier) and the earlier in-memory sketch
 > (v2). Reached after three AUDIT-20 review rounds + three multi-agent design reviews, which showed
 > the remaining hard part was never the cache — it was two concerns tangled into the word "cache"
@@ -226,26 +226,32 @@ exists.
 
 ---
 
-## 5. The AUTO classifier — re-shelved (concern 3, deleted)
+## 5. The AUTO classifier — composite luminance via a clean IoC signal (v4.3)
 
-`ClassifyWallpaperUseCase` (`:domain`) reverts to the state it was in before commit `9ce46d8d`: for
-a multi-layer wallpaper it classifies **`layers[0]`** (the bottom-most, painted-first layer) behind
-its existing two gates — the layer-level alpha gate (`alpha ≥ DOMINANT_ALPHA_THRESHOLD` **and**
-Normal blend) and the pixel-level coverage gate (`WallpaperBitmapLuminanceImpl`) — and falls through
-to the system-wallpaper `colorHints` signal when either gate fails. Single-layer is unchanged
-(classify the one image). **The composite is never sampled for classification.**
+*v4 briefly re-shelved this (classify `layers[0]` only); v4.3 restores composite classification
+without disk and without a layering breach.* The composite lives only in the `:app` cache, which
+`ClassifyWallpaperUseCase` (`:domain`) can't read — so instead of the classifier *pulling* pixels,
+the warm *pushes* the answer:
 
-Why this is the right cut, not a regression hidden: sampling the composite required the composite's
-pixels to reach a `:domain` use case that cannot read `:app` and must be re-triggered when the warm
-lands — a cross-module signal + a derived-key-in-`:data` that is the same cost whether the composite
-is on disk or in RAM, and that is the seam that sank v3.3. It buys only the AUTO light/dark *surface
-choice* for multi-layer wallpapers whose bottom layer is unrepresentative — a polish case with a
-manual LIGHT/DARK override, and an *accepted* limitation for most of this project's life.
+- **`CompositeLuminanceSignal`** — a `:domain`/`core` port holding `StateFlow<Float?>`, **exactly
+  mirroring `SystemWallpaperColorsSignal`** (fed by `:app`, read by `:domain`; dependency rule
+  `:app → :domain` intact — no layering violation, no disk, no persisted pointer).
+- **Producer (`:app`):** the warm samples the SOFTWARE composite's luminance during the flatten
+  (`WallpaperBitmapLuminanceImpl.computeFromBitmap`, the *same* coverage-gate + median as the old
+  file path — identical result) **before** the HARDWARE copy makes it unreadable, and `emit`s it on
+  a successful put. `onClearWallpaper` emits `null`.
+- **Consumer (`:domain`):** `ClassifyWallpaperUseCase` `combine`s the signal as a third input. For a
+  multi-layer state it uses the composite luminance; it falls back to the `layers[0]` heuristic
+  (alpha + Normal-blend gate) only until the warm emits. Single-layer is unchanged. The classifier
+  never computes `compositeKey` (no metrics in `:domain`) — it trusts "latest warm = current
+  wallpaper", which the key-gated warm guarantees except in the brief windows below.
 
-**Action:** re-open `ACCEPTED_LIMITATIONS.md #1` (the AUTO classifier not compositing multi-layer
-wallpapers before choosing a surface), with the re-evaluation trigger: *revisit if a clean
-cross-module composite-luminance signal becomes cheap (e.g. the classifier moves to `:app`, or a
-buffered `CompositeReadySignal` is justified by another feature).*
+**Two transient residuals (accepted, `ACCEPTED_LIMITATIONS #1a/#1b`):** on cold start the signal is
+`null` until the first warm → `layers[0]` fallback for ~1 s (#1a); on a layer-set change the signal
+briefly holds the previous composite's luminance until the new warm completes (#1b). Both self-heal;
+rotate is exempt (luminance is resolution-independent). This closes `ACCEPTED_LIMITATIONS #1` for the
+steady state — the same classification as the old on-disk Option-D path, sourced from the in-memory
+composite.
 
 ---
 
@@ -305,8 +311,9 @@ one bitmap-config copy the disk used to hide made explicit.
    changed key kicks one more (no stranded final key).
 6. **Cancellation cleanliness** — a cancelled flatten recycles the software bitmap, no leak; the
    warm's broad catch carries the `CancellationException`-first arm (Rule 11).
-7. **Classifier re-shelf** — `ClassifyWallpaperUseCase` for a multi-layer state classifies
-   `layers[0]` behind its gates, never a composite; `ACCEPTED_LIMITATIONS.md #1` updated.
+7. **Classifier composite luminance (v4.3)** — a multi-layer state classifies the composite
+   luminance emitted into `CompositeLuminanceSignal`; with the signal empty it falls back to the
+   `layers[0]` heuristic (cold-start #1a). Pinned in `ClassifyWallpaperUseCaseTest`.
 8. **One** adversarial review against §1's invariant — a tiny surface (one in-memory single-entry
    memo, no file, no pointer, no lock, no signal; the only stateful point is the key-gated put).
 

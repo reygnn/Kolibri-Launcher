@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
+import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBlendMode
@@ -45,6 +46,7 @@ class ClassifyWallpaperUseCaseTest {
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var systemColorsSignal: SystemWallpaperColorsSignal
     private lateinit var bitmapLuminance: WallpaperBitmapLuminance
+    private lateinit var compositeLuminanceSignal: CompositeLuminanceSignal
     private lateinit var useCase: ClassifyWallpaperUseCase
 
     @Before
@@ -53,10 +55,12 @@ class ClassifyWallpaperUseCaseTest {
         observeWallpaperStateUseCase = ObserveWallpaperStateUseCase(fakeWallpaperRepository)
         systemColorsSignal = SystemWallpaperColorsSignal()
         bitmapLuminance = mockk()
+        compositeLuminanceSignal = CompositeLuminanceSignal()
         useCase = ClassifyWallpaperUseCase(
             observeWallpaperStateUseCase = observeWallpaperStateUseCase,
             systemWallpaperColorsSignal = systemColorsSignal,
             wallpaperBitmapLuminance = bitmapLuminance,
+            compositeLuminanceSignal = compositeLuminanceSignal,
         )
     }
 
@@ -153,6 +157,38 @@ class ClassifyWallpaperUseCaseTest {
             systemColorsSignal.emit(
                 DomainWallpaperColors(supportsDarkText = false, secondaryColorArgb = null),
             )
+            assertEquals(LuminanceClassification.DARK, useCase().first())
+        }
+
+    // ============================================================
+    // v4.3: composite luminance from CompositeLuminanceSignal
+    // ============================================================
+
+    @Test
+    fun `multi-layer classifies the COMPOSITE luminance when the signal has one (v4_3)`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // A dark bottom layer that WOULD classify DARK via the fallback heuristic...
+            fakeWallpaperRepository.currentState = WallpaperState.multiLayer(
+                listOf(
+                    WallpaperLayerState(imageUri = "file:///wallpapers/dark-bottom.png", alpha = 1.0f),
+                    WallpaperLayerState(imageUri = "file:///wallpapers/bright-top.png", alpha = 1.0f),
+                ),
+            )
+            // ...but the warm resolved a BRIGHT composite → LIGHT. The composite luminance wins,
+            // and the bottom layer is never sampled (no decode).
+            compositeLuminanceSignal.emit(0.9f)
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
+            coVerify(exactly = 0) { bitmapLuminance.compute(any()) }
+        }
+
+    @Test
+    fun `multi-layer falls back to layers 0 until the composite luminance arrives (cold-start 1a)`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // No composite luminance yet (signal null) → the bottom-layer heuristic runs.
+            fakeWallpaperRepository.currentState = WallpaperState.multiLayer(
+                listOf(WallpaperLayerState(imageUri = "file:///wallpapers/bottom.png", alpha = 1.0f)),
+            )
+            coEvery { bitmapLuminance.compute("file:///wallpapers/bottom.png") } returns 0.1f
             assertEquals(LuminanceClassification.DARK, useCase().first())
         }
 

@@ -287,6 +287,8 @@ class MonolithicLauncherViewModelTest {
             wallpaperFileManager,
             mockk(relaxed = true), // wallpaperFlattener
             mockk(relaxed = true), // wallpaperCompositeCache
+            mockk(relaxed = true), // wallpaperBitmapLuminance
+            mockk(relaxed = true), // compositeLuminanceSignal
             appUpdateSignal,
             neverThrottlingClock(),
             SavedStateHandle(),

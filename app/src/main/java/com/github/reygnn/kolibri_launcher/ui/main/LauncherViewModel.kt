@@ -22,6 +22,8 @@ import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -140,6 +142,8 @@ class LauncherViewModel @Inject constructor(
     wallpaperFileManager: WallpaperFileManager,
     wallpaperFlattener: WallpaperFlattener,
     wallpaperCompositeCache: WallpaperCompositeCache,
+    wallpaperBitmapLuminance: WallpaperBitmapLuminanceImpl,
+    compositeLuminanceSignal: CompositeLuminanceSignal,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
@@ -233,6 +237,8 @@ class LauncherViewModel @Inject constructor(
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = wallpaperCompositeCache,
+        bitmapLuminance = wallpaperBitmapLuminance,
+        compositeLuminanceSignal = compositeLuminanceSignal,
         ioDispatcher = ioDispatcher,
         scope = delegateScope
     )

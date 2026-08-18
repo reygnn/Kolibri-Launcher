@@ -169,6 +169,8 @@ class LauncherViewModelDoomsdayTest {
         wallpaperFileManager = mockk(relaxed = true),
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeCache = mockk(relaxed = true),
+            wallpaperBitmapLuminance = mockk(relaxed = true),
+            compositeLuminanceSignal = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
         monotonicClock = neverThrottlingClock(),
         savedStateHandle = savedStateHandle,

@@ -131,6 +131,8 @@ class WallpaperDelegateTest {
         scope: DelegateScope = createDelegateScope(),
         wallpaperFlattener: WallpaperFlattener = mockk(relaxed = true),
         compositeCache: WallpaperCompositeCache = mockk(relaxed = true),
+        bitmapLuminance: com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl = mockk(relaxed = true),
+        compositeLuminanceSignal: com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal = mockk(relaxed = true),
     ) = WallpaperDelegate(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
@@ -142,6 +144,8 @@ class WallpaperDelegateTest {
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = compositeCache,
+        bitmapLuminance = bitmapLuminance,
+        compositeLuminanceSignal = compositeLuminanceSignal,
         ioDispatcher = ioDispatcher,
         scope = scope
     )

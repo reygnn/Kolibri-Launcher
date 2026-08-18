@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
+import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
@@ -73,26 +74,34 @@ class ClassifyWallpaperUseCase @Inject constructor(
     private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     private val systemWallpaperColorsSignal: SystemWallpaperColorsSignal,
     private val wallpaperBitmapLuminance: WallpaperBitmapLuminance,
+    private val compositeLuminanceSignal: CompositeLuminanceSignal,
 ) {
 
     operator fun invoke(): Flow<LuminanceClassification> {
-        // Kolibri-internal classification only changes when the
-        // wallpaper state changes; computing the bitmap luminance on
-        // every system-colour emission too would be wasteful. Each
-        // upstream feeds an independent intermediate flow; the final
-        // combine just picks Kolibri-internal when present, else
-        // system, else fallback.
+        // Three signals; the final combine picks Kolibri-internal when present, else system,
+        // else DARK. The Kolibri-internal signal combines the wallpaper state with the composite
+        // luminance (v4.3): for a multi-layer state we classify the COMPOSITE's luminance (pushed
+        // by the warm through CompositeLuminanceSignal — the resolved composition, closing
+        // ACCEPTED_LIMITATIONS #1), falling back to the layers[0] heuristic only until the warm
+        // emits (#1a cold-start, #1b eventual consistency). Single-layer classifies its image.
         //
-        // Project to the dominant URI BEFORE dedup (AUDIT-19 F4): the
-        // luminance depends only on that URI, not on the layer's
-        // scale/translate. Dedup'ing the whole WallpaperState would
-        // re-run the bitmap decode on every pan/zoom save (a distinct
-        // state, same URI); dedup'ing the projected URI skips it.
+        // Project to a small deduped input BEFORE the decode (AUDIT-19 F4): the bottom-layer /
+        // single-image luminance depends only on its URI, not on scale/translate, so a pan/zoom
+        // save (distinct state, same URI) must not re-run the decode. The composite path takes no
+        // decode at all — it reads the pre-computed luminance from the signal.
         val kolibriInternalFlow: Flow<LuminanceClassification?> =
-            observeWallpaperStateUseCase()
-                .map { pickDominantUri(it) }
-                .distinctUntilChanged()
-                .map { uri -> uri?.let { classifyDominant(it) } }
+            combine(
+                observeWallpaperStateUseCase().map { projectKolibriInput(it) }.distinctUntilChanged(),
+                compositeLuminanceSignal.luminance,
+            ) { input, compositeLum ->
+                when (input) {
+                    KolibriInput.None -> null
+                    is KolibriInput.Single -> classifyDominant(input.uri)
+                    is KolibriInput.Multi ->
+                        compositeLum?.let { classifyByLuminance(it) }
+                            ?: input.fallbackUri?.let { classifyDominant(it) }
+                }
+            }
 
         val systemFlow: Flow<LuminanceClassification?> =
             systemWallpaperColorsSignal.colors
@@ -109,24 +118,28 @@ class ClassifyWallpaperUseCase @Inject constructor(
     }
 
     /**
-     * Returns the URI whose pixels we should sample, or `null` if
-     * Kolibri-internal isn't visually dominant for this state.
+     * The deduped classification input for a state. Multi-layer carries the bottom-layer
+     * FALLBACK URI (used only until the composite luminance arrives); the composite itself is
+     * classified from [CompositeLuminanceSignal], not from here.
      */
-    private fun pickDominantUri(state: WallpaperState): String? {
+    private sealed interface KolibriInput {
+        data object None : KolibriInput
+        data class Single(val uri: String) : KolibriInput
+        data class Multi(val fallbackUri: String?) : KolibriInput
+    }
+
+    private fun projectKolibriInput(state: WallpaperState): KolibriInput {
         if (state.isMultiLayer) {
-            // Multi-layer: classify the bottom-most layer (painted first) behind the
-            // alpha + Normal-blend gates — anything below either bar means the system
-            // wallpaper bleeds through and should drive classification instead. The
-            // flattened composite is NOT sampled: it lives only in the in-memory
-            // display cache (no file, no persisted pointer), so a :domain use case
-            // cannot reach it. See WALLPAPER_COMPOSITE_LIFECYCLE_SPEC §5 and the
-            // re-opened ACCEPTED_LIMITATIONS #1.
-            val bottom = state.layers.firstOrNull() ?: return null
-            if (bottom.alpha < DOMINANT_ALPHA_THRESHOLD) return null
-            if (bottom.blendModeName != null) return null
-            return bottom.imageUri
+            // Bottom-most layer (painted first) behind the alpha + Normal-blend gates — anything
+            // below either bar means the system wallpaper bleeds through. This is only the
+            // FALLBACK while the composite luminance is not yet available (v4.3).
+            val bottom = state.layers.firstOrNull() ?: return KolibriInput.Multi(null)
+            val fallback =
+                if (bottom.alpha < DOMINANT_ALPHA_THRESHOLD || bottom.blendModeName != null) null
+                else bottom.imageUri
+            return KolibriInput.Multi(fallback)
         }
-        return state.imageUri
+        return state.imageUri?.let { KolibriInput.Single(it) } ?: KolibriInput.None
     }
 
     private fun classifySystem(

@@ -10,26 +10,52 @@ re-litigate the decision every time the limitation is noticed.
 
 ## 1. AppDrawer AUTO-mode classifier ignores layer composition
 
-- **Status:** 🟡 RE-OPENED (2026-08-18, v4) — the composite is no longer sampled; bottom-layer heuristic only
-- **Frequency:** Two narrow shapes — see "When the heuristic punts"
-- **Affected:** ALL multi-layer Kolibri-internal wallpapers in AUTO mode
+- **Status:** 🟢 Resolved again (v4.3) via the in-memory composite-luminance signal; 🟡 two *transient* residuals (see 1a / 1b)
+- **Frequency:** Only the two transient windows below; steady state is fully composite-classified
+- **Affected:** Multi-layer Kolibri-internal wallpapers in AUTO mode, only during a cold-start / a wallpaper change
 
-### RE-OPENED (2026-08-18) — composite classification removed with the on-disk composite (v4)
+### RESOLVED AGAIN (2026-08-18, v4.3) — composite luminance via a clean IoC signal
 
-The Option D resolution below was **reverted**. `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC`
-v4 deleted the on-disk composite entirely (the composite now lives only in an
-in-memory `:app` cache) after three review rounds showed the on-disk lifecycle was
-not cleanly solvable, and a fourth review showed that letting the `:domain`
-classifier sample the composite needs a cross-module re-trigger signal whose cost is
-not justified by a light/dark surface choice. So `ClassifyWallpaperUseCase.pickDominantUri`
-no longer classifies the composite — it always uses the `layers[0]` bottom-layer
-heuristic described below, for **every** multi-layer wallpaper (not just the
-composite-less transient). The two soft spots are the accepted cost, mitigated by the
-manual LIGHT/DARK override. **Re-evaluation trigger:** revisit only if a clean
-cross-module composite-luminance path becomes cheap — e.g. the classifier moves to
-`:app`, or a buffered `CompositeReadySignal` is justified by another feature. The
-"resolved for composited wallpapers (Option D)" note below is retained for history
-but no longer describes shipped behavior.
+v4 (in-memory composite, no disk) had briefly **re-opened** this (see the history note
+at the bottom): the composite lived only in an `:app` cache the `:domain` classifier
+can't read, so it fell back to the `layers[0]` heuristic. v4.3 restores composite
+classification **without disk and without a layering breach**: the composite warm
+(`WallpaperDelegate`) samples the SOFTWARE composite's luminance during the flatten and
+pushes it into a `CompositeLuminanceSignal` — a `:domain`/`core` port, fed by `:app`,
+read by `ClassifyWallpaperUseCase`, exactly mirroring the existing
+`SystemWallpaperColorsSignal` (dependency rule `:app → :domain` intact; the classifier
+`combine`s it as a third signal). The pixel gate (coverage + median WCAG) is the same
+code as the old file path, so the classification result is identical to Option D — just
+sourced from the in-memory composite instead of an on-disk file.
+
+Two **transient** residuals are accepted (both self-heal, neither is a persisted lie):
+
+- **1a. Cold-start gap.** Right after process start (or an app-data wipe) the in-memory
+  cache is empty and no warm has run yet, so `CompositeLuminanceSignal` has no value. The
+  classifier uses the `layers[0]` bottom-layer heuristic (below) until the first composite
+  warm emits — ~1 s after home is visible — then corrects. **Once per process life.** (The
+  old on-disk path had the same gap until its file decode completed.)
+
+- **1b. Eventual consistency on a wallpaper change.** On an edit / restore that changes
+  the layer set, the signal still holds the *previous* composite's luminance until the new
+  warm completes (~the flatten duration, sub-second). The AUTO surface may reflect the old
+  classification for that window, then self-corrects when the new warm emits. Rotate/fold
+  is exempt — luminance is resolution-independent, so a metrics-only re-flatten produces the
+  same value. This is the price of not verifying the luminance against the exact current
+  `compositeKey` (the `:domain` classifier can't compute the key — no display metrics — so
+  it trusts "latest warm = current wallpaper", which the key-gated warm guarantees except in
+  this brief window).
+
+Both are strictly narrower and less harmful than the pre-v4.3 state (a *permanent*
+possible mis-classification via `layers[0]`), and both are dominated by the manual
+LIGHT/DARK override.
+
+### (Historical) RE-OPENED (2026-08-18) — composite classification removed with the on-disk composite (v4)
+
+v4 deleted the on-disk composite entirely (in-memory `:app` cache only) after three review
+rounds showed the on-disk lifecycle was not cleanly solvable. That temporarily reverted
+composite classification to the `layers[0]` heuristic for every multi-layer wallpaper — the
+gap that v4.3 (above) closed with the signal.
 
 ### (Historical) UPDATE — resolved for composited wallpapers (Option D)
 

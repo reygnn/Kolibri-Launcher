@@ -146,6 +146,8 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCa
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
 import android.graphics.Bitmap
+import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
@@ -181,6 +183,8 @@ class WallpaperDelegate(
     private val wallpaperFileManager: WallpaperFileManager,
     private val wallpaperFlattener: WallpaperFlattener,
     private val compositeCache: WallpaperCompositeCache,
+    private val bitmapLuminance: WallpaperBitmapLuminanceImpl,
+    private val compositeLuminanceSignal: CompositeLuminanceSignal,
     private val ioDispatcher: CoroutineDispatcher,
     private val scope: DelegateScope
 ) {
@@ -527,6 +531,9 @@ class WallpaperDelegate(
             // composite after a clear, so the ~10 MB HARDWARE bitmap would otherwise stay
             // resident. invalidate() only drops the reference (never recycles).
             compositeCache.invalidate()
+            // Drop the composite luminance too (v4.3), so the AUTO classifier stops using a
+            // removed wallpaper's value and falls back to its heuristic / the system signal.
+            compositeLuminanceSignal.emit(null)
             // Optimistic in-memory NONE, mirroring onCancelWallpaperEditMode's synchronous
             // restore: the observe flow re-emits NONE shortly (idempotent), but setting it now
             // closes the window in which a warm resuming right after this lock releases would
@@ -657,15 +664,26 @@ class WallpaperDelegate(
         val metrics = context.resources.displayMetrics
         val software = wallpaperFlattener.flatten(state, metrics.widthPixels, metrics.heightPixels)
             ?: return@withLock
-        val hardware: Bitmap? = try {
-            withContext(ioDispatcher) { software.copy(Bitmap.Config.HARDWARE, /* isMutable = */ false) }
+        // Sample the composite LUMINANCE from the SOFTWARE bitmap (readable) BEFORE the HARDWARE
+        // copy makes it unreadable (v4.3) — the AUTO classifier reads it via CompositeLuminanceSignal.
+        // Then copy to HARDWARE for the display cache. Recycle the software temp either way.
+        val hardware: Bitmap?
+        val luminance: Float?
+        try {
+            val out = withContext(ioDispatcher) {
+                val lum = bitmapLuminance.computeFromBitmap(software)
+                val hw = software.copy(Bitmap.Config.HARDWARE, /* isMutable = */ false)
+                hw to lum
+            }
+            hardware = out.first
+            luminance = out.second
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // copy() of a full-screen composite is an allocation boundary (OOM). A failed copy
-            // just means no composite this time; the display stays on the per-layer path.
-            TimberWrapper.silentError(e, "Composite HARDWARE copy failed")
-            null
+            // copy() of a full-screen composite is an allocation boundary (OOM). A failure just
+            // means no composite this time; the display stays on the per-layer path.
+            TimberWrapper.silentError(e, "Composite HARDWARE copy / luminance failed")
+            return@withLock
         } finally {
             software.recycle()
         }
@@ -684,6 +702,8 @@ class WallpaperDelegate(
                     originalHeight = metrics.heightPixels,
                 ),
             )
+            // Publish the composite luminance for the AUTO classifier (v4.3, ACCEPTED_LIMITATIONS #1).
+            compositeLuminanceSignal.emit(luminance)
         }
     }
 
