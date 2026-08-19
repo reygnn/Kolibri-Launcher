@@ -103,11 +103,17 @@ data class WallpaperLayer(
 
         /**
          * All supported blend modes with their label resource IDs (each Int
-         * is a `@StringRes`). Useful for a UI picker (Spinner / BottomSheet)
-         * — call sites resolve the display string via
+         * is a `@StringRes`). Call sites resolve the display string via
          * `context.getString(labelResId)`. Labels live in strings.xml as
          * `blend_mode_*` (translatable="false", since these are
          * industry-standard names kept in English across locales).
+         *
+         * INTENTIONALLY UNUSED IN PRODUCTION — do NOT wire a blend-mode picker
+         * to this list. Per-layer blend modes are a deliberate no-UI decision:
+         * they are editor-scope, not launcher-scope. See
+         * `ACCEPTED_LIMITATIONS.md` §5 (and AUDIT-20 F14) before adding a
+         * consumer. The list stays wired so the render/backup path keeps
+         * working and so a future product pivot can enable it cheaply.
          */
         val AVAILABLE_BLEND_MODES: List<Pair<Int, BlendMode?>> = listOf(
             R.string.blend_mode_normal to null,

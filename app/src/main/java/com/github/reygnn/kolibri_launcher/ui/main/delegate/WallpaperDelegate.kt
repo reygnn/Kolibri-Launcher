@@ -989,6 +989,19 @@ class WallpaperDelegate(
     // ===========================================
     // MULTI-LAYER: PROPERTIES
     // ===========================================
+    //
+    // INTENTIONALLY UNUSED IN PRODUCTION — the wallpaper editor stays
+    // transform-only (add / remove / reorder / pan-zoom). Per-layer alpha,
+    // blend mode and visibility get NO UI, by design: the layered-collage
+    // workflow bakes its compositing into the source PNGs (darkroom/greenwall
+    // alpha cutouts over darkroom/chiaroscuro AMOLED frames), which
+    // ZoomableImageView.drawLayers already honours per-pixel — a uniform
+    // layer-alpha / blend / visibility control is redundant. Visibility also
+    // has no cheap wiring: the canvas hit-test skips invisible layers and there
+    // is no layer list/cycler, so a hidden layer would be unreachable.
+    // The three setters stay so the render/backup path keeps working (values
+    // reachable only via imported backup JSON); do NOT wire a slider / picker /
+    // toggle to them. Decision: ACCEPTED_LIMITATIONS.md §5 + AUDIT-20 F14.
 
     fun onSetLayerAlpha(layerIndex: Int, alpha: Float) =
         mutateLayerAndPersist("Error setting layer alpha", layerIndex) {

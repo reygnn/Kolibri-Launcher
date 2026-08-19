@@ -684,7 +684,7 @@ Cache tatsächlich gebraucht wird.
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
 | **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ⛔ OFFEN (bewusst) |
 | **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ⛔ OFFEN |
-| **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ⛔ OFFEN (Produktentscheidung) |
+| **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ✅ ENTSCHIEDEN (2026-08-19): alle drei UI-los, Editor transform-only (§5); Modell-Felder bleiben dormant |
 
 ---
 
@@ -852,8 +852,11 @@ der einzige reale Weg zu abweichenden Werten ist ein von Hand editiertes
 Backup-JSON (der Importer liest die Felder). Das macht den bedingten Collapse
 unten deutlich attraktiver, als die reine Modell-Betrachtung nahelegt: er würde
 heute praktisch immer greifen und wäre trotzdem gegen den Backup-Edge korrekt.
-Sollte F14 dagegen zugunsten eines echten Alpha-/Blend-UIs entschieden werden,
-kippt die Rechnung zurück — dann ist die Einbahnstraße die richtige Seite.
+Mit der F14-Entscheidung vom 2026-08-19 (alle drei Layer-Regler bleiben UI-los,
+`ACCEPTED_LIMITATIONS.md` §5) ist dieser „hypothetisch"-Status jetzt dauerhaft —
+kein UI wird je abweichende Werte erzeugen, der einzige reale Weg bleibt das
+von Hand editierte Backup-JSON. Die frühere Gegenrechnung („sollte F14 ein
+Alpha-/Blend-UI bringen, kippt es zurück") ist damit vom Tisch.
 
 **Kosten:** schmal. Beide Pfade rendern korrekt und liefern eine Ein-Textur-Anbindung;
 der Flatten kostet pro Refill eine zusätzliche Vollbild-Allokation plus Copy, und
@@ -996,6 +999,34 @@ erzeugen kann. Die Gates sind dadurch nicht falsch, nur derzeit gegenstandslos.
 
 Die Entscheidung ist eine Produkt-, keine Technikfrage — deshalb hier nur
 dokumentiert.
+
+**Entscheidung gefallen (2026-08-19):** **Alle drei** Eigenschaften bleiben
+**UI-los**, der Editor bleibt **transform-only** (Hinzufügen / Entfernen /
+Reihenfolge / Pan-Zoom). Festgehalten als `ACCEPTED_LIMITATIONS.md` §5, mit einem
+gemeinsamen „unused by design"-Marker über den drei Settern in `WallpaperDelegate`
+und der KDoc an `AVAILABLE_BLEND_MODES`. Die Modell-/Render-/Backup-Felder bleiben
+dormant erhalten (Rückbau bräche Backups — die separate „Zurückbauen"-Frage).
+
+Kern der Begründung (Details in §5): Die kanonische Kolibri-Collage entsteht aus
+KI-Bildern, die vorab in den Schwester-Apps `darkroom/chiaroscuro` (deckende
+AMOLED-Schwarz-Vollbilder) und `darkroom/greenwall` (Alpha-Freisteller, Motiv auf
+gekeytem Transparent-Hintergrund) aufbereitet werden. Kolibris
+`canvas.drawBitmap` auf `ARGB_8888` respektiert diese **Per-Pixel**-Transparenz
+gratis — ein greenwall-Cutout komponiert korrekt über einem chiaroscuro-Bild ganz
+**ohne** Layer-Regler. Damit sind alle drei redundant bzw. das falsche Werkzeug:
+
+- **Alpha** — uniformer Regler; würde nur den ganzen Layer (inkl. Motiv) ghosten
+  oder auf den allgegenwärtigen Schwarzflächen ein No-op sein. Die relevante
+  Transparenz steckt im PNG, nicht im Layer.
+- **Blend-Modi** — Editor-Scope (Difference/Exclusion/… gehören in eine
+  Bild-App). Randnotiz: für AMOLED-Schwarz wäre *Screen* der relevante Knopf
+  (Schwarz ist in Screen neutral) — aber genau das macht greenwalls
+  Transparent-Export sauberer per Pixel.
+- **Sichtbarkeit** — nicht mal billig verdrahtbar: Der aktive Layer wird **nur**
+  per Canvas-Hit-Test gewählt, und der überspringt unsichtbare Layer
+  (`ZoomableImageView.handleLayerTap:1165`). Ohne Layer-Liste/Cycler wäre ein
+  versteckter Layer, der nicht gerade aktiv ist, unerreichbar — der Toggle würde
+  ihn stranden. Ein „Hide"-Toggle bräuchte erst einen ganzen Layer-Navigator.
 
 ---
 

@@ -316,3 +316,88 @@ Reopen this entry if any of the following changes:
 - The ANR drain is moved to run only under a reconciled, known-good consent
   decision (e.g. after RC1 rather than unconditionally in `onCreate`), which
   would make the ordering race moot.
+
+---
+
+## 5. Per-layer alpha, blend mode and visibility are intentionally UI-less (editor stays transform-only)
+
+- **Status:** 🟡 Intentional / Documented — product decision (not a defect)
+- **Frequency:** Always — no build exposes an alpha slider, blend picker or
+  visibility toggle
+- **Affected:** `WallpaperDelegate.onSetLayerAlpha` / `.onSetLayerBlendMode` /
+  `.onSetLayerVisibility` (`ui/main/delegate/WallpaperDelegate.kt:993-1006`) +
+  `WallpaperLayer.AVAILABLE_BLEND_MODES` (`ui/home/WallpaperLayer.kt:112-125`);
+  AUDIT-20 F14
+
+### Explanation
+
+The multi-layer wallpaper pipeline fully models, persists, backup-round-trips
+and renders three per-layer properties — `alpha`, `blendModeName`, `isVisible`
+(`WallpaperLayerState`) — and `ZoomableImageView.drawLayers` applies all three
+(`paint.alpha` `:944`, `paint.blendMode` `:945`, `if (!isVisible) continue`
+`:939`). The domain setters `onSetLayerAlpha` / `onSetLayerBlendMode` /
+`onSetLayerVisibility` and their `LauncherViewModel` pass-throughs exist, and
+`AVAILABLE_BLEND_MODES` is a fully-wired 12-entry picker list. The only missing
+link, for all three, is the UI control — and it is missing **on purpose**.
+
+F14 confirmed the surface is otherwise complete and has **zero** production
+consumers: no view calls any of the three setters. So in production every layer
+always renders at `alpha == 1f`, Normal blend, `isVisible == true`; a divergent
+value is reachable only through a hand-edited backup JSON. The wallpaper editor
+stays **transform-only**: add layer, remove, reorder (z-order), pan/zoom per
+layer. No opacity slider, no blend picker, no visibility toggle.
+
+### Why it is accepted (no UI will be added for any of the three)
+
+- **The compositing already lives in the source images, not in a layer knob.**
+  The canonical Kolibri collage is built from AI images pre-processed in the
+  sister `darkroom` apps: opaque AMOLED-black full frames from
+  `darkroom/chiaroscuro`, and alpha cutouts (subject on a keyed-out transparent
+  background) from `darkroom/greenwall`. Kolibri's `canvas.drawBitmap` on
+  `ARGB_8888` already honours that **per-pixel** alpha for free, so a greenwall
+  cutout composites correctly over a chiaroscuro background with no layer knob
+  at all. A **uniform** per-layer alpha would only ghost the whole layer
+  (subject included) or no-op on the ubiquitous black regions — the wrong tool
+  for this workflow. The transparency that matters is baked into the PNGs.
+- **Blend modes are editor-scope, not launcher-scope.** Eleven photo-compositing
+  modes (Difference / Exclusion invert, Color Dodge / Color Burn hard contrast,
+  …) are a creative image-editing tool; a wallpaper is a backdrop behind icons,
+  clock and text that must stay legible. (Aside: for AMOLED-black frames *Screen*
+  would actually be the relevant knob — black is neutral in Screen, so it drops
+  out — but greenwall's transparent export does exactly that, cleaner and
+  per-pixel. No reason to own the blend step.)
+- **Visibility can't even be wired cheaply.** A "hide layer" toggle presupposes a
+  way to *re-show* it, but the editor selects the active layer **only** by
+  tapping its bitmap on the canvas, and that hit-test skips invisible layers
+  (`ZoomableImageView.handleLayerTap:1165`, `if (!layer.isVisible) continue`).
+  There is no layer list and no prev/next cycler, so a hidden layer that isn't
+  the currently-active one is unreachable — the toggle would strand it. Making it
+  usable would mean adding a whole layer navigator: scope the workflow doesn't
+  justify.
+- **The launcher stays minimal by declining all three.** Owning opacity / blend /
+  visibility imports UI (sliders, pickers, a navigator, live preview, an
+  explanation burden) for capability the darkroom→set-wallpaper route already
+  provides. Users pick Kolibri *because* it does not do everything.
+- **The model fields stay; only the UI is declined.** `alpha` / `blendModeName` /
+  `isVisible` remain in the model, persistence and render path — removing them
+  would break existing backups that carry the fields and cost the render
+  capability, so they are priced in as dormant, backup-compatible fields, not
+  dead code to delete. Note `ACCEPTED_LIMITATIONS.md` §1 and AUDIT-20 F13 both
+  reason about non-default values of these fields; those arguments are not wrong,
+  only currently vacuous, and this entry is what keeps that intentional.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Kolibri's product direction shifts away from minimalism toward an in-app
+  wallpaper editor — at which point owning opacity/blend/visibility becomes
+  consistent rather than scope-creep.
+- The wallpaper workflow moves away from darkroom-pre-composited images (e.g.
+  users start stacking raw opaque full frames that genuinely need an in-launcher
+  opacity or double-exposure control) — the per-pixel-alpha-in-source premise
+  above is what makes the layer knobs redundant.
+- The model fields are ever proposed for removal (the "Zurückbauen" direction of
+  F14): that is a *different* decision from this one (which keeps them dormant)
+  and must be argued separately, weighing the backup break and the lost render
+  capability.
