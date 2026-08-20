@@ -505,17 +505,27 @@ class WallpaperDelegate(
         translateX: Float,
         translateY: Float,
         captureSampleSize: Int? = null
-    ) = scope.launchSafe("Error saving wallpaper transform") {
+    ) {
         val currentState = _wallpaperState.value
-        if (currentState.hasWallpaper) {
-            saveWallpaperStateUseCase.updateTransform(
-                currentState = currentState,
-                scale = scale,
-                translateX = translateX,
-                translateY = translateY,
-                captureSampleSize = captureSampleSize
-            )
-        }
+        if (!currentState.hasWallpaper) return
+        // Update _wallpaperState SYNCHRONOUSLY via the commit core — same as the
+        // multi-layer transform save (onSaveLayerTransform). Persisting only to
+        // DataStore (the old path) left _wallpaperState holding the OLD transform
+        // until the async write round-tripped, so the commit-triggered re-render
+        // (HomeFragment Observer 8, fired by the edit-mode flag flip) read the stale
+        // state and briefly regressed the display to the old scale/position before
+        // the DataStore emission corrected it. commit() applies synchronously first.
+        commit(
+            "Error saving wallpaper transform",
+            Mutation(
+                currentState.copy(
+                    scale = scale,
+                    translateX = translateX,
+                    translateY = translateY,
+                    captureSampleSize = captureSampleSize,
+                )
+            ),
+        )
     }
 
     fun onClearWallpaper() = scope.launchSafe(

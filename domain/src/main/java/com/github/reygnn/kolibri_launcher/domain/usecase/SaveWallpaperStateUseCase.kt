@@ -19,25 +19,4 @@ class SaveWallpaperStateUseCase @Inject constructor(
     suspend operator fun invoke(state: WallpaperState) {
         repository.saveWallpaperState(state)
     }
-
-    /**
-     * Convenience: Nur die Transformation updaten, URI beibehalten.
-     * Funktioniert nur im Single-Layer-Modus.
-     */
-    suspend fun updateTransform(
-        currentState: WallpaperState,
-        scale: Float,
-        translateX: Float,
-        translateY: Float,
-        captureSampleSize: Int? = null
-    ) {
-        repository.saveWallpaperState(
-            currentState.copy(
-                scale = scale,
-                translateX = translateX,
-                translateY = translateY,
-                captureSampleSize = captureSampleSize
-            )
-        )
-    }
 }

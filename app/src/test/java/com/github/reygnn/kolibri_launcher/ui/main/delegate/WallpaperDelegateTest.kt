@@ -413,28 +413,30 @@ class WallpaperDelegateTest {
     // ===========================================
 
     @Test
-    fun `onSaveWallpaperTransform calls saveUseCase when wallpaper exists`() = runTest {
-        val stateWithWallpaper: WallpaperState = mockk {
-            every { hasWallpaper } returns true
-        }
-        val stateFlow = MutableStateFlow(stateWithWallpaper)
+    fun `onSaveWallpaperTransform updates state synchronously and persists`() = runTest {
+        // The stale-frame fix: the new transform must land in _wallpaperState
+        // SYNCHRONOUSLY (before the async persist), so the commit-triggered re-render
+        // reads it on the first frame instead of the old transform.
+        val initial = WallpaperState(imageUri = "file:///a.png", scale = 1f)
+        val stateFlow = MutableStateFlow(initial)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
 
         val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
-
         delegate.start()
         advanceUntilIdle()
 
         delegate.onSaveWallpaperTransform(2.0f, 10f, 20f)
-        advanceUntilIdle()
 
+        // Synchronous — asserted BEFORE advanceUntilIdle (no persist round-trip yet).
+        assertEquals(2.0f, delegate.wallpaperState.value.scale)
+        assertEquals(10f, delegate.wallpaperState.value.translateX)
+        assertEquals(20f, delegate.wallpaperState.value.translateY)
+
+        advanceUntilIdle()
         coVerify {
-            saveWallpaperStateUseCase.updateTransform(
-                currentState = stateWithWallpaper,
-                scale = 2.0f,
-                translateX = 10f,
-                translateY = 20f
+            saveWallpaperStateUseCase.invoke(
+                match { it.scale == 2.0f && it.translateX == 10f && it.translateY == 20f }
             )
         }
     }
@@ -446,7 +448,8 @@ class WallpaperDelegateTest {
         delegate.onSaveWallpaperTransform(2.0f, 10f, 20f)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { saveWallpaperStateUseCase.updateTransform(any(), any(), any(), any()) }
+        assertEquals(WallpaperState.NONE, delegate.wallpaperState.value)
+        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(any()) }
     }
 
     // ===========================================

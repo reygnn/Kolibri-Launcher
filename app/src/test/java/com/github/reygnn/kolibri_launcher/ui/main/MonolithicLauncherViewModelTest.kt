@@ -243,7 +243,6 @@ class MonolithicLauncherViewModelTest {
 
         coEvery { setWallpaperImageUseCase.invoke(any()) } returns Unit
         coEvery { clearWallpaperUseCase.invoke() } returns Unit
-        coEvery { saveWallpaperStateUseCase.updateTransform(any(), any(), any(), any()) } returns Unit
     }
 
     private fun setupViewModel(enableTestMode: Boolean = false) {
