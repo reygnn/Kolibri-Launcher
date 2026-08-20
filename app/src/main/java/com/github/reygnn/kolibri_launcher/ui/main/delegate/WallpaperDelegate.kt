@@ -262,18 +262,18 @@ class WallpaperDelegate(
     private var editSnapshot: WallpaperState? = null
 
     /**
-     * Guards the lazy composite backfill (Option D §9.6) against CONCURRENT runs:
-     * true while a background flatten is in flight, reset when it finishes. NOT
-     * once-per-process — a launcher runs for weeks and can see several
-     * composite-less states over time (each backup restore brings a different
-     * wallpaper), and each must get its own backfill. Loop-safe without a
-     * once-flag: a SUCCESSFUL backfill sets the path, so the re-emitted state no
-     * longer qualifies; a FAILURE just retries on the next (rare) state change, not
-     * in a tight loop (state emissions for a stable wallpaper are infrequent).
-     * Main-thread confined (set on the collect, reset in the coroutine's finally,
-     * both on the delegate scope).
+     * Guards the lazy cache refill ([refillCache]) against CONCURRENT runs: true
+     * while a background fill (single-layer decode or multi-layer flatten) is in
+     * flight, reset when it finishes. NOT once-per-process — a launcher runs for
+     * weeks and can see several cache-less states over time (each backup restore
+     * brings a different wallpaper), and each must get its own refill. Loop-safe
+     * without a once-flag: a SUCCESSFUL refill caches the entry, so the re-emitted
+     * state's key hits and no longer qualifies; a FAILURE just retries on the next
+     * (rare) state change, not in a tight loop (state emissions for a stable
+     * wallpaper are infrequent). Main-thread confined (set on the collect, reset in
+     * the coroutine's finally, both on the delegate scope).
      */
-    private var backfillInProgress = false
+    private var refillInProgress = false
 
     /**
      * Serializes the in-memory composite warm ([warmComposite]) against the user clear
@@ -522,8 +522,8 @@ class WallpaperDelegate(
         errorMessage = "Error clearing wallpaper",
         defaultErrorToast = R.string.error_generic
     ) {
-        // Serialize with composite regeneration (AUDIT-20 F6): a lazy backfill or
-        // commit flatten in flight must not re-persist a composite after the wallpaper
+        // Serialize with composite regeneration (AUDIT-20 F6): a lazy refill or a
+        // commit-triggered fill in flight must not re-cache a bitmap after the wallpaper
         // is gone. Holding the regen lock across the clear makes them mutually
         // exclusive; the optimistic NONE below makes a regen still queued on the lock
         // fail its latest-wins guard and drop its own file (F7) rather than resurrect
@@ -639,23 +639,23 @@ class WallpaperDelegate(
      *    cheaper than pre-baking a full-screen composite.
      *  - multi-layer        -> flatten N layers -> HARDWARE composite, cached under `composite://`.
      *
-     * Deliberately NOT on the launch hot path. Single-flighted ([backfillInProgress]) and skipped
+     * Deliberately NOT on the launch hot path. Single-flighted ([refillInProgress]) and skipped
      * during edit mode (the layers are mid-change; the commit path refills). Gated on a cache MISS
      * for the current key, so an already-warm state is a no-op. On completion it self-reschedules
      * (spec S5) if the current state moved to a DIFFERENT miss during the fill — but never re-fires
      * the SAME key, so a persistently failing fill cannot loop.
      */
     private fun refillCache(state: WallpaperState) {
-        if (backfillInProgress) return
+        if (refillInProgress) return
         if (_isWallpaperEditMode.value) return
         val key = cacheKeyOrNull(state) ?: return
         if (compositeCache.get(key) != null) return
-        backfillInProgress = true
+        refillInProgress = true
         scope.launchSafe("Error refilling wallpaper cache") {
             try {
                 if (state.isMultiLayer) warmComposite(state, key) else warmSingleLayer(state, key)
             } finally {
-                backfillInProgress = false
+                refillInProgress = false
                 // Self-reschedule (S5): only if the current state is a DIFFERENT miss — never the
                 // same key, so a failed/incomplete fill does not loop.
                 val current = _wallpaperState.value
