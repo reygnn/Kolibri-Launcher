@@ -14,7 +14,8 @@ package com.github.reygnn.kolibri_launcher.data
  * THE INTERFACE
  *   ```
  *   interface DataStoreMaintenanceRepository {
- *       suspend fun removeOrphanKeys(): Result   // Removed(count) | Failed
+ *       suspend fun removeOrphanKeys(): Result           // Removed(count) | Failed
+ *       suspend fun previewOrphanKeys(): PreviewResult   // Loaded(keyNames) | Failed  (dry run)
  *   }
  *   ```
  *

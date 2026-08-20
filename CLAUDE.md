@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, settings-store keep-list registration + straggler guard, ActivityResult placement, adapter null-out, Exception breadth, localization parity, Rule 2 contract triple, stale-replay hot-flow point-read [AUDIT-13, wired as a dependsOn task])
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, settings-store keep-list registration + straggler guard + @IntoSet binding parity, ActivityResult placement, adapter null-out, Exception breadth, localization parity, Rule 2 contract triple, stale-replay hot-flow point-read [AUDIT-13, wired as a dependsOn task])
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```

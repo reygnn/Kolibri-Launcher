@@ -91,9 +91,15 @@ END {
         # The optional `:[^=]*` tolerates an explicit type annotation
         # (`val X: Preferences.Key<Boolean> = …`), which would otherwise escape
         # detection entirely and never be required to register.
-        if (code ~ /^[[:space:]]*(private[[:space:]]+)?val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*(:[^=]*)?=/) {
+        if (code ~ /^[[:space:]]*(private[[:space:]]+|internal[[:space:]]+)?val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*(:[^=]*)?=/) {
+            # Append line n+1 ONLY when this line has no CLOSED PreferencesKey call
+            # — i.e. the factory is wrapped onto the next line (break at `=` or right
+            # after `(`). Appending UNCONDITIONALLY let a dynamic-prefix key on the
+            # next line pollute rhs, matching the `(...+...)` prefix pattern and
+            # misclassifying THIS exact key as a prefix key (skipping its
+            # registration check) — the mirror of the round-2 prefix-branch bug.
             rhs = code
-            if (n < NR) {
+            if (code !~ /PreferencesKey[[:space:]]*\([^)]*\)/ && n < NR) {
                 nx = lines[n + 1]
                 sub(/\/\/.*$/, "", nx)
                 rhs = rhs " " nx

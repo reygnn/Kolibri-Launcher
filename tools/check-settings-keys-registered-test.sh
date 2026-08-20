@@ -204,6 +204,29 @@ else
   echo "✓ Fixture 7: unregistered prefix wrapped across the open-paren flags once on the opening line."
 fi
 
+# ── Fixture 8: an unregistered EXACT key on the line directly ABOVE a dynamic
+#    prefix key MUST still flag. The exact branch appends n+1 only for a real
+#    wrap now; appending unconditionally let the next line's `(PREFIX + x)`
+#    misclassify this exact key as a prefix key and skip it (round-3 finding). ──
+f8="$tmpdir/AdjacentRepositoryImpl.kt"
+cat > "$f8" <<'EOF'
+class AdjacentRepositoryImpl : OwnsSettingsStoreKeys {
+    override fun ownedKeyPrefixes(): Set<String> = setOf(AppConstants.KEY_NAME_PREFIX)
+    override fun ownedExactKeys(): Set<String> = emptySet()
+    private val NEW_TOGGLE = booleanPreferencesKey("new_toggle")
+    private val dynamicSample = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "x")
+}
+EOF
+expected8="$f8:4:     private val NEW_TOGGLE = booleanPreferencesKey(\"new_toggle\")"
+actual8=$(awk -f "$awk_script" "$f8")
+if [ "$actual8" != "$expected8" ]; then
+  echo "✗ Fixture 8 (exact key adjacent to prefix key) regression:"
+  diff <(printf '%s\n' "$expected8") <(printf '%s\n' "$actual8") || true
+  fail=1
+else
+  echo "✓ Fixture 8: unregistered exact key directly above a prefix key still flags (not misclassified)."
+fi
+
 if [ "$fail" -eq 0 ]; then
   echo "✓ settings-keys-registered awk: all fixtures behaved as expected."
   exit 0
