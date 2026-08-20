@@ -47,7 +47,6 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitm
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
@@ -1556,19 +1555,6 @@ class HomeFragment : Fragment() {
         return if (compositeCache.get(key) != null) key else null
     }
 
-    /**
-     * The decode-side cache PUT gate (v4 §3): true only for a genuine SINGLE-LAYER wallpaper in
-     * display mode. Only single-layer images are decoded-and-cached here (by `file://` URI); the
-     * multi-layer composite is produced and cached by the delegate's warm (never decoded from a
-     * file), so multi-layer is excluded. `hasWallpaper` keeps a decode finishing after a clear
-     * (NONE) from re-inserting a stale bitmap (AUDIT-20 F9).
-     */
-    private fun renderingSingleImageNow(): Boolean {
-        if (viewModel.isWallpaperEditMode.value) return false
-        val s = viewModel.wallpaperState.value
-        return s.hasWallpaper && !s.isMultiLayer
-    }
-
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
         // Catch kept per Rule 11: this is the I/O boundary for bitmap
         // loading. Real failure modes are FileNotFoundException +
@@ -1592,20 +1578,13 @@ class HomeFragment : Fragment() {
             // Bounded decode: downsample below the Canvas ~100 MB per-bitmap draw
             // limit so a huge camera photo (POCO 108 MP) can't crash the wallpaper
             // draw (#21). Pinned by an instrumented test — see BoundedBitmapDecoder.
-            val decoded = decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
-            // Cache the single display bitmap — the composite for a multi-layer
-            // wallpaper, or the image itself for a single-layer one — but never a
-            // per-layer EDIT bitmap (renderingSingleImageNow excludes edit mode and
-            // the multi-layer-without-composite rebuild, which decodes many layers).
-            // The composite is invalidated on commit (WallpaperDelegate); a
-            // single-layer image self-invalidates (a new pick → new uri → new key).
-            if (decoded != null && renderingSingleImageNow()) {
-                compositeCache.put(key, decoded)
-                // TEMP (remove later): visual signal on each SINGLE-LAYER cache fill. A
-                // multi-layer composite fill is toasted separately from the delegate warm.
-                view?.post { context?.showToastSafe("Single-layer cache filled") }
-            }
-            decoded
+            // Decode-to-DRAW only: caching is owned by the delegate's PROACTIVE refill
+            // (WallpaperDelegate.refillCache — file:// decode for single, composite:// flatten
+            // for multi, AUDIT-20 F15). This path just supplies the bitmap on a miss; it never
+            // writes the cache, matching the multi-layer per-layer path. (Previously it also
+            // cached + toasted single-layer fills; that double-filled once the proactive refill
+            // landed, so the write moved wholesale to the delegate.)
+            decodeBoundedWallpaperBitmap { ctx.contentResolver.openInputStream(uri) }
         } catch (e: Throwable) {
             // Catch kept (Expected error, four-category frame): bitmap I/O boundary —
             // FileNotFoundException / SecurityException + OOM (Throwable umbrella); the
