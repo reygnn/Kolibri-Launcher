@@ -276,7 +276,7 @@ class WallpaperDelegateTest {
     }
 
     @Test
-    fun `refill is a no-op for a single-layer cache hit`() = runTest {
+    fun `refill skips decode and signals still-valid on a single-layer cache hit`() = runTest {
         val single = WallpaperState(imageUri = "file:///single.jpg")
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(single)
@@ -294,7 +294,12 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
+        // No re-decode — the raw bitmap is still valid; the TEMP debug toast makes the
+        // "already cached" case visible (a transform-only edit hits this path).
         coVerify(exactly = 0) { flattener.decodeSingle(any()) }
+        assertTrue(
+            sentEvents.any { it is UiEvent.ShowToastFromString && it.message == "Single-layer cache still valid" }
+        )
     }
 
     @Test

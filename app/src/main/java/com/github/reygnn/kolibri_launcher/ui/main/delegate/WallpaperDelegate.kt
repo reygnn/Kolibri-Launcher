@@ -659,7 +659,18 @@ class WallpaperDelegate(
         if (refillInProgress) return
         if (_isWallpaperEditMode.value) return
         val key = cacheKeyOrNull(state) ?: return
-        if (compositeCache.get(key) != null) return
+        if (compositeCache.get(key) != null) {
+            // TEMP (remove later): a single-layer cache HIT means the raw bitmap is
+            // still valid — e.g. a transform-only edit changed scale/position but not
+            // the image, so nothing is re-decoded. Signals that "no fill toast" is NOT
+            // "not cached". Removed together with the fill toasts once verified (F10).
+            if (!state.isMultiLayer) {
+                scope.launchSafe("Error signalling single-layer cache hit") {
+                    scope.sendEvent(UiEvent.ShowToastFromString("Single-layer cache still valid"))
+                }
+            }
+            return
+        }
         refillInProgress = true
         scope.launchSafe("Error refilling wallpaper cache") {
             try {
