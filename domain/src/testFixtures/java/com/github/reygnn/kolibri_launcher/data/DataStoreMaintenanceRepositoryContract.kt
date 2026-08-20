@@ -30,10 +30,11 @@ package com.github.reygnn.kolibri_launcher.data
  *
  *   The behaviour that CAN drift — building the keep-list from the injected owners
  *   and removing exactly the un-owned keys via `edit {}` while leaving claimed keys
- *   (exact + prefix) untouched, the empty-keep-list refusal, plus the fail-soft
- *   contract (`Removed(count)` on success, `Failed` on an I/O error or empty
- *   keep-list, `CancellationException` always propagated) — is pinned directly
- *   against a throwing/healthy `FakeSettingsDataStore` in
+ *   (exact + prefix) untouched, the read-only `previewOrphanKeys()` dry run
+ *   computing the same set while deleting nothing, the empty-keep-list refusal, plus
+ *   the fail-soft contract (`Removed(count)` / `Loaded(names)` on success, `Failed`
+ *   on an I/O error or empty keep-list, `CancellationException` always propagated) —
+ *   is pinned directly against a throwing/healthy `FakeSettingsDataStore` in
  *   `DataStoreMaintenanceRepositoryImplTest` (the impl test). The keep-list's
  *   completeness (the only place a mistake could delete live data) is pinned NOT by
  *   a runtime test but by the `checkConventions` settings-key linter, which proves

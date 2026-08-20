@@ -212,4 +212,25 @@ class SettingsViewModel @Inject constructor(
             sendEvent(UiEvent.ShowToast(messageResId))
         }
     }
+
+    /**
+     * Dry run for the storage cleanup: returns which keys [onCleanupStorageConfirmed] would delete,
+     * without deleting anything, so the UI can show the user before they confirm. Maps the domain
+     * [DataStoreMaintenanceRepository.PreviewResult] to a UI-facing [CleanupPreview]; the empty-vs-
+     * non-empty and failure routing lives in the caller.
+     */
+    suspend fun getCleanupPreview(): CleanupPreview =
+        when (val result = dataStoreMaintenanceRepository.previewOrphanKeys()) {
+            is DataStoreMaintenanceRepository.PreviewResult.Loaded -> CleanupPreview.Loaded(result.keyNames)
+            DataStoreMaintenanceRepository.PreviewResult.Failed -> CleanupPreview.Failed
+        }
+
+    /** UI-facing result of [getCleanupPreview]. */
+    sealed interface CleanupPreview {
+        /** [keyNames] are the keys a cleanup would remove (empty = already clean). */
+        data class Loaded(val keyNames: List<String>) : CleanupPreview
+
+        /** The preview read failed; the orphan set is unknown. */
+        data object Failed : CleanupPreview
+    }
 }

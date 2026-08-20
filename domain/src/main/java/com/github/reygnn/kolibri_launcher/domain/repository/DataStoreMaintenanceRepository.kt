@@ -24,6 +24,17 @@ interface DataStoreMaintenanceRepository {
      */
     suspend fun removeOrphanKeys(): Result
 
+    /**
+     * Dry run for [removeOrphanKeys]: computes the orphan keys the SAME way but via a read-only
+     * snapshot — it deletes nothing. Lets the UI show the user exactly which keys a cleanup would
+     * remove before they confirm.
+     *
+     * The result is advisory (a store snapshot); [removeOrphanKeys] recomputes at deletion time, so
+     * its final count is authoritative. Cancellation always propagates; an I/O failure surfaces as
+     * [PreviewResult.Failed] rather than a misleading empty list.
+     */
+    suspend fun previewOrphanKeys(): PreviewResult
+
     /** Outcome of [removeOrphanKeys]. */
     sealed interface Result {
         /** The edit succeeded; [count] retired keys were removed (`0` = the store was already clean). */
@@ -31,5 +42,17 @@ interface DataStoreMaintenanceRepository {
 
         /** The edit failed (I/O error); nothing was removed and orphans may still be present. */
         data object Failed : Result
+    }
+
+    /** Outcome of [previewOrphanKeys]. */
+    sealed interface PreviewResult {
+        /**
+         * The snapshot was read; [keyNames] are the settings-store keys a cleanup would remove
+         * (empty = the store is already clean). Sorted for stable display.
+         */
+        data class Loaded(val keyNames: List<String>) : PreviewResult
+
+        /** The read failed (I/O error or empty keep-list); the orphan set is unknown, not empty. */
+        data object Failed : PreviewResult
     }
 }

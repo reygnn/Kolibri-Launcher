@@ -15,6 +15,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -134,6 +135,62 @@ class DataStoreMaintenanceRepositoryImplTest {
         val cancelling = FakeSettingsDataStore(updateError = CancellationException("cancelled"))
         assertFailsWith<CancellationException> { repo(cancelling).removeOrphanKeys() }
     }
+
+    // ---- previewOrphanKeys (dry run) ----
+
+    @Test
+    fun `previewOrphanKeys lists the un-owned keys sorted and deletes nothing`() = runTest {
+        val dataStore = FakeSettingsDataStore()
+        dataStore.seed {
+            it[liveUri] = "file:///a.jpg"
+            it[liveName] = "My App"
+            it[orphanFlattened] = "file:///c.webp"
+            it[orphanUsage] = setOf("1")
+            it[orphanObsolete] = "stale"
+        }
+
+        val result = repo(dataStore).previewOrphanKeys()
+
+        assertEquals(
+            DataStoreMaintenanceRepository.PreviewResult.Loaded(
+                listOf("obsolete_widget_key", "usage_com.foo", "wallpaper_flattened_path"),
+            ),
+            result,
+        )
+        // Dry run: the store is unchanged — every key (live AND orphan) still present.
+        val prefs = dataStore.data.first()
+        assertEquals("file:///a.jpg", prefs[liveUri])
+        assertEquals("My App", prefs[liveName])
+        assertEquals("file:///c.webp", prefs[orphanFlattened])
+        assertEquals(setOf("1"), prefs[orphanUsage])
+        assertEquals("stale", prefs[orphanObsolete])
+    }
+
+    @Test
+    fun `previewOrphanKeys reports Failed on an empty keep-list`() = runTest {
+        val dataStore = FakeSettingsDataStore()
+        dataStore.seed { it[orphanObsolete] = "stale" }
+
+        assertEquals(
+            DataStoreMaintenanceRepository.PreviewResult.Failed,
+            repo(dataStore, keyOwners = emptySet()).previewOrphanKeys(),
+        )
+    }
+
+    @Test
+    fun `previewOrphanKeys reports Failed when the read throws - never an empty list`() = runTest {
+        val failing = FakeSettingsDataStore(readError = IOException("cannot read"))
+        assertEquals(
+            DataStoreMaintenanceRepository.PreviewResult.Failed,
+            repo(failing).previewOrphanKeys(),
+        )
+    }
+
+    @Test
+    fun `previewOrphanKeys propagates CancellationException - never swallows cancellation`() = runTest {
+        val cancelling = FakeSettingsDataStore(readError = CancellationException("cancelled"))
+        assertFailsWith<CancellationException> { repo(cancelling).previewOrphanKeys() }
+    }
 }
 
 private fun fakeOwner(
@@ -152,10 +209,14 @@ private fun fakeOwner(
 private class FakeSettingsDataStore(
     initial: Preferences = emptyPreferences(),
     private val updateError: Throwable? = null,
+    private val readError: Throwable? = null,
 ) : DataStore<Preferences> {
     private val state = MutableStateFlow(initial)
 
-    override val data: Flow<Preferences> = state
+    // When readError is set, collecting `data` (and hence `.first()`) throws it — used to drive the
+    // preview fail-soft / cancellation branches.
+    override val data: Flow<Preferences> =
+        if (readError != null) flow { throw readError } else state
 
     override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
         updateError?.let { throw it }

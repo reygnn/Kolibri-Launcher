@@ -936,17 +936,49 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     /**
-     * Shows the storage-cleanup confirmation dialog. On confirm, the ViewModel removes the retired
-     * orphan keys (see [SettingsViewModel.onCleanupStorageConfirmed]).
+     * Storage cleanup, dry-run first: computes which keys a cleanup would delete (read-only, deletes
+     * nothing), then routes on the result — nothing to clean → toast; failure → toast; orphans found
+     * → a confirm dialog that LISTS them, whose positive button runs the real deletion via
+     * [SettingsViewModel.onCleanupStorageConfirmed]. So the user always sees exactly what will be
+     * removed before confirming.
      */
     private fun showStorageCleanupDialog() {
+        if (!isAdded) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                when (val preview = viewModel.getCleanupPreview()) {
+                    is SettingsViewModel.CleanupPreview.Failed ->
+                        showToastSafe(R.string.cleanup_storage_error)
+                    is SettingsViewModel.CleanupPreview.Loaded ->
+                        if (preview.keyNames.isEmpty()) {
+                            showToastSafe(R.string.cleanup_storage_none)
+                        } else {
+                            showStorageCleanupConfirmDialog(preview.keyNames)
+                        }
+                }
+            } catch (e: CancellationException) {
+                throw e // rethrow per canonical — view teardown must cancel, not report
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Cannot compute storage cleanup preview")
+            }
+        }
+    }
+
+    /**
+     * Confirm dialog listing the [keyNames] a cleanup would remove. Only reached with a non-empty
+     * list. The positive button runs the real deletion.
+     */
+    private fun showStorageCleanupConfirmDialog(keyNames: List<String>) {
         try {
             if (!isAdded) return
+
+            val body = getString(R.string.cleanup_storage_preview_message) +
+                "\n\n" + keyNames.joinToString("\n") { "•  $it" }
 
             currentDialog?.dismiss()
             currentDialog = MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.cleanup_storage_dialog_title)
-                .setMessage(R.string.cleanup_storage_dialog_message)
+                .setMessage(body)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.cleanup_storage_action) { _, _ ->
                     viewModel.onCleanupStorageConfirmed()

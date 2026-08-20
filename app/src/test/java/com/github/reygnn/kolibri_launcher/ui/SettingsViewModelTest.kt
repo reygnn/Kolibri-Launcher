@@ -717,4 +717,25 @@ class SettingsViewModelTest {
             createViewModel().prepareFavoritesForSorting(testApps)
         }
     }
+
+    @Test
+    fun `getCleanupPreview - maps repository Loaded to CleanupPreview Loaded`() = runTest {
+        coEvery { dataStoreMaintenanceRepository.previewOrphanKeys() } returns
+            DataStoreMaintenanceRepository.PreviewResult.Loaded(listOf("usage_com.foo", "obsolete_key"))
+
+        val preview = createViewModel().getCleanupPreview()
+
+        assertEquals(
+            SettingsViewModel.CleanupPreview.Loaded(listOf("usage_com.foo", "obsolete_key")),
+            preview,
+        )
+    }
+
+    @Test
+    fun `getCleanupPreview - maps repository Failed to CleanupPreview Failed`() = runTest {
+        coEvery { dataStoreMaintenanceRepository.previewOrphanKeys() } returns
+            DataStoreMaintenanceRepository.PreviewResult.Failed
+
+        assertEquals(SettingsViewModel.CleanupPreview.Failed, createViewModel().getCleanupPreview())
+    }
 }
