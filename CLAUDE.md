@@ -269,18 +269,21 @@ activities.
    is inverted vs. purge**: a whitelist forgetting a key left a harmless orphan,
    but here a forgotten *owner* makes a live key look orphaned and get **deleted**
    (data loss). That risk is contained by, and only by: (1) owners returning the
-   live key objects (nothing to hand-sync), (2) `@IntoSet` auto-registration (the
-   aggregation site can't miss an owner), (3) the impl's empty-keep-list floor (a
-   DI failure reports `Failed`, never wipes the store), and (4) two
-   `./gradlew checkConventions` gates
-   (`tools/check-settings-keys-registered.awk`): **per-owner completeness** —
-   every settings-store key an owner declares must appear in its
-   `ownedExactKeys()`/`ownedKeyPrefixes()` — and a **straggler guard** — any file
-   that declares a `PreferencesKey` but is neither an owner nor a known
-   usage/consent writer flags (the cross-module `AnrReporter` case: a non-repo in
-   `:app` that owns one settings key). A new settings-store key writer MUST
-   implement `OwnsSettingsStoreKeys` and register its keys, or the cleanup will
-   delete them. Two details are load-bearing and were hardened after a
+   live key objects (nothing to hand-sync), (2) the impl's empty-keep-list floor (a
+   *total* DI failure reports `Failed`, never wipes the store), and (3) three
+   `./gradlew checkConventions` gates: **per-owner completeness** — every
+   settings-store key an owner declares must appear in its
+   `ownedExactKeys()`/`ownedKeyPrefixes()` — a **straggler guard** — any file that
+   declares a `PreferencesKey` but is neither an owner nor a known usage/consent
+   writer flags (the cross-module `AnrReporter` case: a non-repo in `:app` that owns
+   one settings key) — and **binding parity** — every structural owner must have
+   exactly one `@IntoSet` binding. The parity gate exists because `@IntoSet` is
+   **not** auto-registration: implementing `OwnsSettingsStoreKeys` has no Dagger
+   effect, the binding is a manual per-owner line, and a forgotten one would drop
+   the owner from the runtime `Set` (only *total* loss trips the empty-keep-list
+   floor, not one missing owner) so its live keys get deleted. A new settings-store
+   key writer MUST implement `OwnsSettingsStoreKeys`, register its keys, AND add its
+   `@IntoSet` binding, or the cleanup will delete them. Two details are load-bearing and were hardened after a
    multi-agent review found them as data-loss false-negatives: registration is a
    **whole-token** match, not an `index()` substring test (else a forgotten
    `COLOR` matches inside a registered `TEXT_COLOR` and slips through — real

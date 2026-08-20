@@ -180,6 +180,30 @@ else
   echo "✓ Fixture 6: explicitly-typed unregistered key is detected and flags."
 fi
 
+# ── Fixture 7: WRAPPED prefix key — the PreferencesKey( opening and its
+#    PREFIX + entity argument split across two lines. The prefix branch now has
+#    the same n+1 lookahead as the exact branch, so an unregistered wrapped
+#    prefix MUST still flag (and exactly once, on the opening line). ──
+f7="$tmpdir/WrapPrefixRepositoryImpl.kt"
+cat > "$f7" <<'EOF'
+class WrapPrefixRepositoryImpl : OwnsSettingsStoreKeys {
+    override fun ownedKeyPrefixes(): Set<String> = setOf(AppConstants.KEY_NAME_PREFIX)
+    suspend fun write(pkg: String) {
+        val k = stringPreferencesKey(
+            AppConstants.MISSING_PREFIX + pkg)
+    }
+}
+EOF
+expected7="$f7:4:         val k = stringPreferencesKey("
+actual7=$(awk -f "$awk_script" "$f7")
+if [ "$actual7" != "$expected7" ]; then
+  echo "✗ Fixture 7 (wrapped prefix key) regression:"
+  diff <(printf '%s\n' "$expected7") <(printf '%s\n' "$actual7") || true
+  fail=1
+else
+  echo "✓ Fixture 7: unregistered prefix wrapped across the open-paren flags once on the opening line."
+fi
+
 if [ "$fail" -eq 0 ]; then
   echo "✓ settings-keys-registered awk: all fixtures behaved as expected."
   exit 0

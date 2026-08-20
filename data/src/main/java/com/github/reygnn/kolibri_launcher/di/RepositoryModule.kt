@@ -146,10 +146,13 @@ abstract class RepositoryModule {
     // ---- Storage-cleanup keep-list (OwnsSettingsStoreKeys) ----
     // Every settings-store key owner is multibound into this set; the cleanup
     // (DataStoreMaintenanceRepositoryImpl) deletes any settings-store key that NO
-    // owner claims. @IntoSet auto-registration means adding an owner is a single
-    // binding with nothing to wire at the aggregation site — the aggregation can
-    // never silently miss an owner and delete its live data. AnrReporter (:app)
-    // is NOT a repository and contributes its watermark key separately, from
+    // owner claims. NOTE: the @IntoSet binding below is a MANUAL per-owner line —
+    // implementing OwnsSettingsStoreKeys does NOT auto-contribute to the set, so a
+    // forgotten binding would silently drop that owner and let the cleanup delete
+    // its live keys. That is caught by the checkConventions binding-parity gate
+    // (tools/check-conventions.sh), which fails the build unless every structural
+    // owner has exactly one @IntoSet binding. AnrReporter (:app) is NOT a
+    // repository and contributes its watermark key separately, from
     // SettingsStoreKeyOwnerModule in :app.
     @Multibinds
     abstract fun settingsStoreKeyOwners(): Set<OwnsSettingsStoreKeys>

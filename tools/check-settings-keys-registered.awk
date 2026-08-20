@@ -115,15 +115,30 @@ END {
         }
 
         # ---- dynamic prefix key: <...>PreferencesKey(<TOKEN> + …) ----
-        if (code ~ /PreferencesKey[[:space:]]*\([^)]*\+/) {
-            tmp = code
-            sub(/^.*PreferencesKey[[:space:]]*\(/, "", tmp)   # drop through the '('
-            sub(/\+.*$/, "", tmp)                             # keep the prefix operand
-            gsub(/[[:space:]]/, "", tmp)
-            seg = tmp
-            sub(/^.*\./, "", seg)                             # last dotted segment
-            if (seg != "" && index(prefixTokens, " " seg " ") == 0) {
-                print FILENAME ":" n ": " line
+        # Anchor on the line carrying the `PreferencesKey(` opening. Append the
+        # NEXT line ONLY when this call does not close on this line (a real wrap
+        # between the `(` and its `PREFIX +` argument), so the exact branch's
+        # n+1 lookahead is matched WITHOUT (a) grabbing a second call's argument
+        # when two keys sit on adjacent lines, or (b) mistaking an unrelated `+`
+        # on the next line for this key's prefix. Report stays on line n.
+        if (code ~ /PreferencesKey[[:space:]]*\(/) {
+            tail = code
+            sub(/^.*PreferencesKey[[:space:]]*\(/, "", tail)     # text after the '('
+            srcline = code
+            if (index(tail, ")") == 0 && n < NR) {               # call wraps to next line
+                pnx = lines[n + 1]; sub(/\/\/.*$/, "", pnx)
+                srcline = code " " pnx
+            }
+            if (srcline ~ /PreferencesKey[[:space:]]*\([^)]*\+/) {
+                tmp = srcline
+                sub(/^.*PreferencesKey[[:space:]]*\(/, "", tmp)  # drop through the '('
+                sub(/\+.*$/, "", tmp)                            # keep the prefix operand
+                gsub(/[[:space:]]/, "", tmp)
+                seg = tmp
+                sub(/^.*\./, "", seg)                            # last dotted segment
+                if (seg != "" && index(prefixTokens, " " seg " ") == 0) {
+                    print FILENAME ":" n ": " line
+                }
             }
         }
     }

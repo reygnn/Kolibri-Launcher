@@ -604,6 +604,67 @@ if [ -n "$straggler_hits" ]; then
   report "Settings-store keep-list — unclassified DataStore-key writer (implement OwnsSettingsStoreKeys + register its keys, or add it to the non-settings writers list if it targets the usage/consent store)" "${straggler_hits%$'\n'}"
 fi
 
+# (c) owner ↔ @IntoSet binding parity. Gates (a)/(b) key on the interface
+# OVERRIDE, but the RUNTIME keep-list is the Hilt `Set<OwnsSettingsStoreKeys>`,
+# populated ONLY by hand-written `@IntoSet` bindings — implementing the interface
+# has no Dagger effect. So a structural owner whose `@Binds/@Provides @IntoSet`
+# line is forgotten passes (a) and (b) and compiles cleanly, yet is ABSENT from
+# the injected set at runtime → removeOrphanKeys() treats its live keys as
+# orphans and deletes them (the empty-keep-list guard only catches TOTAL loss,
+# not one missing owner). This gate asserts every structural owner is
+# @IntoSet-bound and vice versa, so the "@IntoSet can't miss an owner" guarantee
+# is actually enforced rather than assumed. (Found by a multi-agent review.)
+di_owner_modules=(
+  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/di/RepositoryModule.kt"
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/di/SettingsStoreKeyOwnerModule.kt"
+)
+# Impl types contributed via `@IntoSet` (scan a few lines past the annotation for
+# the `impl: Type` parameter, tolerating wrapped signatures).
+bound_owners=$(awk '
+  { code = $0; sub(/\/\/.*/, "", code) }   # ignore prose @IntoSet in comments
+  code ~ /@IntoSet/ { scan = 6; next }
+  scan > 0 {
+    if (match(code, /impl:[[:space:]]*[A-Za-z0-9_]+/)) {
+      t = substr(code, RSTART, RLENGTH); sub(/impl:[[:space:]]*/, "", t); print t; scan = 0
+    } else { scan-- }
+  }
+' "${di_owner_modules[@]}" 2>/dev/null | sort -u)
+
+# Class names of the structural owners discovered above.
+owner_classes=$(while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  grep -oE '^[[:space:]]*(internal[[:space:]]+)?class[[:space:]]+[A-Za-z0-9_]+' "$f" |
+    head -1 | grep -oE '[A-Za-z0-9_]+$'
+done <<EOF
+$owner_files
+EOF
+)
+owner_classes=$(printf '%s\n' "$owner_classes" | sort -u | sed '/^$/d')
+
+parity_hits=""
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  if ! printf '%s\n' "$bound_owners" | grep -qx "$c"; then
+    parity_hits="${parity_hits}${c}: implements OwnsSettingsStoreKeys but has no @IntoSet binding — absent from the runtime keep-list, its live keys would be deleted
+"
+  fi
+done <<EOF
+$owner_classes
+EOF
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  if ! printf '%s\n' "$owner_classes" | grep -qx "$c"; then
+    parity_hits="${parity_hits}${c}: @IntoSet-bound into the keep-list but does not implement OwnsSettingsStoreKeys (stale/incorrect binding?)
+"
+  fi
+done <<EOF
+$bound_owners
+EOF
+
+if [ -n "$parity_hits" ]; then
+  report "Settings-store keep-list — owner/@IntoSet binding parity broken (every OwnsSettingsStoreKeys owner needs exactly one @IntoSet binding, or the runtime Set silently misses it and its keys are deleted)" "${parity_hits%$'\n'}"
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then

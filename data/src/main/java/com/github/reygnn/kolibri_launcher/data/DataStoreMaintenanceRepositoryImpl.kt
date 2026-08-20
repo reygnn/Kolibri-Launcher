@@ -28,9 +28,11 @@ import javax.inject.Singleton
  * **Failure mode is inverted vs. the old whitelist, and guarded accordingly.** With a
  * whitelist-of-dead a forgotten entry left a harmless orphan; here a forgotten OWNER would make a
  * live key look orphaned and get deleted. That is contained by (1) owners returning keys from the
- * live key objects (nothing to keep in sync), (2) `@IntoSet` auto-registration (the aggregation site
- * can't miss an owner), (3) the `checkConventions` settings-key linter, and (4) the empty-keep-list
- * guard in [liveKeepList] (a DI failure must never be read as "the store has no live keys").
+ * live key objects (nothing to keep in sync), (2) the `checkConventions` settings-key linter —
+ * per-owner key completeness AND owner↔`@IntoSet` binding parity, since the `@IntoSet` binding is a
+ * manual per-owner line, not automatic, so a forgotten binding fails the build rather than silently
+ * dropping the owner from this set — and (3) the empty-keep-list guard in [liveKeepList] (a total DI
+ * failure must never be read as "the store has no live keys").
  */
 @Singleton
 class DataStoreMaintenanceRepositoryImpl @Inject constructor(
