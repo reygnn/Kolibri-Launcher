@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.ComponentKey
 import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
@@ -92,6 +93,16 @@ class FavoritesRepositoryImpl @Inject constructor(
 
     override suspend fun addFavoriteComponent(componentName: String): Boolean {
         if (componentName.isBlank()) return false
+        if (!ComponentKey.isValid(componentName)) {
+            // A malformed key (not a package/class flatten) is a programmer error
+            // on the call path, not user data — surface it loudly in DEBUG (Rule 9)
+            // and no-op in release, rather than persisting a stale entry that the
+            // backup restore would later drop silently (TODO §15).
+            TimberWrapper.silentError(
+                "addFavoriteComponent: malformed component key '$componentName' (expected package/class)"
+            )
+            return false
+        }
 
         return try {
             // Read-modify-write fully inside the edit transaction: reading the

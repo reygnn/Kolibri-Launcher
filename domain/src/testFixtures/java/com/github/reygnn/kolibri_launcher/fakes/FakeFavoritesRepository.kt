@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 // TIMESTAMP 2025-12-04 05:01
 
+import com.github.reygnn.kolibri_launcher.core.ComponentKey
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,11 @@ class FakeFavoritesRepository : FavoritesRepository {
     override suspend fun isFavoriteComponent(componentName: String?) = componentName in favorites
 
     override suspend fun addFavoriteComponent(componentName: String): Boolean {
-        if (componentName.isBlank()) return false
+        // Reject blank AND malformed keys, matching FavoritesRepositoryImpl via the
+        // shared ComponentKey rule. The impl additionally silentErrors on a
+        // malformed key; that diagnostic is not part of the observable contract
+        // (return value + resulting set), so the fake omits it.
+        if (componentName.isBlank() || !ComponentKey.isValid(componentName)) return false
         favorites = favorites + componentName
         return true
     }

@@ -26,7 +26,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
 | 14 | `Invalid resource ID 0x00000000` Logcat-Noise | **erledigt 2026-08-20** — der Schwall reproduziert auf 0.99.188 nicht mehr (inzident behoben seit dem Mai-Befund); die eine verbliebene Warnung derselben Familie (AppCompat-Widget ohne AppCompat-Theme im `WallpaperFlattener`) via `ContextThemeWrapper(AppTheme)` gefixt, auf Gerät verifiziert. Detail-Sektion §14 unten. | — |
-| 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
+| 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | **erledigt 2026-08-20** — shared `core/ComponentKey.isValid` (pure-Kotlin, driftfrei über Fake+Impl); malformed Key → `silentError` + `false` statt silent-accept; Regressions-Anker im Contract. Detail-Sektion §15. | — |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | **won't-do (2026-08-14)** — der aktuelle `extraBufferCapacity = 1` ist korrekt (Event-Bus-Buffered-Regel). `replay = 1` würde einem späten Subscriber das letzte Paket-Event nachspielen (Stale-Replay → redundante Re-Enumeration); der einzige genannte Nutzen war Test-Bequemlichkeit. Produktions-Risiko > Test-Komfort → geschlossen. | — |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
@@ -1702,6 +1702,21 @@ Import, Custom-Backups Dritter) ist ein Risiko.
 **Größenordnung:** Variante 1 ist klein (5 Zeilen + Test), Variante 3 ist
 mittel-groß. Empfehlung für jetzt: Variante 1, plus den Test in
 `BackupRoundTripSafTest` als Regressions-Anker.
+
+**Ergebnis (2026-08-20, erledigt).** Umgesetzt als Kombination aus Variante 1
++ 2, mit dem Regressions-Anker im **Contract** statt in `BackupRoundTripSafTest`
+(deckt so Fake UND Impl ab, nicht nur einen androidTest-Pfad). Neu:
+`core/ComponentKey.isValid(value)` in `:domain` — pure Kotlin (`:domain` hat kein
+Android SDK, kann `ComponentName.unflattenFromString` nicht rufen), akzeptiert nur
+`package/class` mit nicht-leerer Paket- UND Klassen-Seite. Weil beide Seiten des
+Contracts dieselbe Funktion nutzen, gibt es keinen Fake/Impl-Drift.
+`FavoritesRepositoryImpl.addFavoriteComponent` weist einen malformed Key jetzt ab:
+`TimberWrapper.silentError` (Rule 9: DEBUG-Throw, Release-Log) + `return false`
+statt stillem Stale-Add; die Fake spiegelt nur die beobachtbare Semantik (false,
+kein State-Change), ohne das Diagnose-`silentError`. Contract-Tests: „returns false
+for a malformed component key" (kein Slash / leere Seite) + „does not modify state",
+laufen gegen Fake und Impl. Volle Suite + `checkConventions` grün. Branch
+`fix/favorites-validate-component-key`.
 
 ---
 

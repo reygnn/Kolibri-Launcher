@@ -170,6 +170,26 @@ abstract class FavoritesRepositoryContract {
     }
 
     @Test
+    fun `addFavoriteComponent returns false for a malformed component key`() = runTest {
+        // A string that is not a package/class flatten (no separator, or an empty
+        // side) must be rejected rather than silently persisted — otherwise it
+        // survives as a stale favorite that the backup restore later drops for not
+        // matching an installed component (TODO §15).
+        val repo = createRepository()
+        assertFalse("bare package, no class", repo.addFavoriteComponent("com.example.alpha"))
+        assertFalse("trailing slash, empty class", repo.addFavoriteComponent("com.example.alpha/"))
+        assertFalse("leading slash, empty package", repo.addFavoriteComponent("/.MainActivity"))
+    }
+
+    @Test
+    fun `addFavoriteComponent with a malformed key does not modify state`() = runTest {
+        val repo = createRepository()
+        repo.addFavoriteComponent(compA)
+        repo.addFavoriteComponent("com.example.alpha")
+        assertEquals(setOf(compA), repo.favoriteComponentsFlow.first())
+    }
+
+    @Test
     fun `addFavoriteComponent with blank does not modify state`() = runTest {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
