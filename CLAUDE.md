@@ -276,11 +276,22 @@ activities.
    (`tools/check-settings-keys-registered.awk`): **per-owner completeness** —
    every settings-store key an owner declares must appear in its
    `ownedExactKeys()`/`ownedKeyPrefixes()` — and a **straggler guard** — any file
-   that declares a `PreferencesKey` but is neither a registered owner nor a known
+   that declares a `PreferencesKey` but is neither an owner nor a known
    usage/consent writer flags (the cross-module `AnrReporter` case: a non-repo in
    `:app` that owns one settings key). A new settings-store key writer MUST
-   implement `OwnsSettingsStoreKeys` and join the owner list, or the cleanup will
-   delete its key. Regression-tested via
+   implement `OwnsSettingsStoreKeys` and register its keys, or the cleanup will
+   delete them. Two details are load-bearing and were hardened after a
+   multi-agent review found them as data-loss false-negatives: registration is a
+   **whole-token** match, not an `index()` substring test (else a forgotten
+   `COLOR` matches inside a registered `TEXT_COLOR` and slips through — real
+   collisions exist: `SCALE⊂LAYOUT_SCALE`, `ALARM⊂SHOW_ALARM`,
+   `FAB_X⊂FAB_X_FRACTION`); and **owners are discovered structurally** (a file
+   that overrides an `OwnsSettingsStoreKeys` method), NOT from a hand-maintained
+   list — a second list drifts, and a new owner could otherwise be added only to
+   a straggler-allowlist to green the build while escaping completeness. Deriving
+   owners from the override means "join the keep-list" (what silences the
+   straggler) *is* implementing the interface, which subjects the file to the
+   completeness gate. Regression-tested via
    `tools/check-settings-keys-registered-test.sh` (manual rerun, not a CI gate).
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies

@@ -112,6 +112,74 @@ else
   echo "✓ Fixture 3: dynamic prefix key with no matching ownedKeyPrefixes() entry flags."
 fi
 
+# ── Fixture 4: SUBSTRING collision, exact — unregistered COLOR vs registered
+#    TEXT_COLOR MUST flag (token match, not index() substring). This is the
+#    data-loss false-negative the multi-agent review found. ──
+f4="$tmpdir/ColorRepositoryImpl.kt"
+cat > "$f4" <<'EOF'
+class ColorRepositoryImpl : OwnsSettingsStoreKeys {
+    private object PreferencesKeys {
+        val TEXT_COLOR = intPreferencesKey("text_color")
+        val COLOR = intPreferencesKey("color")
+    }
+    override fun ownedExactKeys(): Set<String> = setOf(
+        PreferencesKeys.TEXT_COLOR.name,
+    )
+}
+EOF
+expected4="$f4:4:         val COLOR = intPreferencesKey(\"color\")"
+actual4=$(awk -f "$awk_script" "$f4")
+if [ "$actual4" != "$expected4" ]; then
+  echo "✗ Fixture 4 (exact substring collision) regression:"
+  diff <(printf '%s\n' "$expected4") <(printf '%s\n' "$actual4") || true
+  fail=1
+else
+  echo "✓ Fixture 4: unregistered COLOR flags although it is a substring of registered TEXT_COLOR."
+fi
+
+# ── Fixture 5: SUBSTRING collision, prefix — unregistered NAME vs registered
+#    KEY_NAME_PREFIX MUST flag. ──
+f5="$tmpdir/NamePrefixRepositoryImpl.kt"
+cat > "$f5" <<'EOF'
+class NamePrefixRepositoryImpl : OwnsSettingsStoreKeys {
+    override fun ownedKeyPrefixes(): Set<String> = setOf(AppConstants.KEY_NAME_PREFIX)
+    suspend fun write(pkg: String) {
+        val k1 = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + pkg)
+        val k2 = stringPreferencesKey(AppConstants.NAME + pkg)
+    }
+}
+EOF
+expected5="$f5:5:         val k2 = stringPreferencesKey(AppConstants.NAME + pkg)"
+actual5=$(awk -f "$awk_script" "$f5")
+if [ "$actual5" != "$expected5" ]; then
+  echo "✗ Fixture 5 (prefix substring collision) regression:"
+  diff <(printf '%s\n' "$expected5") <(printf '%s\n' "$actual5") || true
+  fail=1
+else
+  echo "✓ Fixture 5: unregistered NAME prefix flags although it is a substring of registered KEY_NAME_PREFIX."
+fi
+
+# ── Fixture 6: TYPE ANNOTATION — an explicitly-typed unregistered key MUST still
+#    be detected as a declared key and flagged (the val NAME[: Type] = regex). ──
+f6="$tmpdir/TypedRepositoryImpl.kt"
+cat > "$f6" <<'EOF'
+class TypedRepositoryImpl : OwnsSettingsStoreKeys {
+    private object PreferencesKeys {
+        val WIDGET_ENABLED: Preferences.Key<Boolean> = booleanPreferencesKey("widget_enabled")
+    }
+    override fun ownedExactKeys(): Set<String> = emptySet()
+}
+EOF
+expected6="$f6:3:         val WIDGET_ENABLED: Preferences.Key<Boolean> = booleanPreferencesKey(\"widget_enabled\")"
+actual6=$(awk -f "$awk_script" "$f6")
+if [ "$actual6" != "$expected6" ]; then
+  echo "✗ Fixture 6 (typed declaration) regression:"
+  diff <(printf '%s\n' "$expected6") <(printf '%s\n' "$actual6") || true
+  fail=1
+else
+  echo "✓ Fixture 6: explicitly-typed unregistered key is detected and flags."
+fi
+
 if [ "$fail" -eq 0 ]; then
   echo "✓ settings-keys-registered awk: all fixtures behaved as expected."
   exit 0

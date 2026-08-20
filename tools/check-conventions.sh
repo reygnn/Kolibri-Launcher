@@ -534,13 +534,19 @@ fi
 #
 #  (a) per-owner completeness — every settings-store key an owner file declares
 #      must be registered in that file's ownedExactKeys()/ownedKeyPrefixes().
-#      Positive-list scan; awk core in tools/check-settings-keys-registered.awk.
-#  (b) straggler guard — any file that DECLARES a DataStore key but is neither a
-#      registered owner nor a known usage/consent writer flags. That is a new
-#      settings-store writer (the AnrReporter case) that must join the keep-list,
-#      or the cleanup silently deletes its key. Classify it deliberately.
+#      awk core in tools/check-settings-keys-registered.awk.
+#  (b) straggler guard — any file that DECLARES a DataStore key but is neither an
+#      owner nor a known usage/consent writer flags. That is a new settings-store
+#      writer (the AnrReporter case) that must join the keep-list, or the cleanup
+#      silently deletes its key.
 #
-# Regression-tested via tools/check-settings-keys-registered-test.sh.
+# Owners are discovered STRUCTURALLY: a file is an owner iff it overrides an
+# OwnsSettingsStoreKeys method. There is deliberately no hand-maintained owner
+# list — a second list drifts, and (worse) a new owner could be added only to a
+# straggler-allowlist to green the build while escaping completeness gate (a).
+# Deriving owners from the override closes that: joining the keep-list (which is
+# what silences the straggler) IS implementing the interface, which subjects the
+# file to (a). Regression-tested via tools/check-settings-keys-registered-test.sh.
 # ─────────────────────────────────────────────────────────────────────────────
 settings_keys_awk="$script_dir/check-settings-keys-registered.awk"
 
@@ -549,56 +555,53 @@ if [ ! -f "$settings_keys_awk" ]; then
   exit 2
 fi
 
-# (a) per-owner completeness
-settings_key_owner_files=(
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/SettingsRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesOrderRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/HiddenAppsRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/CustomNamesRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/SwipeActionsRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
-  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FabPositionRepositoryImpl.kt"
-  "app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
-)
+owner_marker='override fun ownedExactKeys|override fun ownedKeyPrefixes'
 
-settings_keys_hits=""
-for rel in "${settings_key_owner_files[@]}"; do
-  f="$repo_root/$rel"
-  if [ ! -f "$f" ]; then
-    settings_keys_hits="${settings_keys_hits}${rel}: MISSING owner file (renamed/removed? update settings_key_owner_files)
-"
-    continue
-  fi
-  hits=$(awk -f "$settings_keys_awk" "$f")
-  if [ -n "$hits" ]; then
-    settings_keys_hits="${settings_keys_hits}${hits}
-"
-  fi
-done
+# (a) per-owner completeness — over every structural owner.
+owner_files=$(grep -rlE "$owner_marker" \
+  "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" 2>/dev/null || true)
 
-if [ -n "$settings_keys_hits" ]; then
-  report "Settings-store keep-list — declared key not registered by its owner (add it to ownedExactKeys()/ownedKeyPrefixes(), or storage cleanup will delete it as an orphan)" "${settings_keys_hits%$'\n'}"
+if [ -z "$owner_files" ]; then
+  report "Settings-store keep-list — no OwnsSettingsStoreKeys owner found (interface renamed / override methods gone?)" "expected at least one owner overriding $owner_marker"
+else
+  settings_keys_hits=""
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    hits=$(awk -f "$settings_keys_awk" "$f")
+    if [ -n "$hits" ]; then
+      settings_keys_hits="${settings_keys_hits}${hits}
+"
+    fi
+  done <<EOF
+$owner_files
+EOF
+
+  if [ -n "$settings_keys_hits" ]; then
+    report "Settings-store keep-list — declared key not registered by its owner (add it to ownedExactKeys()/ownedKeyPrefixes(), or storage cleanup will delete it as an orphan)" "${settings_keys_hits%$'\n'}"
+  fi
 fi
 
-# (b) straggler guard — any DataStore-key writer not classified as owner or as a
+# (b) straggler guard — a DataStore-key writer that is neither a structural owner
+# (overrides an OwnsSettingsStoreKeys method -> completeness-checked above) nor a
 # known non-settings-store (usage / consent) writer.
-settings_known_writers=" SettingsRepositoryImpl.kt FavoritesRepositoryImpl.kt FavoritesOrderRepositoryImpl.kt HiddenAppsRepositoryImpl.kt CustomNamesRepositoryImpl.kt SwipeActionsRepositoryImpl.kt WallpaperRepositoryImpl.kt FabPositionRepositoryImpl.kt AnrReporter.kt AppUsageRepositoryImpl.kt UsageExportRepositoryImpl.kt ConsentBootstrap.kt "
+settings_nonsettings_writers=" AppUsageRepositoryImpl.kt UsageExportRepositoryImpl.kt ConsentBootstrap.kt "
 straggler_hits=""
 while IFS= read -r kt; do
   # A real key DECLARATION contains `xxxPreferencesKey(` — imports have no paren.
   if grep -qE '[A-Za-z]PreferencesKey[[:space:]]*\(' "$kt"; then
+    # Structural owner? Then (a) already checks it.
+    if grep -qE "$owner_marker" "$kt"; then continue; fi
     base="$(basename "$kt")"
-    case "$settings_known_writers" in
-      *" $base "*) : ;;   # classified — fine
-      *) straggler_hits="${straggler_hits}${kt}: declares a DataStore key but is neither a registered settings-store owner nor a known usage/consent writer
+    case "$settings_nonsettings_writers" in
+      *" $base "*) : ;;   # known non-settings writer — fine
+      *) straggler_hits="${straggler_hits}${kt}: declares a DataStore key but neither implements OwnsSettingsStoreKeys nor is a known usage/consent writer
 " ;;
     esac
   fi
 done < <(find "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" -name '*.kt')
 
 if [ -n "$straggler_hits" ]; then
-  report "Settings-store keep-list — unclassified DataStore-key writer (implement OwnsSettingsStoreKeys + join the keep-list, or add it to the non-settings writers list if it targets the usage/consent store)" "${straggler_hits%$'\n'}"
+  report "Settings-store keep-list — unclassified DataStore-key writer (implement OwnsSettingsStoreKeys + register its keys, or add it to the non-settings writers list if it targets the usage/consent store)" "${straggler_hits%$'\n'}"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

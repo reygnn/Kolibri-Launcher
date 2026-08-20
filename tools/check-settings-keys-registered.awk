@@ -12,15 +12,24 @@
 # check-conventions.sh).
 #
 # == DECLARED EXACT KEY ==
-#   `[private] val UPPER_SNAKE = <...>PreferencesKey(<arg>)` where <arg> is a
-#   plain constant (NO ` + ` concatenation). Its val NAME must appear in the
-#   `ownedExactKeys()` body, which references it as `Foo.NAME.name`.
+#   `[private] val UPPER_SNAKE[: Type] = <...>PreferencesKey(<arg>)` where <arg>
+#   is a plain constant (NO ` + ` concatenation). Its val NAME must be registered
+#   in the `ownedExactKeys()` body (which references it as `Foo.NAME.name`).
 #
 # == DECLARED PREFIX KEY ==
 #   Any `<...>PreferencesKey(<TOKEN> + …)` — a dynamic per-entity key built from
 #   a prefix (e.g. `stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + pkg)`).
-#   The prefix's last identifier segment (`KEY_NAME_PREFIX`) must appear in the
-#   `ownedKeyPrefixes()` body.
+#   The prefix's last identifier segment (`KEY_NAME_PREFIX`) must be registered
+#   in the `ownedKeyPrefixes()` body.
+#
+# == REGISTRATION IS A WHOLE-TOKEN MATCH, NOT A SUBSTRING ==
+#   The body is tokenised (every non-identifier char -> space) and the name must
+#   appear as a WHOLE space-delimited token. A raw `index(body, name)` substring
+#   test was a data-loss false-negative: a forgotten key `COLOR` would match
+#   inside a registered `TEXT_COLOR.name` and pass unflagged, after which the
+#   blacklist cleanup deletes the live `color` key. Realistic collisions already
+#   exist among registered keys (SCALE⊂LAYOUT_SCALE, COLOR⊂TEXT_COLOR,
+#   ALARM⊂SHOW_ALARM, FAB_X⊂FAB_X_FRACTION), so the token boundary is load-bearing.
 #
 # Both bodies are `= setOf(...)` single-expression functions, so the body is the
 # text inside that `setOf(...)` (paren-balanced), NOT a brace block.
@@ -59,19 +68,30 @@ function collect_setof_body(fname,   n, start, region, i, c, p, depth, j, ch, bo
     return body
 }
 
+# " token1 token2 … " — the body reduced to whole identifier tokens padded by
+# spaces, so `index(t, " NAME ") > 0` is an exact-token membership test.
+function tokenize(body,   t) {
+    t = " " body " "
+    gsub(/[^A-Za-z0-9_]/, " ", t)
+    return t
+}
+
 { lines[NR] = $0 }
 
 END {
-    exactBody  = collect_setof_body("ownedExactKeys")
-    prefixBody = collect_setof_body("ownedKeyPrefixes")
+    exactTokens  = tokenize(collect_setof_body("ownedExactKeys"))
+    prefixTokens = tokenize(collect_setof_body("ownedKeyPrefixes"))
 
     for (n = 1; n <= NR; n++) {
         line = lines[n]
         code = line
         sub(/\/\/.*$/, "", code)
 
-        # ---- exact constant key: val UPPER = <...>PreferencesKey(<no '+'>) ----
-        if (code ~ /^[[:space:]]*(private[[:space:]]+)?val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*=/) {
+        # ---- exact constant key: val UPPER[: Type] = <...>PreferencesKey(<no '+'>) ----
+        # The optional `:[^=]*` tolerates an explicit type annotation
+        # (`val X: Preferences.Key<Boolean> = …`), which would otherwise escape
+        # detection entirely and never be required to register.
+        if (code ~ /^[[:space:]]*(private[[:space:]]+)?val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*(:[^=]*)?=/) {
             rhs = code
             if (n < NR) {
                 nx = lines[n + 1]
@@ -82,10 +102,12 @@ END {
                 # A prefix-built key ( '+' inside the call ) is handled by the
                 # prefix branch below, not here.
                 if (rhs !~ /PreferencesKey[[:space:]]*\([^)]*\+/) {
-                    name = code
-                    sub(/^[[:space:]]*(private[[:space:]]+)?val[[:space:]]+/, "", name)
-                    sub(/[[:space:]]*=.*$/, "", name)
-                    if (index(exactBody, name) == 0) {
+                    # Robust name extraction: grab the UPPER_SNAKE token after
+                    # `val`, whatever follows it (`=`, `:`, whitespace).
+                    match(code, /val[[:space:]]+[A-Z][A-Z0-9_]*/)
+                    name = substr(code, RSTART, RLENGTH)
+                    sub(/^val[[:space:]]+/, "", name)
+                    if (index(exactTokens, " " name " ") == 0) {
                         print FILENAME ":" n ": " line
                     }
                 }
@@ -100,7 +122,7 @@ END {
             gsub(/[[:space:]]/, "", tmp)
             seg = tmp
             sub(/^.*\./, "", seg)                             # last dotted segment
-            if (seg != "" && index(prefixBody, seg) == 0) {
+            if (seg != "" && index(prefixTokens, " " seg " ") == 0) {
                 print FILENAME ":" n ": " line
             }
         }
