@@ -1959,7 +1959,7 @@ am gleichen Mechanismus hängen.
 
 ---
 
-## 23. (offen) Tote ACRA-Consent-Keys im `settingsDataStore` bei Bestands-Installs
+## 23. (erledigt 2026-08-20) Tote ACRA-Consent-Keys im `settingsDataStore` bei Bestands-Installs
 
 **Aufgedeckt 2026-07-22** im Review des AUDIT-4-#2-Fixes. Mit dem
 Backup-Fix wurde der ACRA-Consent bewusst in einen eigenen, vom
@@ -2000,6 +2000,24 @@ Zustimmung „wiederbeleben".
 **Empfehlung:** Variante 1 (belassen), solange die toten Keys nicht
 konkret stören. Variante 2 ist der günstigste echte Cleanup, falls
 gewünscht.
+
+**Erledigt 2026-08-20 — durch das Blacklist-Cleanup.** Die
+Speicher-aufräumen-Funktion wurde von einer Whitelist-of-dead
+(`RetiredDataStoreKeys`, gelöscht) auf eine **Keep-Liste / Blacklist**
+umgestellt: `DataStoreMaintenanceRepository.removeOrphanKeys` löscht jeden
+Settings-Store-Key, den kein lebender `OwnsSettingsStoreKeys`-Owner
+beansprucht. Beide toten Keys (`acra_has_consent` / `acra_has_asked`)
+gehören keinem Owner → sie werden jetzt vom user-getriggerten Cleanup
+erfasst und entfernt (faktisch eine user-gesteuerte Variante 3, ohne
+Migrations-Maschinerie und ohne Bootstrap-Read-Pfad). Der neue
+**Dry-Run** listet sie vor dem Löschen auf, was diesen Eintrag on-device
+verifiziert hat: sie liegen tatsächlich im Settings-Store, kein Owner
+beansprucht sie. Der lebende Consent (`consent_decision` im separaten,
+vom Cleanup nie berührten `consentDataStore`) bleibt unangetastet, und
+das Entfernen schließt zugleich die oben genannte „einzige theoretische
+Falle" (ein zurückgedrehter Import-Pfad, der den mitgesicherten toten Key
+liest). Kein dedizierter §23-Code nötig — der generische Blacklist-Sweep
+deckt es ab.
 
 ---
 
