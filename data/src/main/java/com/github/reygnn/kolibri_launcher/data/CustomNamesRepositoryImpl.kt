@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
@@ -44,7 +45,11 @@ import javax.inject.Singleton
 @Singleton
 class CustomNamesRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>
-) : CustomNamesRepository {
+) : CustomNamesRepository, OwnsSettingsStoreKeys {
+
+    // Custom-name keys are dynamic per-package: `name_<pkg>` built from
+    // KEY_NAME_PREFIX. The cleanup keeps every key under this prefix.
+    override fun ownedKeyPrefixes(): Set<String> = setOf(AppConstants.KEY_NAME_PREFIX)
 
     /**
      * Reactive `packageName -> customName` view (REACTIVE_APPLIST_SPEC RAL-1).

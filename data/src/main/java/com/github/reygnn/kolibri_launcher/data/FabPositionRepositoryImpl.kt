@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
@@ -34,12 +35,17 @@ import javax.inject.Singleton
 @Singleton
 class FabPositionRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-) : FabPositionRepository {
+) : FabPositionRepository, OwnsSettingsStoreKeys {
 
     private object PreferencesKeys {
         val FAB_X_FRACTION = floatPreferencesKey("wallpaper_edit_fab_x_fraction")
         val FAB_Y_FRACTION = floatPreferencesKey("wallpaper_edit_fab_y_fraction")
     }
+
+    override fun ownedExactKeys(): Set<String> = setOf(
+        PreferencesKeys.FAB_X_FRACTION.name,
+        PreferencesKeys.FAB_Y_FRACTION.name,
+    )
 
     override val fabPositionFlow: Flow<FabPosition> =
         dataStore.readFlowFailOpen("Error reading FAB position preferences") { preferences ->

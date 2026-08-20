@@ -526,6 +526,82 @@ if [ -n "$triple_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Settings-store cleanup keep-list (OwnsSettingsStoreKeys). Storage cleanup
+# deletes every settings-store key that NO live owner claims (blacklist-of-
+# unknown). The failure mode is inverted vs. the old whitelist-of-dead — a
+# forgotten LIVE key is DELETED, not left as a harmless orphan — so two gates
+# guard it:
+#
+#  (a) per-owner completeness — every settings-store key an owner file declares
+#      must be registered in that file's ownedExactKeys()/ownedKeyPrefixes().
+#      Positive-list scan; awk core in tools/check-settings-keys-registered.awk.
+#  (b) straggler guard — any file that DECLARES a DataStore key but is neither a
+#      registered owner nor a known usage/consent writer flags. That is a new
+#      settings-store writer (the AnrReporter case) that must join the keep-list,
+#      or the cleanup silently deletes its key. Classify it deliberately.
+#
+# Regression-tested via tools/check-settings-keys-registered-test.sh.
+# ─────────────────────────────────────────────────────────────────────────────
+settings_keys_awk="$script_dir/check-settings-keys-registered.awk"
+
+if [ ! -f "$settings_keys_awk" ]; then
+  echo "ERROR: settings-keys-registered awk script not found: $settings_keys_awk" >&2
+  exit 2
+fi
+
+# (a) per-owner completeness
+settings_key_owner_files=(
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/SettingsRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FavoritesOrderRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/HiddenAppsRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/CustomNamesRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/SwipeActionsRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
+  "data/src/main/java/com/github/reygnn/kolibri_launcher/data/FabPositionRepositoryImpl.kt"
+  "app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
+)
+
+settings_keys_hits=""
+for rel in "${settings_key_owner_files[@]}"; do
+  f="$repo_root/$rel"
+  if [ ! -f "$f" ]; then
+    settings_keys_hits="${settings_keys_hits}${rel}: MISSING owner file (renamed/removed? update settings_key_owner_files)
+"
+    continue
+  fi
+  hits=$(awk -f "$settings_keys_awk" "$f")
+  if [ -n "$hits" ]; then
+    settings_keys_hits="${settings_keys_hits}${hits}
+"
+  fi
+done
+
+if [ -n "$settings_keys_hits" ]; then
+  report "Settings-store keep-list — declared key not registered by its owner (add it to ownedExactKeys()/ownedKeyPrefixes(), or storage cleanup will delete it as an orphan)" "${settings_keys_hits%$'\n'}"
+fi
+
+# (b) straggler guard — any DataStore-key writer not classified as owner or as a
+# known non-settings-store (usage / consent) writer.
+settings_known_writers=" SettingsRepositoryImpl.kt FavoritesRepositoryImpl.kt FavoritesOrderRepositoryImpl.kt HiddenAppsRepositoryImpl.kt CustomNamesRepositoryImpl.kt SwipeActionsRepositoryImpl.kt WallpaperRepositoryImpl.kt FabPositionRepositoryImpl.kt AnrReporter.kt AppUsageRepositoryImpl.kt UsageExportRepositoryImpl.kt ConsentBootstrap.kt "
+straggler_hits=""
+while IFS= read -r kt; do
+  # A real key DECLARATION contains `xxxPreferencesKey(` — imports have no paren.
+  if grep -qE '[A-Za-z]PreferencesKey[[:space:]]*\(' "$kt"; then
+    base="$(basename "$kt")"
+    case "$settings_known_writers" in
+      *" $base "*) : ;;   # classified — fine
+      *) straggler_hits="${straggler_hits}${kt}: declares a DataStore key but is neither a registered settings-store owner nor a known usage/consent writer
+" ;;
+    esac
+  fi
+done < <(find "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" -name '*.kt')
+
+if [ -n "$straggler_hits" ]; then
+  report "Settings-store keep-list — unclassified DataStore-key writer (implement OwnsSettingsStoreKeys + join the keep-list, or add it to the non-settings writers list if it targets the usage/consent store)" "${straggler_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [ "$violations" -eq 0 ]; then
   echo "✓ All convention checks passed."

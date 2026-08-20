@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceAtMostSafe
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -57,7 +58,7 @@ import javax.inject.Singleton
 @Singleton
 class FavoritesOrderRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-) : FavoritesOrderRepository {
+) : FavoritesOrderRepository, OwnsSettingsStoreKeys {
 
     // distinctUntilChanged: shared settingsDataStore re-emits on every write to
     // ANY key; dedupe the decoded order List so unrelated writes (usage tick on
@@ -71,6 +72,8 @@ class FavoritesOrderRepositoryImpl @Inject constructor(
     private object PreferencesKeys {
         val ORDER_LIST = stringPreferencesKey("favorites_order_components_list_json")
     }
+
+    override fun ownedExactKeys(): Set<String> = setOf(PreferencesKeys.ORDER_LIST.name)
 
     companion object {
         /**

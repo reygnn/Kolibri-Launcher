@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import kotlinx.coroutines.flow.Flow
@@ -91,11 +92,13 @@ import javax.inject.Singleton
 @Singleton
 class HiddenAppsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>
-) : HiddenAppsRepository {
+) : HiddenAppsRepository, OwnsSettingsStoreKeys {
 
     private object PreferencesKeys {
         val HIDDEN_COMPONENTS = stringSetPreferencesKey("hidden_components_set")
     }
+
+    override fun ownedExactKeys(): Set<String> = setOf(PreferencesKeys.HIDDEN_COMPONENTS.name)
 
     // distinctUntilChanged: shared settingsDataStore re-emits on every write to
     // ANY key. This flow feeds three combines (drawer, favorites, recents); dedupe

@@ -196,9 +196,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Removes orphaned settings-store keys (retired features / moved stores). Safe by construction —
-     * only [com.github.reygnn.kolibri_launcher.core.RetiredDataStoreKeys] entries are touched, never
-     * a live key. Reports whether anything was cleaned.
+     * Removes orphaned settings-store keys (retired features / moved stores). Driven by the
+     * [com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys] keep-list: every key no live
+     * owner claims is removed, so nothing hand-maintained can go stale. Reports whether anything was
+     * cleaned.
      */
     fun onCleanupStorageConfirmed() {
         launchSafe {

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import kotlinx.coroutines.CancellationException
@@ -17,18 +18,22 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertFailsWith
 
 /**
- * Impl test for [DataStoreMaintenanceRepositoryImpl] against a [FakeSettingsDataStore]: the retired-key
- * filter + the DataStore edit mechanics (the part a pure-map fake couldn't exercise, see the ADR in
- * `DataStoreMaintenanceRepositoryContract`), plus the fail-soft contract. The critical properties:
- * live keys are NEVER removed, an I/O failure surfaces as [DataStoreMaintenanceRepository.Result.Failed]
- * (not a silent `Removed(0)`), and `CancellationException` always propagates.
+ * Impl test for [DataStoreMaintenanceRepositoryImpl] against a [FakeSettingsDataStore]: the
+ * keep-list (blacklist) filter + the DataStore edit mechanics (the part a pure-map fake couldn't
+ * exercise, see the ADR in `DataStoreMaintenanceRepositoryContract`), plus the fail-soft contract.
+ *
+ * The critical properties, in inverted-failure-mode terms:
+ * - every key a live owner claims (exact OR by prefix) is NEVER removed;
+ * - every key NO owner claims IS removed;
+ * - an empty keep-list (a DI wiring failure) is refused, NOT read as "wipe everything";
+ * - an I/O failure surfaces as [DataStoreMaintenanceRepository.Result.Failed] (never a silent
+ *   `Removed(0)`), and `CancellationException` always propagates.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DataStoreMaintenanceRepositoryImplTest {
@@ -36,73 +41,107 @@ class DataStoreMaintenanceRepositoryImplTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private lateinit var dataStore: FakeSettingsDataStore
-    private lateinit var repo: DataStoreMaintenanceRepositoryImpl
+    // A representative live keep-list: a couple of exact settings keys plus the custom-name prefix.
+    private val owners: Set<OwnsSettingsStoreKeys> = setOf(
+        fakeOwner(
+            exact = setOf("wallpaper_uri", "wallpaper_layers_json", "some_live_setting"),
+            prefixes = setOf(AppConstants.KEY_NAME_PREFIX),
+        ),
+    )
 
-    // Live keys — must NEVER be removed.
+    // Live keys (claimed by an owner) — must NEVER be removed.
     private val liveUri = stringPreferencesKey("wallpaper_uri")
     private val liveLayers = stringPreferencesKey("wallpaper_layers_json")
     private val liveSetting = stringPreferencesKey("some_live_setting")
+    private val liveName = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.example") // prefix-kept
 
-    // Retired keys — must be removed.
-    private val retiredExact = stringPreferencesKey("wallpaper_flattened_path")
-    private val retiredUsage1 = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.foo")
-    private val retiredUsage2 = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.bar")
+    // Orphan keys (claimed by no owner) — must be removed.
+    private val orphanFlattened = stringPreferencesKey("wallpaper_flattened_path")
+    private val orphanUsage = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.foo")
+    private val orphanObsolete = stringPreferencesKey("obsolete_widget_key")
 
-    @Before
-    fun setUp() {
-        dataStore = FakeSettingsDataStore()
-        repo = DataStoreMaintenanceRepositoryImpl(dataStore, mainDispatcherRule.testDispatcher)
-    }
+    private fun repo(
+        store: FakeSettingsDataStore,
+        keyOwners: Set<OwnsSettingsStoreKeys> = owners,
+    ) = DataStoreMaintenanceRepositoryImpl(store, keyOwners, mainDispatcherRule.testDispatcher)
 
     @Test
-    fun `removeOrphanKeys deletes retired keys and leaves live keys intact`() = runTest {
+    fun `removeOrphanKeys deletes un-owned keys and leaves every claimed key intact`() = runTest {
+        val dataStore = FakeSettingsDataStore()
         dataStore.seed {
             it[liveUri] = "file:///a.jpg"
             it[liveLayers] = "[]"
             it[liveSetting] = "x"
-            it[retiredExact] = "file:///c.webp"
-            it[retiredUsage1] = setOf("1")
-            it[retiredUsage2] = setOf("2")
+            it[liveName] = "My App"
+            it[orphanFlattened] = "file:///c.webp"
+            it[orphanUsage] = setOf("1")
+            it[orphanObsolete] = "stale"
         }
 
-        assertEquals(DataStoreMaintenanceRepository.Result.Removed(3), repo.removeOrphanKeys())
+        assertEquals(DataStoreMaintenanceRepository.Result.Removed(3), repo(dataStore).removeOrphanKeys())
 
         val prefs = dataStore.data.first()
-        // Live keys untouched.
+        // Claimed keys untouched (exact + prefix).
         assertEquals("file:///a.jpg", prefs[liveUri])
         assertEquals("[]", prefs[liveLayers])
         assertEquals("x", prefs[liveSetting])
-        // Retired keys gone.
-        assertNull(prefs[retiredExact])
-        assertNull(prefs[retiredUsage1])
-        assertNull(prefs[retiredUsage2])
+        assertEquals("My App", prefs[liveName])
+        // Un-owned keys gone.
+        assertNull(prefs[orphanFlattened])
+        assertNull(prefs[orphanUsage])
+        assertNull(prefs[orphanObsolete])
     }
 
     @Test
     fun `removeOrphanKeys is a no-op reporting Removed(0) on a store with no orphans`() = runTest {
+        val dataStore = FakeSettingsDataStore()
         dataStore.seed { it[liveUri] = "file:///a.jpg" }
 
-        assertEquals(DataStoreMaintenanceRepository.Result.Removed(0), repo.removeOrphanKeys())
+        assertEquals(DataStoreMaintenanceRepository.Result.Removed(0), repo(dataStore).removeOrphanKeys())
         assertEquals("file:///a.jpg", dataStore.data.first()[liveUri])
+    }
+
+    @Test
+    fun `removeOrphanKeys refuses an empty keep-list and never wipes the store`() = runTest {
+        // An empty owner set can only mean a DI/multibinding failure. Deleting "everything not kept"
+        // would wipe the whole settings store, so the impl must refuse and leave the store intact.
+        val dataStore = FakeSettingsDataStore()
+        dataStore.seed {
+            it[liveUri] = "file:///a.jpg"
+            it[orphanObsolete] = "stale"
+        }
+
+        assertEquals(
+            DataStoreMaintenanceRepository.Result.Failed,
+            repo(dataStore, keyOwners = emptySet()).removeOrphanKeys(),
+        )
+
+        // Nothing deleted — not even the genuine orphan — because the guard aborts before editing.
+        val prefs = dataStore.data.first()
+        assertEquals("file:///a.jpg", prefs[liveUri])
+        assertEquals("stale", prefs[orphanObsolete])
     }
 
     @Test
     fun `removeOrphanKeys reports Failed when the store edit throws - never masquerades as clean`() =
         runTest {
             val failing = FakeSettingsDataStore(updateError = IOException("disk full"))
-            val failingRepo = DataStoreMaintenanceRepositoryImpl(failing, mainDispatcherRule.testDispatcher)
-
-            assertEquals(DataStoreMaintenanceRepository.Result.Failed, failingRepo.removeOrphanKeys())
+            assertEquals(DataStoreMaintenanceRepository.Result.Failed, repo(failing).removeOrphanKeys())
         }
 
     @Test
     fun `removeOrphanKeys propagates CancellationException - never swallows cancellation`() = runTest {
         val cancelling = FakeSettingsDataStore(updateError = CancellationException("cancelled"))
-        val cancellingRepo = DataStoreMaintenanceRepositoryImpl(cancelling, mainDispatcherRule.testDispatcher)
-
-        assertFailsWith<CancellationException> { cancellingRepo.removeOrphanKeys() }
+        assertFailsWith<CancellationException> { repo(cancelling).removeOrphanKeys() }
     }
+}
+
+private fun fakeOwner(
+    exact: Set<String> = emptySet(),
+    prefixes: Set<String> = emptySet(),
+): OwnsSettingsStoreKeys = object : OwnsSettingsStoreKeys {
+    override fun ownedExactKeys(): Set<String> = exact
+    override fun ownedKeyPrefixes(): Set<String> = prefixes
 }
 
 /**

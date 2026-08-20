@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.toEnumOrNull
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
@@ -27,7 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class SettingsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>
-) : SettingsRepository {
+) : SettingsRepository, OwnsSettingsStoreKeys {
 
     /**
      * Definition der DataStore Keys.
@@ -63,6 +64,31 @@ class SettingsRepositoryImpl @Inject constructor(
         val CONTENT_TOP_MARGIN_SCALE =
             floatPreferencesKey(AppConstants.PrefKeys.CONTENT_TOP_MARGIN_SCALE)
     }
+
+    // Keep-list for storage cleanup (OwnsSettingsStoreKeys): EVERY declared key
+    // above, ONBOARDING_COMPLETED included — it is exempt from a factory reset
+    // (purgeRepository) but is still a LIVE key, so the cleanup must never delete
+    // it. Sourced straight from the key objects; the checkConventions linter
+    // pins this list against PreferenceKeys so a new key can't be forgotten here.
+    override fun ownedExactKeys(): Set<String> = setOf(
+        PreferenceKeys.SORT_ORDER_KEY.name,
+        PreferenceKeys.DOUBLE_TAP_CLIPBOARD.name,
+        PreferenceKeys.FAVORITES_ALIGNMENT.name,
+        PreferenceKeys.APP_DRAWER_MODE.name,
+        PreferenceKeys.ONBOARDING_COMPLETED.name,
+        PreferenceKeys.TEXT_SHADOW_ENABLED.name,
+        PreferenceKeys.IS_FONT_BOLD.name,
+        PreferenceKeys.SHOW_CALENDAR_EVENT.name,
+        PreferenceKeys.SHOW_ALARM.name,
+        PreferenceKeys.AUTO_SHOW_KEYBOARD.name,
+        PreferenceKeys.AUTO_LAUNCH_APP.name,
+        PreferenceKeys.ROTATION_LOCKED.name,
+        PreferenceKeys.TEXT_COLOR.name,
+        PreferenceKeys.CHIP_BACKGROUND_COLOR.name,
+        PreferenceKeys.LAYOUT_SCALE.name,
+        PreferenceKeys.VERTICAL_PADDING_SCALE.name,
+        PreferenceKeys.CONTENT_TOP_MARGIN_SCALE.name,
+    )
 
     // --- HELPER ---
 

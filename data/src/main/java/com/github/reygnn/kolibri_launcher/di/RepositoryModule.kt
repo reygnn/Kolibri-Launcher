@@ -40,12 +40,15 @@ import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepos
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.domain.service.PackagePresence
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
+import dagger.multibindings.Multibinds
 import javax.inject.Singleton
 
 @Module
@@ -139,4 +142,49 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindFabPositionRepository(impl: FabPositionRepositoryImpl): FabPositionRepository
+
+    // ---- Storage-cleanup keep-list (OwnsSettingsStoreKeys) ----
+    // Every settings-store key owner is multibound into this set; the cleanup
+    // (DataStoreMaintenanceRepositoryImpl) deletes any settings-store key that NO
+    // owner claims. @IntoSet auto-registration means adding an owner is a single
+    // binding with nothing to wire at the aggregation site — the aggregation can
+    // never silently miss an owner and delete its live data. AnrReporter (:app)
+    // is NOT a repository and contributes its watermark key separately, from
+    // SettingsStoreKeyOwnerModule in :app.
+    @Multibinds
+    abstract fun settingsStoreKeyOwners(): Set<OwnsSettingsStoreKeys>
+
+    @Binds
+    @IntoSet
+    abstract fun bindSettingsKeysOwner(impl: SettingsRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindFavoritesKeysOwner(impl: FavoritesRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindFavoritesOrderKeysOwner(
+        impl: FavoritesOrderRepositoryImpl,
+    ): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindHiddenAppsKeysOwner(impl: HiddenAppsRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindCustomNamesKeysOwner(impl: CustomNamesRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindSwipeActionsKeysOwner(impl: SwipeActionsRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindWallpaperKeysOwner(impl: WallpaperRepositoryImpl): OwnsSettingsStoreKeys
+
+    @Binds
+    @IntoSet
+    abstract fun bindFabPositionKeysOwner(impl: FabPositionRepositoryImpl): OwnsSettingsStoreKeys
 }

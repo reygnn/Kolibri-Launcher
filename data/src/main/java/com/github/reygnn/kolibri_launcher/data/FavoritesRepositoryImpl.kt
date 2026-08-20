@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -53,11 +54,13 @@ import javax.inject.Singleton
 @Singleton
 class FavoritesRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-) : FavoritesRepository {
+) : FavoritesRepository, OwnsSettingsStoreKeys {
 
     private object PreferencesKeys {
         val FAVORITES = stringSetPreferencesKey("favorites_components_set")
     }
+
+    override fun ownedExactKeys(): Set<String> = setOf(PreferencesKeys.FAVORITES.name)
 
     // distinctUntilChanged: this key lives in the shared settingsDataStore, so
     // DataStore.data re-emits on EVERY write to that store (usage, sort order,

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -68,7 +69,12 @@ class AnrReporter @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
     private val dataStore: DataStore<Preferences>,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) {
+) : OwnsSettingsStoreKeys {
+
+    // AnrReporter is NOT a repository, but it owns a settings-store key (its ANR
+    // dedup watermark). It joins the cleanup keep-list so the blacklist cleanup
+    // never wipes the watermark and resurrects already-reported ANRs.
+    override fun ownedExactKeys(): Set<String> = setOf(KEY_WATERMARK.name)
 
     /**
      * Walks all ANRs in `getHistoricalProcessExitReasons` newer than the stored

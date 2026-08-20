@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
@@ -33,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class SwipeActionsRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-) : SwipeActionsRepository {
+) : SwipeActionsRepository, OwnsSettingsStoreKeys {
 
     /**
      * Interne Definition der DataStore-Schlüssel, spezifisch für diesen Manager.
@@ -42,6 +43,11 @@ class SwipeActionsRepositoryImpl @Inject constructor(
         val SWIPE_LEFT_APP_COMPONENT = stringPreferencesKey("swipe_left_app_component")
         val SWIPE_RIGHT_APP_COMPONENT = stringPreferencesKey("swipe_right_app_component")
     }
+
+    override fun ownedExactKeys(): Set<String> = setOf(
+        PreferencesKeys.SWIPE_LEFT_APP_COMPONENT.name,
+        PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT.name,
+    )
 
     override suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?) {
         val key = when (slot) {

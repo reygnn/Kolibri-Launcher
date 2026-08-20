@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
+import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -58,7 +59,16 @@ class WallpaperRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val wallpaperFileManager: WallpaperFileManager,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
-) : WallpaperRepository {
+) : WallpaperRepository, OwnsSettingsStoreKeys {
+
+    override fun ownedExactKeys(): Set<String> = setOf(
+        KEY_WALLPAPER_URI.name,
+        KEY_WALLPAPER_SCALE.name,
+        KEY_WALLPAPER_TRANSLATE_X.name,
+        KEY_WALLPAPER_TRANSLATE_Y.name,
+        KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE.name,
+        KEY_LAYERS_JSON.name,
+    )
 
     companion object {
         // --- Legacy Keys (Single-Layer, beibehalten für Migration) ---

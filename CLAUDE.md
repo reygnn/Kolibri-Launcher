@@ -39,7 +39,7 @@ testing reference.
 ./gradlew assembleDebug          # debug APK
 ./gradlew test                   # unit tests (JVM, no emulator)
 ./gradlew jacocoTestReport       # coverage report
-./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, ActivityResult placement, adapter null-out, Exception breadth, localization parity, Rule 2 contract triple, stale-replay hot-flow point-read [AUDIT-13, wired as a dependsOn task])
+./gradlew checkConventions       # CLAUDE.md rule linter (Rule 9, 11, 12, naming, Toast routing, cancellation rethrow, Flow.catch rethrow, unbuffered SharedFlow, purge completeness, settings-store keep-list registration + straggler guard, ActivityResult placement, adapter null-out, Exception breadth, localization parity, Rule 2 contract triple, stale-replay hot-flow point-read [AUDIT-13, wired as a dependsOn task])
 ./gradlew checkRule13            # diff-aware German-comment linter (Rule 13)
 ./gradlew assembleRelease        # finalized: triggers ProGuard mapping upload to ACRA
 ```
@@ -254,6 +254,34 @@ activities.
    keys (local `camelCase` vals built from a prefix, purged by iteration)
    are excluded; a wholesale `.clear()` exempts the file. Regression-tested
    via `tools/check-purge-completeness-test.sh` (manual rerun, not a CI gate).
+
+   *Storage-cleanup keep-list (enforced).* The user-facing "clean up storage"
+   feature (`DataStoreMaintenanceRepository.removeOrphanKeys`) is a
+   **blacklist-of-unknown**: it deletes every **settings-store** key that no
+   live owner claims, rather than a hand-maintained list of retired keys (the
+   old `RetiredDataStoreKeys` whitelist-of-dead, removed). Consent and usage
+   stores are out of scope (ACRA privacy / usage self-heals). Each settings-store
+   key writer declares the keys it owns by implementing
+   `core/OwnsSettingsStoreKeys` (`ownedExactKeys()` / `ownedKeyPrefixes()`,
+   sourced straight from its live `Preferences.Key` objects), and all owners are
+   aggregated into `Set<OwnsSettingsStoreKeys>` via Hilt `@IntoSet` multibinding
+   — the only multibinding in the project, justified because its **failure mode
+   is inverted vs. purge**: a whitelist forgetting a key left a harmless orphan,
+   but here a forgotten *owner* makes a live key look orphaned and get **deleted**
+   (data loss). That risk is contained by, and only by: (1) owners returning the
+   live key objects (nothing to hand-sync), (2) `@IntoSet` auto-registration (the
+   aggregation site can't miss an owner), (3) the impl's empty-keep-list floor (a
+   DI failure reports `Failed`, never wipes the store), and (4) two
+   `./gradlew checkConventions` gates
+   (`tools/check-settings-keys-registered.awk`): **per-owner completeness** —
+   every settings-store key an owner declares must appear in its
+   `ownedExactKeys()`/`ownedKeyPrefixes()` — and a **straggler guard** — any file
+   that declares a `PreferencesKey` but is neither a registered owner nor a known
+   usage/consent writer flags (the cross-module `AnrReporter` case: a non-repo in
+   `:app` that owns one settings key). A new settings-store key writer MUST
+   implement `OwnsSettingsStoreKeys` and join the owner list, or the cleanup will
+   delete its key. Regression-tested via
+   `tools/check-settings-keys-registered-test.sh` (manual rerun, not a CI gate).
 
 6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
    carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
