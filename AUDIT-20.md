@@ -42,7 +42,8 @@
 > **Vierter Durchgang 2026-08-18** (gegen `main` @ `ebd13868`, Version 0.99.178 /
 > code 198, *nach* dem v4-Umbau auf den reinen In-Memory-Composite): gezielter
 > **manueller** Blick auf den Refill/Warm-Pfad — ausdrücklich **keine**
-> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Sechs Punkte, **alle OFFEN**, keiner
+> Multi-Agent-Flächenabdeckung wie §1/§4/§5. Sechs Punkte, zum Zeitpunkt des
+> Durchgangs **alle OFFEN** (F13/F14 inzwischen erledigt — s. §6), keiner
 > ein Korrektheitsdefekt: **F10** (TEMP-Toasts, Release-Blocker), **F11**
 > (Edit-Cancel ohne Warm-Trigger, Performance), **F12** (unerreichbarer
 > Cache-Eintrag nach Auflösungswechsel, Speicher), **F13** (Single→Multi ist eine
@@ -605,10 +606,14 @@ ausgeklammert (s. o.).
 > Blicks auf die Refill-Kante. Wer Vollständigkeit will, muss die
 > Multi-Agent-Methode erneut fahren.
 >
-> **Status: alle sechs OFFEN** — auf Wunsch nur dokumentiert, nicht gefixt (die Arbeit
-> liegt gerade woanders). Kein Fund ist ein Korrektheitsdefekt: F10 ist ein
-> Release-Blocker (Debug-UI), F11 und F15 kosten Performance, F12 Speicher, F13 ist
+> **Status (ursprünglich): alle sechs OFFEN** — auf Wunsch nur dokumentiert, nicht
+> gefixt (die Arbeit lag gerade woanders). Kein Fund ist ein Korrektheitsdefekt: F10 ist
+> ein Release-Blocker (Debug-UI), F11 und F15 kosten Performance, F12 Speicher, F13 ist
 > eine Modell-Asymmetrie, F14 eine halbfertige Feature-Fläche.
+>
+> **Update 2026-08-20:** F14 **entschieden** (alle drei Layer-Regler bleiben UI-los,
+> `ACCEPTED_LIMITATIONS.md` §5), F13 **behoben** (`toSingleLayer`-Collapse am
+> Commit-Rand). Offen bleiben **F10** (Release-Blocker), **F11**, **F12**, **F15**.
 >
 > **F15 ist der einzige Fund dieses Abschnitts, der aus einer Geräte-Beobachtung
 > stammt statt aus dem Lesen** — und er hat eine Leseanalyse widerlegt: die
@@ -682,7 +687,7 @@ Cache tatsächlich gebraucht wird.
 | **F10** | Debug-Residuum | `WallpaperDelegate.kt:733-740` + `HomeFragment.kt:1604-1606` | Die TEMP-Debug-Toasts auf jedem Cache-Fill sind **nicht mehr einer, sondern zwei** (Composite-Warm + Single-Layer-Decode); beide „remove later"-markiert, beide user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
 | **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
-| **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ⛔ OFFEN (bewusst) |
+| **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): bedingter `toSingleLayer` am Commit-Rand |
 | **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ⛔ OFFEN |
 | **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ✅ ENTSCHIEDEN (2026-08-19): alle drei UI-los, Editor transform-only (§5); Modell-Felder bleiben dormant |
 
@@ -812,7 +817,7 @@ Die zweite Variante ist die ehrlichere Invariante, die erste der kleinere Diff.
 
 ---
 
-### F13 — Single→Multi ist eine Einbahnstraße · `low` · CONFIRMED
+### F13 — Single→Multi ist eine Einbahnstraße · `low` · CONFIRMED → BEHOBEN (2026-08-20)
 
 `domain/model/WallpaperState.kt:233-238` (`withRemovedLayer`) + `:157` (`isMultiLayer`)
 
@@ -835,7 +840,7 @@ Layer **nicht** zurück in die Single-Layer-Darstellung. Wer einen Layer hinzuf�
 Cache unter `composite://`) statt des Decode-Cache-Pfads (`file://`-Key), obwohl
 inhaltlich ein Einzelbild vorliegt.
 
-**Warum das NICHT einfach kollabiert wird — mit einer wichtigen Einschränkung:**
+**Warum der Collapse bedingt ist — die Modell-Asymmetrie:**
 `WallpaperLayerState` ist echt reicher als die Single-Layer-Felder von
 `WallpaperState`. Ein Layer trägt `alpha`, `blendModeName`, `isVisible` und `label`;
 die Single-Layer-Darstellung kennt nur
@@ -866,15 +871,32 @@ war die falsche Toast-Beschriftung — behoben, indem `warmComposite` bei
 `layerCount == 1` als Single-Layer-Fill meldet (die Mechanik bleibt der Flatten; der
 Kommentar an der Stelle hält das fest).
 
-**Option, falls die Einbahnstraße doch aufgemacht werden soll:** ein **bedingter**
-Collapse in `withRemovedLayer` — nur wenn genau ein Layer übrig bleibt **und** der
-schlicht ist (`alpha == 1f`, `blendModeName == null`, `isVisible`), sonst bleibt der
-State multi. Das ist verlustfrei bzgl. der Layer-Eigenschaften (Label und Layer-ID
-gehen verloren), bringt solche Wallpaper zurück auf den billigeren Pfad und macht die
-Toast-Unterscheidung gegenstandslos. Bewusst **nicht** jetzt umgesetzt: es ist ein
-Verhaltenswechsel im Render-/Cache-Pfad, an dem AUDIT-20 bereits viermal iteriert hat,
-und er braucht eigene Tests (Collapse trifft nur den schlichten Fall; Alpha-/Blend-/
-Hidden-Layer bleiben multi).
+**Behoben (2026-08-20) — bedingter Collapse in `toSingleLayer`.** Die
+Einbahnstraße ist zu: neu `WallpaperState.toSingleLayer()` (Spiegelbild zu
+`toMultiLayer`) kollabiert einen Multi-State mit genau einem **schlichten** Layer
+(`alpha == 1f`, `blendModeName == null`, `isVisible`) zurück in die
+Single-Layer-Darstellung; jeder andere Fall bleibt No-op (`return this`), sodass ein
+Backup-Edge mit divergentem Wert multi bleibt. `imageUri`/`scale`/`translateX`/
+`translateY`/`captureSampleSize` mappen 1:1; Layer-`id` und `label` (reine
+Bookkeeping-Felder, nie angezeigt) fallen weg.
+
+**Abweichung von der ursprünglich skizzierten Stelle:** der Collapse sitzt **nicht**
+in `withRemovedLayer`, sondern am **Commit-Rand** (`onCommitWallpaperEditMode`). In
+`withRemovedLayer` würde er beim Sprung 2→1 **mitten in der Edit-Session** feuern und
+die noch im Multi-Modus laufende View gegen einen bereits-Single-Layer-State
+desyncen. Am Commit normalisiert er an der Persistenz-Grenze; `commit()` wendet
+synchron an, daher sieht der anschließende Composite-Warm-Snapshot schon den
+Single-Layer-State und überspringt den Flatten korrekt. `toMultiLayer` konvertiert
+beim nächsten „Layer hinzufügen" ohnehin zurück, der Nutzer wird nicht eingesperrt.
+
+**Tests:** `WallpaperStateTest` (neu, `:domain`) pinnt Guard, Feld-Mapping,
+Round-Trip und No-ops **beider** Richtungen — inkl. der ersten dedizierten
+`toMultiLayer`-Abdeckung; zwei `WallpaperDelegateTest`-Fälle pinnen Collapse+Persist
+am Commit und „Non-plain bleibt multi".
+
+*Die frühere Toast-Notiz oben (F10) bleibt gültig — die Single-Layer-Meldung bei
+`layerCount == 1` ist jetzt zusätzlich dadurch abgesichert, dass ein schlichter
+1-Layer-State gar nicht mehr im Multi-/Flatten-Pfad landet.*
 
 **Der Rückweg existiert heute schon:** „Hintergrund wählen" setzt via
 `SetWallpaperImageUseCase` einen frischen Single-Layer-State und verwirft den
