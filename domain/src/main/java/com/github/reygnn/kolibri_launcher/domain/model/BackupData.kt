@@ -45,16 +45,6 @@ data class WallpaperLayerBackup(
 
     @JsonNames("translate_y")
     val translateY: Float = 0f,
-
-    val alpha: Float = 1.0f,
-
-    @JsonNames("blend_mode")
-    val blendModeName: String? = null,
-
-    @JsonNames("is_visible")
-    val isVisible: Boolean = true,
-
-    val label: String? = null
 ) {
     fun toLayerState(): WallpaperLayerState {
         return WallpaperLayerState(
@@ -66,10 +56,6 @@ data class WallpaperLayerBackup(
             scale = scale,
             translateX = translateX,
             translateY = translateY,
-            alpha = alpha,
-            blendModeName = blendModeName?.takeIf { it.isNotEmpty() },
-            isVisible = isVisible,
-            label = label?.takeIf { it.isNotEmpty() }
         )
     }
 
@@ -81,10 +67,6 @@ data class WallpaperLayerBackup(
                 scale = state.scale,
                 translateX = state.translateX,
                 translateY = state.translateY,
-                alpha = state.alpha,
-                blendModeName = state.blendModeName,
-                isVisible = state.isVisible,
-                label = state.label
             )
         }
     }

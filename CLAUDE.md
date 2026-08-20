@@ -812,9 +812,10 @@ per-quantity coverage inside a `<plurals>` is not checked, since German and
 English share the same one/other split.
 
 `translatable="false"` in the DEFAULT locale is the exemption — the platform's
-own way of marking something as not-UI-prose. 14 keys carry it today (the
-blend-mode names, `time_placeholder`, `battery_placeholder`) and are correctly
-absent from `values-de/`. An orphan in `values-de/` is never exempt: a locale
+own way of marking something as not-UI-prose. 2 keys carry it today
+(`time_placeholder`, `battery_placeholder`) and are correctly absent from
+`values-de/`. (The 12 `blend_mode_*` names were removed with the per-layer
+blend-mode machinery on 2026-08-20.) An orphan in `values-de/` is never exempt: a locale
 override of a non-translatable key is itself the bug.
 
 Unlike the catch-breadth axes this is a GLOBAL check, not a positive list —

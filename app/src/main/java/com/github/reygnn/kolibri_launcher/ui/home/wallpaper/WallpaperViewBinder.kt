@@ -329,10 +329,7 @@ class WallpaperViewBinder(
                     LaunchTrace.section(LaunchTrace.Names.WALLPAPER_ADD_LAYER) {
                         view.addLayer(
                             bitmap = loaded.bitmap,
-                            label = result.spec.label,
                             centerCrop = result.spec.centerCrop,
-                            alpha = result.spec.alpha,
-                            blendMode = result.spec.blendMode,
                             sourceUri = result.spec.imageUri,
                             id = result.spec.id,
                             sampleSize = loaded.sampleSize,
@@ -438,12 +435,6 @@ class WallpaperViewBinder(
                         // invalidate() outside this loop stay caller-side
                         // because they are not part of the decision.
                         applyLayerTransformOrDefault(view, update.layerIndex, update.transform)
-
-                        view.getLayer(update.layerIndex)?.let { layer ->
-                            layer.alpha = update.alpha
-                            layer.blendMode = update.blendMode
-                            layer.isVisible = update.isVisible
-                        }
                     }
                     view.invalidate()
                     onRebuildComplete?.invoke()

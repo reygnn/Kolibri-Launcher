@@ -27,30 +27,21 @@ import javax.inject.Inject
  *    layer, painted first) "only when opaque enough to dominate
  *    perception". See `WALLPAPER_COMPOSITE_LIFECYCLE_SPEC` §5 and
  *    `ACCEPTED_LIMITATIONS.md` #1 (closed again in v4.3, with transient
- *    residuals #1a/#1b). Two cooperating gates decide the fallback's
- *    "opaque enough":
+ *    residuals #1a/#1b). The fallback's "opaque enough" is decided by a
+ *    **pixel-level coverage gate** (`WallpaperBitmapLuminanceImpl`): the
+ *    bitmap itself must have a high enough fraction of effectively-opaque
+ *    pixels (alpha ≥ 80%) to dominate. AMOLED-converted wallpapers typically
+ *    have 10..20% coverage and fall through this gate; fully-opaque images
+ *    have ~100% and pass. The impl signals "not visually dominant" by
+ *    returning `null` from `compute()`, indistinguishable from a load failure.
  *
- *    - **Layer-level alpha gate** (this use case): the persisted
- *      `WallpaperLayerState.alpha` ≥ [DOMINANT_ALPHA_THRESHOLD]
- *      **and** Normal blend mode (no `blendModeName`).
- *    - **Pixel-level coverage gate**
- *      (`WallpaperBitmapLuminanceImpl`): the bitmap itself must
- *      have a high enough fraction of effectively-opaque pixels
- *      (alpha ≥ 80%) to dominate. AMOLED-converted wallpapers
- *      typically have 10..20% coverage and fall through this gate;
- *      fully-opaque images have ~100% and pass. The impl signals
- *      "not visually dominant" by returning `null` from
- *      `compute()`, indistinguishable from a load failure.
+ *    When the gate fails, the classifier falls through to the system signal —
+ *    that's what the user actually sees through the low-coverage Kolibri layer.
  *
- *    When either gate fails, the classifier falls through to the
- *    system signal — that's what the user actually sees through the
- *    transparent or low-coverage Kolibri layer.
- *
- *    The bottom-layer soft spots — a transparent `layers[0]` over an
- *    opaque higher layer, or an opaque `layers[0]` with a non-Normal
- *    blend (e.g. MULTIPLY at alpha 1.0) — are exactly what the composite
- *    luminance resolves once the warm has emitted; they apply only during
- *    the brief fallback window (`ACCEPTED_LIMITATIONS.md` #1a/#1b).
+ *    The bottom-layer soft spot — an opaque higher layer over a low-coverage
+ *    `layers[0]` — is exactly what the composite luminance resolves once the
+ *    warm has emitted; it applies only during the brief fallback window
+ *    (`ACCEPTED_LIMITATIONS.md` #1a/#1b).
  *
  * 2. **System-wallpaper `colorHints`** via
  *    [SystemWallpaperColorsSignal]. The OS publishes
@@ -132,13 +123,10 @@ class ClassifyWallpaperUseCase @Inject constructor(
 
     private fun projectKolibriInput(state: WallpaperState): KolibriInput {
         if (state.isMultiLayer) {
-            // Bottom-most layer (painted first) behind the alpha + Normal-blend gates — anything
-            // below either bar means the system wallpaper bleeds through. This is only the
-            // FALLBACK while the composite luminance is not yet available (v4.3).
-            val bottom = state.layers.firstOrNull() ?: return KolibriInput.Multi(null)
-            val fallback =
-                if (bottom.alpha < DOMINANT_ALPHA_THRESHOLD || bottom.blendModeName != null) null
-                else bottom.imageUri
+            // Bottom-most layer (painted first) as the FALLBACK URI while the composite
+            // luminance is not yet available (v4.3); the composite itself is classified from
+            // CompositeLuminanceSignal, not from here.
+            val fallback = state.layers.firstOrNull()?.imageUri
             return KolibriInput.Multi(fallback)
         }
         return state.imageUri?.let { KolibriInput.Single(it) } ?: KolibriInput.None
@@ -155,13 +143,6 @@ class ClassifyWallpaperUseCase @Inject constructor(
         else LuminanceClassification.DARK
 
     companion object {
-        /**
-         * Threshold above which `layers[0]` is "opaque enough" to
-         * dominate the perceived background. Anything below means
-         * the system wallpaper visibly bleeds through.
-         */
-        const val DOMINANT_ALPHA_THRESHOLD: Float = 0.8f
-
         /** WCAG midpoint, strict greater-than (matches `ResolvedBackground`). */
         const val LUMINANCE_THRESHOLD: Float = 0.5f
     }

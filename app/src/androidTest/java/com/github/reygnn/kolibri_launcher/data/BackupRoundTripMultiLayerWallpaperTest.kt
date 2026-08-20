@@ -103,20 +103,12 @@ class BackupRoundTripMultiLayerWallpaperTest {
             scale = 1.4f,
             translateX = 12.5f,
             translateY = -34.0f,
-            alpha = 0.75f,
-            blendModeName = "MULTIPLY",
-            isVisible = true,
-            label = "Base",
         )
         val layer1 = WallpaperLayerState(
             imageUri = seedInternalLayerImage(layer1Bytes, "l1"),
             scale = 2.1f,
             translateX = -8.0f,
             translateY = 44.5f,
-            alpha = 0.5f,
-            blendModeName = "SCREEN",
-            isVisible = false,
-            label = "Overlay",
         )
         wallpaper.saveWallpaperState(WallpaperState.multiLayer(listOf(layer0, layer1)))
 
@@ -153,22 +145,14 @@ class BackupRoundTripMultiLayerWallpaperTest {
         val r0 = restored.layers[0]
         val r1 = restored.layers[1]
 
-        // ── ASSERT: per-layer transform + blend metadata round-tripped ─────
+        // ── ASSERT: per-layer transform metadata round-tripped ─────────────
         assertThat(r0.scale).isEqualTo(1.4f)
         assertThat(r0.translateX).isEqualTo(12.5f)
         assertThat(r0.translateY).isEqualTo(-34.0f)
-        assertThat(r0.alpha).isEqualTo(0.75f)
-        assertThat(r0.blendModeName).isEqualTo("MULTIPLY")
-        assertThat(r0.isVisible).isTrue()
-        assertThat(r0.label).isEqualTo("Base")
 
         assertThat(r1.scale).isEqualTo(2.1f)
         assertThat(r1.translateX).isEqualTo(-8.0f)
         assertThat(r1.translateY).isEqualTo(44.5f)
-        assertThat(r1.alpha).isEqualTo(0.5f)
-        assertThat(r1.blendModeName).isEqualTo("SCREEN")
-        assertThat(r1.isVisible).isFalse()
-        assertThat(r1.label).isEqualTo("Overlay")
 
         // ── ASSERT: each layer's bytes survived AND were not cross-wired ───
         // (layer 0 must carry layer0Bytes, layer 1 must carry layer1Bytes —
@@ -190,8 +174,8 @@ class BackupRoundTripMultiLayerWallpaperTest {
     @Test
     fun saveAndLoad_layersSharingOneImage_bothSurvive() = runBlocking {
         val sharedUri = seedInternalLayerImage(layer0Bytes, "shared")
-        val layer0 = WallpaperLayerState(imageUri = sharedUri, scale = 1.2f, label = "First")
-        val layer1 = WallpaperLayerState(imageUri = sharedUri, scale = 3.0f, label = "Second")
+        val layer0 = WallpaperLayerState(imageUri = sharedUri, scale = 1.2f)
+        val layer1 = WallpaperLayerState(imageUri = sharedUri, scale = 3.0f)
         wallpaper.saveWallpaperState(WallpaperState.multiLayer(listOf(layer0, layer1)))
 
         val saved = withTimeout(15_000) { backup.saveBackupToFile(backupFile.toUri().toString()) }
@@ -213,8 +197,6 @@ class BackupRoundTripMultiLayerWallpaperTest {
         // The core AUDIT-3 #8 assertion: the second (shared-file) layer is
         // NOT dropped.
         assertThat(restored.layers).hasSize(2)
-        assertThat(restored.layers[0].label).isEqualTo("First")
-        assertThat(restored.layers[1].label).isEqualTo("Second")
         assertThat(restored.layers[0].scale).isEqualTo(1.2f)
         assertThat(restored.layers[1].scale).isEqualTo(3.0f)
         // Both restored layers carry the shared image's bytes.

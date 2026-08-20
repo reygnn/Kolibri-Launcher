@@ -904,7 +904,7 @@ class WallpaperDelegate(
     // MULTI-LAYER: MANAGEMENT
     // ===========================================
 
-    fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) {
+    fun onAddWallpaperLayer(imageUri: Uri) {
         // Capture the rollback generation synchronously, at invocation time.
         // The copy below hops to Dispatchers.IO and releases the main
         // dispatcher, so a synchronous Cancel can restore the snapshot
@@ -947,11 +947,8 @@ class WallpaperDelegate(
                 current
             }
 
-            // Auto-label: pick the lowest unused "Layer N" number so that
-            // after a delete+add cycle we don't get "Layer 3" twice.
             val newLayer = WallpaperLayerState(
                 imageUri = internalUriString,
-                label = label ?: nextFreeAutoLabel(base)
             )
 
             val mutation = Mutation(
@@ -966,19 +963,6 @@ class WallpaperDelegate(
             applyState(mutation)
             persist(mutation)
         }
-    }
-
-    /**
-     * Findet die kleinste freie Nummer N, so dass "Layer N" noch nicht im
-     * [state] vorkommt. Verhindert Kollisionen nach Delete-then-Add-Zyklen.
-     */
-    private fun nextFreeAutoLabel(state: WallpaperState): String {
-        val used = state.layers.mapNotNull { layer ->
-            layer.label?.removePrefix("Layer ")?.toIntOrNull()
-        }.toSet()
-        var n = 1
-        while (n in used) n++
-        return "Layer $n"
     }
 
     fun onRemoveWallpaperLayer(layerIndex: Int) {
@@ -1061,37 +1045,5 @@ class WallpaperDelegate(
         }
         commit("Error saving all layer transforms", Mutation(state))
     }
-
-    // ===========================================
-    // MULTI-LAYER: PROPERTIES
-    // ===========================================
-    //
-    // INTENTIONALLY UNUSED IN PRODUCTION — the wallpaper editor stays
-    // transform-only (add / remove / reorder / pan-zoom). Per-layer alpha,
-    // blend mode and visibility get NO UI, by design: the layered-collage
-    // workflow bakes its compositing into the source PNGs (darkroom/greenwall
-    // alpha cutouts over darkroom/chiaroscuro AMOLED frames), which
-    // ZoomableImageView.drawLayers already honours per-pixel — a uniform
-    // layer-alpha / blend / visibility control is redundant. Visibility also
-    // has no cheap wiring: the canvas hit-test skips invisible layers and there
-    // is no layer list/cycler, so a hidden layer would be unreachable.
-    // The three setters stay so the render/backup path keeps working (values
-    // reachable only via imported backup JSON); do NOT wire a slider / picker /
-    // toggle to them. Decision: ACCEPTED_LIMITATIONS.md §5 + AUDIT-20 F14.
-
-    fun onSetLayerAlpha(layerIndex: Int, alpha: Float) =
-        mutateLayerAndPersist("Error setting layer alpha", layerIndex) {
-            it.copy(alpha = alpha.coerceIn(0f, 1f))
-        }
-
-    fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) =
-        mutateLayerAndPersist("Error setting layer blend mode", layerIndex) {
-            it.copy(blendModeName = blendModeName)
-        }
-
-    fun onSetLayerVisibility(layerIndex: Int, isVisible: Boolean) =
-        mutateLayerAndPersist("Error setting layer visibility", layerIndex) {
-            it.copy(isVisible = isVisible)
-        }
 
 }

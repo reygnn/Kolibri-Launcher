@@ -257,12 +257,6 @@ class BackupSerializer @Inject constructor() {
                 ?: obj.getStrictFloat("translate_x") ?: 0f,
             translateY = obj.getStrictFloat("translateY")
                 ?: obj.getStrictFloat("translate_y") ?: 0f,
-            alpha = obj.getStrictFloat("alpha") ?: 1.0f,
-            blendModeName = obj.getStrictString("blendModeName")
-                ?: obj.getStrictString("blend_mode"),
-            isVisible = obj.getStrictBool("isVisible")
-                ?: obj.getStrictBool("is_visible") ?: true,
-            label = obj.getStrictString("label"),
         )
     }
 
@@ -500,9 +494,8 @@ class BackupSerializer @Inject constructor() {
     }
 
     private fun validateWallpaperLayerTypes(layersArray: JSONArray): Boolean {
-        val layerFloatFields = listOf("scale", "translateX", "translate_x", "translateY", "translate_y", "alpha")
-        val layerBoolFields = listOf("isVisible", "is_visible")
-        val layerStringFields = listOf("id", "imageUri", "image_uri", "imageFileName", "image_file_name", "blendModeName", "blend_mode", "label")
+        val layerFloatFields = listOf("scale", "translateX", "translate_x", "translateY", "translate_y")
+        val layerStringFields = listOf("id", "imageUri", "image_uri", "imageFileName", "image_file_name")
 
         for (i in 0 until layersArray.length()) {
             val layer = layersArray.optJSONObject(i) ?: continue
@@ -517,14 +510,6 @@ class BackupSerializer @Inject constructor() {
                     val doubleVal = (value as Number).toDouble()
                     if (!doubleVal.isFinite()) {
                         Timber.w("Type validation failed: wallpaperLayers[$i].$field is Infinity or NaN")
-                        return false
-                    }
-                }
-            }
-            for (field in layerBoolFields) {
-                if (layer.has(field) && !layer.isNull(field)) {
-                    if (layer.get(field) !is Boolean) {
-                        Timber.w("Type validation failed: wallpaperLayers[$i].$field is not a boolean")
                         return false
                     }
                 }

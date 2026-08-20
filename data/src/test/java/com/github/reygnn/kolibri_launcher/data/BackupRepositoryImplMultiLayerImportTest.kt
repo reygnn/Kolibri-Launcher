@@ -125,8 +125,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         // plain JSON, then re-import (Phase 7 clears wallpaper, then restores).
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(imageUri = "content://img/0", scale = 1.3f, label = "Has image"),
-                WallpaperLayerState(imageUri = null, scale = 2.0f, label = "Metadata only"),
+                WallpaperLayerState(imageUri = "content://img/0", scale = 1.3f),
+                WallpaperLayerState(imageUri = null, scale = 2.0f),
             )
         )
 
@@ -141,7 +141,7 @@ class BackupRepositoryImplMultiLayerImportTest {
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.isMultiLayer).isTrue()
         assertThat(restored.layers).hasSize(1)
-        assertThat(restored.layers[0].label).isEqualTo("Has image")
+        assertThat(restored.layers[0].imageUri).isEqualTo("content://img/0")
         assertThat(restored.layers[0].scale).isEqualTo(1.3f)
     }
 
@@ -150,8 +150,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         // Build an all-image-less backup by exporting a metadata-only state…
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(imageUri = null, scale = 1.5f, label = "A"),
-                WallpaperLayerState(imageUri = null, scale = 2.5f, label = "B"),
+                WallpaperLayerState(imageUri = null, scale = 1.5f),
+                WallpaperLayerState(imageUri = null, scale = 2.5f),
             )
         )
         val json = backupManager.exportToJson()
@@ -178,8 +178,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         // per-layer transforms through parse + restore.
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(imageUri = "content://img/0", scale = 1.1f, label = "First"),
-                WallpaperLayerState(imageUri = "content://img/1", scale = 2.2f, label = "Second"),
+                WallpaperLayerState(imageUri = "content://img/0", scale = 1.1f),
+                WallpaperLayerState(imageUri = "content://img/1", scale = 2.2f),
             )
         )
 
@@ -191,7 +191,8 @@ class BackupRepositoryImplMultiLayerImportTest {
         assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.layers).hasSize(2)
-        assertThat(restored.layers.map { it.label }).containsExactly("First", "Second").inOrder()
+        assertThat(restored.layers.map { it.imageUri })
+            .containsExactly("content://img/0", "content://img/1").inOrder()
         assertThat(restored.layers[0].scale).isEqualTo(1.1f)
         assertThat(restored.layers[1].scale).isEqualTo(2.2f)
     }
@@ -208,8 +209,8 @@ class BackupRepositoryImplMultiLayerImportTest {
 
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(imageUri = "content://img/ok", label = "Kept"),
-                WallpaperLayerState(imageUri = "content://img/gone", label = "Lost"),
+                WallpaperLayerState(imageUri = "content://img/ok"),
+                WallpaperLayerState(imageUri = "content://img/gone"),
             )
         )
 
@@ -219,6 +220,6 @@ class BackupRepositoryImplMultiLayerImportTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
         val restored = fakeWallpaperRepo.currentState
-        assertThat(restored.layers.map { it.label }).containsExactly("Kept")
+        assertThat(restored.layers.map { it.imageUri }).containsExactly("content://img/ok")
     }
 }

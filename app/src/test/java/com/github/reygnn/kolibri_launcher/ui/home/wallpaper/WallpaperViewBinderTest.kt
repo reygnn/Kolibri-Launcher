@@ -21,8 +21,8 @@ import org.robolectric.RobolectricTestRunner
  * layer's position down. Without the remap, `applyUpdates` would apply
  * `plan.updates[i]` (still indexed against the original spec position) to
  * the wrong view layer — persistent visual corruption of a multi-layer
- * wallpaper. Each layer here carries a distinct alpha so a surviving
- * update can be traced back to the layer it belongs to.
+ * wallpaper. Each layer here carries a distinct translateX so a surviving
+ * update (via its transform) can be traced back to the layer it belongs to.
  */
 @RunWith(RobolectricTestRunner::class)
 class WallpaperViewBinderTest {
@@ -31,12 +31,11 @@ class WallpaperViewBinderTest {
 
     private fun uri(path: String): String = "file://$path"
 
-    private fun layer(id: String, alpha: Float): WallpaperLayerState =
+    private fun layer(id: String, translateX: Float): WallpaperLayerState =
         WallpaperLayerState(
             id = id,
             imageUri = uri("/data/$id.jpg"),
-            alpha = alpha,
-            label = null
+            translateX = translateX,
         )
 
     /**
@@ -53,11 +52,11 @@ class WallpaperViewBinderTest {
         return plan as RebuildPlan.FullRebuild
     }
 
-    // Distinct alphas so an update can be identified by the layer it came from.
-    private val l0 = layer("L0", alpha = 0.1f)
-    private val l1 = layer("L1", alpha = 0.2f)
-    private val l2 = layer("L2", alpha = 0.3f)
-    private val l3 = layer("L3", alpha = 0.4f)
+    // Distinct translateX so an update can be identified by the layer it came from.
+    private val l0 = layer("L0", translateX = 10f)
+    private val l1 = layer("L1", translateX = 20f)
+    private val l2 = layer("L2", translateX = 30f)
+    private val l3 = layer("L3", translateX = 40f)
 
     // ===========================================
     // FAST PATH — nothing skipped
@@ -95,9 +94,9 @@ class WallpaperViewBinderTest {
 
         // L1's update is dropped; L0/L2/L3 map to real positions 0/1/2.
         assertEquals(3, result.size)
-        assertEquals(0.1f to 0, result[0].alpha to result[0].layerIndex) // L0
-        assertEquals(0.3f to 1, result[1].alpha to result[1].layerIndex) // L2
-        assertEquals(0.4f to 2, result[2].alpha to result[2].layerIndex) // L3
+        assertEquals(10f to 0, result[0].transform?.translateX to result[0].layerIndex) // L0
+        assertEquals(30f to 1, result[1].transform?.translateX to result[1].layerIndex) // L2
+        assertEquals(40f to 2, result[2].transform?.translateX to result[2].layerIndex) // L3
     }
 
     @Test
@@ -112,9 +111,9 @@ class WallpaperViewBinderTest {
         )
 
         assertEquals(3, result.size)
-        assertEquals(0.2f to 0, result[0].alpha to result[0].layerIndex) // L1
-        assertEquals(0.3f to 1, result[1].alpha to result[1].layerIndex) // L2
-        assertEquals(0.4f to 2, result[2].alpha to result[2].layerIndex) // L3
+        assertEquals(20f to 0, result[0].transform?.translateX to result[0].layerIndex) // L1
+        assertEquals(30f to 1, result[1].transform?.translateX to result[1].layerIndex) // L2
+        assertEquals(40f to 2, result[2].transform?.translateX to result[2].layerIndex) // L3
     }
 
     // ===========================================
@@ -134,7 +133,7 @@ class WallpaperViewBinderTest {
 
         assertEquals(3, result.size)
         assertEquals(listOf(0, 1, 2), result.map { it.layerIndex })
-        assertEquals(listOf(0.1f, 0.2f, 0.3f), result.map { it.alpha })
+        assertEquals(listOf(10f, 20f, 30f), result.map { it.transform?.translateX })
     }
 
     // ===========================================

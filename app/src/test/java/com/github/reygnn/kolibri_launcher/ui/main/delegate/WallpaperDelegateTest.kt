@@ -636,7 +636,7 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        delegate.onAddWallpaperLayer(testUri, "My Layer")
+        delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.copyToInternal(testUri) }
@@ -737,7 +737,7 @@ class WallpaperDelegateTest {
     @Test
     fun `commit collapses a single plain layer back to single-layer and persists it`() = runTest {
         val multi = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///only.png", scale = 2f, label = "Layer 1"))
+            listOf(WallpaperLayerState(imageUri = "file:///only.png", scale = 2f))
         )
         val stateFlow = MutableStateFlow<WallpaperState>(multi)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
@@ -760,32 +760,6 @@ class WallpaperDelegateTest {
         assertFalse("commit must collapse a single plain layer", collapsed.isMultiLayer)
         assertEquals("file:///only.png", collapsed.imageUri)
         assertEquals(2f, collapsed.scale)
-        coVerify { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer && it.imageUri == "file:///only.png" }) }
-    }
-
-    @Test
-    fun `commit collapses even a single layer carrying dead per-layer props`() = runTest {
-        // alpha/blend/isVisible are UI-less and slated for retirement; the
-        // collapse is unconditional, so even a (theoretical) non-default layer
-        // collapses and its dead props are dropped.
-        val multi = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///only.png", alpha = 0.5f))
-        )
-        val stateFlow = MutableStateFlow<WallpaperState>(multi)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-        val cache: WallpaperCompositeCache = mockk(relaxed = true)
-        every { cache.get(any()) } returns mockk(relaxed = true)
-
-        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, compositeCache = cache)
-        delegate.start()
-        advanceUntilIdle()
-
-        delegate.onEnterWallpaperEditMode()
-        delegate.onCommitWallpaperEditMode()
-        advanceUntilIdle()
-
-        assertFalse(delegate.wallpaperState.value.isMultiLayer)
         coVerify { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer && it.imageUri == "file:///only.png" }) }
     }
 
@@ -834,8 +808,8 @@ class WallpaperDelegateTest {
         // would have deferred this write into a coroutine and failed here.
         val realState = WallpaperState(
             layers = listOf(
-                WallpaperLayerState(imageUri = "file:///a.jpg", label = "Layer 1"),
-                WallpaperLayerState(imageUri = "file:///b.jpg", label = "Layer 2"),
+                WallpaperLayerState(imageUri = "file:///a.jpg"),
+                WallpaperLayerState(imageUri = "file:///b.jpg"),
             )
         )
         val stateFlow = MutableStateFlow(realState)
@@ -931,45 +905,6 @@ class WallpaperDelegateTest {
 
         val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
         return delegate
-    }
-
-    @Test
-    fun `onSetLayerAlpha clamps and saves`() = runTest {
-        val delegate = createDelegateWithStatefulWallpaper()
-
-        delegate.start()
-        advanceUntilIdle()
-
-        delegate.onSetLayerAlpha(0, 0.5f)
-        advanceUntilIdle()
-
-        coVerify { saveWallpaperStateUseCase.invoke(any()) }
-    }
-
-    @Test
-    fun `onSetLayerBlendMode saves state`() = runTest {
-        val delegate = createDelegateWithStatefulWallpaper()
-
-        delegate.start()
-        advanceUntilIdle()
-
-        delegate.onSetLayerBlendMode(0, "MULTIPLY")
-        advanceUntilIdle()
-
-        coVerify { saveWallpaperStateUseCase.invoke(any()) }
-    }
-
-    @Test
-    fun `onSetLayerVisibility saves state`() = runTest {
-        val delegate = createDelegateWithStatefulWallpaper()
-
-        delegate.start()
-        advanceUntilIdle()
-
-        delegate.onSetLayerVisibility(0, false)
-        advanceUntilIdle()
-
-        coVerify { saveWallpaperStateUseCase.invoke(any()) }
     }
 
     // ===========================================
@@ -1396,41 +1331,6 @@ class WallpaperDelegateTest {
     }
 
     // ===========================================
-    // LABEL AUTO-NUMBERING
-    // ===========================================
-
-    @Test
-    fun `onAddWallpaperLayer picks non-colliding auto-label after delete`() = runTest {
-        // This is a weak-sauce test at the unit level because mockk()'d
-        // WallpaperState cannot easily capture the label of the added layer.
-        // The strongest signal we can assert here is that add still
-        // persists even when layers is non-empty with gaps in labels.
-        val existingLayer: WallpaperLayerState = mockk {
-            every { label } returns "Layer 1"
-        }
-        val addedState: WallpaperState = mockk(relaxed = true)
-        val state: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
-            every { hasWallpaper } returns true
-            every { layers } returns listOf(existingLayer)
-            every { withAddedLayer(any()) } returns addedState
-        }
-
-        val stateFlow = MutableStateFlow(state)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-
-        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
-        delegate.start()
-        advanceUntilIdle()
-
-        delegate.onAddWallpaperLayer(testUri)
-        advanceUntilIdle()
-
-        coVerify { saveWallpaperStateUseCase.invoke(any()) }
-    }
-
-    // ===========================================
     // ORPHAN GC — FREQUENCY CONTRACT
     // ===========================================
 
@@ -1531,7 +1431,7 @@ class WallpaperDelegateTest {
 
         assertNull("initial pending-focus must be null", delegate.pendingFocusLayerId.value)
 
-        delegate.onAddWallpaperLayer(testUri, "My Layer")
+        delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
 
         assertNotNull(

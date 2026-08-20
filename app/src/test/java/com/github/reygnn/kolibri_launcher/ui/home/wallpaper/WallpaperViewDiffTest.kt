@@ -40,19 +40,12 @@ class WallpaperViewDiffTest {
         scale: Float = 1f,
         translateX: Float = 0f,
         translateY: Float = 0f,
-        alpha: Float = 1f,
-        blendModeName: String? = null,
-        isVisible: Boolean = true
     ): WallpaperLayerState = WallpaperLayerState(
         id = id,
         imageUri = imageUri,
         scale = scale,
         translateX = translateX,
         translateY = translateY,
-        alpha = alpha,
-        blendModeName = blendModeName,
-        isVisible = isVisible,
-        label = null
     )
 
     private fun multiLayer(vararg layers: WallpaperLayerState) =
@@ -216,7 +209,7 @@ class WallpaperViewDiffTest {
     @Test
     fun `rebuild carries load specs with correct properties`() {
         val target = multiLayer(
-            layer("L1", scale = 2f, translateX = 10f, translateY = 20f, alpha = 0.5f)
+            layer("L1", scale = 2f, translateX = 10f, translateY = 20f)
         )
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
@@ -224,7 +217,6 @@ class WallpaperViewDiffTest {
         assertEquals(1, plan.layers.size)
         val spec = plan.layers[0]
         assertEquals("L1", spec.id)
-        assertEquals(0.5f, spec.alpha)
         assertEquals(false, spec.centerCrop) // isTransformed → don't center-crop
     }
 
@@ -274,8 +266,8 @@ class WallpaperViewDiffTest {
     @Test
     fun `UpdatePropertiesOnly carries transforms and properties`() {
         val target = multiLayer(
-            layer("L1", scale = 2f, translateX = 10f, translateY = 20f, alpha = 0.7f),
-            layer("L2", alpha = 0.3f, isVisible = false)
+            layer("L1", scale = 2f, translateX = 10f, translateY = 20f),
+            layer("L2")
         )
         val current = snapshot(ids = listOf("L1", "L2"))
 
@@ -290,12 +282,9 @@ class WallpaperViewDiffTest {
             LayerPropertyUpdate.Transform(2f, 10f, 20f),
             u0.transform
         )
-        assertEquals(0.7f, u0.alpha)
 
         val u1 = plan.updates[1]
         assertNull("untransformed layer → null transform (will center-crop)", u1.transform)
-        assertEquals(0.3f, u1.alpha)
-        assertEquals(false, u1.isVisible)
     }
 
     @Test

@@ -1,11 +1,9 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
-import android.graphics.BlendMode
 import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.ui.util.toAndroidBlendMode
 
 /**
  * =====================================================================================
@@ -111,10 +109,7 @@ data class ViewLayerSnapshot(
 data class LayerLoadSpec(
     val id: String,
     val imageUri: Uri,
-    val label: String?,
     val centerCrop: Boolean,
-    val alpha: Float,
-    val blendMode: BlendMode?
 ) {
     companion object {
         fun fromLayerState(state: WallpaperLayerState): LayerLoadSpec? {
@@ -122,10 +117,7 @@ data class LayerLoadSpec(
             return LayerLoadSpec(
                 id = state.id,
                 imageUri = uriString.toUri(),
-                label = state.label,
                 centerCrop = !state.isTransformed,
-                alpha = state.alpha,
-                blendMode = state.blendMode?.toAndroidBlendMode()
             )
         }
     }
@@ -142,9 +134,6 @@ data class LayerLoadSpec(
 data class LayerPropertyUpdate(
     val layerIndex: Int,
     val transform: Transform?,
-    val alpha: Float,
-    val blendMode: BlendMode?,
-    val isVisible: Boolean
 ) {
     /**
      * @property captureSampleSize the decode downsample factor the [scale] was
@@ -170,9 +159,6 @@ data class LayerPropertyUpdate(
             return LayerPropertyUpdate(
                 layerIndex = index,
                 transform = transform,
-                alpha = state.alpha,
-                blendMode = state.blendMode?.toAndroidBlendMode(),
-                isVisible = state.isVisible
             )
         }
     }
@@ -189,7 +175,7 @@ data class LayerPropertyUpdate(
  *  - [HideAll]: view should be empty (no wallpaper at all).
  *  - [SwitchToSingleLayer]: transition to the legacy single-image mode.
  *  - [UpdatePropertiesOnly]: identities and count match; just reapply
- *      transforms, alpha, blend mode and visibility. No bitmap reload.
+ *      transforms. No bitmap reload.
  *  - [FullRebuild]: layer identities or count differ; clear the view
  *      and re-add all layers from scratch. [restoreActiveLayerId]
  *      allows preserving the user's selection across the rebuild.

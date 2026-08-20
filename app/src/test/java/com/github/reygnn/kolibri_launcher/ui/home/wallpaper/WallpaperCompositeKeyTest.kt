@@ -27,22 +27,14 @@ class WallpaperCompositeKeyTest {
         scale: Float = 1.0f,
         translateX: Float = 0f,
         translateY: Float = 0f,
-        alpha: Float = 1.0f,
-        blendModeName: String? = null,
-        isVisible: Boolean = true,
         captureSampleSize: Int? = null,
         id: String = "fixed-id",
-        label: String? = null,
     ) = WallpaperLayerState(
         id = id,
         imageUri = imageUri,
         scale = scale,
         translateX = translateX,
         translateY = translateY,
-        alpha = alpha,
-        blendModeName = blendModeName,
-        isVisible = isVisible,
-        label = label,
         captureSampleSize = captureSampleSize,
     )
 
@@ -72,9 +64,6 @@ class WallpaperCompositeKeyTest {
         assertNotEquals("scale", baseKey, key(state(layer(scale = 1.5f))))
         assertNotEquals("translateX", baseKey, key(state(layer(translateX = 10f))))
         assertNotEquals("translateY", baseKey, key(state(layer(translateY = 10f))))
-        assertNotEquals("alpha", baseKey, key(state(layer(alpha = 0.5f))))
-        assertNotEquals("blendModeName", baseKey, key(state(layer(blendModeName = "MULTIPLY"))))
-        assertNotEquals("isVisible", baseKey, key(state(layer(isVisible = false))))
         assertNotEquals("captureSampleSize", baseKey, key(state(layer(captureSampleSize = 2))))
     }
 
@@ -93,10 +82,9 @@ class WallpaperCompositeKeyTest {
     }
 
     @Test
-    fun `non-pixel fields (id, label) do NOT change the key`() {
-        val base = state(layer(id = "id-1", label = null))
-        assertEquals("id", key(base), key(state(layer(id = "id-2", label = null))))
-        assertEquals("label", key(base), key(state(layer(id = "id-1", label = "Top"))))
+    fun `non-pixel field id does NOT change the key`() {
+        val base = state(layer(id = "id-1"))
+        assertEquals("id", key(base), key(state(layer(id = "id-2"))))
     }
 
     /**
@@ -114,10 +102,9 @@ class WallpaperCompositeKeyTest {
             .toSet()
         val expected = setOf(
             // In the key (pixel-affecting):
-            "imageUri", "scale", "translateX", "translateY",
-            "alpha", "blendModeName", "isVisible", "captureSampleSize",
+            "imageUri", "scale", "translateX", "translateY", "captureSampleSize",
             // NOT in the key (identity / UI only):
-            "id", "label",
+            "id",
         )
         assertEquals(
             "WallpaperLayerState fields changed. If the new/removed field affects rendered " +

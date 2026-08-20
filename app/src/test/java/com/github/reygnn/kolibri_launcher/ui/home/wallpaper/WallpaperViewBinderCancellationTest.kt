@@ -68,7 +68,6 @@ class WallpaperViewBinderCancellationTest {
     private fun layer(id: String) = WallpaperLayerState(
         id = id,
         imageUri = "file:///data/$id.jpg",
-        label = null,
     )
 
     private fun twoLayerState() = WallpaperState.multiLayer(listOf(layer("L0"), layer("L1")))

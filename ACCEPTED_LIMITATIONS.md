@@ -79,34 +79,33 @@ inspecting *one* signal at a time, in priority order:
 
 1. Kolibri-internal wallpaper, but only `layers[0]` (the bottom-
    most layer in render order) — and only when it's "opaque
-   enough to dominate perception". Two cooperating gates make that
-   call: a **layer-level** alpha gate (`WallpaperLayerState.alpha`
-   ≥ 0.8 and Normal blend) and a **pixel-level** coverage gate
-   (≥ 50% of pixels with alpha ≥ 80% inside the bitmap itself).
-   Either gate failing routes the classifier to the next signal.
+   enough to dominate perception". A **pixel-level** coverage gate
+   (≥ 50% of pixels with alpha ≥ 80% inside the bitmap itself)
+   makes that call; failing it routes the classifier to the next
+   signal. (Historically there was also a *layer-level* alpha /
+   Normal-blend gate, but per-layer alpha and blend mode were
+   removed on 2026-08-20 — see §5 — so only the pixel gate remains.)
 2. System-wallpaper `colorHints` (`HINT_SUPPORTS_DARK_TEXT`).
 3. Fallback: DARK.
 
 The classifier never composites multiple Kolibri layers together
 to estimate the user-perceived background. When `layers[0]` fails
-either dominance gate, the classifier punts to the system
-signal — even if a *higher* layer (e.g. `layers[1]`) is fully
-opaque and dominates the actual composition.
+the coverage gate, the classifier punts to the system signal —
+even if a *higher* layer (e.g. `layers[1]`) is fully opaque and
+dominates the actual composition.
 
-### When the heuristic punts (the two known soft spots)
+### When the heuristic punts (the known soft spot)
 
-- **Transparent `layers[0]` + opaque `layers[1]+`.** A user with
-  `[transparent grey detail, opaque blue background]` would have
-  the blue dominate visually. The classifier sees `layers[0].alpha
-  < 0.8`, falls through to the system signal, and may pick the
-  wrong surface. (In practice the typical Kolibri-multi-layer
-  setup is "opaque background at index 0, detail overlays above"
-  — the inverse — so this case is uncommon.)
-- **Opaque `layers[0]` with non-Normal blend.** An opaque layer
-  with e.g. MULTIPLY at alpha 1.0 over a bright underlying image
-  visually darkens the result, but the classifier punts to the
-  system signal rather than approximate the blend. Documented in
-  the use-case KDoc.
+- **A higher layer dominates over a low-coverage `layers[0]`.** If
+  `layers[0]` is a low-coverage cutout (its bitmap has few
+  effectively-opaque pixels) but a *higher* layer is opaque and
+  actually dominates perception, the pixel gate on `layers[0]`
+  fails, the classifier falls through to the system signal, and it
+  may pick the wrong surface. (In practice the typical setup is
+  "opaque background at index 0, detail overlays above" — so
+  `layers[0]` usually IS the dominant one and this is uncommon.)
+  This is exactly what the composite luminance resolves once the
+  warm has emitted (#1a/#1b above).
 
 ### Why we don't fix it further
 
@@ -114,7 +113,7 @@ Compositing layers properly requires loading every layer's
 bitmap, allocating an N×M ARGB buffer, running the blend ops in
 order, and sampling luminance from the result. That's a real
 mini-render pipeline. The cost-vs.-coverage trade is unfavourable
-right now: the alpha-gate-on-`layers[0]` heuristic is correct for
+right now: the coverage-gate-on-`layers[0]` heuristic is correct for
 the common shape (opaque bottom + detail overlays + the
 single-layer case), and shipping a partially-correct compositor
 would only paper over edge cases that the user can already work
@@ -133,9 +132,9 @@ Reopen this entry if any of the following changes:
 - The wallpaper editor grows a "preview composite as bitmap"
   step that already runs the render pipeline — at that point the
   classifier could reuse the result for free.
-- Multi-layer alpha conventions in the codebase shift (e.g.,
-  `layers[0]` becomes the *top* layer instead of the bottom by
-  some refactor) — the alpha-gate semantics would need to follow.
+- Multi-layer conventions in the codebase shift (e.g., `layers[0]`
+  becomes the *top* layer instead of the bottom by some refactor)
+  — the coverage-gate semantics would need to follow.
 
 ---
 
@@ -319,85 +318,31 @@ Reopen this entry if any of the following changes:
 
 ---
 
-## 5. Per-layer alpha, blend mode and visibility are intentionally UI-less (editor stays transform-only)
+## 5. (Resolved by removal) Per-layer alpha, blend mode, visibility and layer label
 
-- **Status:** 🟡 Intentional / Documented — product decision (not a defect)
-- **Frequency:** Always — no build exposes an alpha slider, blend picker or
-  visibility toggle
-- **Affected:** `WallpaperDelegate.onSetLayerAlpha` / `.onSetLayerBlendMode` /
-  `.onSetLayerVisibility` (`ui/main/delegate/WallpaperDelegate.kt:993-1006`) +
-  `WallpaperLayer.AVAILABLE_BLEND_MODES` (`ui/home/WallpaperLayer.kt:112-125`);
-  AUDIT-20 F14
+- **Status:** ⚪ Resolved — the fields were **removed entirely** (2026-08-20),
+  superseding the earlier "keep them dormant / UI-less" decision.
+- **Affected (historical):** `WallpaperLayerState` / `WallpaperLayerBackup` /
+  view-side `WallpaperLayer` — `alpha`, `blendModeName`, `isVisible`, `label`;
+  AUDIT-20 F14.
 
-### Explanation
+This entry formerly documented keeping `alpha`, `blendModeName` and `isVisible`
+(plus the auto-generated layer `label`) as **dormant, UI-less** per-layer fields —
+modelled, persisted and rendered but never exposed. Its re-evaluation trigger
+named the alternative: *"the model fields are ever proposed for removal (the
+'Zurückbauen' direction of F14) … must be argued separately."* That happened.
 
-The multi-layer wallpaper pipeline fully models, persists, backup-round-trips
-and renders three per-layer properties — `alpha`, `blendModeName`, `isVisible`
-(`WallpaperLayerState`) — and `ZoomableImageView.drawLayers` applies all three
-(`paint.alpha` `:944`, `paint.blendMode` `:945`, `if (!isVisible) continue`
-`:939`). The domain setters `onSetLayerAlpha` / `onSetLayerBlendMode` /
-`onSetLayerVisibility` and their `LauncherViewModel` pass-throughs exist, and
-`AVAILABLE_BLEND_MODES` is a fully-wired 12-entry picker list. The only missing
-link, for all three, is the UI control — and it is missing **on purpose**.
+On **2026-08-20** the four fields and their whole machinery were **removed
+entirely** (branch `refactor/drop-dormant-layer-props`): the `WallpaperBlendMode`
+enum, the blend-mode mapper, `AVAILABLE_BLEND_MODES`, the 12 `blend_mode_*`
+strings, the `onSetLayer*` delegate setters and `nextFreeAutoLabel` are gone; the
+render path (`drawLayers`), the composite key and both persistence paths (backup +
+live DataStore) no longer carry them.
 
-F14 confirmed the surface is otherwise complete and has **zero** production
-consumers: no view calls any of the three setters. So in production every layer
-always renders at `alpha == 1f`, Normal blend, `isVisible == true`; a divergent
-value is reachable only through a hand-edited backup JSON. The wallpaper editor
-stays **transform-only**: add layer, remove, reorder (z-order), pan/zoom per
-layer. No opacity slider, no blend picker, no visibility toggle.
-
-### Why it is accepted (no UI will be added for any of the three)
-
-- **The compositing already lives in the source images, not in a layer knob.**
-  The canonical Kolibri collage is built from AI images pre-processed in the
-  sister `darkroom` apps: opaque AMOLED-black full frames from
-  `darkroom/chiaroscuro`, and alpha cutouts (subject on a keyed-out transparent
-  background) from `darkroom/greenwall`. Kolibri's `canvas.drawBitmap` on
-  `ARGB_8888` already honours that **per-pixel** alpha for free, so a greenwall
-  cutout composites correctly over a chiaroscuro background with no layer knob
-  at all. A **uniform** per-layer alpha would only ghost the whole layer
-  (subject included) or no-op on the ubiquitous black regions — the wrong tool
-  for this workflow. The transparency that matters is baked into the PNGs.
-- **Blend modes are editor-scope, not launcher-scope.** Eleven photo-compositing
-  modes (Difference / Exclusion invert, Color Dodge / Color Burn hard contrast,
-  …) are a creative image-editing tool; a wallpaper is a backdrop behind icons,
-  clock and text that must stay legible. (Aside: for AMOLED-black frames *Screen*
-  would actually be the relevant knob — black is neutral in Screen, so it drops
-  out — but greenwall's transparent export does exactly that, cleaner and
-  per-pixel. No reason to own the blend step.)
-- **Visibility can't even be wired cheaply.** A "hide layer" toggle presupposes a
-  way to *re-show* it, but the editor selects the active layer **only** by
-  tapping its bitmap on the canvas, and that hit-test skips invisible layers
-  (`ZoomableImageView.handleLayerTap:1165`, `if (!layer.isVisible) continue`).
-  There is no layer list and no prev/next cycler, so a hidden layer that isn't
-  the currently-active one is unreachable — the toggle would strand it. Making it
-  usable would mean adding a whole layer navigator: scope the workflow doesn't
-  justify.
-- **The launcher stays minimal by declining all three.** Owning opacity / blend /
-  visibility imports UI (sliders, pickers, a navigator, live preview, an
-  explanation burden) for capability the darkroom→set-wallpaper route already
-  provides. Users pick Kolibri *because* it does not do everything.
-- **The model fields stay; only the UI is declined.** `alpha` / `blendModeName` /
-  `isVisible` remain in the model, persistence and render path — removing them
-  would break existing backups that carry the fields and cost the render
-  capability, so they are priced in as dormant, backup-compatible fields, not
-  dead code to delete. Note `ACCEPTED_LIMITATIONS.md` §1 and AUDIT-20 F13 both
-  reason about non-default values of these fields; those arguments are not wrong,
-  only currently vacuous, and this entry is what keeps that intentional.
-
-### Trigger for re-evaluation
-
-Reopen this entry if any of the following changes:
-
-- Kolibri's product direction shifts away from minimalism toward an in-app
-  wallpaper editor — at which point owning opacity/blend/visibility becomes
-  consistent rather than scope-creep.
-- The wallpaper workflow moves away from darkroom-pre-composited images (e.g.
-  users start stacking raw opaque full frames that genuinely need an in-launcher
-  opacity or double-exposure control) — the per-pixel-alpha-in-source premise
-  above is what makes the layer knobs redundant.
-- The model fields are ever proposed for removal (the "Zurückbauen" direction of
-  F14): that is a *different* decision from this one (which keeps them dormant)
-  and must be argued separately, weighing the backup break and the lost render
-  capability.
+Why it was safe: no UI ever wrote them, no backup carried a non-default value, and
+backup import tolerates the now-unknown keys (`ignoreUnknownKeys = true` plus a
+read-by-known-key strict parser), so old backups still restore. The wallpaper
+editor stays transform-only exactly as before — this deleted only always-default
+plumbing, no behaviour change. §1 above was reconciled in the same change (the
+classifier's layer-level alpha/blend dominance gate is gone; only the pixel-level
+coverage gate remains).

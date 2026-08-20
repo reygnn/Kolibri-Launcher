@@ -41,43 +41,30 @@ class WallpaperLayerBackupTest {
     }
 
     @Test
-    fun `toLayerState - transform and blend metadata round-trip`() {
+    fun `toLayerState - transform round-trips`() {
         val restored = WallpaperLayerBackup(
             id = "l",
             imageUri = "file:///a.img",
             scale = 2.3f,
             translateX = 11f,
             translateY = -4f,
-            alpha = 0.6f,
-            blendModeName = "MULTIPLY",
-            isVisible = false,
-            label = "Overlay",
         ).toLayerState()
 
         assertThat(restored.scale).isEqualTo(2.3f)
         assertThat(restored.translateX).isEqualTo(11f)
         assertThat(restored.translateY).isEqualTo(-4f)
-        assertThat(restored.alpha).isEqualTo(0.6f)
-        assertThat(restored.blendModeName).isEqualTo("MULTIPLY")
-        assertThat(restored.isVisible).isFalse()
-        assertThat(restored.label).isEqualTo("Overlay")
     }
 
     @Test
-    fun `toLayerState - empty strings collapse to null`() {
-        // The mapping guards every nullable string with takeIf { isNotEmpty() },
-        // so a hand-edited backup carrying "" must not resurface as an empty
-        // URI / blend name / label (which downstream code treats differently
-        // from null).
+    fun `toLayerState - empty imageUri collapses to null`() {
+        // The mapping guards imageUri with takeIf { isNotEmpty() }, so a
+        // hand-edited backup carrying "" must not resurface as an empty URI
+        // (which downstream code treats differently from null).
         val restored = WallpaperLayerBackup(
             id = "l",
             imageUri = "",
-            blendModeName = "",
-            label = "",
         ).toLayerState()
 
         assertThat(restored.imageUri).isNull()
-        assertThat(restored.blendModeName).isNull()
-        assertThat(restored.label).isNull()
     }
 }

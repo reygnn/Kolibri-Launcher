@@ -60,22 +60,18 @@ class WallpaperFlattener @Inject constructor(
                     )
                     layout(0, 0, width, height)
                 }
-                // Same binder the live view uses -> identical decode/transform/blend
+                // Same binder the live view uses -> identical decode/transform
                 // logic, only with a software loader. Track per-layer decode failures:
                 // a partial composite (one layer skipped) is a decodable-but-INCOMPLETE
                 // artifact, and it must NOT reach the cache (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC
                 // §3, all-or-nothing). parseWallpaperState already drops missing-file layers,
                 // so a null here is a TRANSIENT decode failure — returning null makes the warm
                 // skip caching and re-flatten on the next miss, exactly like the live path heals.
-                // Only a VISIBLE layer's decode failure makes the composite INCOMPLETE: drawLayers
-                // skips invisible layers, so a hidden layer failing to decode changes no pixels and
-                // must NOT block the cache (spec §3b, review #2). The binder decodes every
-                // image-bearing layer regardless of visibility, so filter here.
-                val visibleUris = state.layers.filter { it.isVisible }.mapNotNull { it.imageUri }.toSet()
+                val imageUris = state.layers.mapNotNull { it.imageUri }.toSet()
                 val anyLayerFailed = AtomicBoolean(false)
                 val binder = WallpaperViewBinder { uri ->
                     loadSoftware(uri).also {
-                        if (it == null && uri.toString() in visibleUris) anyLayerFailed.set(true)
+                        if (it == null && uri.toString() in imageUris) anyLayerFailed.set(true)
                     }
                 }
                 binder.bind(view, state)

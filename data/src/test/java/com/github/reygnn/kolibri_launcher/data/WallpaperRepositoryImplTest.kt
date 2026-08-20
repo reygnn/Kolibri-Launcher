@@ -159,8 +159,8 @@ class WallpaperRepositoryImplTest {
     fun `parseWallpaperState with valid LAYERS_JSON yields multi-layer state`() = runTest {
         val json = """
             [
-              {"id":"layer_1","imageUri":"file:///data/a.jpg","scale":1.5,"translateX":10.0,"translateY":20.0,"alpha":0.8,"blendModeName":"MULTIPLY","isVisible":true,"label":"Oben"},
-              {"id":"layer_2","imageUri":"file:///data/b.jpg","scale":2.0,"translateX":-5.0,"translateY":0.0,"alpha":1.0,"blendModeName":"","isVisible":false,"label":"Unten"}
+              {"id":"layer_1","imageUri":"file:///data/a.jpg","scale":1.5,"translateX":10.0,"translateY":20.0},
+              {"id":"layer_2","imageUri":"file:///data/b.jpg","scale":2.0,"translateX":-5.0,"translateY":0.0}
             ]
         """.trimIndent()
 
@@ -178,15 +178,12 @@ class WallpaperRepositoryImplTest {
         assertEquals(1.5f, l1.scale)
         assertEquals(10f, l1.translateX)
         assertEquals(20f, l1.translateY)
-        assertEquals(0.8f, l1.alpha)
-        assertEquals("MULTIPLY", l1.blendModeName)
-        assertTrue(l1.isVisible)
-        assertEquals("Oben", l1.label)
 
         val l2 = state.getLayer(1)!!
         assertEquals("layer_2", l2.id)
-        assertFalse(l2.isVisible)
-        assertNull("empty blendModeName deserializes to null", l2.blendModeName)
+        assertEquals(2.0f, l2.scale)
+        assertEquals(-5f, l2.translateX)
+        assertEquals(0f, l2.translateY)
     }
 
     @Test
@@ -382,10 +379,6 @@ class WallpaperRepositoryImplTest {
                     scale = 1.25f,
                     translateX = 7f,
                     translateY = -3f,
-                    alpha = 0.5f,
-                    blendModeName = "SCREEN",
-                    isVisible = false,
-                    label = "Oben"
                 )
             )
         )
@@ -402,10 +395,6 @@ class WallpaperRepositoryImplTest {
         assertEquals(1.25f, layer.scale)
         assertEquals(7f, layer.translateX)
         assertEquals(-3f, layer.translateY)
-        assertEquals(0.5f, layer.alpha)
-        assertEquals("SCREEN", layer.blendModeName)
-        assertFalse(layer.isVisible)
-        assertEquals("Oben", layer.label)
     }
 
     @Test

@@ -112,8 +112,8 @@ class BackupRepositoryImplZipExportTest {
         }
         fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(imageUri = "content://media/external/images/1", label = "content"),
-                WallpaperLayerState(imageUri = Uri.fromFile(realImage).toString(), label = "file"),
+                WallpaperLayerState(imageUri = "content://media/external/images/1"),
+                WallpaperLayerState(imageUri = Uri.fromFile(realImage).toString()),
             )
         )
 
@@ -131,10 +131,9 @@ class BackupRepositoryImplZipExportTest {
         val layers = backup.settings.wallpaperLayers
         assertThat(layers).hasSize(2)
         // content:// layer: no imageFileName stamped (nothing was written).
-        assertThat(layers[0].label).isEqualTo("content")
+        assertThat(layers[0].imageUri).isEqualTo("content://media/external/images/1")
         assertThat(layers[0].imageFileName).isNull()
         // file:// layer: stamped with the single embedded entry.
-        assertThat(layers[1].label).isEqualTo("file")
         assertThat(layers[1].imageFileName).isEqualTo(wallpaperEntries.single())
     }
 

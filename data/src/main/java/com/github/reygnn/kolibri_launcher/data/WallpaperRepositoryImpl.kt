@@ -409,10 +409,6 @@ class WallpaperRepositoryImpl @Inject constructor(
                 // -1 sentinel = absent (JSON has no null int here); read back as
                 // null via takeIf { it > 0 } — a legacy field-less transform.
                 put("captureSampleSize", layer.captureSampleSize ?: -1)
-                put("alpha", layer.alpha.toDouble())
-                put("blendModeName", layer.blendModeName ?: "")
-                put("isVisible", layer.isVisible)
-                put("label", layer.label ?: "")
             }
             array.put(obj)
         }
@@ -441,10 +437,6 @@ class WallpaperRepositoryImpl @Inject constructor(
                         translateX = obj.optDouble("translateX", DEFAULT_TRANSLATE.toDouble()).toFloat(),
                         translateY = obj.optDouble("translateY", DEFAULT_TRANSLATE.toDouble()).toFloat(),
                         captureSampleSize = obj.optInt("captureSampleSize", -1).takeIf { it > 0 },
-                        alpha = obj.optDouble("alpha", 1.0).toFloat(),
-                        blendModeName = obj.optString("blendModeName", "").takeIf { it.isNotBlank() },
-                        isVisible = obj.optBoolean("isVisible", true),
-                        label = obj.optString("label", "").takeIf { it.isNotBlank() }
                     )
                 )
             } catch (e: Throwable) {

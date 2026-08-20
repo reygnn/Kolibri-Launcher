@@ -1,25 +1,20 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
 import android.graphics.Bitmap
-import android.graphics.BlendMode
 import android.graphics.Matrix
 import android.graphics.RectF
 import android.net.Uri
-import com.github.reygnn.kolibri_launcher.R
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Repräsentiert ein einzelnes Layer im Multi-Layer Wallpaper.
- * Jedes Layer ist eine "Folie" mit eigenem Bild, Transform, Alpha und Blend-Modus.
+ * Represents a single layer of a multi-layer wallpaper — a "sheet" with its own
+ * image and transform.
  *
- * Folien-Modell:
- * - Layer werden übereinander gezeichnet (Index 0 = ganz hinten)
- * - Transparente Bereiche lassen darunterliegende Layer durchscheinen
- * - Alpha steuert die Gesamtdeckkraft der Folie
- * - BlendMode bestimmt wie sich Pixel mit darunterliegenden mischen
+ * Sheet model:
+ * - layers are painted on top of each other (index 0 = bottom-most)
+ * - transparent areas (in the image's alpha channel) let lower layers show through
  *
- * Die Transformation ist identisch zum bestehenden ZoomableImageView-Modell:
- * Matrix = Scale → Translate
+ * The transform matches the existing ZoomableImageView model: Matrix = Scale → Translate.
  */
 data class WallpaperLayer(
     /**
@@ -65,28 +60,6 @@ data class WallpaperLayer(
     var scale: Float = 1f,
     var translateX: Float = 0f,
     var translateY: Float = 0f,
-
-    // --- Display State ---
-
-    /** Sichtbarkeit des Layers */
-    var isVisible: Boolean = true,
-
-    /**
-     * Deckkraft der Folie: 0.0 (komplett transparent) bis 1.0 (komplett deckend).
-     * Wird als Paint.alpha im Rendering angewandt.
-     */
-    var alpha: Float = 1.0f,
-
-    /**
-     * Blend-Modus: Bestimmt wie die Pixel dieses Layers
-     * mit den darunterliegenden Layern gemischt werden.
-     *
-     * null = Standard (SRC_OVER, normales Übereinanderlegen)
-     */
-    var blendMode: BlendMode? = null,
-
-    /** Optionaler Label für UI (z.B. "Oben", "Unten") */
-    var label: String? = null
 ) {
     companion object {
         // Thread-safe counter. View-seitige Layer werden normalerweise
@@ -100,35 +73,6 @@ data class WallpaperLayer(
          */
         fun newId(): String =
             "layer_${System.currentTimeMillis()}_${counter.getAndIncrement()}"
-
-        /**
-         * All supported blend modes with their label resource IDs (each Int
-         * is a `@StringRes`). Call sites resolve the display string via
-         * `context.getString(labelResId)`. Labels live in strings.xml as
-         * `blend_mode_*` (translatable="false", since these are
-         * industry-standard names kept in English across locales).
-         *
-         * INTENTIONALLY UNUSED IN PRODUCTION — do NOT wire a blend-mode picker
-         * to this list. Per-layer blend modes are a deliberate no-UI decision:
-         * they are editor-scope, not launcher-scope. See
-         * `ACCEPTED_LIMITATIONS.md` §5 (and AUDIT-20 F14) before adding a
-         * consumer. The list stays wired so the render/backup path keeps
-         * working and so a future product pivot can enable it cheaply.
-         */
-        val AVAILABLE_BLEND_MODES: List<Pair<Int, BlendMode?>> = listOf(
-            R.string.blend_mode_normal to null,
-            R.string.blend_mode_multiply to BlendMode.MULTIPLY,
-            R.string.blend_mode_screen to BlendMode.SCREEN,
-            R.string.blend_mode_overlay to BlendMode.OVERLAY,
-            R.string.blend_mode_soft_light to BlendMode.SOFT_LIGHT,
-            R.string.blend_mode_hard_light to BlendMode.HARD_LIGHT,
-            R.string.blend_mode_darken to BlendMode.DARKEN,
-            R.string.blend_mode_lighten to BlendMode.LIGHTEN,
-            R.string.blend_mode_difference to BlendMode.DIFFERENCE,
-            R.string.blend_mode_exclusion to BlendMode.EXCLUSION,
-            R.string.blend_mode_color_dodge to BlendMode.COLOR_DODGE,
-            R.string.blend_mode_color_burn to BlendMode.COLOR_BURN,
-        )
     }
 
     // ===========================================
@@ -180,18 +124,6 @@ data class WallpaperLayer(
         tmp.mapRect(out)
         return true
     }
-
-    // ===========================================
-    // ALPHA HELPERS
-    // ===========================================
-
-    /**
-     * Setzt Alpha als Int-Wert (0-255).
-     * Convenience für Code der mit Int-Alpha arbeitet.
-     */
-    var alphaInt: Int
-        get() = (alpha * 255).toInt().coerceIn(0, 255)
-        set(value) { alpha = (value.coerceIn(0, 255) / 255f) }
 
     /**
      * Wendet eine "Cover"-Transformation an: Skaliert das Bild so,

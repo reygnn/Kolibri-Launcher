@@ -401,7 +401,7 @@ class LauncherViewModel @Inject constructor(
     fun onToggleWallpaperEditMode() = wallpaperDelegate.onToggleWallpaperEditMode()
     fun onCommitWallpaperEditMode() = wallpaperDelegate.onCommitWallpaperEditMode()
     fun onCancelWallpaperEditMode() = wallpaperDelegate.onCancelWallpaperEditMode()
-    fun onAddWallpaperLayer(imageUri: Uri, label: String? = null) = wallpaperDelegate.onAddWallpaperLayer(imageUri, label)
+    fun onAddWallpaperLayer(imageUri: Uri) = wallpaperDelegate.onAddWallpaperLayer(imageUri)
     fun onRemoveWallpaperLayer(layerIndex: Int) = wallpaperDelegate.onRemoveWallpaperLayer(layerIndex)
     fun onSwapWallpaperLayers(indexA: Int, indexB: Int) = wallpaperDelegate.onSwapWallpaperLayers(indexA, indexB)
     fun onSaveLayerTransform(
@@ -413,9 +413,6 @@ class LauncherViewModel @Inject constructor(
     ) = wallpaperDelegate.onSaveLayerTransform(layerIndex, scale, translateX, translateY, captureSampleSize)
     fun onSaveAllLayerTransforms(transforms: List<LayerTransform>) =
         wallpaperDelegate.onSaveAllLayerTransforms(transforms)
-    fun onSetLayerAlpha(layerIndex: Int, alpha: Float) = wallpaperDelegate.onSetLayerAlpha(layerIndex, alpha)
-    fun onSetLayerBlendMode(layerIndex: Int, blendModeName: String?) = wallpaperDelegate.onSetLayerBlendMode(layerIndex, blendModeName)
-    fun onSetLayerVisibility(layerIndex: Int, isVisible: Boolean) = wallpaperDelegate.onSetLayerVisibility(layerIndex, isVisible)
     fun onFabPositionChanged(xFraction: Float, yFraction: Float) =
         wallpaperDelegate.onFabPositionChanged(xFraction, yFraction)
 

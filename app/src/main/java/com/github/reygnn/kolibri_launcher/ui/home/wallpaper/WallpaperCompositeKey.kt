@@ -47,9 +47,6 @@ object WallpaperCompositeKey {
                 .append(l.scale).append(';')
                 .append(l.translateX).append(';')
                 .append(l.translateY).append(';')
-                .append(l.alpha).append(';')
-                .append(l.blendModeName).append(';')
-                .append(l.isVisible).append(';')
                 .append(l.captureSampleSize)
         }
         val digest = MessageDigest.getInstance("SHA-256").digest(sb.toString().toByteArray(Charsets.UTF_8))

@@ -40,7 +40,6 @@ import kotlin.math.sqrt
  * == MULTI-LAYER MODE (Folien-Modell) ==
  * Sobald addLayer() aufgerufen wird, wechselt der View in den Multi-Layer-Modus:
  * - Mehrere Bitmaps als Folien übereinander (transparente Bereiche = durchsichtig)
- * - Per-Layer Alpha (Deckkraft) und BlendMode (Mischverhalten)
  * - Jedes Layer individuell zoom-/pannbar
  * - Tap selektiert Layer, aktives Layer empfängt Gesten
  * - Transparenter Hintergrund möglich → System-Wallpaper scheint durch
@@ -66,12 +65,8 @@ import kotlin.math.sqrt
  * // Transparent → System-Wallpaper scheint durch
  * wallpaperView.layerBackgroundColor = Color.TRANSPARENT
  *
- * wallpaperView.addLayer(bitmapTop, label = "Oben")
- * wallpaperView.addLayer(bitmapBottom, label = "Unten")
- *
- * // Per-Layer Alpha und BlendMode
- * wallpaperView.getLayer(1)?.alpha = 0.85f
- * wallpaperView.getLayer(1)?.blendMode = BlendMode.MULTIPLY
+ * wallpaperView.addLayer(bitmapTop)
+ * wallpaperView.addLayer(bitmapBottom)
  *
  * wallpaperView.isEditMode = true
  * wallpaperView.activeLayerIndex = 0
@@ -514,17 +509,12 @@ class ZoomableImageView @JvmOverloads constructor(
      * @param label Optionaler Name (z.B. "Oben", "Unten")
      * @param centerCrop When true, the new layer is auto-scaled to fit the view
      *   width on first layout. Legacy name — it applies fit-width, not center-crop.
-     * @param alpha Deckkraft der Folie (0.0–1.0, Default: 1.0 = voll deckend)
-     * @param blendMode Wie sich die Folie mit darunterliegenden mischt (null = normal)
      * @param sourceUri Source URI für Persistierung
      * @return Index des neuen Layers
      */
     fun addLayer(
         bitmap: Bitmap,
-        label: String? = null,
         centerCrop: Boolean = true,
-        alpha: Float = 1.0f,
-        blendMode: BlendMode? = null,
         sourceUri: Uri? = null,
         id: String? = null,
         sampleSize: Int = 1,
@@ -547,9 +537,6 @@ class ZoomableImageView @JvmOverloads constructor(
             // supplies no original dims, so the backfill still has a sane input.
             originalWidth = if (originalWidth > 0) originalWidth else bitmap.width * sampleSize,
             originalHeight = if (originalHeight > 0) originalHeight else bitmap.height * sampleSize,
-            alpha = alpha.coerceIn(0f, 1f),
-            blendMode = blendMode,
-            label = label
         )
 
         if (centerCrop && width > 0 && height > 0) {
@@ -721,43 +708,6 @@ class ZoomableImageView @JvmOverloads constructor(
     // ===========================================
     // PUBLIC API: LAYER PROPERTIES (Folie)
     // ===========================================
-
-    /**
-     * Setzt die Deckkraft eines Layers.
-     * @param layerIndex Index des Layers
-     * @param alpha 0.0 (transparent) bis 1.0 (deckend)
-     */
-    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
-    @Suppress("unused")
-    fun setLayerAlpha(layerIndex: Int, alpha: Float) {
-        val layer = layers.getOrNull(layerIndex) ?: return
-        layer.alpha = alpha.coerceIn(0f, 1f)
-        invalidate()
-    }
-
-    /**
-     * Setzt den Blend-Modus eines Layers.
-     * Verfügbare Modi: siehe [WallpaperLayer.AVAILABLE_BLEND_MODES]
-     * null = Normal (SRC_OVER)
-     */
-    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
-    @Suppress("unused")
-    fun setLayerBlendMode(layerIndex: Int, blendMode: BlendMode?) {
-        val layer = layers.getOrNull(layerIndex) ?: return
-        layer.blendMode = blendMode
-        invalidate()
-    }
-
-    /**
-     * Setzt Sichtbarkeit eines Layers.
-     */
-    /** Public API – aktuell nicht intern genutzt, aber Teil der View-Schnittstelle. */
-    @Suppress("unused")
-    fun setLayerVisible(layerIndex: Int, visible: Boolean) {
-        val layer = layers.getOrNull(layerIndex) ?: return
-        layer.isVisible = visible
-        invalidate()
-    }
 
     /**
      * Transformation auf ein bestimmtes Layer (per Index).
@@ -936,20 +886,13 @@ class ZoomableImageView @JvmOverloads constructor(
         }
         val scaled = outputScaleX != 1f || outputScaleY != 1f
         for ((index, layer) in layers.withIndex()) {
-            if (!layer.isVisible) continue
             val bmp = layer.bitmap ?: continue
             // Guard: skip a recycled bitmap
             if (bmp.isRecycled) continue
 
-            paint.alpha = layer.alphaInt
-            paint.blendMode = layer.blendMode
-
             layer.buildMatrixInto(matrix)
             if (scaled) matrix.postScale(outputScaleX, outputScaleY)
             canvas.drawBitmap(bmp, matrix, paint)
-
-            paint.alpha = 255
-            paint.blendMode = null
 
             if (drawSelection && index == activeLayerIndex) {
                 drawSelectionHighlight(canvas, layer)
@@ -1162,7 +1105,6 @@ class ZoomableImageView @JvmOverloads constructor(
     private fun handleLayerTap(x: Float, y: Float) {
         for (i in layers.indices.reversed()) {
             val layer = layers[i]
-            if (!layer.isVisible) continue
             val bounds = layer.getTransformedBounds() ?: continue
             if (bounds.contains(x, y)) {
                 if (activeLayerIndex != i) {

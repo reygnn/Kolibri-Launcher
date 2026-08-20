@@ -43,8 +43,6 @@ class WallpaperFlattenerInstrumentedTest {
                     WallpaperLayerState(imageUri = Uri.fromFile(f1).toString()),
                     WallpaperLayerState(
                         imageUri = Uri.fromFile(f2).toString(),
-                        alpha = 0.6f,
-                        blendModeName = "MULTIPLY",
                     ),
                 ),
             )

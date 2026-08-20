@@ -28,7 +28,6 @@ class WallpaperStateTest {
                     translateX = 10f,
                     translateY = -20f,
                     captureSampleSize = 2,
-                    label = "Layer 1",
                 )
             )
         )
@@ -43,32 +42,6 @@ class WallpaperStateTest {
         assertEquals(-20f, collapsed.translateY)
         assertEquals(2, collapsed.captureSampleSize)
         assertTrue(collapsed.hasWallpaper)
-    }
-
-    // ---------------------------------------------------------------
-    // toSingleLayer — unconditional for a one-layer list
-    // ---------------------------------------------------------------
-
-    @Test
-    fun `toSingleLayer collapses a single layer regardless of its dead per-layer props`() {
-        // alpha/blend/isVisible are UI-less by design and slated for retirement;
-        // no state carries non-default values in practice, so the collapse is
-        // unconditional and drops them (AUDIT-20 F13/F14).
-        val state = WallpaperState.multiLayer(
-            listOf(
-                WallpaperLayerState(
-                    imageUri = "file:///a.png",
-                    alpha = 0.5f,
-                    blendModeName = "MULTIPLY",
-                    isVisible = false,
-                )
-            )
-        )
-
-        val collapsed = state.toSingleLayer()
-
-        assertFalse(collapsed.isMultiLayer, "a one-layer list always collapses")
-        assertEquals("file:///a.png", collapsed.imageUri)
     }
 
     // ---------------------------------------------------------------
@@ -104,7 +77,7 @@ class WallpaperStateTest {
     // ---------------------------------------------------------------
 
     @Test
-    fun `toMultiLayer converts a single-layer state into one labelled layer`() {
+    fun `toMultiLayer converts a single-layer state into one layer`() {
         val single = WallpaperState(
             imageUri = "file:///wallpapers/a.png",
             scale = 2.0f,
@@ -123,7 +96,6 @@ class WallpaperStateTest {
         assertEquals(5f, layer.translateX)
         assertEquals(-3f, layer.translateY)
         assertEquals(2, layer.captureSampleSize)
-        assertEquals("Layer 1", layer.label)
     }
 
     @Test
@@ -173,21 +145,20 @@ class WallpaperStateTest {
     }
 
     @Test
-    fun `id and label are dropped by the collapse`() {
+    fun `id is dropped by the collapse`() {
         val state = WallpaperState.multiLayer(
             listOf(
                 WallpaperLayerState(
                     id = "layer_custom_id",
                     imageUri = "file:///a.png",
-                    label = "Base",
                 )
             )
         )
 
         val collapsed = state.toSingleLayer()
 
-        // The single-layer representation has no id/label home; the only proof is
-        // that the image round-trips while the layer (and thus its id/label) is gone.
+        // The single-layer representation has no id home; the only proof is that the
+        // image round-trips while the layer (and thus its id) is gone.
         assertTrue(collapsed.layers.isEmpty())
         assertEquals("file:///a.png", collapsed.imageUri)
     }

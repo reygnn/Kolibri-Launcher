@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import com.github.reygnn.kolibri_launcher.core.toEnumOrNull
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -23,18 +22,6 @@ data class WallpaperLayerState(
 
     /** Vertikale Verschiebung in Pixel */
     val translateY: Float = 0f,
-
-    /** Deckkraft: 0.0 (transparent) bis 1.0 (deckend) */
-    val alpha: Float = 1.0f,
-
-    /** Blend-Modus Name (für Persistierung). null = Normal (SRC_OVER) */
-    val blendModeName: String? = null,
-
-    /** Sichtbarkeit */
-    val isVisible: Boolean = true,
-
-    /** Optionaler Label (z.B. "Oben", "Unten") */
-    val label: String? = null,
 
     /**
      * The bitmap `inSampleSize` this layer's [scale]/[translateX]/[translateY]
@@ -71,14 +58,6 @@ data class WallpaperLayerState(
     /** Hat dieses Layer ein Bild? */
     val hasImage: Boolean
         get() = imageUri != null
-
-    /**
-     * Domain blend mode resolved from the persisted [blendModeName].
-     * `null` = Normal (SRC_OVER) or an unknown name. UI consumers map this to
-     * `android.graphics.BlendMode` via `WallpaperBlendMode.toAndroidBlendMode()`.
-     */
-    val blendMode: WallpaperBlendMode?
-        get() = blendModeName.toEnumOrNull<WallpaperBlendMode>()
 
 }
 
@@ -272,7 +251,6 @@ data class WallpaperState(
             translateX = translateX,
             translateY = translateY,
             captureSampleSize = captureSampleSize,
-            label = "Layer 1"
         )
 
         return copy(
@@ -300,12 +278,8 @@ data class WallpaperState(
      *
      * The collapse is UNCONDITIONAL for a one-layer list.
      * `imageUri`/`scale`/`translateX`/`translateY`/`captureSampleSize` carry
-     * meaning and map 1:1; the layer's `alpha`/`blendModeName`/`isVisible` and
-     * `id`/`label` have no single-layer home and are dropped. That is lossless
-     * in practice: the three render props are UI-less by design
-     * (ACCEPTED_LIMITATIONS.md §5 / AUDIT-20 F14), no backup carries a
-     * non-default value for them, and all four are slated for retirement — so a
-     * single layer is always effectively "plain". No plain-guard is needed.
+     * meaning and map 1:1; the layer's `id` has no single-layer home and is
+     * dropped (irrelevant for a single image).
      *
      * No-op (returns `this`) for a single-layer state, and for a multi-layer
      * state with zero or two-plus layers.

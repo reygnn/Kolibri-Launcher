@@ -49,7 +49,6 @@ class WallpaperViewBinderParallelDecodeTest {
     private fun layer(id: String) = WallpaperLayerState(
         id = id,
         imageUri = "file:///data/$id.jpg",
-        label = null,
     )
 
     private fun stateOf(vararg ids: String) =
