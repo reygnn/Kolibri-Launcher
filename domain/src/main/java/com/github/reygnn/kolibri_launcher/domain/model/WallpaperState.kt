@@ -284,4 +284,44 @@ data class WallpaperState(
             layers = listOf(singleLayer),
         )
     }
+
+    // ===========================================
+    // MIGRATION: MULTI → SINGLE  (F13 collapse)
+    // ===========================================
+
+    /**
+     * Reverse of [toMultiLayer]: collapses a multi-layer state that holds
+     * exactly ONE "plain" layer back into the single-layer representation, so a
+     * wallpaper whittled down to a single layer in the editor takes the cheaper
+     * decode-cache path (`file://` key) again instead of the flatten path
+     * (`composite://` key). This closes the AUDIT-20 F13 one-way-street: layer
+     * removals never collapsed back, so a 1-layer state stayed [isMultiLayer]
+     * forever and kept flattening a single image.
+     *
+     * Collapses ONLY when the sole layer carries nothing the single-layer
+     * representation cannot hold: `alpha == 1f`, no blend mode, and visible.
+     * Those three per-layer properties are UI-less by design
+     * (ACCEPTED_LIMITATIONS.md §5 / AUDIT-20 F14), so in production the guard
+     * always passes; it exists to stay correct against a hand-edited backup that
+     * sets a divergent value — such a layer stays multi-layer, preserving it.
+     * The layer's [WallpaperLayerState.id] and [WallpaperLayerState.label] are
+     * dropped: both are internal bookkeeping, never displayed.
+     *
+     * No-op (returns `this`) for a single-layer state, and for a multi-layer
+     * state with zero or two-plus layers or a single non-plain layer.
+     */
+    fun toSingleLayer(): WallpaperState {
+        if (!isMultiLayer) return this
+        val only = layers.singleOrNull() ?: return this
+        if (only.alpha != 1f || only.blendModeName != null || !only.isVisible) return this
+
+        return copy(
+            imageUri = only.imageUri,
+            scale = only.scale,
+            translateX = only.translateX,
+            translateY = only.translateY,
+            captureSampleSize = only.captureSampleSize,
+            layers = emptyList(),
+        )
+    }
 }

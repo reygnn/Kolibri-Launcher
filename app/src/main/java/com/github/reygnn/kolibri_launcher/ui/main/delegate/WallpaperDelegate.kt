@@ -592,6 +592,20 @@ class WallpaperDelegate(
         editSnapshot = null
         _isWallpaperEditMode.value = false
 
+        // F13: a wallpaper edited down to a single plain layer collapses back to
+        // the single-layer representation, so the next render takes the cheaper
+        // decode-cache path (file://) instead of the flatten path (composite://).
+        // No-op unless exactly one layer remains and it is plain (alpha 1 / no
+        // blend / visible) — see WallpaperState.toSingleLayer. Done at the commit
+        // boundary, not per removal, so the live editor never desyncs from a
+        // mid-session single-layer state. commit() applies synchronously, so the
+        // snapshot below already sees the collapsed state.
+        val current = _wallpaperState.value
+        val collapsed = current.toSingleLayer()
+        if (collapsed !== current) {
+            commit("Error collapsing single-layer wallpaper", Mutation(collapsed))
+        }
+
         // Snapshot the committed state now; the flatten below reads it.
         val committedState = _wallpaperState.value
 

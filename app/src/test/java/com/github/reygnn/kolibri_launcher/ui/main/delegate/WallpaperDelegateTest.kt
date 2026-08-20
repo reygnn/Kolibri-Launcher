@@ -668,6 +668,63 @@ class WallpaperDelegateTest {
     }
 
     // ===========================================
+    // COMMIT: SINGLE-LAYER COLLAPSE (AUDIT-20 F13)
+    // ===========================================
+
+    @Test
+    fun `commit collapses a single plain layer back to single-layer and persists it`() = runTest {
+        val multi = WallpaperState.multiLayer(
+            listOf(WallpaperLayerState(imageUri = "file:///only.png", scale = 2f, label = "Layer 1"))
+        )
+        val stateFlow = MutableStateFlow<WallpaperState>(multi)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        // Hitting cache: keep the composite warm a guaranteed no-op so the test
+        // isolates the collapse + persist, not the flatten path.
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns mockk(relaxed = true)
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, compositeCache = cache)
+        delegate.start()
+        advanceUntilIdle()
+        assertTrue(delegate.wallpaperState.value.isMultiLayer)
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        val collapsed = delegate.wallpaperState.value
+        assertFalse("commit must collapse a single plain layer", collapsed.isMultiLayer)
+        assertEquals("file:///only.png", collapsed.imageUri)
+        assertEquals(2f, collapsed.scale)
+        coVerify { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer && it.imageUri == "file:///only.png" }) }
+    }
+
+    @Test
+    fun `commit keeps a non-plain single layer multi-layer`() = runTest {
+        // A backup-edge layer (alpha != 1) must survive the commit as multi-layer.
+        val multi = WallpaperState.multiLayer(
+            listOf(WallpaperLayerState(imageUri = "file:///only.png", alpha = 0.5f))
+        )
+        val stateFlow = MutableStateFlow<WallpaperState>(multi)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns mockk(relaxed = true)
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, compositeCache = cache)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        assertTrue("a divergent-alpha layer must not collapse", delegate.wallpaperState.value.isMultiLayer)
+        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer }) }
+    }
+
+    // ===========================================
     // MULTI-LAYER: REMOVE LAYER
     // ===========================================
 
@@ -1047,7 +1104,10 @@ class WallpaperDelegateTest {
         }
         val newState: WallpaperState = mockk {
             every { layers } returns listOf(mockk())
-            every { hasWallpaper } returns true        }
+            every { hasWallpaper } returns true
+            // Commit calls toSingleLayer() (F13); this mock state does not collapse.
+            every { toSingleLayer() } returns this@mockk
+        }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
             every { withRemovedLayer(0) } returns newState
