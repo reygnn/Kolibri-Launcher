@@ -63,4 +63,23 @@ class WallpaperCompositeCache @Inject constructor() {
         cached = null
         cachedPath = null
     }
+
+    /**
+     * Drops the held bitmap reference IF it is cached under a key other than [currentKey]
+     * (AUDIT-20 F12). A resolution change (rotate/fold) versions the composite key, so the
+     * previous-resolution entry becomes a guaranteed miss for [currentKey]; without this it
+     * would stay resident — a stranded ~10 MB bitmap nothing queries — until a later
+     * successful [put] happens to replace it. A warm for the new key that FAILS never does
+     * that replace, which is the leak this closes. No-op when the cache already holds
+     * [currentKey] (the live entry) or is empty, so it never drops the current display
+     * bitmap. Does NOT recycle — the never-recycle invariant holds; it only releases this
+     * side's reference.
+     */
+    @Synchronized
+    fun invalidateIfNotKey(currentKey: String) {
+        if (cached != null && cachedPath != currentKey) {
+            cached = null
+            cachedPath = null
+        }
+    }
 }

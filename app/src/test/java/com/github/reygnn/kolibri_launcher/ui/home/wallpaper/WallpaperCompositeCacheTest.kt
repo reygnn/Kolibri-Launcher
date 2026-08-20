@@ -12,7 +12,7 @@ import org.junit.Test
  * in-memory cache for the display wallpaper bitmap. Pure JVM: the [Bitmap] is
  * mocked (only [Bitmap.isRecycled] is ever touched by the cache), no Robolectric
  * needed. Pins the get/put/recycle behavior plus [WallpaperCompositeCache.invalidate]
- * (AUDIT-20 F3).
+ * (AUDIT-20 F3) and [WallpaperCompositeCache.invalidateIfNotKey] (AUDIT-20 F12).
  */
 class WallpaperCompositeCacheTest {
 
@@ -50,5 +50,33 @@ class WallpaperCompositeCacheTest {
             "AUDIT-20 F3: the cache must be empty after invalidate()",
             cache.get("file:///composite_1.webp"),
         )
+    }
+
+    @Test
+    fun `invalidateIfNotKey drops a stale-key entry`() {
+        cache.put("composite://portrait", decoded())
+        cache.invalidateIfNotKey("composite://landscape")
+        assertNull(
+            "AUDIT-20 F12: an entry under a now-dead key must be dropped",
+            cache.get("composite://portrait"),
+        )
+    }
+
+    @Test
+    fun `invalidateIfNotKey keeps the current-key entry`() {
+        val entry = decoded()
+        cache.put("composite://portrait", entry)
+        cache.invalidateIfNotKey("composite://portrait")
+        assertSame(
+            "AUDIT-20 F12: the live current-key entry must survive",
+            entry,
+            cache.get("composite://portrait"),
+        )
+    }
+
+    @Test
+    fun `invalidateIfNotKey is a no-op on an empty cache`() {
+        cache.invalidateIfNotKey("composite://anything")
+        assertNull(cache.get("composite://anything"))
     }
 }

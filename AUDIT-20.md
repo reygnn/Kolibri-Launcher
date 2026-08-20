@@ -615,8 +615,10 @@ ausgeklammert (s. o.).
 > `ACCEPTED_LIMITATIONS.md` §5), F13 **behoben** (`toSingleLayer`-Collapse am
 > Commit-Rand), F15 **behoben/entschieden** (Single-Layer-Warm-Pfad via `refillCache`
 > ergänzt; Multi-Layer-Restore-Timing S1 bewusst akzeptiert), **F11** **behoben**
-> (gemeinsamer `leaveEditMode`-Funnel am Edit-Mode-Ausgang, 2026-08-20). Offen bleiben
-> **F10** (Release-Blocker) und **F12**. Aus der anschließenden
+> (gemeinsamer `leaveEditMode`-Funnel am Edit-Mode-Ausgang, 2026-08-20) und **F12**
+> **behoben** (strukturell: `invalidateIfNotKey` im `refillCache`-Chokepoint, 2026-08-20).
+> Offen bleibt nur noch **F10** (Release-Blocker, bewusst bis zur Freigabe stehen
+> gelassen). Aus der anschließenden
 > On-Device-Verifikation kamen zwei Nachträge (fünfter Durchgang): **F16**
 > (Single-Layer-Transform-Stale-Frame) **behoben**, **F17** (Wallpaper als
 > eigener Restore-Punkt) **umgesetzt**.
@@ -656,10 +658,10 @@ sondern eine Wiedervorlage des ersten.
 | **Inhalt: Edit-Cancel** | Key kann sich geändert haben, ohne dass der persistierte Wert es tut | Edit-Mode-Ausgang (`leaveEditMode`, seit F11-Fix) | ~~F11~~ behoben |
 | **Inhalt: „Hintergrund wählen"** | neue `file://`-URI | *kein Warm* — lazy beim nächsten Decode (`:1603`) | by design, aber siehe F15 |
 | **Inhalt: Backup-Restore** | neuer State | Collect (`:400`) — greift laut Gerätebeobachtung nicht | **F15** |
-| **Auflösung** (Rotation, Falten, Multi-Window) | `widthPx × heightPx` im Hash — **nur** für `composite://`; der Single-Layer-Key kennt keine Maße und überlebt eine Rotation als Treffer | Config-Change (`:558`) | im Edit-Mode ausgesetzt → **F11** |
+| **Auflösung** (Rotation, Falten, Multi-Window) | `widthPx × heightPx` im Hash — **nur** für `composite://`; der Single-Layer-Key kennt keine Maße und überlebt eine Rotation als Treffer | Config-Change (`:558`) | im Edit-Mode ausgesetzt → ~~F11~~ behoben (Warm am Edit-Ausgang) |
 | **Prozessneustart** | Cache ist rein in-memory (kein On-Disk-Composite seit v4) | erste Emission nach `start()` (`:400`) | — |
 | **App-Update mit `RENDER_BUDGET_VERSION`-Bump** | Versions-Term im Hash — bewusst als natürlicher Miss statt Migration | braucht keinen eigenen: der nächste Trigger greift | — |
-| **Fehlgeschlagener Warm** (partieller Flatten, OOM bei der HARDWARE-Copy) | kein Eintrag für den aktuellen Key | *keiner* — der Self-Reschedule feuert denselben Key bewusst nicht (Schleifenschutz, `:643`) | **F12** |
+| **Fehlgeschlagener Warm** (partieller Flatten, OOM bei der HARDWARE-Copy) | kein Eintrag für den aktuellen Key | *keiner* — der Self-Reschedule feuert denselben Key bewusst nicht (Schleifenschutz, `:643`) | ~~F12~~ behoben (stale-Eintrag wird up-front via `invalidateIfNotKey` gedroppt, nicht am Warm-Erfolg hängend) |
 
 Was **keinen** Refill braucht, obwohl man es vermuten könnte: drawer→home (das ist der
 Treffer, für den der Cache existiert), Edit-Mode betreten und verlassen (die View
@@ -692,7 +694,7 @@ Cache tatsächlich gebraucht wird.
 |---|---|---|---|---|---|---|
 | **F10** | Debug-Residuum | `WallpaperDelegate.kt` (`refillCache:669`, `warmSingleLayer:722`, `warmComposite:823`) | Die TEMP-Debug-Toasts sind **inzwischen drei, alle im Delegate** (Stand 2026-08-20): zwei auf Cache-**Fill** (Single-Layer-Decode + Composite-Warm) plus einer auf Cache-**Hit** („cache still valid"). Beim F15-Umbau wurde der HomeFragment-Decode-Toast in den Delegate konsolidiert (render-seitiger Lazy-`put` entfiel) und der Hit-Toast kam neu dazu. Alle „remove later"-markiert, alle user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
 | **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` vs. `onCommitWallpaperEditMode` | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): gemeinsamer `leaveEditMode`-Funnel |
-| **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
+| **F12** | Cache-Residenz | `WallpaperCompositeCache` (kein Key-Change-Drop) + `warmComposite`-Fehlerpfade | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): strukturell — `invalidateIfNotKey` im `refillCache`-Chokepoint |
 | **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): bedingter `toSingleLayer` am Commit-Rand |
 | **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ✅ BEHOBEN/ENTSCHIEDEN (2026-08-20): Single-Warm-Pfad via `refillCache`; Multi-Timing (S1) bewusst akzeptiert |
 | **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ✅ ENTSCHIEDEN (2026-08-19): alle drei UI-los (§5) → am 2026-08-20 samt `label` **ganz entfernt** (`refactor/drop-dormant-layer-props`) |
@@ -799,7 +801,7 @@ einen zweiten Warm über `leaveEditMode` durchdrücken — die früher fehlende
 
 ---
 
-### F12 — Unerreichbarer Eintrag nach Auflösungswechsel bleibt resident · `low` · CONFIRMED
+### F12 — Unerreichbarer Eintrag nach Auflösungswechsel bleibt resident · `low` · CONFIRMED → BEHOBEN (2026-08-20)
 
 `app/ui/home/wallpaper/WallpaperCompositeCache.kt:46-50` + `WallpaperDelegate.warmComposite:683-716`
 
@@ -848,6 +850,31 @@ akkumuliert nicht, self-heilt beim nächsten erfolgreichen Warm.
   Eintrag ist in diesem Fenster ohnehin unerreichbar).
 
 Die zweite Variante ist die ehrlichere Invariante, die erste der kleinere Diff.
+
+**Behoben (2026-08-20, `fix/composite-warm-on-editmode-exit`) — strukturell.** Die
+zweite Variante umgesetzt, an einem noch etwas allgemeineren Ort als skizziert: neu
+`WallpaperCompositeCache.invalidateIfNotKey(currentKey)` (`@Synchronized`, droppt nur die
+Referenz — never-recycle bleibt, No-op bei Hit auf denselben Key oder leerem Cache) wird
+**im `refillCache`-Chokepoint** aufgerufen (direkt nach der Key-Berechnung, vor dem
+`get`/Warm) statt nur auf dem Config-Change-Pfad. Da `onDisplayConfigChanged` ohnehin nur
+`refillCache` ist, deckt das den Rotations-/Faltfall ab — **und** zusätzlich jeden
+Content-Key-Wechsel (neues Bild/Layer): „Eintrag für tote Auflösung/toten Content" ist
+damit pfadübergreifend gar nicht erst ein Zustand, **unabhängig davon, ob der
+anschließende Warm gelingt**. Der Drop trifft nie den Live-Eintrag, weil `key` in jedem
+`refillCache`-Aufruf der Key des aktuellen Wallpapers ist und `invalidateIfNotKey` genau
+diesen verschont. Damit ist die Bitmap-Seite symmetrisch zur Luminanz
+(`dropLuminanceIfCurrent`) — und sogar strenger, weil der Drop nicht mehr an einen
+Fehlerpfad gebunden ist, sondern up-front passiert.
+
+Tests: `WallpaperCompositeCacheTest` (drei neue Fälle — stale-Key droppt, current-Key
+überlebt, leerer Cache No-op) und `WallpaperDelegateTest`
+(`a failed warm still drops any stale-key cache entry up front` — Flatten liefert null,
+`invalidateIfNotKey` wird trotzdem gerufen, `put` nicht). Rein JVM.
+
+*Rest-Kosten (bewusst):* der Fallback-Eintrag im Fenster zwischen Rotation und fertigem
+Warm entfällt — kein Render-Nachteil, der Eintrag ist in diesem Fenster ohnehin
+unerreichbar (sein Key matcht die neue Auflösung nicht), und der Composite-Miss rendert
+solange korrekt per-Layer live (`displayTargetFor`).
 
 ---
 

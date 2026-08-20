@@ -356,6 +356,37 @@ class WallpaperDelegateTest {
     }
 
     /**
+     * AUDIT-20 F12 (structural): refillCache drops a stale-key entry UP FRONT
+     * ([WallpaperCompositeCache.invalidateIfNotKey]) before deciding to warm, so a warm that
+     * then FAILS (flatten -> null here) cannot strand the prior-resolution ~10 MB bitmap
+     * under a key nothing queries. The drop must not depend on a successful put.
+     */
+    @Test
+    fun `a failed warm still drops any stale-key cache entry up front`() = runTest {
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } returns null // warm fails -> no put
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // miss -> the warm fires
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        verify { cache.invalidateIfNotKey(any()) } // dropped up front, not gated on success
+        verify(exactly = 0) { cache.put(any(), any()) } // warm failed -> nothing (re)cached
+    }
+
+    /**
      * AUDIT-20 F11: leaving edit mode is a single funnel ([WallpaperDelegate.leaveEditMode])
      * that refills the display cache for BOTH commit and cancel. A no-op cancel restores an
      * unchanged state and produces no DataStore emission, so this explicit warm is the only

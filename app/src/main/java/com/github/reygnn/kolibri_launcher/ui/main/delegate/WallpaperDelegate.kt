@@ -656,6 +656,13 @@ class WallpaperDelegate(
         if (refillInProgress) return
         if (_isWallpaperEditMode.value) return
         val key = cacheKeyOrNull(state) ?: return
+        // F12 (structural): drop any entry cached under a now-dead key BEFORE deciding to
+        // warm, so "entry for a dead resolution" is never even a state — independent of
+        // whether the warm below succeeds. A rotate/fold (or a content change) versions the
+        // key; the previous entry is a guaranteed miss for `key`, and a warm that then fails
+        // would otherwise leave the old ~10 MB bitmap resident. No-op on a hit (same key) or
+        // an empty cache, so the live current-key entry is never touched.
+        compositeCache.invalidateIfNotKey(key)
         if (compositeCache.get(key) != null) {
             // TEMP (remove later): a single-layer cache HIT means the raw bitmap is
             // still valid — e.g. a transform-only edit changed scale/position but not
