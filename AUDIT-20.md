@@ -613,7 +613,9 @@ ausgeklammert (s. o.).
 >
 > **Update 2026-08-20:** F14 **entschieden** (alle drei Layer-Regler bleiben UI-los,
 > `ACCEPTED_LIMITATIONS.md` §5), F13 **behoben** (`toSingleLayer`-Collapse am
-> Commit-Rand). Offen bleiben **F10** (Release-Blocker), **F11**, **F12**, **F15**.
+> Commit-Rand), F15 **behoben/entschieden** (Single-Layer-Warm-Pfad via `refillCache`
+> ergänzt; Multi-Layer-Restore-Timing S1 bewusst akzeptiert). Offen bleiben
+> **F10** (Release-Blocker), **F11**, **F12**.
 >
 > **F15 ist der einzige Fund dieses Abschnitts, der aus einer Geräte-Beobachtung
 > stammt statt aus dem Lesen** — und er hat eine Leseanalyse widerlegt: die
@@ -688,7 +690,7 @@ Cache tatsächlich gebraucht wird.
 | **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
 | **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): bedingter `toSingleLayer` am Commit-Rand |
-| **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ⛔ OFFEN |
+| **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ✅ BEHOBEN/ENTSCHIEDEN (2026-08-20): Single-Warm-Pfad via `refillCache`; Multi-Timing (S1) bewusst akzeptiert |
 | **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ✅ ENTSCHIEDEN (2026-08-19): alle drei UI-los, Editor transform-only (§5); Modell-Felder bleiben dormant |
 
 ---
@@ -905,7 +907,7 @@ Layer-Stack.
 
 ---
 
-### F15 — Backup-Restore aktualisiert den Cache nicht · `med` · CONFIRMED (Beobachtung)
+### F15 — Backup-Restore aktualisiert den Cache nicht · `med` · CONFIRMED (Beobachtung) → BEHOBEN/ENTSCHIEDEN (2026-08-20)
 
 `ui/main/delegate/WallpaperDelegate.kt:626-649` (`maybeWarmComposite`) +
 `ui/home/HomeFragment.kt:1590-1607` (`loadBitmapFromUri`)
@@ -926,46 +928,38 @@ ist „erst beim nächsten Render" damit **kein Fehler im Trigger, sondern das F
 eines Triggers**. Das deckt die Beobachtung vollständig ab, wenn das restaurierte
 Wallpaper einlagig war.
 
-**Offen (Multi-Layer-Fall).** Für einen mehrlagigen Restore ist die Kette
-nachweisbar verdrahtet — `saveWallpaperStateForRestore` (`BackupDataAssembler:423`)
-→ `saveWallpaperState` → dieselbe DataStore-Instanz, die
-`observeWallpaperStateUseCase()` liest → der Collect im Delegate (`:391-401`, im
-**viewModelScope** via `LauncherViewModel.init:313`, nicht view-lifecycle-gebunden)
-→ `maybeWarmComposite`. Warum sie in der Praxis trotzdem nicht greift, ist **nicht
-geklärt**. Kandidaten, keiner davon bestätigt:
+**Behoben / entschieden (2026-08-20).** In zwei Hälften:
 
-1. **MainActivitys ViewModel überlebt den Settings-Ausflug nicht.** Der Restore läuft
-   in `BackupFragment` unter der separaten SettingsActivity; wird MainActivity im
-   Hintergrund abgeräumt, läuft kein Collect und der Warm fällt auf den nächsten
-   MainActivity-Start — also faktisch auf „Kaltstart".
-2. **Der Warm läuft, aber sein key-gated `put` greift nicht** (`:721`) — etwa weil
-   `compositeKey` auf beiden Seiten aus unterschiedlichen `Resources` kommt: der
-   Delegate hält den Application-Context, `HomeFragment` einen Activity-Context. Die
-   §3a-Zusage „eine Metrik-Quelle" ist damit nur solange erfüllt, wie beide dieselben
-   Werte liefern (Multi-Window / Split-Screen sind der Zweifelsfall).
-3. **Der Flatten scheitert still** und F12 greift (kein Retry für denselben Key).
+- **Single-Layer-Warm-Lücke: geschlossen.** Genau die „Fix-Richtung" von unten ist
+  umgesetzt: `maybeWarmComposite` wurde zu **`refillCache`** vereinheitlicht, das
+  nach Repräsentation verzweigt — `!isMultiLayer` → `warmSingleLayer` (HARDWARE-Decode
+  via `WallpaperFlattener.decodeSingle`, gecached unter dem `file://`-Key), sonst
+  Flatten. Ein Einzelbild-Restore hat damit denselben proaktiven Pfad wie Multi. Der
+  render-seitige Lazy-`put` (`renderingSingleImageNow`) wurde entfernt; gecached wird
+  jetzt **nur** über `refillCache` — es gibt genau EINEN Cache-Schreiber. Ein neuer
+  Delegate-Test pinnt „Single-Layer-State ⇒ decode-Warm" (die früher fehlende
+  „Emission ⇒ Warm"-Abdeckung).
+- **Multi-Layer-Restore-Timing (S1): root-caused und bewusst akzeptiert.** Ursache
+  ist Kandidat 1: der Collector lebt in `MainActivity`s `LauncherViewModel`, der
+  Restore läuft in der separaten `SettingsActivity` — beim Rückkehr auf Home wärmt
+  der frische Collector. Nur bei **Multi** sichtbar, weil Single über den Live-Decode
+  ohnehin sofort rendert; Multi rendert bei Composite-Miss **per-Layer live**
+  (`displayTargetFor` gibt den echten State zurück) — also **korrekt, nur ohne
+  Cache-Vorsprung**. Es früher (schon zur Restore-Zeit) zu erzwingen wäre
+  architektonisch heikel (der Restore-Pfad hat kein `WallpaperDelegate`, andere Scope)
+  bei geringem Nutzen — **bewusst nicht umgesetzt.** S1 ist damit ein akzeptiertes
+  Minor-Perf-Detail (erster Home-Render nach Restore evtl. live statt aus Cache),
+  kein Korrektheitsfehler.
 
-**Nichts davon ist getestet.** `WallpaperDelegateTest` hat drei Warm-Tests, alle
-negativ (`does not warm a single-layer wallpaper`, `does not warm when the composite
-is already cached`, `a failed warm drops the composite luminance`) — es gibt **keinen**
-Test „State-Emission ⇒ Warm". Genau diese Lücke ist der Grund, warum die Frage
-überhaupt offen sein kann.
+Netto: Das Display ist nach einem Restore in **allen** Fällen (single / multi /
+keins) korrekt; die Cache-Warm-Lücke für Single-Layer ist geschlossen, die für
+Multi-Layer (S1) bewusst akzeptiert. Kandidaten 2/3 (Metrik-Divergenz,
+still gescheiterter Flatten) sind nicht die beobachtete Ursache, bleiben aber als
+generische Warm-Risiken unter F12 dokumentiert.
 
-**Nächster Diagnoseschritt (bevor irgendetwas gefixt wird):** unterscheiden, ob das
-restaurierte Wallpaper ein- oder mehrlagig war. Der TEMP-Toast (F10) trennt beide
-Fälle inzwischen sprachlich, und der UiEvent-Kanal ist ein `Channel(BUFFERED)`
-(`BaseViewModel:41`) — ein Toast aus dem Hintergrund geht also nicht verloren,
-sondern erscheint beim Zurückkehren. Bleibt er bei einem **mehrlagigen** Restore
-auch dann aus, ist Kandidat 1–3 zu klären; erscheint er dagegen erst beim
-drawer→home, war es der Single-Layer-Fall und der Fix ist ein Warm-Pfad für
-einlagige Wallpaper.
-
-**Fix-Richtung (nicht umgesetzt):** der Warm braucht einen Single-Layer-Zweig. Heute
-ist er an `isMultiLayer` gebunden, weil nur der Flatten dort etwas zu tun hat — für
-ein Einzelbild wäre das Äquivalent ein Decode-und-Cachen unter dem `file://`-Key,
-also genau das, was `HomeFragment.loadBitmapFromUri` lazy tut, nur vorgezogen. Das
-berührt allerdings die PUT-Gate-Logik (`renderingSingleImageNow`) und damit den
-Pfad, an dem AUDIT-20 bereits mehrfach iteriert hat — nicht nebenbei zu machen.
+*(Optional offen: S1 könnte als kurzer `ACCEPTED_LIMITATIONS.md`-Eintrag festgehalten
+werden — analog §1 —, wenn die akzeptierte Perf-Lücke einen kanonischen Ort
+verdient. Bewusst noch nicht angelegt.)*
 
 ---
 
