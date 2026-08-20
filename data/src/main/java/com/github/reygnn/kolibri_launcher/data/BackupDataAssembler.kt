@@ -34,7 +34,7 @@ import javax.inject.Singleton
  *
  * One responsibility: gather state from all 8 backup-relevant
  * repositories into a [BackupData] (export side), and apply a [BackupData]
- * back across the same 8 repositories (import side, the 10-phase
+ * back across the same 8 repositories (import side, the phased
  * `performImport`).
  *
  * NO dependencies on:
@@ -45,13 +45,15 @@ import javax.inject.Singleton
  *  - The ZIP file format
  *
  * Repository writes during import:
- *  - Phases 1–6 + 8–10 happen here, directly against the injected
+ *  - Phases 1–7 + 8–10 happen here, directly against the injected
  *    repositories.
- *  - Phase 7 (wallpaper) splits responsibility: this class clears
- *    [WallpaperRepository] state, then hands off to the
- *    [WallpaperRestorer] which does the file-system work and ultimately
- *    calls back into [saveWallpaperStateForRestore] so the
- *    [WallpaperRepository] dependency stays in this class only.
+ *  - Phase 7b (wallpaper) is a SEPARATE, independently-selectable restore
+ *    item (`options.importWallpaper`), not bundled with the theme scalars.
+ *    It splits responsibility: this class clears [WallpaperRepository]
+ *    state, then hands off to the [WallpaperRestorer] which does the
+ *    file-system work and ultimately calls back into
+ *    [saveWallpaperStateForRestore] so the [WallpaperRepository] dependency
+ *    stays in this class only.
  */
 @Singleton
 class BackupDataAssembler @Inject constructor(
@@ -313,7 +315,7 @@ class BackupDataAssembler @Inject constructor(
             if (swipeImportedCount > 0) Timber.i("Imported swipe actions")
         }
 
-        // ===== PHASE 7: Import Theme Settings (incl. wallpaper) =====
+        // ===== PHASE 7: Import Theme Settings =====
         var droppedWallpaperLayers = 0
         if (options.importThemeSettings) {
             backup.settings.textColor?.let { settingsRepository.setTextColor(it) }
@@ -354,24 +356,27 @@ class BackupDataAssembler @Inject constructor(
                 }
             }
 
-            // Only touch the wallpaper when the backup actually carries one.
-            // Every other theme field above skips on null (?.let), leaving the
-            // user's current value; the wallpaper must behave the same way, or
-            // importing a wallpaper-less backup would silently wipe the user's
-            // wallpaper with no warning (dropped stays 0 — nothing was in the
-            // backup to drop).
-            // "Has a wallpaper" means an actual image to restore — a layer
-            // with a blank imageUri carries no image, so an all-image-less
-            // layer list must not trigger the clear (which would silently wipe
-            // the user's current wallpaper with dropped=0, i.e. no warning).
+        }
+
+        // ===== PHASE 7b: Import Wallpaper (independent restore item) =====
+        // Lifted out of theme settings so the wallpaper is a SEPARATE restore
+        // choice: a theme restore never touches the active wallpaper and vice
+        // versa. Like every theme field above, skip on "nothing to restore":
+        // importing a wallpaper-less backup — OR one where the user DESELECTED
+        // the wallpaper (importWallpaper == false) — must leave the user's
+        // current wallpaper untouched (dropped stays 0 = no warning), never
+        // silently wipe it.
+        if (options.importWallpaper) {
+            // "Has a wallpaper" means an actual image to restore — a layer with
+            // a blank imageUri carries no image, so an all-image-less layer list
+            // must not trigger the clear (which would silently wipe the user's
+            // current wallpaper with dropped=0, i.e. no warning).
             val backupHasWallpaper = backup.settings.wallpaperLayers.any { !it.imageUri.isNullOrBlank() } ||
                 !backup.settings.wallpaperUri.isNullOrBlank()
             if (backupHasWallpaper) {
-                // Reset only the DataStore state — files are overwritten by
-                // the restorer below via copyToInternal(). Orphaned old files
-                // get reaped because only files referenced by the new state
-                // are kept. (Safe to skip when there is nothing to restore:
-                // no new files means nothing to reap.)
+                // Reset only the DataStore state — files are overwritten by the
+                // restorer below via copyToInternal(). Orphaned old files get
+                // reaped because only files referenced by the new state are kept.
                 wallpaperRepository.clearWallpaper()
                 droppedWallpaperLayers = wallpaperRestorer.restoreFromBackup(backup.settings)
             }

@@ -160,6 +160,12 @@ class ImportOptionsUiStateTest {
     }
 
     @Test
+    fun `wallpaper follows hasWallpaper (independent of theme)`() {
+        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = true)).wallpaper.visible)
+        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = false)).wallpaper.visible)
+    }
+
+    @Test
     fun `timeBasedEvents follows hasTimeBasedEvents`() {
         assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = true)).timeBasedEvents.visible)
         assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = false)).timeBasedEvents.visible)

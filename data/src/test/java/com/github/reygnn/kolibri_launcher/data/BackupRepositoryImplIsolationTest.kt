@@ -433,6 +433,7 @@ class BackupRepositoryImplIsolationTest {
         importCustomNames: Boolean = false,
         importSwipeActions: Boolean = false,
         importThemeSettings: Boolean = false,
+        importWallpaper: Boolean = false,
         importTimeBasedEvents: Boolean = false,
         importQualityOfLife: Boolean = false,
         importPowerUserSettings: Boolean = false
@@ -444,6 +445,7 @@ class BackupRepositoryImplIsolationTest {
             importCustomNames = importCustomNames,
             importSwipeActions = importSwipeActions,
             importThemeSettings = importThemeSettings,
+            importWallpaper = importWallpaper,
             importTimeBasedEvents = importTimeBasedEvents,
             importQualityOfLife = importQualityOfLife,
             importPowerUserSettings = importPowerUserSettings

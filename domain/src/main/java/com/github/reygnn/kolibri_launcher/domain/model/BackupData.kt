@@ -192,6 +192,11 @@ data class ImportOptions(
     val importCustomNames: Boolean = true,
     val importSwipeActions: Boolean = true,
     val importThemeSettings: Boolean = true,
+    // The wallpaper is its own restore item, independent of theme scalars: a
+    // theme restore never touches the active wallpaper and vice versa. Default
+    // true so programmatic callers that only set importThemeSettings keep
+    // restoring the wallpaper as before.
+    val importWallpaper: Boolean = true,
     val importTimeBasedEvents: Boolean = true,
     val importQualityOfLife: Boolean = true,
     val importPowerUserSettings: Boolean = true
@@ -203,6 +208,7 @@ data class ImportOptions(
                 !importCustomNames &&
                 !importSwipeActions &&
                 !importThemeSettings &&
+                !importWallpaper &&
                 !importTimeBasedEvents &&
                 !importQualityOfLife &&
                 !importPowerUserSettings

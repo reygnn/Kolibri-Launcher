@@ -296,6 +296,7 @@ class BackupRepositoryImplDoomsdayTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
+            importWallpaper = false,
             importTimeBasedEvents = false,
             importQualityOfLife = false,
             importPowerUserSettings = false
@@ -907,6 +908,7 @@ class BackupRepositoryImplDoomsdayTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
+            importWallpaper = false,
             importTimeBasedEvents = false,
             importQualityOfLife = true
         )
@@ -944,6 +946,7 @@ class BackupRepositoryImplDoomsdayTest {
             importCustomNames = false,
             importSwipeActions = false,
             importThemeSettings = false,
+            importWallpaper = false,
             importTimeBasedEvents = false,
             importQualityOfLife = false
         )

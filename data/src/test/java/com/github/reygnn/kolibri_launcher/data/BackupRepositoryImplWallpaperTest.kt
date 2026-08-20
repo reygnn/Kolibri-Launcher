@@ -317,7 +317,7 @@ class BackupRepositoryImplWallpaperTest {
     // ========================================================================
 
     @Test
-    fun `importFromJson - importThemeSettings false - does not import wallpaper`() = runTest {
+    fun `importFromJson - importWallpaper false - does not import wallpaper`() = runTest {
         fakeWallpaperRepo.currentState = WallpaperState.NONE
 
         val jsonWithWallpaper = createWallpaperBackupJson(
@@ -329,11 +329,33 @@ class BackupRepositoryImplWallpaperTest {
 
         val result = backupManager.importFromJson(
             jsonWithWallpaper,
-            ImportOptions(importThemeSettings = false, importFavorites = true)
+            ImportOptions(importWallpaper = false, importFavorites = true)
         )
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeWallpaperRepo.currentState).isEqualTo(WallpaperState.NONE)
+    }
+
+    @Test
+    fun `importFromJson - importThemeSettings false but importWallpaper true - still imports wallpaper`() = runTest {
+        // The wallpaper is now an INDEPENDENT restore item: deselecting the theme
+        // scalars must NOT drop the wallpaper (and vice versa).
+        fakeWallpaperRepo.currentState = WallpaperState.NONE
+
+        val jsonWithWallpaper = createWallpaperBackupJson(
+            wallpaperUri = testWallpaperUri,
+            wallpaperScale = 2.0f,
+            wallpaperTranslateX = 100f,
+            wallpaperTranslateY = 100f
+        )
+
+        val result = backupManager.importFromJson(
+            jsonWithWallpaper,
+            ImportOptions(importThemeSettings = false, importWallpaper = true, importFavorites = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeWallpaperRepo.currentState).isNotEqualTo(WallpaperState.NONE)
     }
 
     @Test
