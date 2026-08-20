@@ -25,7 +25,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | erledigt 2026-05-03 (alle 16 Files Android-frei); Modul-Type-Switch in §12 nachgezogen | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
-| 14 | `Invalid resource ID 0x00000000` Logcat-Noise | offen — Quelle lokalisieren, ~50 Errors pro App-Start aus dem Kolibri-Process (Tag `olibri_launcher`), keine Crashes aber Framework-Logs voll. Beobachtet 2026-05-04 nach ACRA-Verifikation. | klein-mittel, Investigation |
+| 14 | `Invalid resource ID 0x00000000` Logcat-Noise | **erledigt 2026-08-20** — der Schwall reproduziert auf 0.99.188 nicht mehr (inzident behoben seit dem Mai-Befund); die eine verbliebene Warnung derselben Familie (AppCompat-Widget ohne AppCompat-Theme im `WallpaperFlattener`) via `ContextThemeWrapper(AppTheme)` gefixt, auf Gerät verifiziert. Detail-Sektion §14 unten. | — |
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | offen — silent-accept, aufgedeckt durch `BackupRoundTripSafTest` 2026-05-04 | klein |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | **won't-do (2026-08-14)** — der aktuelle `extraBufferCapacity = 1` ist korrekt (Event-Bus-Buffered-Regel). `replay = 1` würde einem späten Subscriber das letzte Paket-Event nachspielen (Stale-Replay → redundante Re-Enumeration); der einzige genannte Nutzen war Test-Bequemlichkeit. Produktions-Risiko > Test-Komfort → geschlossen. | — |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
@@ -1653,6 +1653,21 @@ zumüllen. ACRA selbst funktioniert (separat verifiziert).
 vermutlich 1-2 Stellen mit Null-Check / Default-`R.string.empty`.
 Kein Score-Hebel, aber ein Logcat-Hygiene-Win und ein Indikator dass
 irgendwo eine `@StringRes Int = 0` Lücke schwelt.
+
+**Ergebnis (2026-08-20, erledigt).** Auf 0.99.188 (code 208) reproduziert
+der `Invalid resource ID 0x00000000`-Schwall **nicht mehr** — 0 Treffer
+über MainActivity- und SettingsActivity-Cold-Open (Release-Build, `-b all`
+Logcat). In den 348 Commits seit dem Mai-Befund inzident behoben (der
+`@StringRes`-Verdacht — Wallpaper-Color-Sealed-State — wurde in der
+Zwischenzeit komplett umgebaut). Übrig war genau **eine** Warnung derselben
+Familie (AppCompat-Widget ohne AppCompat-Theme): `WallpaperFlattener` baute
+die off-screen `ZoomableImageView` (ein `AppCompatImageView`) mit dem rohen
+`@ApplicationContext`, was AppCompats Theme-Check auslöst und auf manchen
+Plattform-Versionen die ResID-0-Fehler pro ungelöstem Tint-Attribut
+erzeugt. Fix: die Detached-View in einen `ContextThemeWrapper(context,
+R.style.AppTheme)` gehängt (Material3 → AppCompat-Nachfahre) — Theme-only,
+Composite bleibt pixelgleich (auf Gerät verifiziert). ThemeUtils-Warnung
+1 → 0, `Invalid resource ID` bleibt 0. Branch `fix/flattener-appcompat-theme`.
 
 ---
 
