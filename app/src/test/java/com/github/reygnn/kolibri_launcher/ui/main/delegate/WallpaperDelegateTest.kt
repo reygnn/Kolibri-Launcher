@@ -428,6 +428,205 @@ class WallpaperDelegateTest {
         assertEquals("cancel must trigger a second warm through leaveEditMode", 2, flattenCalls.get())
     }
 
+    /**
+     * Anti-loop guard (refillCache self-reschedule, spec S5): a warm that fails for the CURRENT
+     * key must NOT re-fire the same key, or a persistently-failing fill would spin forever. With
+     * flatten permanently failing and the cache a permanent miss, the collect-loop warm runs
+     * exactly once — the self-reschedule sees currentKey == key and declines. If the guard broke,
+     * this test would hang (infinite reschedule), so exactly-one IS the assertion.
+     */
+    @Test
+    fun `a persistently failing warm does not self-reschedule the same key`() = runTest {
+        val flattenCalls = AtomicInteger(0)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            flattenCalls.incrementAndGet()
+            null // always fails
+        }
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // permanent miss
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        assertEquals("same-key failure must not loop -> exactly one warm", 1, flattenCalls.get())
+    }
+
+    /**
+     * warmSingleLayer key-gate (AUDIT-20 F9, single-layer twin of the composite gate): a decode
+     * that finishes AFTER the state was superseded must drop its bitmap, not cache it under the
+     * now-stale key. The first state's decode parks on a gate; a second emission supersedes it
+     * (the in-flight refill is single-flighted, so it just updates the state); on release the
+     * key-gate sees a different current imageUri and skips the put.
+     */
+    @Test
+    fun `a superseded single-layer decode does not cache under its stale key`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val s1Bitmap = DecodedWallpaperBitmap(mockk<Bitmap>(relaxed = true), 1, 100, 100)
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        coEvery { flattener.decodeSingle("file:///a.jpg") } coAnswers { gate.await(); s1Bitmap }
+        coEvery { flattener.decodeSingle("file:///b.jpg") } returns null // superseding state: no put either
+
+        val s1 = WallpaperState(imageUri = "file:///a.jpg")
+        val s2 = WallpaperState(imageUri = "file:///b.jpg")
+        val stateFlow = MutableStateFlow(s1)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle() // s1 warm parks in decodeSingle, holding the regen lock
+
+        stateFlow.value = s2 // supersede; the in-flight refill is single-flighted -> just updates state
+        advanceUntilIdle()
+
+        gate.complete(Unit) // s1 decode finishes into a state that is now s2
+        advanceUntilIdle()
+
+        coVerify { flattener.decodeSingle("file:///a.jpg") } // the stale decode DID run
+        verify(exactly = 0) { cache.put("file:///a.jpg", any()) } // ...but its key-gate rejected the put
+    }
+
+    /**
+     * Single-flight (refillInProgress): while a warm is in flight, a second refill trigger must be
+     * dropped, not start a concurrent warm. The first warm parks on a gate; onDisplayConfigChanged
+     * fires a refill into that window; it must early-return, leaving the flatten count at one.
+     */
+    @Test
+    fun `a refill trigger while a warm is in flight is dropped`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            flattenCalls.incrementAndGet()
+            gate.await()
+            bitmap
+        }
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle() // warm #1 parks on the gate, refillInProgress == true
+        assertEquals(1, flattenCalls.get())
+
+        delegate.onDisplayConfigChanged() // refillCache -> single-flight guard -> early return
+        advanceUntilIdle()
+        assertEquals("second trigger while in-flight must be dropped", 1, flattenCalls.get())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("same key -> no self-reschedule after completion", 1, flattenCalls.get())
+    }
+
+    /**
+     * F11 commit half: the leaveEditMode funnel warms on COMMIT too (the F11 test above pins the
+     * cancel half). A two-layer state stays multi through the F13 collapse (a no-op for >1 layer),
+     * so the committed warm takes the composite flatten path.
+     */
+    @Test
+    fun `onCommitWallpaperEditMode warms the display cache via the exit funnel`() = runTest {
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            flattenCalls.incrementAndGet()
+            bitmap
+        }
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            ),
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // permanent miss -> every refill warms
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+        assertEquals("start warms once via the collect loop", 1, flattenCalls.get())
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        assertEquals("commit must trigger a second warm through leaveEditMode", 2, flattenCalls.get())
+    }
+
+    /**
+     * Config-change re-warm (rotate/fold): onDisplayConfigChanged drives a refill so the composite
+     * is re-warmed for the new resolution's key. Pins the delegate-level trigger (the key test
+     * proves the resolution change is a MISS; this proves the miss actually re-warms).
+     */
+    @Test
+    fun `onDisplayConfigChanged re-warms the composite`() = runTest {
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            flattenCalls.incrementAndGet()
+            bitmap
+        }
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // permanent miss
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+        assertEquals(1, flattenCalls.get())
+
+        delegate.onDisplayConfigChanged()
+        advanceUntilIdle()
+
+        assertEquals("config change must drive a re-warm", 2, flattenCalls.get())
+    }
+
     // ===========================================
     // SET WALLPAPER IMAGE
     // ===========================================
