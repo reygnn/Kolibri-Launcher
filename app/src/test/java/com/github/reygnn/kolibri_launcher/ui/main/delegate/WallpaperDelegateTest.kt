@@ -701,8 +701,10 @@ class WallpaperDelegateTest {
     }
 
     @Test
-    fun `commit keeps a non-plain single layer multi-layer`() = runTest {
-        // A backup-edge layer (alpha != 1) must survive the commit as multi-layer.
+    fun `commit collapses even a single layer carrying dead per-layer props`() = runTest {
+        // alpha/blend/isVisible are UI-less and slated for retirement; the
+        // collapse is unconditional, so even a (theoretical) non-default layer
+        // collapses and its dead props are dropped.
         val multi = WallpaperState.multiLayer(
             listOf(WallpaperLayerState(imageUri = "file:///only.png", alpha = 0.5f))
         )
@@ -720,8 +722,8 @@ class WallpaperDelegateTest {
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
 
-        assertTrue("a divergent-alpha layer must not collapse", delegate.wallpaperState.value.isMultiLayer)
-        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer }) }
+        assertFalse(delegate.wallpaperState.value.isMultiLayer)
+        coVerify { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer && it.imageUri == "file:///only.png" }) }
     }
 
     // ===========================================

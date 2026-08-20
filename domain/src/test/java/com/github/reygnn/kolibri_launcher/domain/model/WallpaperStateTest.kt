@@ -46,43 +46,29 @@ class WallpaperStateTest {
     }
 
     // ---------------------------------------------------------------
-    // toSingleLayer — the guard: non-plain layers stay multi
+    // toSingleLayer — unconditional for a one-layer list
     // ---------------------------------------------------------------
 
     @Test
-    fun `toSingleLayer keeps a layer with non-default alpha multi-layer`() {
+    fun `toSingleLayer collapses a single layer regardless of its dead per-layer props`() {
+        // alpha/blend/isVisible are UI-less by design and slated for retirement;
+        // no state carries non-default values in practice, so the collapse is
+        // unconditional and drops them (AUDIT-20 F13/F14).
         val state = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///a.png", alpha = 0.5f))
+            listOf(
+                WallpaperLayerState(
+                    imageUri = "file:///a.png",
+                    alpha = 0.5f,
+                    blendModeName = "MULTIPLY",
+                    isVisible = false,
+                )
+            )
         )
 
-        val result = state.toSingleLayer()
+        val collapsed = state.toSingleLayer()
 
-        assertSame(state, result, "a divergent-alpha layer must not collapse")
-        assertTrue(result.isMultiLayer)
-    }
-
-    @Test
-    fun `toSingleLayer keeps a layer with a blend mode multi-layer`() {
-        val state = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///a.png", blendModeName = "MULTIPLY"))
-        )
-
-        val result = state.toSingleLayer()
-
-        assertSame(state, result, "a layer with a blend mode must not collapse")
-        assertTrue(result.isMultiLayer)
-    }
-
-    @Test
-    fun `toSingleLayer keeps a hidden layer multi-layer`() {
-        val state = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///a.png", isVisible = false))
-        )
-
-        val result = state.toSingleLayer()
-
-        assertSame(state, result, "a hidden layer must not collapse")
-        assertTrue(result.isMultiLayer)
+        assertFalse(collapsed.isMultiLayer, "a one-layer list always collapses")
+        assertEquals("file:///a.png", collapsed.imageUri)
     }
 
     // ---------------------------------------------------------------

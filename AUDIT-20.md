@@ -871,14 +871,15 @@ war die falsche Toast-Beschriftung — behoben, indem `warmComposite` bei
 `layerCount == 1` als Single-Layer-Fill meldet (die Mechanik bleibt der Flatten; der
 Kommentar an der Stelle hält das fest).
 
-**Behoben (2026-08-20) — bedingter Collapse in `toSingleLayer`.** Die
+**Behoben (2026-08-20) — Collapse in `toSingleLayer`.** Die
 Einbahnstraße ist zu: neu `WallpaperState.toSingleLayer()` (Spiegelbild zu
-`toMultiLayer`) kollabiert einen Multi-State mit genau einem **schlichten** Layer
-(`alpha == 1f`, `blendModeName == null`, `isVisible`) zurück in die
-Single-Layer-Darstellung; jeder andere Fall bleibt No-op (`return this`), sodass ein
-Backup-Edge mit divergentem Wert multi bleibt. `imageUri`/`scale`/`translateX`/
-`translateY`/`captureSampleSize` mappen 1:1; Layer-`id` und `label` (reine
-Bookkeeping-Felder, nie angezeigt) fallen weg.
+`toMultiLayer`) kollabiert einen Multi-State mit genau einem Layer zurück in die
+Single-Layer-Darstellung (No-op bei 0 oder 2+ Layern). `imageUri`/`scale`/
+`translateX`/`translateY`/`captureSampleSize` mappen 1:1; `alpha`/`blendModeName`/
+`isVisible` sowie `id`/`label` fallen weg — verlustfrei, weil diese Felder UI-los
+sind (§5 / F14), **kein Backup Nicht-Default-Werte trägt** und sie ohnehin
+stillgelegt werden (Keys via „Speicher aufräumen" gelöscht). Der Collapse ist
+deshalb **unbedingt**; ein Schlicht-Guard (`alpha == 1f` …) ist nicht nötig.
 
 **Abweichung von der ursprünglich skizzierten Stelle:** der Collapse sitzt **nicht**
 in `withRemovedLayer`, sondern am **Commit-Rand** (`onCommitWallpaperEditMode`). In
