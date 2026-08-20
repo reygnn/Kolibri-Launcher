@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.view.View
+import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -95,6 +96,32 @@ class WallpaperFlattener @Inject constructor(
             }
         }
     }
+
+    /**
+     * HARDWARE decode of a single-layer wallpaper image for the display cache (AUDIT-20 F15).
+     * Unlike [flatten] — which composes SOFTWARE layers the caller copies to HARDWARE — a lone
+     * image needs no compositing: it is decoded straight to HARDWARE, matching the render side's
+     * config ([com.github.reygnn.kolibri_launcher.ui.home.HomeFragment] `loadBitmapFromUri`) so the
+     * entry is a drop-in cache hit, and the render positions it via the ImageView matrix. Returns
+     * null on decode failure; the caller then skips caching and the render path re-decodes on the
+     * next miss.
+     *
+     * Owns the `Uri` parse + `contentResolver`, so callers (the delegate) stay Uri-free and
+     * JVM-testable — the decode itself is real-runtime work, pinned by the instrumented decoder test.
+     */
+    suspend fun decodeSingle(uriString: String): DecodedWallpaperBitmap? =
+        withContext(Dispatchers.IO) {
+            try {
+                decodeBoundedWallpaperBitmap {
+                    context.contentResolver.openInputStream(uriString.toUri())
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Single-layer decode failed for refill")
+                null
+            }
+        }
 
     /** SOFTWARE decode of one layer source, matching the binder's loader contract. */
     private suspend fun loadSoftware(uri: Uri): DecodedWallpaperBitmap? =

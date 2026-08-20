@@ -397,7 +397,7 @@ class WallpaperDelegate(
                     }
                 }
 
-                maybeWarmComposite(state)
+                refillCache(state)
             }
         }
     }
@@ -552,10 +552,11 @@ class WallpaperDelegate(
     /**
      * The display configuration changed (rotate / fold / multi-window resize), so the composite
      * key's width/height changed and any cached composite is now wrong-resolution (v4 §3a/R2). A
-     * config change emits no new [WallpaperState], so this is the warm trigger for that case:
-     * re-evaluate the current state at the new metrics and warm on a miss.
+     * config change emits no new [WallpaperState], so this is the refill trigger for that case:
+     * re-evaluate the current state at the new metrics and refill on a miss. (Single-layer is
+     * resolution-independent — its `file://` key is unchanged — so this is a no-op for it.)
      */
-    fun onDisplayConfigChanged() = maybeWarmComposite(_wallpaperState.value)
+    fun onDisplayConfigChanged() = refillCache(_wallpaperState.value)
 
     // ===========================================
     // EDIT MODE
@@ -617,47 +618,88 @@ class WallpaperDelegate(
                     filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
                 }
             }
-            // Option D: regenerate the flattened display composite for the committed
-            // layers so drawer->home stops re-decoding every layer (§9.3).
-            maybeWarmComposite(committedState)
+            // Refill the display cache for the committed wallpaper (single-layer decode or
+            // multi-layer composite) so drawer->home is a cache hit, not a re-decode (§9.3).
+            refillCache(committedState)
         }
     }
 
     /**
-     * Warms the in-memory composite cache (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4 §3/§3a):
-     * an existing multi-layer wallpaper whose composite is not cached yet — cold start,
-     * edit-commit (new key), backup restore, or a rotate/fold (new resolution) — gets one
-     * flattened in the BACKGROUND, so the next drawer->home is a ~0 ms one-texture hit.
+     * Refills the in-memory display cache for [state] (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4
+     * §3/§3a): an existing wallpaper whose cached bitmap is missing — cold start, edit-commit,
+     * backup restore, or a rotate/fold (new resolution) — gets one produced in the BACKGROUND so
+     * the next drawer->home is a ~0 ms cache hit.
      *
-     * Deliberately NOT on the launch hot path: the flatten re-decodes N layers. Single-flighted
-     * ([backfillInProgress]) and skipped during edit mode (the layers are mid-change; the commit
-     * path warms). Gated on a cache MISS for the current key, so an already-warm state is a no-op.
-     * On completion it self-reschedules (spec S5) if the current state moved to a DIFFERENT
-     * multi-layer miss during the flatten — but never re-fires the SAME key, so a persistently
-     * failing (incomplete) flatten cannot loop.
+     * ONE entry point, branching by representation (AUDIT-20 F15 — single-layer used to have no
+     * proactive fill and only cached lazily on the render path):
+     *  - no wallpaper       -> nothing
+     *  - single-layer image -> HARDWARE decode, cached under the `file://` key. A lone image needs
+     *    no compositing: the render positions it via the ImageView matrix, so the cache holds the
+     *    raw (possibly small) bitmap and the system wallpaper shows through any uncovered area —
+     *    cheaper than pre-baking a full-screen composite.
+     *  - multi-layer        -> flatten N layers -> HARDWARE composite, cached under `composite://`.
+     *
+     * Deliberately NOT on the launch hot path. Single-flighted ([backfillInProgress]) and skipped
+     * during edit mode (the layers are mid-change; the commit path refills). Gated on a cache MISS
+     * for the current key, so an already-warm state is a no-op. On completion it self-reschedules
+     * (spec S5) if the current state moved to a DIFFERENT miss during the fill — but never re-fires
+     * the SAME key, so a persistently failing fill cannot loop.
      */
-    private fun maybeWarmComposite(state: WallpaperState) {
+    private fun refillCache(state: WallpaperState) {
         if (backfillInProgress) return
         if (_isWallpaperEditMode.value) return
-        if (!state.isMultiLayer) return
-        val key = compositeKey(state)
+        val key = cacheKeyOrNull(state) ?: return
         if (compositeCache.get(key) != null) return
         backfillInProgress = true
-        scope.launchSafe("Error warming wallpaper composite") {
+        scope.launchSafe("Error refilling wallpaper cache") {
             try {
-                warmComposite(state, key)
+                if (state.isMultiLayer) warmComposite(state, key) else warmSingleLayer(state, key)
             } finally {
                 backfillInProgress = false
-                // Self-reschedule (S5): only if the current state is a DIFFERENT multi-layer
-                // miss — never the same key, so a failed/incomplete flatten does not loop.
+                // Self-reschedule (S5): only if the current state is a DIFFERENT miss — never the
+                // same key, so a failed/incomplete fill does not loop.
                 val current = _wallpaperState.value
-                if (!_isWallpaperEditMode.value && current.isMultiLayer) {
-                    val currentKey = compositeKey(current)
-                    if (currentKey != key && compositeCache.get(currentKey) == null) {
-                        maybeWarmComposite(current)
+                if (!_isWallpaperEditMode.value) {
+                    val currentKey = cacheKeyOrNull(current)
+                    if (currentKey != null && currentKey != key && compositeCache.get(currentKey) == null) {
+                        refillCache(current)
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The display-cache key for [state], or null if it has no wallpaper. Multi-layer -> the
+     * resolution-keyed `composite://` key; single-layer -> the raw `file://` image URI. The
+     * single-layer key matches `HomeFragment.loadBitmapFromUri`'s `uri.toString()` because
+     * wallpaper URIs come from `WallpaperFileManager.copyToInternal` (canonical `file://`), so
+     * `imageUri == imageUri.toUri().toString()` — keeping this side Uri-free.
+     */
+    private fun cacheKeyOrNull(state: WallpaperState): String? = when {
+        !state.hasWallpaper -> null
+        state.isMultiLayer -> compositeKey(state)
+        else -> state.imageUri
+    }
+
+    /**
+     * Single-layer refill: HARDWARE-decode the lone image via the flattener (which owns the
+     * `Uri`/`contentResolver`), then key-gated cache it under its `file://` key. A decode that
+     * finishes after a clear (NONE) or a supersede drops its bitmap rather than stranding a stale
+     * entry (AUDIT-20 F9). No compositing — the render positions it live via the ImageView matrix.
+     */
+    private suspend fun warmSingleLayer(state: WallpaperState, key: String) = compositeRegenLock.withLock {
+        val uriString = state.imageUri ?: return@withLock
+        val decoded = wallpaperFlattener.decodeSingle(uriString) ?: return@withLock
+        val current = _wallpaperState.value
+        if (!current.isMultiLayer && current.imageUri == key) {
+            compositeCache.put(key, decoded)
+            // TEMP (remove later): visual signal on each single-layer cache fill — kept until the
+            // unified refill is verified 100% on-device. Symmetric with the composite warm's toast.
+            val m = context.resources.displayMetrics
+            scope.sendEvent(
+                UiEvent.ShowToastFromString("Single-layer cache filled (${m.widthPixels}x${m.heightPixels})")
+            )
         }
     }
 

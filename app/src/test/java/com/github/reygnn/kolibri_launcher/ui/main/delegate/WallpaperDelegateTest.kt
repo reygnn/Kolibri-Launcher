@@ -6,6 +6,7 @@ import android.net.Uri
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import android.graphics.Bitmap
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
@@ -228,10 +229,41 @@ class WallpaperDelegateTest {
     // JVM-testable is the warm TRIGGER GATE — that a flatten is (not) kicked — pinned here.
 
     @Test
-    fun `does not warm a single-layer wallpaper`() = runTest {
+    fun `refills a single-layer wallpaper via decode, not flatten`() = runTest {
+        // AUDIT-20 F15: single-layer now gets a PROACTIVE refill through the decode branch
+        // (not the composite flatten), cached under its file:// key, with the debug toast.
         val single = WallpaperState(imageUri = "file:///single.jpg")
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(single)
+
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        val bitmap = DecodedWallpaperBitmap(mockk<Bitmap>(relaxed = true), 1, 100, 100)
+        coEvery { flattener.decodeSingle("file:///single.jpg") } returns bitmap
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
+        coVerify { flattener.decodeSingle("file:///single.jpg") }
+        verify { cache.put("file:///single.jpg", bitmap) }
+        assertTrue(
+            "a single-layer refill emits the debug toast",
+            sentEvents.any { it is UiEvent.ShowToastFromString && it.message.startsWith("Single-layer cache filled") }
+        )
+    }
+
+    @Test
+    fun `refill does nothing when there is no wallpaper`() = runTest {
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(WallpaperState.NONE)
 
         val flattener: WallpaperFlattener = mockk(relaxed = true)
         val delegate = createDelegate(observeWallpaperStateUseCase = useCase, wallpaperFlattener = flattener)
@@ -239,7 +271,30 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
+        coVerify(exactly = 0) { flattener.decodeSingle(any()) }
         coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
+    }
+
+    @Test
+    fun `refill is a no-op for a single-layer cache hit`() = runTest {
+        val single = WallpaperState(imageUri = "file:///single.jpg")
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(single)
+
+        val flattener: WallpaperFlattener = mockk(relaxed = true)
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get("file:///single.jpg") } returns mockk(relaxed = true) // already cached
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { flattener.decodeSingle(any()) }
     }
 
     @Test
