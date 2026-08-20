@@ -464,7 +464,15 @@ class BackupRepositoryImpl @Inject constructor(
         return layersWithImage - validLayerStates.size
     }
 
-    /** @return 1 if a wallpaper was present but could not be restored, else 0. */
+    /**
+     * Backward-compat import path (kept per the refactor decision): an OLD backup
+     * of a single-image wallpaper encodes it only in the flat `wallpaperUri`/`Scale`
+     * /`TranslateX`/`TranslateY` fields with an empty `wallpaperLayers` array. This
+     * reads those flat fields and reconstructs the canonical one-element layer
+     * state. New backups always carry `wallpaperLayers`, so they never reach here.
+     *
+     * @return 1 if a wallpaper was present but could not be restored, else 0.
+     */
     private suspend fun importSingleLayerWallpaper(settings: LauncherSettings): Int {
         val wallpaperUri = settings.wallpaperUri
         if (wallpaperUri.isNullOrBlank()) return 0
@@ -482,14 +490,14 @@ class BackupRepositoryImpl @Inject constructor(
             if (canAccess) {
                 val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                 if (internalUri != null) {
-                    val wallpaperState = WallpaperState(
-                        imageUri = internalUri.toString(),
+                    val wallpaperState = WallpaperState.single(
+                        uri = internalUri.toString(),
                         scale = settings.wallpaperScale ?: 1.0f,
                         translateX = settings.wallpaperTranslateX ?: 0.0f,
                         translateY = settings.wallpaperTranslateY ?: 0.0f,
                     )
                     assembler.saveWallpaperStateForRestore(wallpaperState)
-                    Timber.i("Imported wallpaper settings (single-layer)")
+                    Timber.i("Imported wallpaper settings (legacy flat single-layer backup)")
                     return 0
                 } else {
                     Timber.w("Failed to copy wallpaper to internal storage")

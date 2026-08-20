@@ -143,8 +143,8 @@ class BackupRepositoryImplWallpaperTest {
 
     @Test
     fun `exportToJson - with wallpaper - includes all wallpaper fields`() = runTest {
-        fakeWallpaperRepo.currentState = WallpaperState(
-            imageUri = testWallpaperUri,
+        fakeWallpaperRepo.currentState = WallpaperState.single(
+            testWallpaperUri,
             scale = testWallpaperScale,
             translateX = testWallpaperTranslateX,
             translateY = testWallpaperTranslateY
@@ -174,8 +174,8 @@ class BackupRepositoryImplWallpaperTest {
 
     @Test
     fun `exportToJson - wallpaper uses camelCase keys`() = runTest {
-        fakeWallpaperRepo.currentState = WallpaperState(
-            imageUri = testWallpaperUri,
+        fakeWallpaperRepo.currentState = WallpaperState.single(
+            testWallpaperUri,
             scale = 1.0f,
             translateX = 0f,
             translateY = 0f
@@ -213,11 +213,12 @@ class BackupRepositoryImplWallpaperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        val restoredState = fakeWallpaperRepo.currentState
-        assertThat(restoredState.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(restoredState.scale).isEqualTo(testWallpaperScale)
-        assertThat(restoredState.translateX).isEqualTo(testWallpaperTranslateX)
-        assertThat(restoredState.translateY).isEqualTo(testWallpaperTranslateY)
+        // Successful single-image restore → exactly one layer.
+        val restoredLayer = fakeWallpaperRepo.currentState.layers.single()
+        assertThat(restoredLayer.imageUri).isEqualTo(testWallpaperUri)
+        assertThat(restoredLayer.scale).isEqualTo(testWallpaperScale)
+        assertThat(restoredLayer.translateX).isEqualTo(testWallpaperTranslateX)
+        assertThat(restoredLayer.translateY).isEqualTo(testWallpaperTranslateY)
     }
 
     @Test
@@ -252,8 +253,8 @@ class BackupRepositoryImplWallpaperTest {
         // wallpaper — same skip-on-null semantics as every other theme field
         // (Review 4813864 #2). Previously the wallpaper was cleared
         // unconditionally, silently wiping it with no warning.
-        val existing = WallpaperState(
-            imageUri = testWallpaperUri,
+        val existing = WallpaperState.single(
+            testWallpaperUri,
             scale = 1.2f,
             translateX = 10f,
             translateY = 20f
@@ -305,11 +306,11 @@ class BackupRepositoryImplWallpaperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        val restoredState = fakeWallpaperRepo.currentState
-        assertThat(restoredState.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(restoredState.scale).isEqualTo(1.0f)
-        assertThat(restoredState.translateX).isEqualTo(0.0f)
-        assertThat(restoredState.translateY).isEqualTo(0.0f)
+        val restoredLayer = fakeWallpaperRepo.currentState.layers.single()
+        assertThat(restoredLayer.imageUri).isEqualTo(testWallpaperUri)
+        assertThat(restoredLayer.scale).isEqualTo(1.0f)
+        assertThat(restoredLayer.translateX).isEqualTo(0.0f)
+        assertThat(restoredLayer.translateY).isEqualTo(0.0f)
     }
 
     // ========================================================================
@@ -385,8 +386,9 @@ class BackupRepositoryImplWallpaperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-1)
-        assertThat(fakeWallpaperRepo.currentState.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(fakeWallpaperRepo.currentState.scale).isEqualTo(1.5f)
+        val restoredLayer = fakeWallpaperRepo.currentState.layers.single()
+        assertThat(restoredLayer.imageUri).isEqualTo(testWallpaperUri)
+        assertThat(restoredLayer.scale).isEqualTo(1.5f)
     }
 
     // ========================================================================
@@ -414,11 +416,11 @@ class BackupRepositoryImplWallpaperTest {
         val result = backupManager.importFromJson(jsonWithSnakeCase, ImportOptions(importThemeSettings = true))
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        val state = fakeWallpaperRepo.currentState
-        assertThat(state.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(state.scale).isEqualTo(1.8f)
-        assertThat(state.translateX).isEqualTo(25.5f)
-        assertThat(state.translateY).isEqualTo(-30.0f)
+        val layer = fakeWallpaperRepo.currentState.layers.single()
+        assertThat(layer.imageUri).isEqualTo(testWallpaperUri)
+        assertThat(layer.scale).isEqualTo(1.8f)
+        assertThat(layer.translateX).isEqualTo(25.5f)
+        assertThat(layer.translateY).isEqualTo(-30.0f)
     }
 
     @Test
@@ -442,11 +444,11 @@ class BackupRepositoryImplWallpaperTest {
         val result = backupManager.importFromJson(jsonWithCamelCase, ImportOptions(importThemeSettings = true))
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        val state = fakeWallpaperRepo.currentState
-        assertThat(state.imageUri?.toString()).isEqualTo(testWallpaperUri)
-        assertThat(state.scale).isEqualTo(2.2f)
-        assertThat(state.translateX).isEqualTo(-15.0f)
-        assertThat(state.translateY).isEqualTo(45.5f)
+        val layer = fakeWallpaperRepo.currentState.layers.single()
+        assertThat(layer.imageUri).isEqualTo(testWallpaperUri)
+        assertThat(layer.scale).isEqualTo(2.2f)
+        assertThat(layer.translateX).isEqualTo(-15.0f)
+        assertThat(layer.translateY).isEqualTo(45.5f)
     }
 
     @Test
@@ -472,7 +474,7 @@ class BackupRepositoryImplWallpaperTest {
         val result = backupManager.importFromJson(jsonWithMixedCase, ImportOptions(importThemeSettings = true))
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(fakeWallpaperRepo.currentState.scale).isEqualTo(1.0f)
+        assertThat(fakeWallpaperRepo.currentState.layers.single().scale).isEqualTo(1.0f)
     }
 
     // ========================================================================
@@ -608,8 +610,8 @@ class BackupRepositoryImplWallpaperTest {
 
     @Test
     fun `roundtrip - export then import wallpaper - preserves all values`() = runTest {
-        val originalState = WallpaperState(
-            imageUri = testWallpaperUri,
+        val originalState = WallpaperState.single(
+            testWallpaperUri,
             scale = 1.75f,
             translateX = 42.5f,
             translateY = -17.3f
@@ -624,11 +626,12 @@ class BackupRepositoryImplWallpaperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        val restoredState = fakeWallpaperRepo.currentState
-        assertThat(restoredState.imageUri?.toString()).isEqualTo(originalState.imageUri?.toString())
-        assertThat(restoredState.scale).isEqualTo(originalState.scale)
-        assertThat(restoredState.translateX).isEqualTo(originalState.translateX)
-        assertThat(restoredState.translateY).isEqualTo(originalState.translateY)
+        val restoredLayer = fakeWallpaperRepo.currentState.layers.single()
+        val originalLayer = originalState.layers.single()
+        assertThat(restoredLayer.imageUri).isEqualTo(originalLayer.imageUri)
+        assertThat(restoredLayer.scale).isEqualTo(originalLayer.scale)
+        assertThat(restoredLayer.translateX).isEqualTo(originalLayer.translateX)
+        assertThat(restoredLayer.translateY).isEqualTo(originalLayer.translateY)
     }
 
     // ========================================================================

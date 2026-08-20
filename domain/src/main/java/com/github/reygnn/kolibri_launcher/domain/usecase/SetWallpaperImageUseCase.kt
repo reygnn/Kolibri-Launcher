@@ -16,12 +16,7 @@ class SetWallpaperImageUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(imageUri: String) {
         repository.saveWallpaperState(
-            WallpaperState(
-                imageUri = imageUri,
-                scale = WallpaperState.Companion.DEFAULT_SCALE,
-                translateX = 0f,
-                translateY = 0f
-            )
+            WallpaperState.single(uri = imageUri)
         )
     }
 }

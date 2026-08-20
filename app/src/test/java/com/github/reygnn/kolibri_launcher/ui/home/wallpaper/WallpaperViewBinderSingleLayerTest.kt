@@ -50,7 +50,7 @@ class WallpaperViewBinderSingleLayerTest {
         }
         val view = view()
 
-        binder.bind(view, WallpaperState(imageUri = "file:///wallpaper.jpg"))
+        binder.bind(view, WallpaperState.single("file:///wallpaper.jpg"))
 
         assertEquals("routed through the bounded loader, not setImageURI", 1, loaderCalls)
         assertFalse("single-layer mode, not multi-layer", view.isMultiLayerMode)
@@ -75,7 +75,7 @@ class WallpaperViewBinderSingleLayerTest {
         val binder = WallpaperViewBinder { _ -> null } // decode failed / unreadable
         val view = view()
 
-        binder.bind(view, WallpaperState(imageUri = "file:///broken.jpg"))
+        binder.bind(view, WallpaperState.single("file:///broken.jpg"))
 
         assertEquals(View.GONE, view.visibility)
     }

@@ -93,8 +93,8 @@ class BackupRoundTripWallpaperTest {
             ?: error("copyToInternal returned null — internal storage must be writable for this test")
 
         wallpaper.saveWallpaperState(
-            WallpaperState(
-                imageUri = internalUriBeforeBackup.toString(),
+            WallpaperState.single(
+                uri = internalUriBeforeBackup.toString(),
                 scale = testScale,
                 translateX = testTranslateX,
                 translateY = testTranslateY,
@@ -103,13 +103,13 @@ class BackupRoundTripWallpaperTest {
 
         // ── SANITY: the state we just saved should round-trip through
         // the WallpaperRepository read path before we even invoke backup.
-        // If parseSingleLayerState rejects the URI (file missing, scheme
+        // If parseWallpaperState rejects the URI (file missing, scheme
         // mismatch), getWallpaperStateSync returns NONE and the backup
         // export silently embeds nothing — the bytes-level assertion at
         // the end would then fire with a misleading message. Asserting
         // the read-back here pins the failure to the right step.
         val sanityState = wallpaper.wallpaperState.first()
-        assertThat(sanityState.imageUri).isEqualTo(internalUriBeforeBackup.toString())
+        assertThat(sanityState.layers.single().imageUri).isEqualTo(internalUriBeforeBackup.toString())
 
         // ── ACT 1: save backup ─────────────────────────────────────────
         val saved = withTimeout(10_000) {
@@ -120,7 +120,7 @@ class BackupRoundTripWallpaperTest {
         // ── ARRANGE 2: wipe wallpaper state to prove restore actually
         // brings it back, not just preserves a no-op state.
         wallpaper.clearWallpaper()
-        assertThat(wallpaper.wallpaperState.first().imageUri).isNull()
+        assertThat(wallpaper.wallpaperState.first().layers).isEmpty()
 
         // ── ACT 2: load backup ─────────────────────────────────────────
         val result = withTimeout(10_000) {
@@ -133,11 +133,11 @@ class BackupRoundTripWallpaperTest {
 
         // ── ASSERT: state restored ─────────────────────────────────────
         val restoredState = wallpaper.wallpaperState.first()
-        val restoredUriString = restoredState.imageUri
-        assertThat(restoredUriString).isNotNull()
-        assertThat(restoredState.scale).isEqualTo(testScale)
-        assertThat(restoredState.translateX).isEqualTo(testTranslateX)
-        assertThat(restoredState.translateY).isEqualTo(testTranslateY)
+        val restoredLayer = restoredState.layers.single()
+        assertThat(restoredLayer.imageUri).isNotNull()
+        assertThat(restoredLayer.scale).isEqualTo(testScale)
+        assertThat(restoredLayer.translateX).isEqualTo(testTranslateX)
+        assertThat(restoredLayer.translateY).isEqualTo(testTranslateY)
 
         // ── ASSERT: bytes survived the ZIP round-trip ──────────────────
         // The restored URI typically points at a NEW file in wallpapers/
@@ -146,7 +146,7 @@ class BackupRoundTripWallpaperTest {
         // internal URI may have been GC'd by the wallpaper cleanup pass.
         // What matters for the user is that *some* on-disk file exists
         // with the original bytes.
-        val restoredUri = restoredUriString!!.toUri()
+        val restoredUri = restoredLayer.imageUri!!.toUri()
         assertThat(restoredUri.scheme).isEqualTo("file")
         val restoredFile = File(restoredUri.path!!)
         assertThat(restoredFile.exists()).isTrue()

@@ -31,8 +31,9 @@ import javax.inject.Inject
  *
  * Returns a SOFTWARE bitmap — the caller (`WallpaperDelegate.warmComposite`) samples its
  * luminance, copies it to HARDWARE for the cache, and recycles this software temp — or `null`
- * if [state] is not multi-layer, the size is invalid, or the flatten was partial (all-or-nothing,
- * §3: any per-layer decode failure yields `null` so no incomplete composite is cached).
+ * if [state] has fewer than two layers, the size is invalid, or the flatten was partial
+ * (all-or-nothing, §3: any per-layer decode failure yields `null` so no incomplete composite
+ * is cached). A lone image (one layer) takes [decodeSingle] instead, not compositing.
  */
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -40,8 +41,8 @@ class WallpaperFlattener @Inject constructor(
 ) {
     /**
      * Flattens [state]'s layers into one software bitmap at [width]x[height]
-     * (default: display resolution), or `null` if [state] is not multi-layer, the
-     * size is invalid, or nothing rendered. View construction/mutation runs on the
+     * (default: display resolution), or `null` if [state] has fewer than two
+     * layers, the size is invalid, or nothing rendered. View construction/mutation runs on the
      * Main thread; the binder decodes off-Main internally.
      */
     suspend fun flatten(
@@ -49,7 +50,7 @@ class WallpaperFlattener @Inject constructor(
         width: Int = context.resources.displayMetrics.widthPixels,
         height: Int = context.resources.displayMetrics.heightPixels,
     ): Bitmap? {
-        if (!state.isMultiLayer || width <= 0 || height <= 0) return null
+        if (state.layerCount < 2 || width <= 0 || height <= 0) return null
         return withContext(mainDispatcher) {
             try {
                 val view = ZoomableImageView(context).apply {

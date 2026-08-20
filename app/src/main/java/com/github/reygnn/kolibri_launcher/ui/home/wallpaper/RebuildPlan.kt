@@ -219,15 +219,16 @@ object WallpaperViewDiff {
             return RebuildPlan.HideAll
         }
 
-        // ── Case 2: single-layer target ──
-        if (!target.isMultiLayer) {
-            val uriString = target.imageUri ?: return RebuildPlan.HideAll
-            val transform = if (target.isTransformed) {
+        // ── Case 2: single-image target (layerCount == 1) → cheap file:// path ──
+        if (target.layerCount == 1) {
+            val layer = target.layers[0]
+            val uriString = layer.imageUri ?: return RebuildPlan.HideAll
+            val transform = if (layer.isTransformed) {
                 LayerPropertyUpdate.Transform(
-                    target.scale,
-                    target.translateX,
-                    target.translateY,
-                    target.captureSampleSize
+                    layer.scale,
+                    layer.translateX,
+                    layer.translateY,
+                    layer.captureSampleSize
                 )
             } else {
                 null
@@ -235,7 +236,7 @@ object WallpaperViewDiff {
             return RebuildPlan.SwitchToSingleLayer(uriString.toUri(), transform)
         }
 
-        // ── Case 3: multi-layer target ──
+        // ── Case 3: multi-layer target (layerCount >= 2) ──
 
         // Empty target layers (shouldn't happen because hasWallpaper would
         // be false, but guard anyway).

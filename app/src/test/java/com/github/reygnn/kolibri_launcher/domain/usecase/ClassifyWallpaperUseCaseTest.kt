@@ -71,7 +71,7 @@ class ClassifyWallpaperUseCaseTest {
     fun `single-layer with bright image classifies LIGHT`() =
         runTest(mainDispatcherRule.testDispatcher) {
             fakeWallpaperRepository.currentState =
-                WallpaperState(imageUri = "file:///wallpapers/bright.png")
+                WallpaperState.single("file:///wallpapers/bright.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/bright.png") } returns 0.92f
             assertEquals(LuminanceClassification.LIGHT, useCase().first())
         }
@@ -80,7 +80,7 @@ class ClassifyWallpaperUseCaseTest {
     fun `single-layer with dark image classifies DARK`() =
         runTest(mainDispatcherRule.testDispatcher) {
             fakeWallpaperRepository.currentState =
-                WallpaperState(imageUri = "file:///wallpapers/dark.png")
+                WallpaperState.single("file:///wallpapers/dark.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/dark.png") } returns 0.05f
             assertEquals(LuminanceClassification.DARK, useCase().first())
         }
@@ -89,7 +89,7 @@ class ClassifyWallpaperUseCaseTest {
     fun `single-layer at exactly threshold classifies DARK — strict greater-than`() =
         runTest(mainDispatcherRule.testDispatcher) {
             fakeWallpaperRepository.currentState =
-                WallpaperState(imageUri = "file:///wallpapers/mid.png")
+                WallpaperState.single("file:///wallpapers/mid.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/mid.png") } returns 0.5f
             assertEquals(LuminanceClassification.DARK, useCase().first())
         }
@@ -98,7 +98,7 @@ class ClassifyWallpaperUseCaseTest {
     fun `single-layer with bitmap-load failure falls through to system`() =
         runTest(mainDispatcherRule.testDispatcher) {
             fakeWallpaperRepository.currentState =
-                WallpaperState(imageUri = "file:///wallpapers/missing.png")
+                WallpaperState.single("file:///wallpapers/missing.png")
             coEvery { bitmapLuminance.compute("file:///wallpapers/missing.png") } returns null
             // System says supports-dark-text → LIGHT
             systemColorsSignal.emit(
@@ -217,14 +217,14 @@ class ClassifyWallpaperUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val uri = "file:///wallpapers/x.png"
             coEvery { bitmapLuminance.compute(uri) } returns 0.9f
-            fakeWallpaperRepository.currentState = WallpaperState(imageUri = uri, scale = 1.0f)
+            fakeWallpaperRepository.currentState = WallpaperState.single(uri, scale = 1.0f)
 
             val seen = mutableListOf<LuminanceClassification>()
             val job = launch { useCase().collect { seen.add(it) } }
             testScheduler.runCurrent()
 
             // Pan/zoom save: same URI, only the transform fields changed.
-            fakeWallpaperRepository.currentState = WallpaperState(imageUri = uri, scale = 2.0f)
+            fakeWallpaperRepository.currentState = WallpaperState.single(uri, scale = 2.0f)
             testScheduler.runCurrent()
 
             job.cancel()

@@ -232,7 +232,7 @@ class WallpaperDelegateTest {
     fun `refills a single-layer wallpaper via decode, not flatten`() = runTest {
         // AUDIT-20 F15: single-layer now gets a PROACTIVE refill through the decode branch
         // (not the composite flatten), cached under its file:// key, with the debug toast.
-        val single = WallpaperState(imageUri = "file:///single.jpg")
+        val single = WallpaperState.single("file:///single.jpg")
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(single)
 
@@ -277,7 +277,7 @@ class WallpaperDelegateTest {
 
     @Test
     fun `refill skips decode and signals still-valid on a single-layer cache hit`() = runTest {
-        val single = WallpaperState(imageUri = "file:///single.jpg")
+        val single = WallpaperState.single("file:///single.jpg")
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(single)
 
@@ -306,7 +306,13 @@ class WallpaperDelegateTest {
     fun `does not warm when the composite is already cached`() = runTest {
         // v4: the warm is gated on a compositeCache MISS. A cache hit means the composite is
         // already in memory, so no flatten runs (replaces the old "composite path exists" gate).
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        // Two layers so this is a genuine composite (layerCount >= 2) — the flatten path.
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -331,7 +337,12 @@ class WallpaperDelegateTest {
         // Review #1: a warm that cannot produce a composite (failed/partial flatten -> null) must
         // emit null so the AUTO classifier stops using a PREVIOUS wallpaper's luminance for this
         // state, rather than leaving the stale value in the signal.
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -363,7 +374,12 @@ class WallpaperDelegateTest {
      */
     @Test
     fun `a failed warm still drops any stale-key cache entry up front`() = runTest {
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -404,7 +420,12 @@ class WallpaperDelegateTest {
             flattenCalls.incrementAndGet()
             bitmap
         }
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -443,7 +464,12 @@ class WallpaperDelegateTest {
             flattenCalls.incrementAndGet()
             null // always fails
         }
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -477,8 +503,8 @@ class WallpaperDelegateTest {
         coEvery { flattener.decodeSingle("file:///a.jpg") } coAnswers { gate.await(); s1Bitmap }
         coEvery { flattener.decodeSingle("file:///b.jpg") } returns null // superseding state: no put either
 
-        val s1 = WallpaperState(imageUri = "file:///a.jpg")
-        val s2 = WallpaperState(imageUri = "file:///b.jpg")
+        val s1 = WallpaperState.single("file:///a.jpg")
+        val s2 = WallpaperState.single("file:///b.jpg")
         val stateFlow = MutableStateFlow(s1)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
@@ -521,7 +547,12 @@ class WallpaperDelegateTest {
             gate.await()
             bitmap
         }
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -604,7 +635,12 @@ class WallpaperDelegateTest {
             flattenCalls.incrementAndGet()
             bitmap
         }
-        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multi)
 
@@ -694,7 +730,7 @@ class WallpaperDelegateTest {
         // The stale-frame fix: the new transform must land in _wallpaperState
         // SYNCHRONOUSLY (before the async persist), so the commit-triggered re-render
         // reads it on the first frame instead of the old transform.
-        val initial = WallpaperState(imageUri = "file:///a.png", scale = 1f)
+        val initial = WallpaperState.single("file:///a.png", scale = 1f)
         val stateFlow = MutableStateFlow(initial)
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns stateFlow
@@ -705,15 +741,21 @@ class WallpaperDelegateTest {
 
         delegate.onSaveWallpaperTransform(2.0f, 10f, 20f)
 
-        // Synchronous — asserted BEFORE advanceUntilIdle (no persist round-trip yet).
-        assertEquals(2.0f, delegate.wallpaperState.value.scale)
-        assertEquals(10f, delegate.wallpaperState.value.translateX)
-        assertEquals(20f, delegate.wallpaperState.value.translateY)
+        // Synchronous — asserted BEFORE advanceUntilIdle (no persist round-trip yet). A
+        // single-image wallpaper is the one-element layer list, so the transform lands
+        // in layer 0.
+        assertEquals(2.0f, delegate.wallpaperState.value.layers.first().scale)
+        assertEquals(10f, delegate.wallpaperState.value.layers.first().translateX)
+        assertEquals(20f, delegate.wallpaperState.value.layers.first().translateY)
 
         advanceUntilIdle()
         coVerify {
             saveWallpaperStateUseCase.invoke(
-                match { it.scale == 2.0f && it.translateX == 10f && it.translateY == 20f }
+                match {
+                    it.layers.first().scale == 2.0f &&
+                        it.layers.first().translateX == 10f &&
+                        it.layers.first().translateY == 20f
+                }
             )
         }
     }
@@ -802,7 +844,12 @@ class WallpaperDelegateTest {
             if (flattenCalls.getAndIncrement() == 0) gate.await()
             bitmap
         }
-        val multiNoComposite = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val multiNoComposite = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(multiNoComposite)
 
@@ -894,7 +941,6 @@ class WallpaperDelegateTest {
     fun `onAddWallpaperLayer copies file and saves state`() = runTest {
         val addedState: WallpaperState = mockk(relaxed = true) {        }
         val state: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns addedState
         }
@@ -980,7 +1026,8 @@ class WallpaperDelegateTest {
             "add resuming after commit must persist its layer",
             delegate.wallpaperState.value.hasWallpaper
         )
-        assertTrue(delegate.wallpaperState.value.isMultiLayer)
+        // Adding a layer to NONE yields the one-element layer list (a lone image).
+        assertEquals(1, delegate.wallpaperState.value.layerCount)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
@@ -997,42 +1044,10 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         assertTrue(delegate.wallpaperState.value.hasWallpaper)
-        assertTrue(delegate.wallpaperState.value.isMultiLayer)
+        // Adding a layer to NONE yields the one-element layer list (a lone image).
+        assertEquals(1, delegate.wallpaperState.value.layerCount)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
-    }
-
-    // ===========================================
-    // COMMIT: SINGLE-LAYER COLLAPSE (AUDIT-20 F13)
-    // ===========================================
-
-    @Test
-    fun `commit collapses a single plain layer back to single-layer and persists it`() = runTest {
-        val multi = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///only.png", scale = 2f))
-        )
-        val stateFlow = MutableStateFlow<WallpaperState>(multi)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-        // Hitting cache: keep the composite warm a guaranteed no-op so the test
-        // isolates the collapse + persist, not the flatten path.
-        val cache: WallpaperCompositeCache = mockk(relaxed = true)
-        every { cache.get(any()) } returns mockk(relaxed = true)
-
-        val delegate = createDelegate(observeWallpaperStateUseCase = useCase, compositeCache = cache)
-        delegate.start()
-        advanceUntilIdle()
-        assertTrue(delegate.wallpaperState.value.isMultiLayer)
-
-        delegate.onEnterWallpaperEditMode()
-        delegate.onCommitWallpaperEditMode()
-        advanceUntilIdle()
-
-        val collapsed = delegate.wallpaperState.value
-        assertFalse("commit must collapse a single plain layer", collapsed.isMultiLayer)
-        assertEquals("file:///only.png", collapsed.imageUri)
-        assertEquals(2f, collapsed.scale)
-        coVerify { saveWallpaperStateUseCase.invoke(match { !it.isMultiLayer && it.imageUri == "file:///only.png" }) }
     }
 
     // ===========================================
@@ -1374,15 +1389,13 @@ class WallpaperDelegateTest {
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
-        // Relaxed: commit now refills the display cache synchronously through the F11 exit
-        // funnel, which reads isMultiLayer/imageUri on this committed state. The unstubbed
-        // defaults (isMultiLayer=false, imageUri=null) make cacheKeyOrNull return null, so the
-        // refill early-returns — this test is about the deferred file deletion, not the warm.
+        // Relaxed: commit refills the display cache synchronously through the F11 exit
+        // funnel, which reads layerCount/layers on this committed state. The lone remaining
+        // layer carries no image, so cacheKeyOrNull returns null and the refill early-returns
+        // — this test is about the deferred file deletion, not the warm.
         val newState: WallpaperState = mockk(relaxed = true) {
-            every { layers } returns listOf(mockk())
+            every { layers } returns listOf(WallpaperLayerState(imageUri = null))
             every { hasWallpaper } returns true
-            // Commit calls toSingleLayer() (F13); this mock state does not collapse.
-            every { toSingleLayer() } returns this@mockk
         }
         val currentState: WallpaperState = mockk {
             every { getLayer(0) } returns layer
@@ -1517,7 +1530,6 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns addedLayerUri
 
         val baseState: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
@@ -1551,7 +1563,6 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns addedLayerUri
 
         val baseState: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
@@ -1626,7 +1637,7 @@ class WallpaperDelegateTest {
 
         // Emit two more states — these represent routine saves during
         // normal operation (add layer, transform change, etc.).
-        stateFlow.value = WallpaperState(imageUri = "file:///x.jpg")
+        stateFlow.value = WallpaperState.single("file:///x.jpg")
         advanceUntilIdle()
         stateFlow.value = WallpaperState.NONE
         advanceUntilIdle()
@@ -1675,7 +1686,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Emit additional states too — still no GC while in session.
-        stateFlow.value = WallpaperState(imageUri = "file:///x.jpg")
+        stateFlow.value = WallpaperState.single("file:///x.jpg")
         advanceUntilIdle()
 
         verify(exactly = 0) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
@@ -1692,7 +1703,6 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
         val state: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
@@ -1722,7 +1732,6 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
         val state: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }
@@ -1755,7 +1764,6 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
 
         val baseState: WallpaperState = mockk(relaxed = true) {
-            every { isMultiLayer } returns true
             every { hasWallpaper } returns true
             every { withAddedLayer(any()) } returns this
         }

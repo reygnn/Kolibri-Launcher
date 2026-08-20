@@ -87,7 +87,7 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `single-layer untransformed state yields SwitchToSingleLayer without transform`() {
-        val target = WallpaperState(imageUri = uri("/data/s.jpg"))
+        val target = WallpaperState.single(uri("/data/s.jpg"))
         val plan = WallpaperViewDiff.diff(snapshot(), target)
 
         assertTrue(plan is RebuildPlan.SwitchToSingleLayer)
@@ -97,8 +97,8 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `single-layer transformed state carries the transform`() {
-        val target = WallpaperState(
-            imageUri = uri("/data/s.jpg"),
+        val target = WallpaperState.single(
+            uri = uri("/data/s.jpg"),
             scale = 2.5f,
             translateX = -100f,
             translateY = 50f
@@ -129,7 +129,9 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `rebuild when view is in single-layer mode but target is multi`() {
-        val target = multiLayer(layer("L1"))
+        // Genuinely multi (2+ layers): a one-layer target would take the
+        // SwitchToSingleLayer path, not FullRebuild.
+        val target = multiLayer(layer("L1"), layer("L2"))
         val plan = WallpaperViewDiff.diff(
             current = snapshot(isMulti = false, ids = emptyList()),
             target = target
@@ -208,13 +210,16 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `rebuild carries load specs with correct properties`() {
+        // Two layers so the target takes the FullRebuild (composite) path; the
+        // per-layer load-spec properties are inspected on the first layer.
         val target = multiLayer(
-            layer("L1", scale = 2f, translateX = 10f, translateY = 20f)
+            layer("L1", scale = 2f, translateX = 10f, translateY = 20f),
+            layer("L2")
         )
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
         plan as RebuildPlan.FullRebuild
-        assertEquals(1, plan.layers.size)
+        assertEquals(2, plan.layers.size)
         val spec = plan.layers[0]
         assertEquals("L1", spec.id)
         assertEquals(false, spec.centerCrop) // isTransformed → don't center-crop
@@ -222,7 +227,12 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `rebuild untransformed layer requests center-crop`() {
-        val target = multiLayer(layer("L1", scale = 1f, translateX = 0f, translateY = 0f))
+        // Two layers so the target takes the FullRebuild path; the first
+        // (untransformed) layer's load spec must request center-crop.
+        val target = multiLayer(
+            layer("L1", scale = 1f, translateX = 0f, translateY = 0f),
+            layer("L2")
+        )
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
         plan as RebuildPlan.FullRebuild
@@ -327,7 +337,7 @@ class WallpaperViewDiffTest {
 
     @Test
     fun `transition from multi to single yields SwitchToSingleLayer`() {
-        val target = WallpaperState(imageUri = uri("/data/s.jpg"))
+        val target = WallpaperState.single(uri("/data/s.jpg"))
         val current = snapshot(ids = listOf("L1", "L2"))
 
         val plan = WallpaperViewDiff.diff(current, target)

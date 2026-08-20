@@ -627,7 +627,7 @@ class LauncherViewModelContractTest {
 
         assertFalse(vm.wallpaperState.value.hasWallpaper)
 
-        wallpaperStateFlow.value = WallpaperState(imageUri = "file:///test.jpg", scale = 1.5f)
+        wallpaperStateFlow.value = WallpaperState.single("file:///test.jpg", scale = 1.5f)
         advanceUntilIdle()
 
         assertTrue(vm.wallpaperState.value.hasWallpaper)
@@ -793,7 +793,7 @@ class LauncherViewModelContractTest {
         )
         layoutScaleFlow.value = 0.6f
         uiColorsFlow.value = UiColorsState(textColor = 0xFFFF00)
-        wallpaperStateFlow.value = WallpaperState(imageUri = "file:///test.jpg")
+        wallpaperStateFlow.value = WallpaperState.single("file:///test.jpg")
         timeBasedEventsFlow.value = listOf(
             TimeBasedEvent(System.currentTimeMillis(), "Standup", TimeBasedEventType.CALENDAR)
         )

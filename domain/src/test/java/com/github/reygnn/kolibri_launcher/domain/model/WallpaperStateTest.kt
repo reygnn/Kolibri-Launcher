@@ -2,182 +2,176 @@ package com.github.reygnn.kolibri_launcher.domain.model
 
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for [WallpaperState] representation helpers — focused on the
- * AUDIT-20 F13 collapse ([WallpaperState.toSingleLayer]) and its round-trip
- * with [WallpaperState.toMultiLayer].
+ * Unit tests for [WallpaperState] representation helpers.
+ *
+ * The model is now layers-only: a single-image wallpaper is a one-element
+ * [WallpaperState.layers] list (built via [WallpaperState.single]), a
+ * composite is two-or-more layers ([WallpaperState.multiLayer]), and the
+ * empty state is [WallpaperState.NONE]. The former flat `imageUri`/`scale`
+ * fields and the `toSingleLayer`/`toMultiLayer`/`isMultiLayer` mode API were
+ * removed, so their dedicated round-trip/collapse tests are gone; what
+ * remains is the derived-getter surface expressed over the layer list.
  */
 class WallpaperStateTest {
 
     // ---------------------------------------------------------------
-    // toSingleLayer — the happy path: one plain layer collapses
+    // single() factory
     // ---------------------------------------------------------------
 
     @Test
-    fun `toSingleLayer collapses a single plain layer into the single-layer representation`() {
-        val state = WallpaperState.multiLayer(
-            listOf(
-                WallpaperLayerState(
-                    imageUri = "file:///wallpapers/a.png",
-                    scale = 2.0f,
-                    translateX = 10f,
-                    translateY = -20f,
-                    captureSampleSize = 2,
-                )
-            )
-        )
-
-        val collapsed = state.toSingleLayer()
-
-        assertFalse(collapsed.isMultiLayer, "collapsed state must be single-layer")
-        assertTrue(collapsed.layers.isEmpty(), "layers must be cleared")
-        assertEquals("file:///wallpapers/a.png", collapsed.imageUri)
-        assertEquals(2.0f, collapsed.scale)
-        assertEquals(10f, collapsed.translateX)
-        assertEquals(-20f, collapsed.translateY)
-        assertEquals(2, collapsed.captureSampleSize)
-        assertTrue(collapsed.hasWallpaper)
-    }
-
-    // ---------------------------------------------------------------
-    // toSingleLayer — no-ops: wrong layer count / already single
-    // ---------------------------------------------------------------
-
-    @Test
-    fun `toSingleLayer is a no-op for two-plus layers`() {
-        val state = WallpaperState.multiLayer(
-            listOf(
-                WallpaperLayerState(imageUri = "file:///a.png"),
-                WallpaperLayerState(imageUri = "file:///b.png"),
-            )
-        )
-
-        assertSame(state, state.toSingleLayer())
-    }
-
-    @Test
-    fun `toSingleLayer is a no-op for an already single-layer state`() {
-        val state = WallpaperState(imageUri = "file:///a.png", scale = 1.5f)
-
-        assertSame(state, state.toSingleLayer())
-    }
-
-    @Test
-    fun `toSingleLayer is a no-op for the empty state`() {
-        assertSame(WallpaperState.NONE, WallpaperState.NONE.toSingleLayer())
-    }
-
-    // ---------------------------------------------------------------
-    // toMultiLayer — the forward direction (previously untested)
-    // ---------------------------------------------------------------
-
-    @Test
-    fun `toMultiLayer converts a single-layer state into one layer`() {
-        val single = WallpaperState(
-            imageUri = "file:///wallpapers/a.png",
+    fun `single builds a one-element layer list carrying the transform`() {
+        val state = WallpaperState.single(
+            uri = "file:///wallpapers/a.png",
             scale = 2.0f,
-            translateX = 5f,
-            translateY = -3f,
+            translateX = 10f,
+            translateY = -20f,
             captureSampleSize = 2,
         )
 
-        val multi = single.toMultiLayer()
-
-        assertTrue(multi.isMultiLayer)
-        assertEquals(1, multi.layerCount)
-        val layer = multi.layers.single()
+        assertEquals(1, state.layerCount)
+        val layer = state.layers.single()
         assertEquals("file:///wallpapers/a.png", layer.imageUri)
         assertEquals(2.0f, layer.scale)
-        assertEquals(5f, layer.translateX)
-        assertEquals(-3f, layer.translateY)
+        assertEquals(10f, layer.translateX)
+        assertEquals(-20f, layer.translateY)
         assertEquals(2, layer.captureSampleSize)
     }
 
     @Test
-    fun `toMultiLayer resets the single-layer fields to leave no shadow state`() {
-        val single = WallpaperState(imageUri = "file:///a.png", scale = 2f, translateX = 5f)
+    fun `single defaults leave an untransformed layer`() {
+        val state = WallpaperState.single("file:///a.png")
 
-        val multi = single.toMultiLayer()
-
-        assertNull(multi.imageUri)
-        assertEquals(WallpaperState.DEFAULT_SCALE, multi.scale)
-        assertEquals(0f, multi.translateX)
-        assertEquals(0f, multi.translateY)
-        assertNull(multi.captureSampleSize)
-        // Only the layer branch references the image now.
-        assertEquals(setOf("file:///a.png"), multi.referencedUris)
-    }
-
-    @Test
-    fun `toMultiLayer is a no-op for an already multi-layer state`() {
-        val state = WallpaperState.multiLayer(listOf(WallpaperLayerState(imageUri = "file:///a.png")))
-
-        assertSame(state, state.toMultiLayer())
-    }
-
-    @Test
-    fun `toMultiLayer is a no-op for the empty state`() {
-        assertSame(WallpaperState.NONE, WallpaperState.NONE.toMultiLayer())
+        val layer = state.layers.single()
+        assertEquals(WallpaperState.DEFAULT_SCALE, layer.scale)
+        assertEquals(0f, layer.translateX)
+        assertEquals(0f, layer.translateY)
+        assertFalse(layer.isTransformed)
     }
 
     // ---------------------------------------------------------------
-    // Round-trip with toMultiLayer
+    // layerCount
     // ---------------------------------------------------------------
 
     @Test
-    fun `toMultiLayer then toSingleLayer round-trips a single-layer state`() {
-        val original = WallpaperState(
-            imageUri = "file:///wallpapers/a.png",
-            scale = 3.0f,
-            translateX = 42f,
-            translateY = 7f,
-            captureSampleSize = 4,
+    fun `layerCount is zero for NONE, one for single, N for multi`() {
+        assertEquals(0, WallpaperState.NONE.layerCount)
+        assertEquals(1, WallpaperState.single("file:///a.png").layerCount)
+        assertEquals(
+            3,
+            WallpaperState.multiLayer(
+                listOf(
+                    WallpaperLayerState(imageUri = "file:///a.png"),
+                    WallpaperLayerState(imageUri = "file:///b.png"),
+                    WallpaperLayerState(imageUri = "file:///c.png"),
+                )
+            ).layerCount,
         )
+    }
 
-        val roundTripped = original.toMultiLayer().toSingleLayer()
+    // ---------------------------------------------------------------
+    // hasWallpaper
+    // ---------------------------------------------------------------
 
-        assertEquals(original, roundTripped)
+    @Test
+    fun `hasWallpaper is false for the empty state`() {
+        assertFalse(WallpaperState.NONE.hasWallpaper)
     }
 
     @Test
-    fun `id is dropped by the collapse`() {
+    fun `hasWallpaper is true for a single image`() {
+        assertTrue(WallpaperState.single("file:///a.png").hasWallpaper)
+    }
+
+    @Test
+    fun `hasWallpaper is true when any layer carries an image`() {
         val state = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(
-                    id = "layer_custom_id",
-                    imageUri = "file:///a.png",
-                )
+                WallpaperLayerState(imageUri = null),
+                WallpaperLayerState(imageUri = "file:///b.png"),
             )
         )
+        assertTrue(state.hasWallpaper)
+    }
 
-        val collapsed = state.toSingleLayer()
-
-        // The single-layer representation has no id home; the only proof is that the
-        // image round-trips while the layer (and thus its id) is gone.
-        assertTrue(collapsed.layers.isEmpty())
-        assertEquals("file:///a.png", collapsed.imageUri)
+    @Test
+    fun `hasWallpaper is false when no layer carries an image`() {
+        val state = WallpaperState.multiLayer(
+            listOf(
+                WallpaperLayerState(imageUri = null),
+                WallpaperLayerState(imageUri = null),
+            )
+        )
+        assertFalse(state.hasWallpaper)
     }
 
     // ---------------------------------------------------------------
-    // Invariant guard: single-layer fields default while multi-layer
+    // isTransformed
     // ---------------------------------------------------------------
 
     @Test
-    fun `collapsed state leaves no shadow multi-layer field`() {
+    fun `isTransformed is false for the empty state`() {
+        assertFalse(WallpaperState.NONE.isTransformed)
+    }
+
+    @Test
+    fun `isTransformed follows the single layer transform`() {
+        assertFalse(WallpaperState.single("file:///a.png").isTransformed)
+        assertTrue(WallpaperState.single("file:///a.png", scale = 2f).isTransformed)
+        assertTrue(WallpaperState.single("file:///a.png", translateX = 5f).isTransformed)
+    }
+
+    @Test
+    fun `isTransformed is true when any layer is transformed`() {
         val state = WallpaperState.multiLayer(
-            listOf(WallpaperLayerState(imageUri = "file:///a.png", scale = 2f))
+            listOf(
+                WallpaperLayerState(imageUri = "file:///a.png"),
+                WallpaperLayerState(imageUri = "file:///b.png", scale = 3f),
+            )
         )
+        assertTrue(state.isTransformed)
+    }
 
-        val collapsed = state.toSingleLayer()
+    // ---------------------------------------------------------------
+    // referencedUris
+    // ---------------------------------------------------------------
 
-        assertTrue(collapsed.layers.isEmpty())
-        // referencedUris must still see the image via the single-layer branch.
-        assertEquals(setOf("file:///a.png"), collapsed.referencedUris)
-        assertNull(collapsed.layers.firstOrNull())
+    @Test
+    fun `referencedUris is empty for the empty state`() {
+        assertTrue(WallpaperState.NONE.referencedUris.isEmpty())
+    }
+
+    @Test
+    fun `referencedUris exposes the single image`() {
+        assertEquals(
+            setOf("file:///a.png"),
+            WallpaperState.single("file:///a.png").referencedUris,
+        )
+    }
+
+    @Test
+    fun `referencedUris collects every non-null layer image`() {
+        val state = WallpaperState.multiLayer(
+            listOf(
+                WallpaperLayerState(imageUri = "file:///a.png"),
+                WallpaperLayerState(imageUri = null),
+                WallpaperLayerState(imageUri = "file:///b.png"),
+            )
+        )
+        assertEquals(setOf("file:///a.png", "file:///b.png"), state.referencedUris)
+    }
+
+    // ---------------------------------------------------------------
+    // NONE identity
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `NONE is an empty layer list`() {
+        assertTrue(WallpaperState.NONE.layers.isEmpty())
+        assertSame(WallpaperState.NONE, WallpaperState.NONE)
     }
 }

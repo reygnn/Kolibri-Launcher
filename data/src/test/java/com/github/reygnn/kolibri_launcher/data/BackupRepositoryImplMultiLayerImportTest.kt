@@ -139,7 +139,6 @@ class BackupRepositoryImplMultiLayerImportTest {
         // warning fires for it.
         assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(0)
         val restored = fakeWallpaperRepo.currentState
-        assertThat(restored.isMultiLayer).isTrue()
         assertThat(restored.layers).hasSize(1)
         assertThat(restored.layers[0].imageUri).isEqualTo("content://img/0")
         assertThat(restored.layers[0].scale).isEqualTo(1.3f)
@@ -160,7 +159,7 @@ class BackupRepositoryImplMultiLayerImportTest {
         // The backup carries no actual image, so — like every other theme
         // field's skip-on-null — the wallpaper is left alone (Review 0.99.114
         // #1). Previously the unconditional clear silently wiped it.
-        val existing = WallpaperState(imageUri = "content://existing/wp", scale = 1.3f)
+        val existing = WallpaperState.single("content://existing/wp", scale = 1.3f)
         fakeWallpaperRepo.currentState = existing
 
         val result = backupManager.importFromJson(json, themeOnly)

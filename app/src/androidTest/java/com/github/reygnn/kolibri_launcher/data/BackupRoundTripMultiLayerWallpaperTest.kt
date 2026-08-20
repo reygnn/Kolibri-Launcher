@@ -24,7 +24,7 @@ import javax.inject.Inject
 /**
  * Why instrumented, and why this test exists at all: the single-layer
  * companion [BackupRoundTripWallpaperTest] only exercises the
- * `WallpaperState(imageUri = …)` branch. The MULTI-layer branch —
+ * one-layer `WallpaperState.single(…)` branch. The MULTI-layer branch —
  * `WallpaperState.multiLayer(listOf(layer0, layer1, …))` — was, before
  * this test, uncovered by any test source set (JVM or instrumented). That
  * gap is exactly where two prior audit findings (AUDIT-3 #8 / #10, both
@@ -117,7 +117,7 @@ class BackupRoundTripMultiLayerWallpaperTest {
         // NONE, the export would embed the wrong thing and the final asserts
         // would fail with a misleading message. Pin the failure here instead.
         val sanity = wallpaper.wallpaperState.first()
-        assertThat(sanity.isMultiLayer).isTrue()
+        assertThat(sanity.layerCount).isEqualTo(2)
         assertThat(sanity.layers).hasSize(2)
 
         // ── ACT 1: save backup ─────────────────────────────────────────────
@@ -139,7 +139,7 @@ class BackupRoundTripMultiLayerWallpaperTest {
 
         // ── ASSERT: both layers restored, in order, none silently dropped ──
         val restored = wallpaper.wallpaperState.first()
-        assertThat(restored.isMultiLayer).isTrue()
+        assertThat(restored.layerCount).isEqualTo(2)
         assertThat(restored.layers).hasSize(2)
 
         val r0 = restored.layers[0]
@@ -193,7 +193,7 @@ class BackupRoundTripMultiLayerWallpaperTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         val restored = wallpaper.wallpaperState.first()
-        assertThat(restored.isMultiLayer).isTrue()
+        assertThat(restored.layerCount).isEqualTo(2)
         // The core AUDIT-3 #8 assertion: the second (shared-file) layer is
         // NOT dropped.
         assertThat(restored.layers).hasSize(2)

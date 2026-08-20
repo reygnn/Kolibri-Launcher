@@ -508,8 +508,11 @@ class WallpaperDelegate(
     ) {
         val currentState = _wallpaperState.value
         if (!currentState.hasWallpaper) return
-        // Update _wallpaperState SYNCHRONOUSLY via the commit core — same as the
-        // multi-layer transform save (onSaveLayerTransform). Persisting only to
+        // A single-image wallpaper is the one-element layer list, so the SaveSingle
+        // path (view single-mode) writes the transform back into layer 0 — the same
+        // shape as onSaveLayerTransform.
+        //
+        // Update _wallpaperState SYNCHRONOUSLY via the commit core. Persisting only to
         // DataStore (the old path) left _wallpaperState holding the OLD transform
         // until the async write round-tripped, so the commit-triggered re-render
         // (HomeFragment Observer 8, fired by the edit-mode flag flip) read the stale
@@ -518,12 +521,14 @@ class WallpaperDelegate(
         commit(
             "Error saving wallpaper transform",
             Mutation(
-                currentState.copy(
-                    scale = scale,
-                    translateX = translateX,
-                    translateY = translateY,
-                    captureSampleSize = captureSampleSize,
-                )
+                currentState.withUpdatedLayer(0) {
+                    it.copy(
+                        scale = scale,
+                        translateX = translateX,
+                        translateY = translateY,
+                        captureSampleSize = captureSampleSize,
+                    )
+                }
             ),
         )
     }
@@ -602,18 +607,11 @@ class WallpaperDelegate(
         pendingRemovalsOnCancel.clear()
         editSnapshot = null
 
-        // F13: a wallpaper edited down to a single layer collapses back to the
-        // single-layer representation, so the next render takes the cheaper
-        // decode-cache path (file://) instead of the flatten path (composite://).
-        // No-op unless exactly one layer remains — see WallpaperState.toSingleLayer.
-        // Done at the commit boundary, not per removal, so the live editor never
-        // desyncs from a mid-session single-layer state. commit() applies
-        // synchronously, so leaveEditMode below already sees the collapsed state.
-        val current = _wallpaperState.value
-        val collapsed = current.toSingleLayer()
-        if (collapsed !== current) {
-            commit("Error collapsing single-layer wallpaper", Mutation(collapsed))
-        }
+        // No representation collapse needed anymore (was AUDIT-20 F13): a wallpaper
+        // edited down to one layer already IS the canonical single-image form, so
+        // the render path takes the cheap decode-cache path (file://) off its
+        // layerCount == 1 without any state rewrite. The old toSingleLayer() collapse
+        // existed only because a lone image had a separate flat representation.
 
         if (filesToDelete.isNotEmpty()) {
             scope.launchSafe("Error committing wallpaper edit") {
@@ -668,7 +666,7 @@ class WallpaperDelegate(
             // still valid — e.g. a transform-only edit changed scale/position but not
             // the image, so nothing is re-decoded. Signals that "no fill toast" is NOT
             // "not cached". Removed together with the fill toasts once verified (F10).
-            if (!state.isMultiLayer) {
+            if (state.layerCount == 1) {
                 scope.launchSafe("Error signalling single-layer cache hit") {
                     scope.sendEvent(UiEvent.ShowToastFromString("Single-layer cache still valid"))
                 }
@@ -678,7 +676,7 @@ class WallpaperDelegate(
         refillInProgress = true
         scope.launchSafe("Error refilling wallpaper cache") {
             try {
-                if (state.isMultiLayer) warmComposite(state, key) else warmSingleLayer(state, key)
+                if (state.layerCount >= 2) warmComposite(state, key) else warmSingleLayer(state, key)
             } finally {
                 refillInProgress = false
                 // Self-reschedule (S5): only if the current state is a DIFFERENT miss — never the
@@ -703,8 +701,8 @@ class WallpaperDelegate(
      */
     private fun cacheKeyOrNull(state: WallpaperState): String? = when {
         !state.hasWallpaper -> null
-        state.isMultiLayer -> compositeKey(state)
-        else -> state.imageUri
+        state.layerCount >= 2 -> compositeKey(state)
+        else -> state.layers.firstOrNull()?.imageUri
     }
 
     /**
@@ -714,10 +712,10 @@ class WallpaperDelegate(
      * entry (AUDIT-20 F9). No compositing — the render positions it live via the ImageView matrix.
      */
     private suspend fun warmSingleLayer(state: WallpaperState, key: String) = compositeRegenLock.withLock {
-        val uriString = state.imageUri ?: return@withLock
+        val uriString = state.layers.firstOrNull()?.imageUri ?: return@withLock
         val decoded = wallpaperFlattener.decodeSingle(uriString) ?: return@withLock
         val current = _wallpaperState.value
-        if (!current.isMultiLayer && current.imageUri == key) {
+        if (current.layerCount == 1 && current.layers[0].imageUri == key) {
             compositeCache.put(key, decoded)
             // TEMP (remove later): visual signal on each single-layer cache fill — kept until the
             // unified refill is verified 100% on-device. Symmetric with the composite warm's toast.
@@ -798,7 +796,7 @@ class WallpaperDelegate(
         // A warm that finishes after a clear (NONE, not multi-layer) or a supersede drops its
         // bitmap (uncached -> GC) rather than stranding a stale ~10 MB entry.
         val current = _wallpaperState.value
-        if (current.isMultiLayer && compositeKey(current) == key) {
+        if (current.layerCount >= 2 && compositeKey(current) == key) {
             compositeCache.put(
                 key,
                 DecodedWallpaperBitmap(
@@ -813,18 +811,11 @@ class WallpaperDelegate(
             // TEMP (remove later): visual signal on each composite cache (re)fill — to gauge how
             // often a re-flatten is actually needed (cold start / edit-commit / rotate). The
             // resolution in the text distinguishes a rotate-triggered refill from the rest.
-            //
-            // A ONE-layer state reaches this path too: `isMultiLayer` is `layers.isNotEmpty()`,
-            // and removing layers in the editor never collapses back to the single-layer
-            // representation — so "Composite" would be a lie for what the user just saved. It
-            // reports as a single-layer fill instead, matching the wording of the decode-side
-            // fill in HomeFragment. Note the MECHANISM still differs: this one flattened the
-            // layer (decode -> compose -> HARDWARE copy) and cached it under a `composite://`
-            // key, while the HomeFragment twin merely cached a `file://` decode.
-            val what = if (state.layerCount == 1) "Single-layer" else "Composite"
+            // Only a genuine composite (layerCount >= 2) reaches this path now; a lone image
+            // fills via warmSingleLayer under its file:// key.
             scope.sendEvent(
                 UiEvent.ShowToastFromString(
-                    "$what cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
+                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
                 )
             )
         }
@@ -843,7 +834,7 @@ class WallpaperDelegate(
      */
     private fun dropLuminanceIfCurrent(key: String) {
         val current = _wallpaperState.value
-        if (current.isMultiLayer && compositeKey(current) == key) {
+        if (current.layerCount >= 2 && compositeKey(current) == key) {
             compositeLuminanceSignal.emit(null)
         }
     }
@@ -966,19 +957,15 @@ class WallpaperDelegate(
 
             val current = _wallpaperState.value
 
-            // Migration: Single → Multi beim ersten addLayer
-            val base = if (!current.isMultiLayer && current.hasWallpaper) {
-                current.toMultiLayer()
-            } else {
-                current
-            }
-
+            // No Single → Multi migration needed: a single-image wallpaper is
+            // already the one-element layer list, so adding a layer just appends.
+            // An existing lone image thus becomes a 2-layer composite naturally.
             val newLayer = WallpaperLayerState(
                 imageUri = internalUriString,
             )
 
             val mutation = Mutation(
-                newState = base.withAddedLayer(newLayer),
+                newState = current.withAddedLayer(newLayer),
                 // While in edit mode, track this file so its orphan copy on disk
                 // gets cleaned up if the user cancels the session.
                 trackForCancel = if (_isWallpaperEditMode.value) listOf(internalUriString) else emptyList(),

@@ -64,7 +64,7 @@ class WallpaperFlattenerInstrumentedTest {
     @Test
     fun flattenReturnsNullForSingleLayerState() = runBlocking {
         // Single-layer wallpapers are already one bitmap — nothing to flatten.
-        val state = WallpaperState(imageUri = "file:///does/not/matter.png")
+        val state = WallpaperState.single("file:///does/not/matter.png")
         val flattener = WallpaperFlattener(context, Dispatchers.Main)
         assertNull(flattener.flatten(state, width = 200, height = 400))
     }

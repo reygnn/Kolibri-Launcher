@@ -140,7 +140,7 @@ class BackupRepositoryImplZipExportTest {
     @Test
     fun `single-layer content-uri wallpaper is not embedded`() = runTest {
         fakeWallpaperRepo.currentState =
-            WallpaperState(imageUri = "content://media/external/images/9", scale = 1.5f)
+            WallpaperState.single("content://media/external/images/9", scale = 1.5f)
 
         val saved = backupManager.saveBackupToFile("content://out/backup.zip")
         assertThat(saved).isTrue()

@@ -139,7 +139,7 @@ internal class WallpaperEditController(
                 ensureOverlayInflated()
                 applyEditState(targetState)
                 wireEditModeListeners()
-                Timber.d("Wallpaper edit mode: ON (multiLayer=${viewModel.wallpaperState.value.isMultiLayer}, layers=${binding.wallpaperView.layerCount})")
+                Timber.d("Wallpaper edit mode: ON (stateLayers=${viewModel.wallpaperState.value.layerCount}, viewLayers=${binding.wallpaperView.layerCount})")
             } else {
                 applyEditState(targetState)
                 // If the overlay was never inflated (never entered edit mode),
@@ -185,11 +185,11 @@ internal class WallpaperEditController(
             LaunchTrace.section(LaunchTrace.Names.WALLPAPER_SAVE) {
                 val currentWallpaperState = viewModel.wallpaperState.value
                 // Save runs after a finished edit session, so we trust the
-                // state's isMultiLayer value directly. No race-guard against
-                // the view here — see saveCurrentViewTransforms below for the
-                // contrast.
+                // state's layer count directly. No race-guard against the view
+                // here — see saveCurrentViewTransforms below for the contrast.
+                // Two-plus layers = composite (SaveAllLayers); one layer = single.
                 val action = WallpaperSaveAction.decide(
-                    isMultiLayer = currentWallpaperState.isMultiLayer,
+                    isMultiLayer = currentWallpaperState.layerCount >= 2,
                     hasWallpaper = currentWallpaperState.hasWallpaper,
                     allLayerTransforms = readAllLayerTransforms(wallpaperView),
                     singleTransform = readSingleTransform(wallpaperView),
@@ -391,7 +391,7 @@ internal class WallpaperEditController(
         // intentionally lacks this guard because it runs after a
         // finished edit session.
         val isMultiLayerEffective =
-            currentState.isMultiLayer && wallpaperView.isMultiLayerMode
+            currentState.layerCount >= 2 && wallpaperView.isMultiLayerMode
 
         val action = WallpaperSaveAction.decide(
             isMultiLayer = isMultiLayerEffective,

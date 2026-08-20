@@ -15,7 +15,6 @@ import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.coVerify
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +24,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -42,8 +40,14 @@ import org.junit.runner.RunWith
  * persistence), with a mocked [WallpaperFileManager] controlling whether
  * referenced files are "present" on disk.
  *
- * Robolectric is used so that `Uri.parse` / `String.toUri()` work on the JVM
- * without needing to stub android.net.Uri manually.
+ * A wallpaper is persisted ONLY as a JSON array under `wallpaper_layers_json`
+ * (a single image is a one-element array). The legacy flat single-layer keys
+ * (`wallpaper_uri` etc.) were removed with the flat [WallpaperState]
+ * representation: they are no longer written and no longer read (the sole
+ * migration path across the break is export → reset → restore).
+ *
+ * Robolectric is used so that `String.toUri()` works on the JVM without
+ * stubbing android.net.Uri manually.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -56,11 +60,12 @@ class WallpaperRepositoryImplTest {
     val timberRule = TimberRule()
 
     // --- DataStore keys (mirror production) ---
+    private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
+
+    // Legacy keys: no longer written or read by the impl. Kept here only so the
+    // "legacy-only store yields NONE" regression test can seed them.
     private val KEY_WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
     private val KEY_WALLPAPER_SCALE = floatPreferencesKey("wallpaper_scale")
-    private val KEY_WALLPAPER_TRANSLATE_X = floatPreferencesKey("wallpaper_translate_x")
-    private val KEY_WALLPAPER_TRANSLATE_Y = floatPreferencesKey("wallpaper_translate_y")
-    private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
 
     private lateinit var dataStore: FakeDataStore
     private lateinit var fileManager: WallpaperFileManager
@@ -77,7 +82,7 @@ class WallpaperRepositoryImplTest {
     }
 
     // ===========================================
-    // READ — EMPTY / LEGACY / MULTI
+    // READ — EMPTY / SINGLE / MULTI
     // ===========================================
 
     @Test
@@ -87,29 +92,40 @@ class WallpaperRepositoryImplTest {
     }
 
     @Test
-    fun `parseWallpaperState with only legacy keys yields single-layer state`() = runTest {
+    fun `parseWallpaperState with only legacy keys yields NONE (legacy no longer read)`() = runTest {
+        // The flat single-layer keys are dead: an old install's single-image
+        // wallpaper stored under them is NOT resurrected (breaking change, by
+        // design — the store-cleanup later sweeps them as orphans).
         dataStore.seed {
             it[KEY_WALLPAPER_URI] = "file:///data/wp1.jpg"
             it[KEY_WALLPAPER_SCALE] = 2.5f
-            it[KEY_WALLPAPER_TRANSLATE_X] = -100f
-            it[KEY_WALLPAPER_TRANSLATE_Y] = -50f
         }
 
         val state = manager.wallpaperState.first()
 
-        assertFalse("should NOT be multi-layer", state.isMultiLayer)
-        assertNotNull(state.imageUri)
-        assertEquals(2.5f, state.scale)
-        assertEquals(-100f, state.translateX)
-        assertEquals(-50f, state.translateY)
+        assertEquals(WallpaperState.NONE, state)
     }
 
     @Test
-    fun `parseWallpaperState with legacy keys but file missing yields NONE`() = runTest {
+    fun `parseWallpaperState with single-element JSON yields one-layer state`() = runTest {
+        val json = """[{"id":"only","imageUri":"file:///data/x.jpg","scale":2.5,"translateX":-100.0,"translateY":-50.0}]"""
+        dataStore.seed { it[KEY_LAYERS_JSON] = json }
+
+        val state = manager.wallpaperState.first()
+
+        assertEquals(1, state.layerCount)
+        val layer = state.layers.single()
+        assertEquals("file:///data/x.jpg", layer.imageUri)
+        assertEquals(2.5f, layer.scale)
+        assertEquals(-100f, layer.translateX)
+        assertEquals(-50f, layer.translateY)
+    }
+
+    @Test
+    fun `parseWallpaperState with single-layer file missing yields NONE`() = runTest {
         every { fileManager.fileExists(any<Uri>()) } returns false
         dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/deleted.jpg"
-            it[KEY_WALLPAPER_SCALE] = 1.5f
+            it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/deleted.jpg","scale":1.5}]"""
         }
 
         val state = manager.wallpaperState.first()
@@ -120,14 +136,12 @@ class WallpaperRepositoryImplTest {
     @Test
     fun `parseWallpaperState with non-file single-layer URI yields NONE`() = runTest {
         // Regression guard against ACRA-reported
-        // "Volume external_primary not found" crash: if a content:// URI
-        // ever reaches persistence (old app version, bad restore, or
-        // remapped external volume), we must not pass it to setImageURI —
-        // it can throw IllegalArgumentException on resolve. Treat as
-        // NONE so the user sees an empty wallpaper and can re-pick.
+        // "Volume external_primary not found" crash: if a content:// URI ever
+        // reaches persistence (old app version, bad restore, or remapped
+        // external volume), we must not pass it to setImageURI. Treat as NONE.
         dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "content://media/external_primary/images/media/42"
-            it[KEY_WALLPAPER_SCALE] = 1.0f
+            it[KEY_LAYERS_JSON] =
+                """[{"id":"l","imageUri":"content://media/external_primary/images/media/42","scale":1.0}]"""
         }
 
         val state = manager.wallpaperState.first()
@@ -149,7 +163,6 @@ class WallpaperRepositoryImplTest {
         val state = manager.wallpaperState.first()
 
         // Bad URI layer dropped; good ones kept.
-        assertTrue(state.isMultiLayer)
         assertEquals(2, state.layerCount)
         assertEquals("l_ok", state.getLayer(0)!!.id)
         assertEquals("l_ok2", state.getLayer(1)!!.id)
@@ -170,7 +183,6 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertTrue("should be multi-layer", state.isMultiLayer)
         assertEquals(2, state.layerCount)
 
         val l1 = state.getLayer(0)!!
@@ -204,7 +216,6 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertTrue(state.isMultiLayer)
         assertEquals(1, state.layerCount)
         assertEquals("la", state.getLayer(0)!!.id)
     }
@@ -226,7 +237,9 @@ class WallpaperRepositoryImplTest {
     }
 
     @Test
-    fun `parseWallpaperState with corrupt JSON falls back to legacy keys`() = runTest {
+    fun `parseWallpaperState with corrupt JSON yields NONE (no legacy fallback)`() = runTest {
+        // Even with legacy keys still lying around, an unparsable JSON collapses
+        // to NONE — the legacy single-layer recovery path is gone.
         dataStore.seed {
             it[KEY_LAYERS_JSON] = "{this is not valid json]"
             it[KEY_WALLPAPER_URI] = "file:///data/legacy.jpg"
@@ -235,26 +248,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertFalse("fallback must be single-layer, not multi", state.isMultiLayer)
-        assertNotNull(state.imageUri)
-        assertEquals(3.0f, state.scale)
-    }
-
-    @Test
-    fun `parseWallpaperState with mixed legacy and multi keys prefers multi`() = runTest {
-        // Both keys present: the manager ALWAYS writes legacy keys alongside multi
-        // for forward-compat with older code paths. The reader must pick multi.
-        val json = """[{"id":"l1","imageUri":"file:///data/a.jpg","scale":2.0}]"""
-        dataStore.seed {
-            it[KEY_LAYERS_JSON] = json
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_WALLPAPER_SCALE] = 2.0f
-        }
-
-        val state = manager.wallpaperState.first()
-
-        assertTrue(state.isMultiLayer)
-        assertEquals(1, state.layerCount)
+        assertEquals(WallpaperState.NONE, state)
     }
 
     // ===========================================
@@ -262,41 +256,35 @@ class WallpaperRepositoryImplTest {
     // ===========================================
 
     @Test
-    fun `saveWallpaperState single-layer writes legacy keys and removes layers key`() = runTest {
-        // Pre-populate layers key to ensure it gets cleared on single-layer save
-        dataStore.seed { it[KEY_LAYERS_JSON] = "[]" }
-
-        val single = WallpaperState(
-            imageUri = "file:///data/x.jpg",
+    fun `saveWallpaperState single image writes a one-element JSON array`() = runTest {
+        val single = WallpaperState.single(
+            uri = "file:///data/x.jpg",
             scale = 1.5f,
             translateX = 10f,
-            translateY = 20f
+            translateY = 20f,
         )
         manager.saveWallpaperState(single)
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertEquals("file:///data/x.jpg", prefs[KEY_WALLPAPER_URI])
-        assertEquals(1.5f, prefs[KEY_WALLPAPER_SCALE])
-        assertEquals(10f, prefs[KEY_WALLPAPER_TRANSLATE_X])
-        assertEquals(20f, prefs[KEY_WALLPAPER_TRANSLATE_Y])
-        assertNull("LAYERS_JSON must be cleared in single-layer mode", prefs[KEY_LAYERS_JSON])
+        assertNotNull("single image must persist as JSON", prefs[KEY_LAYERS_JSON])
+
+        // Round-trip: reads back as a one-layer state with the same values.
+        val loaded = manager.wallpaperState.first()
+        assertEquals(1, loaded.layerCount)
+        val layer = loaded.layers.single()
+        assertEquals("file:///data/x.jpg", layer.imageUri)
+        assertEquals(1.5f, layer.scale)
+        assertEquals(10f, layer.translateX)
+        assertEquals(20f, layer.translateY)
     }
 
     @Test
-    fun `saveWallpaperState multi-layer writes JSON and legacy keys from first layer`() = runTest {
+    fun `saveWallpaperState multi-layer writes JSON`() = runTest {
         val state = WallpaperState.multiLayer(
             listOf(
-                WallpaperLayerState(
-                    id = "l1",
-                    imageUri = "file:///data/a.jpg",
-                    scale = 2.0f
-                ),
-                WallpaperLayerState(
-                    id = "l2",
-                    imageUri = "file:///data/b.jpg",
-                    scale = 3.0f
-                )
+                WallpaperLayerState(id = "l1", imageUri = "file:///data/a.jpg", scale = 2.0f),
+                WallpaperLayerState(id = "l2", imageUri = "file:///data/b.jpg", scale = 3.0f)
             )
         )
 
@@ -305,55 +293,42 @@ class WallpaperRepositoryImplTest {
 
         val prefs = dataStore.data.first()
         assertNotNull(prefs[KEY_LAYERS_JSON])
-        // Legacy fallback: first layer with image
-        assertEquals("file:///data/a.jpg", prefs[KEY_WALLPAPER_URI])
-        assertEquals(2.0f, prefs[KEY_WALLPAPER_SCALE])
+
+        val loaded = manager.wallpaperState.first()
+        assertEquals(2, loaded.layerCount)
+        assertEquals("file:///data/a.jpg", loaded.getLayer(0)!!.imageUri)
     }
 
     @Test
-    fun `saveWallpaperState with empty state removes all keys`() = runTest {
-        dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_WALLPAPER_SCALE] = 2.0f
-            it[KEY_LAYERS_JSON] = "[]"
-        }
+    fun `saveWallpaperState with empty state removes the layers key`() = runTest {
+        dataStore.seed { it[KEY_LAYERS_JSON] = "[]" }
 
         manager.saveWallpaperState(WallpaperState.NONE)
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_WALLPAPER_URI])
-        assertNull(prefs[KEY_WALLPAPER_SCALE])
         assertNull(prefs[KEY_LAYERS_JSON])
     }
 
     @Test
-    fun `clearWallpaper removes all keys`() = runTest {
-        dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_LAYERS_JSON] = "[]"
-        }
+    fun `clearWallpaper removes the layers key`() = runTest {
+        dataStore.seed { it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/a.jpg"}]""" }
 
         manager.clearWallpaper()
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_WALLPAPER_URI])
         assertNull(prefs[KEY_LAYERS_JSON])
     }
 
     @Test
-    fun `purgeRepository removes all keys`() = runTest {
-        dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_LAYERS_JSON] = "[]"
-        }
+    fun `purgeRepository removes the layers key`() = runTest {
+        dataStore.seed { it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/a.jpg"}]""" }
 
         manager.purgeRepository()
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_WALLPAPER_URI])
         assertNull(prefs[KEY_LAYERS_JSON])
     }
 
@@ -370,6 +345,28 @@ class WallpaperRepositoryImplTest {
     }
 
     @Test
+    fun `single image roundtrip preserves all fields`() = runTest {
+        val original = WallpaperState.single(
+            uri = "file:///data/a.jpg",
+            scale = 1.25f,
+            translateX = 7f,
+            translateY = -3f,
+        )
+
+        manager.saveWallpaperState(original)
+        advanceUntilIdle()
+
+        val loaded = manager.wallpaperState.first()
+
+        assertEquals(1, loaded.layerCount)
+        val layer = loaded.getLayer(0)!!
+        assertEquals("file:///data/a.jpg", layer.imageUri)
+        assertEquals(1.25f, layer.scale)
+        assertEquals(7f, layer.translateX)
+        assertEquals(-3f, layer.translateY)
+    }
+
+    @Test
     fun `multi-layer roundtrip preserves all fields`() = runTest {
         val original = WallpaperState.multiLayer(
             listOf(
@@ -379,7 +376,12 @@ class WallpaperRepositoryImplTest {
                     scale = 1.25f,
                     translateX = 7f,
                     translateY = -3f,
-                )
+                ),
+                WallpaperLayerState(
+                    id = "def_456",
+                    imageUri = "file:///data/b.jpg",
+                    scale = 2.0f,
+                ),
             )
         )
 
@@ -388,8 +390,7 @@ class WallpaperRepositoryImplTest {
 
         val loaded = manager.wallpaperState.first()
 
-        assertTrue(loaded.isMultiLayer)
-        assertEquals(1, loaded.layerCount)
+        assertEquals(2, loaded.layerCount)
         val layer = loaded.getLayer(0)!!
         assertEquals("abc_123", layer.id)
         assertEquals(1.25f, layer.scale)
@@ -400,19 +401,19 @@ class WallpaperRepositoryImplTest {
     @Test
     fun `getWallpaperStateSync returns current persisted value`() = runTest {
         dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_WALLPAPER_SCALE] = 2.0f
+            it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/a.jpg","scale":2.0}]"""
         }
 
         val state = manager.getWallpaperStateSync()
 
-        assertEquals("file:///data/a.jpg", state.imageUri)
-        assertEquals(2.0f, state.scale)
+        assertEquals(1, state.layerCount)
+        assertEquals("file:///data/a.jpg", state.layers.single().imageUri)
+        assertEquals(2.0f, state.layers.single().scale)
     }
 
     // ===========================================
-// EDGE CASES — VALUE PASSTHROUGH
-// ===========================================
+    // EDGE CASES — VALUE PASSTHROUGH
+    // ===========================================
 
     @Test
     fun `clearWallpaper on already empty state is idempotent`() = runTest {
@@ -430,20 +431,14 @@ class WallpaperRepositoryImplTest {
         assertEquals(WallpaperState.NONE, state)
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_WALLPAPER_URI])
         assertNull(prefs[KEY_LAYERS_JSON])
     }
 
     @Test
     fun `purgeRepository has same effect as clearWallpaper`() = runTest {
         // Both methods must wipe identical key sets. They currently share
-        // removeAllKeys() — this test guards against future divergence
-        // (e.g. someone adds purge-only behavior without updating clear).
+        // removeAllKeys() — this test guards against future divergence.
         val seed: (androidx.datastore.preferences.core.MutablePreferences) -> Unit = {
-            it[KEY_WALLPAPER_URI] = "file:///data/a.jpg"
-            it[KEY_WALLPAPER_SCALE] = 1.5f
-            it[KEY_WALLPAPER_TRANSLATE_X] = 10f
-            it[KEY_WALLPAPER_TRANSLATE_Y] = 20f
             it[KEY_LAYERS_JSON] = """[{"id":"l1","imageUri":"file:///data/a.jpg"}]"""
         }
 
@@ -465,34 +460,31 @@ class WallpaperRepositoryImplTest {
         // Guards against silent clamping (e.g. a future min/max validator).
         // 0.25f and 8.0f are both exactly representable as Float to avoid
         // precision noise in the round-trip via Double in the JSON path.
-        val tinyState = WallpaperState(imageUri = "file:///data/x.jpg", scale = 0.25f)
-        manager.saveWallpaperState(tinyState)
+        manager.saveWallpaperState(WallpaperState.single("file:///data/x.jpg", scale = 0.25f))
         advanceUntilIdle()
-        assertEquals(0.25f, manager.wallpaperState.first().scale)
+        assertEquals(0.25f, manager.wallpaperState.first().layers.single().scale)
 
-        val hugeState = WallpaperState(imageUri = "file:///data/x.jpg", scale = 8.0f)
-        manager.saveWallpaperState(hugeState)
+        manager.saveWallpaperState(WallpaperState.single("file:///data/x.jpg", scale = 8.0f))
         advanceUntilIdle()
-        assertEquals(8.0f, manager.wallpaperState.first().scale)
+        assertEquals(8.0f, manager.wallpaperState.first().layers.single().scale)
     }
 
     @Test
     fun `saveWallpaperState handles negative translate values`() = runTest {
-        // Negative translate is normal during pan operations. READ-side is
-        // covered by `with only legacy keys` (-100/-50); this guards the
-        // SAVE-side specifically against future clamping at write time.
-        val state = WallpaperState(
-            imageUri = "file:///data/x.jpg",
+        // Negative translate is normal during pan operations. Guards the
+        // SAVE-side against future clamping at write time.
+        val state = WallpaperState.single(
+            uri = "file:///data/x.jpg",
             translateX = -999f,
-            translateY = -1500f
+            translateY = -1500f,
         )
 
         manager.saveWallpaperState(state)
         advanceUntilIdle()
 
-        val prefs = dataStore.data.first()
-        assertEquals(-999f, prefs[KEY_WALLPAPER_TRANSLATE_X])
-        assertEquals(-1500f, prefs[KEY_WALLPAPER_TRANSLATE_Y])
+        val layer = manager.wallpaperState.first().layers.single()
+        assertEquals(-999f, layer.translateX)
+        assertEquals(-1500f, layer.translateY)
     }
 
     // ===========================================
@@ -504,8 +496,7 @@ class WallpaperRepositoryImplTest {
     @Test
     fun `unrelated preference change does not re-parse wallpaper state`() = runTest {
         dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/wp.jpg"
-            it[KEY_WALLPAPER_SCALE] = 1.0f
+            it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/wp.jpg","scale":1.0}]"""
         }
 
         val emissions = mutableListOf<WallpaperState>()
@@ -516,7 +507,7 @@ class WallpaperRepositoryImplTest {
         assertEquals(1, emissions.size)
         verify(exactly = 1) { fileManager.fileExists(any<Uri>()) }
 
-        // Merge in an UNRELATED key (edit() keeps the wallpaper keys intact).
+        // Merge in an UNRELATED key (edit() keeps the wallpaper key intact).
         dataStore.edit { it[stringPreferencesKey("some_unrelated_setting")] = "x" }
         advanceUntilIdle()
 
@@ -530,22 +521,23 @@ class WallpaperRepositoryImplTest {
     @Test
     fun `wallpaper key change does re-parse and re-emit`() = runTest {
         dataStore.seed {
-            it[KEY_WALLPAPER_URI] = "file:///data/wp.jpg"
-            it[KEY_WALLPAPER_SCALE] = 1.0f
+            it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/wp.jpg","scale":1.0}]"""
         }
 
         val emissions = mutableListOf<WallpaperState>()
         val job = launch { manager.wallpaperState.collect { emissions.add(it) } }
         advanceUntilIdle()
 
-        // Change a WALLPAPER key — must pass the distinct gate.
-        dataStore.edit { it[KEY_WALLPAPER_SCALE] = 2.0f }
+        // Change the wallpaper key — must pass the distinct gate.
+        dataStore.edit {
+            it[KEY_LAYERS_JSON] = """[{"id":"l","imageUri":"file:///data/wp.jpg","scale":2.0}]"""
+        }
         advanceUntilIdle()
 
         job.cancel()
 
         assertEquals("a real wallpaper change must re-emit", 2, emissions.size)
-        assertEquals(2.0f, emissions.last().scale)
+        assertEquals(2.0f, emissions.last().layers.single().scale)
     }
 }
 
@@ -577,6 +569,4 @@ private class FakeDataStore(initial: Preferences = emptyPreferences()) : DataSto
         build(prefs)
         state.value = prefs
     }
-
-
 }

@@ -121,15 +121,13 @@ class ClassifyWallpaperUseCase @Inject constructor(
         data class Multi(val fallbackUri: String?) : KolibriInput
     }
 
-    private fun projectKolibriInput(state: WallpaperState): KolibriInput {
-        if (state.isMultiLayer) {
-            // Bottom-most layer (painted first) as the FALLBACK URI while the composite
-            // luminance is not yet available (v4.3); the composite itself is classified from
-            // CompositeLuminanceSignal, not from here.
-            val fallback = state.layers.firstOrNull()?.imageUri
-            return KolibriInput.Multi(fallback)
-        }
-        return state.imageUri?.let { KolibriInput.Single(it) } ?: KolibriInput.None
+    private fun projectKolibriInput(state: WallpaperState): KolibriInput = when {
+        // A lone image (layerCount == 1) classifies directly — the cheap path, matching the
+        // single-image render/cache strategy. Two-plus layers classify the flattened COMPOSITE
+        // (pushed via CompositeLuminanceSignal), with the bottom-most layer as the fallback URI
+        // until the composite luminance arrives (v4.3).
+        state.layerCount >= 2 -> KolibriInput.Multi(state.layers.firstOrNull()?.imageUri)
+        else -> state.layers.firstOrNull()?.imageUri?.let { KolibriInput.Single(it) } ?: KolibriInput.None
     }
 
     private fun classifySystem(

@@ -62,125 +62,96 @@ data class WallpaperLayerState(
 }
 
 /**
- * Domain Model für den gesamten Wallpaper-Zustand.
+ * Domain model for the whole wallpaper state.
  *
- * == BACKWARD COMPATIBILITY ==
- * Single-Layer (wie bisher):
- *   WallpaperState(imageUri = uri, scale = 2.0f, ...)
- *   → layers bleibt leer, hasWallpaper/imageUri/scale/etc. funktionieren wie vorher.
+ * A wallpaper is ALWAYS represented as a list of [layers]. There is no
+ * separate flat "single-layer" representation anymore (the legacy
+ * `imageUri`/`scale`/`translateX`/`translateY`/`captureSampleSize` fields
+ * were removed): a single-image wallpaper is simply a one-element [layers]
+ * list, an empty list is [NONE].
  *
- * Multi-Layer (neu):
- *   WallpaperState(layers = listOf(layer1, layer2, ...))
- *   → imageUri gibt Layer 0 zurück (Fallback für alten Code).
+ * The single-vs-composite distinction that remains is a pure RENDER
+ * strategy keyed on [layerCount], not a data-model mode:
+ *   - `layerCount == 1` → the cheap path (decode the lone image, position it
+ *     via the ImageView matrix, `file://` cache key).
+ *   - `layerCount >= 2` → flatten/composite the layers into one bitmap
+ *     (`composite://` cache key).
+ * Consumers therefore branch on [layerCount], never on a stored flag.
  *
- * Immutable data class – jede Änderung erzeugt eine neue Instanz.
+ * Immutable data class — every change produces a new instance.
  */
 data class WallpaperState(
-    // --- Single-Layer Felder (Backward Compatibility) ---
-    //
-    // Invariant: when [layers] is non-empty, ALL four single-layer fields
-    // MUST hold their default values (null URI, default scale, zero
-    // translates). The codebase keys every read on [isMultiLayer] and
-    // never falls back to these fields in multi-mode, so any non-default
-    // value here would be a shadow state — invisible in the UI but counted
-    // by [referencedUris] and exported by callers that walk both branches.
-    // [toMultiLayer] enforces this when migrating; constructed states
-    // should respect it too.
-
-    /**
-     * Image URI as string — `null` = no custom wallpaper. MUST be `null` when [layers]
-     * is non-empty.
-     */
-    val imageUri: String? = null,
-
-    /** Zoom-Faktor (Single-Layer). MUSS Default sein wenn layers nicht leer. */
-    val scale: Float = WallpaperLayerState.DEFAULT_SCALE,
-
-    /** Horizontale Verschiebung (Single-Layer). MUSS 0f sein wenn layers nicht leer. */
-    val translateX: Float = 0f,
-
-    /** Vertikale Verschiebung (Single-Layer). MUSS 0f sein wenn layers nicht leer. */
-    val translateY: Float = 0f,
-
-    // --- Multi-Layer Felder ---
-
-    /** Liste der Layer-States. Leer = Single-Layer-Modus. */
+    /** The layers, bottom-most first. Empty = no wallpaper ([NONE]). */
     val layers: List<WallpaperLayerState> = emptyList(),
-
-    /**
-     * Single-layer twin of [WallpaperLayerState.captureSampleSize]: the decode
-     * downsample factor the single-layer [scale]/[translateX]/[translateY] were
-     * captured against. MUST be `null` when [layers] is non-empty. See spec §4-Y.
-     */
-    val captureSampleSize: Int? = null,
 ) {
     companion object {
         const val DEFAULT_SCALE = WallpaperLayerState.DEFAULT_SCALE
 
-        /** Leerer Zustand – kein Wallpaper gesetzt */
+        /** Empty state — no wallpaper set. */
         val NONE = WallpaperState()
 
         /**
-         * Erstellt einen Multi-Layer WallpaperState aus einer Layer-Liste.
+         * Builds a [WallpaperState] from a layer list. A one-element list is a
+         * single-image wallpaper; two or more layers composite.
          */
         fun multiLayer(layers: List<WallpaperLayerState>): WallpaperState {
             return WallpaperState(layers = layers)
         }
+
+        /**
+         * Convenience builder for a single-image wallpaper — the canonical
+         * one-element [layers] representation. Reads at call sites like the
+         * removed flat constructor did, so a lone image never has to be
+         * hand-wrapped into a list.
+         */
+        fun single(
+            uri: String,
+            scale: Float = DEFAULT_SCALE,
+            translateX: Float = 0f,
+            translateY: Float = 0f,
+            captureSampleSize: Int? = null,
+        ): WallpaperState = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(
+                    imageUri = uri,
+                    scale = scale,
+                    translateX = translateX,
+                    translateY = translateY,
+                    captureSampleSize = captureSampleSize,
+                )
+            )
+        )
     }
 
     // ===========================================
-    // MODE DETECTION
+    // MODE / RENDER-STRATEGY DETECTION
     // ===========================================
 
-    /** True wenn Multi-Layer aktiv (mindestens ein Layer definiert) */
-    val isMultiLayer: Boolean
-        get() = layers.isNotEmpty()
-
-    /** Anzahl der Layer (0 im Single-Layer-Modus) */
+    /** Number of layers (0 = no wallpaper). */
     val layerCount: Int
         get() = layers.size
 
     // ===========================================
-    // BACKWARD COMPATIBLE GETTERS
+    // DERIVED GETTERS
     // ===========================================
 
-    /**
-     * Hat der User ein Wallpaper konfiguriert?
-     * Multi-Layer: Mindestens ein Layer mit Bild.
-     * Single-Layer: imageUri != null.
-     */
+    /** Has the user configured a wallpaper? (at least one layer with an image) */
     val hasWallpaper: Boolean
-        get() = if (isMultiLayer) layers.any { it.hasImage } else imageUri != null
+        get() = layers.any { it.hasImage }
 
-    /**
-     * Wurde das Bild transformiert?
-     * Multi-Layer: Irgendein Layer transformiert.
-     * Single-Layer: Original-Logik.
-     */
+    /** Has any layer been transformed (moved/zoomed away from default)? */
     val isTransformed: Boolean
-        get() = if (isMultiLayer) {
-            layers.any { it.isTransformed }
-        } else {
-            scale != DEFAULT_SCALE || translateX != 0f || translateY != 0f
-        }
+        get() = layers.any { it.isTransformed }
 
     /**
-     * Alle Bild-URIs, die dieser State referenziert — Single-Layer- und Multi-Layer-Fall kombiniert.
-     * Nützlich für Orphan-File-GC: Dateien in `wallpapers/`, die nicht in diesem Set
-     * vorkommen, sind Waisen und können weggeräumt werden.
+     * All image URIs this state references. Useful for orphan-file GC: files in
+     * `wallpapers/` not present in this set are orphans and can be cleaned up.
      */
     val referencedUris: Set<String>
-        get() {
-            val set = mutableSetOf<String>()
-            imageUri?.let { set.add(it) }
-            for (layer in layers) {
-                layer.imageUri?.let { set.add(it) }
-            }
-            return set
-        }
+        get() = layers.mapNotNullTo(mutableSetOf()) { it.imageUri }
 
     // ===========================================
-    // MULTI-LAYER HELPERS
+    // LAYER HELPERS
     // ===========================================
 
     /**
@@ -226,75 +197,5 @@ data class WallpaperState(
         newLayers[indexA] = newLayers[indexB]
         newLayers[indexB] = temp
         return copy(layers = newLayers)
-    }
-
-    // ===========================================
-    // MIGRATION: SINGLE → MULTI
-    // ===========================================
-
-    /**
-     * Konvertiert einen Single-Layer State in einen Multi-Layer State.
-     * Nützlich beim ersten Mal "Add Layer".
-     *
-     * Setzt die Single-Layer-Felder explizit auf Defaults zurück. Aus
-     * Sicht des Konsumenten ist der State danach komplett durch [layers]
-     * beschrieben; die alten Felder zu lassen wäre Schatten-State, das
-     * niemand liest, aber [referencedUris] und JSON-Exporter mitziehen.
-     */
-    fun toMultiLayer(): WallpaperState {
-        if (isMultiLayer) return this
-        if (!hasWallpaper) return this
-
-        val singleLayer = WallpaperLayerState(
-            imageUri = imageUri,
-            scale = scale,
-            translateX = translateX,
-            translateY = translateY,
-            captureSampleSize = captureSampleSize,
-        )
-
-        return copy(
-            imageUri = null,
-            scale = DEFAULT_SCALE,
-            translateX = 0f,
-            translateY = 0f,
-            captureSampleSize = null,
-            layers = listOf(singleLayer),
-        )
-    }
-
-    // ===========================================
-    // MIGRATION: MULTI → SINGLE  (F13 collapse)
-    // ===========================================
-
-    /**
-     * Reverse of [toMultiLayer]: collapses a multi-layer state that holds
-     * exactly ONE layer back into the single-layer representation, so a
-     * wallpaper whittled down to a single layer in the editor takes the cheaper
-     * decode-cache path (`file://` key) again instead of the flatten path
-     * (`composite://` key). This closes the AUDIT-20 F13 one-way-street: layer
-     * removals never collapsed back, so a 1-layer state stayed [isMultiLayer]
-     * forever and kept flattening a single image.
-     *
-     * The collapse is UNCONDITIONAL for a one-layer list.
-     * `imageUri`/`scale`/`translateX`/`translateY`/`captureSampleSize` carry
-     * meaning and map 1:1; the layer's `id` has no single-layer home and is
-     * dropped (irrelevant for a single image).
-     *
-     * No-op (returns `this`) for a single-layer state, and for a multi-layer
-     * state with zero or two-plus layers.
-     */
-    fun toSingleLayer(): WallpaperState {
-        if (!isMultiLayer) return this
-        val only = layers.singleOrNull() ?: return this
-
-        return copy(
-            imageUri = only.imageUri,
-            scale = only.scale,
-            translateX = only.translateX,
-            translateY = only.translateY,
-            captureSampleSize = only.captureSampleSize,
-            layers = emptyList(),
-        )
     }
 }

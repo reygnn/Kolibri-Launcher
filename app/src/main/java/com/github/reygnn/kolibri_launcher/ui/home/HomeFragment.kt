@@ -1537,7 +1537,7 @@ class HomeFragment : Fragment() {
         // through to the real multi-layer state (per-layer FullRebuild), which is correct at any
         // resolution and drives the async warm.
         val key = compositeCacheKeyIfHit(state) ?: return state
-        return WallpaperState(imageUri = key)
+        return WallpaperState.single(key)
     }
 
     /**
@@ -1548,7 +1548,7 @@ class HomeFragment : Fragment() {
      */
     private fun compositeCacheKeyIfHit(state: WallpaperState): String? {
         if (viewModel.isWallpaperEditMode.value) return null
-        if (!state.isMultiLayer) return null
+        if (state.layerCount < 2) return null
         val ctx = context ?: return null
         val m = ctx.resources.displayMetrics
         val key = WallpaperCompositeKey.of(state, m.widthPixels, m.heightPixels)

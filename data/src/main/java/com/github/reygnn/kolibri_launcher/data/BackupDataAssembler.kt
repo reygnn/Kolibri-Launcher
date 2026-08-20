@@ -114,27 +114,18 @@ class BackupDataAssembler @Inject constructor(
         val sortOrder = settingsRepository.sortOrderFlow.first()
         val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
-        // ===== Wallpaper: multi-layer export =====
-        val wallpaperUri: String?
-        val wallpaperScale: Float?
-        val wallpaperTranslateX: Float?
-        val wallpaperTranslateY: Float?
-        val wallpaperLayers: List<WallpaperLayerBackup>
-
-        if (wallpaperState.isMultiLayer) {
-            wallpaperLayers = wallpaperState.layers.map { WallpaperLayerBackup.fromLayerState(it) }
-            val firstLayer = wallpaperState.layers.firstOrNull()
-            wallpaperUri = firstLayer?.imageUri?.toString()
-            wallpaperScale = if (firstLayer?.imageUri != null) firstLayer.scale else null
-            wallpaperTranslateX = if (firstLayer?.imageUri != null) firstLayer.translateX else null
-            wallpaperTranslateY = if (firstLayer?.imageUri != null) firstLayer.translateY else null
-        } else {
-            wallpaperLayers = emptyList()
-            wallpaperUri = wallpaperState.imageUri?.toString()
-            wallpaperScale = if (wallpaperState.imageUri != null) wallpaperState.scale else null
-            wallpaperTranslateX = if (wallpaperState.imageUri != null) wallpaperState.translateX else null
-            wallpaperTranslateY = if (wallpaperState.imageUri != null) wallpaperState.translateY else null
-        }
+        // ===== Wallpaper export =====
+        // A wallpaper is always a layer list now (a single image = one layer), so
+        // export the layers array directly. The flat fields are still written as a
+        // mirror of layer 0 — a backward-compat convenience so a downgraded / older
+        // importer can still restore the first layer from the flat keys.
+        val wallpaperLayers: List<WallpaperLayerBackup> =
+            wallpaperState.layers.map { WallpaperLayerBackup.fromLayerState(it) }
+        val firstLayer = wallpaperState.layers.firstOrNull()
+        val wallpaperUri: String? = firstLayer?.imageUri
+        val wallpaperScale: Float? = if (firstLayer?.imageUri != null) firstLayer.scale else null
+        val wallpaperTranslateX: Float? = if (firstLayer?.imageUri != null) firstLayer.translateX else null
+        val wallpaperTranslateY: Float? = if (firstLayer?.imageUri != null) firstLayer.translateY else null
 
         val settings = LauncherSettings(
             favoriteComponents = favoriteComponents,

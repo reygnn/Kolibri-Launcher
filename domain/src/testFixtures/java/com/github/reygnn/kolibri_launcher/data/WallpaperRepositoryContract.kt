@@ -16,63 +16,52 @@ import org.junit.Test
  * WALLPAPER REPOSITORY — CONTRACT TEST
  * ============================================================================
  *
- * Siehe [FavoritesRepositoryContract] für Hintergrund und Konventionen.
+ * See [FavoritesRepositoryContract] for background and conventions.
  *
- * Das [WallpaperRepository]-Interface ist klein, aber hat eine wichtige
- * Konsistenz-Property zwischen den beiden Read-Pfaden:
+ * The [WallpaperRepository] interface is small but has one important
+ * consistency property between its two read paths:
  *
- *   `getWallpaperStateSync()` und `wallpaperState.first()` müssen denselben
- *   Wert liefern. Der Manager implementiert das, indem `getWallpaperStateSync`
- *   intern `wallpaperState.first()` aufruft. Der Fake implementiert das,
- *   indem beide auf dieselbe `MutableStateFlow.value` zeigen. Wenn jemand
- *   beim Refactoring eine Cache-Schicht einbaut, die nur einer der beiden
- *   Pfade benutzt, fängt der entsprechende Contract-Test das ab.
+ *   `getWallpaperStateSync()` and `wallpaperState.first()` must return the
+ *   same value. The impl implements this by having `getWallpaperStateSync`
+ *   call `wallpaperState.first()` internally. The fake implements it by
+ *   pointing both at the same `MutableStateFlow.value`. If someone adds a
+ *   cache layer that only one path uses, the matching contract test catches
+ *   it.
  *
- * BEKANNTE DIVERGENZEN — werden vermutlich auf dem Fake rot:
+ * A wallpaper is always represented as a layer list now (a single image is a
+ * one-element list). The contract exercises a single-image round-trip
+ * (`WallpaperState.single(...)`) and the two-read-path consistency.
  *
- *   1. **`saveWallpaperState(WallpaperState(scale = 2.0f, imageUri = null))`**
- *      - Manager: interpretiert "kein imageUri und nicht multi-layer" als
- *        "kein Wallpaper" und persistiert nichts. Folge-Read liefert
- *        `WallpaperState.NONE` — der `scale` ist verloren.
- *      - Fake: speichert den exakten State, den man übergibt.
+ * KNOWN DIVERGENCES — likely red on the fake, deliberately NOT pinned:
  *
- *   2. **Non-file URI scheme** (z.B. `content://...`)
- *      - Manager: verwirft beim Read mit `scheme != "file"` → returnt
- *        `WallpaperState.NONE`. Schutz vor SD-Card-Remap und Backup-Restore.
- *      - Fake: speichert jede Uri unverändert.
+ *   1. **Non-file URI scheme** (e.g. `content://...`)
+ *      - Impl: drops it on read with `scheme != "file"` → returns
+ *        `WallpaperState.NONE`. Guards against SD-card remap and backup
+ *        restore artifacts.
+ *      - Fake: stores every URI unchanged.
  *
- *   3. **Datei nicht (mehr) auf Disk** (file://-URI ohne existierende Datei)
- *      - Manager: ruft `WallpaperFileManager.fileExists(uri)` und returnt
- *        bei `false` → `WallpaperState.NONE`.
- *      - Fake: kennt das Konzept "Datei existiert" nicht.
+ *   2. **File not (any longer) on disk** (a `file://` URI without a backing
+ *      file)
+ *      - Impl: calls `WallpaperFileManager.fileExists(uri)` and returns
+ *        `WallpaperState.NONE` on `false`.
+ *      - Fake: has no concept of "file exists".
  *
- *   Realer Schaden bei (1): Code, der scale/translateX/translateY ohne
- *   imageUri persistieren möchte (gibt's in der Codebase aktuell vermutlich
- *   nicht — aber wer weiß), wird in Produktion silently brechen.
+ *   So the contract uses `file://` URIs and the impl test stubs
+ *   `fileExists(any()) returns true`. The two drifts above are documented but
+ *   NOT pinned as contract tests — declaring the fakes "broken" and forcing
+ *   Robolectric would be overkill for behaviour almost nobody relies on.
  *
- *   Realer Schaden bei (2)+(3): Tests die mit `content://`-URIs oder
- *   nicht-existierenden Dateien arbeiten, sehen im Fake sinnvoll-aussehende
- *   Daten — die in Produktion sofort zu `NONE` werden.
+ * NOT IN CONTRACT (impl-specific):
+ *   - Layer JSON serialization (an impl detail of the store).
+ *   - DataStore IOException recovery.
+ *   - URI-scheme and file-existence validation (see above).
  *
- *   Damit der Contract überhaupt sinnvolle Save/Load-Roundtrips testen kann,
- *   benutzen die Tests `file://`-URIs und der Manager-Test stubt
- *   `fileExists(any()) returns true`. Die drei Drifts oben werden bewusst
- *   im KDoc dokumentiert, aber NICHT als Tests im Contract aufgenommen —
- *   die Fakes "kaputt" zu deklarieren und auf Robolectric zwingen wäre
- *   übertrieben für Verhalten, das in der Praxis kaum jemand benutzt.
- *
- * NICHT IM CONTRACT (Manager-spezifisch):
- *   - Multi-Layer JSON-Serialisierung (Implementation-Detail des Managers).
- *   - Backward-Compat-Migration zwischen Single- und Multi-Layer-Keys.
- *   - DataStore-IOException-Recovery.
- *   - URI-scheme- und file-existence-Validierung (s.o.).
- *
- * WARUM ROBOLECTRIC:
- *   Der Contract konstruiert echte `android.net.Uri`-Instanzen via
- *   `String.toUri()`. Auf reiner JVM wirft das eine RuntimeException — also
- *   müssen alle Subklassen mit `@RunWith(RobolectricTestRunner::class)`
- *   annotiert werden. Das ist der einzige Repository-Contract im Projekt
- *   mit diesem Setup; Begründung im jeweiligen Subklassen-KDoc.
+ * WHY ROBOLECTRIC:
+ *   The contract builds real `android.net.Uri` instances via `String.toUri()`
+ *   inside the impl. On plain JVM that throws, so every subclass must be
+ *   annotated `@RunWith(RobolectricTestRunner::class)`. This is the only
+ *   repository contract in the project with this setup; rationale is in each
+ *   subclass KDoc.
  *
  * @see FakeWallpaperRepositoryContractTest
  * @see WallpaperRepositoryImplContractTest
@@ -89,10 +78,14 @@ abstract class WallpaperRepositoryContract {
 
     protected abstract fun createRepository(): WallpaperRepository
 
-    // file://-URIs gewählt, weil der Manager content://-URIs auf NONE setzt
-    // (siehe Klassen-KDoc, Drift Nr. 2). Damit testen wir die gemeinsame Basis.
+    // file:// URIs chosen because the impl resets content:// URIs to NONE
+    // (see class KDoc, drift #1). This exercises the common base.
     private val testUri = "file:///data/wallpaper.jpg"
     private val testUri2 = "file:///data/other.jpg"
+
+    /** The lone image URI of a single-image state, for round-trip assertions. */
+    private val WallpaperState.singleImageUri: String?
+        get() = layers.firstOrNull()?.imageUri
 
     // ---------- Fresh state ----------
 
@@ -113,51 +106,51 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `saveWallpaperState with imageUri persists imageUri`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri))
-        assertEquals(testUri, repo.wallpaperState.first().imageUri)
+        repo.saveWallpaperState(WallpaperState.single(testUri))
+        assertEquals(testUri, repo.wallpaperState.first().singleImageUri)
     }
 
     @Test
     fun `saveWallpaperState with imageUri and scale persists both`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 2.5f))
-        val state = repo.wallpaperState.first()
-        assertEquals(testUri, state.imageUri)
-        assertEquals(2.5f, state.scale)
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.5f))
+        val layer = repo.wallpaperState.first().layers.single()
+        assertEquals(testUri, layer.imageUri)
+        assertEquals(2.5f, layer.scale)
     }
 
     @Test
     fun `saveWallpaperState with imageUri and translation persists both`() = runTest {
         val repo = createRepository()
         repo.saveWallpaperState(
-            WallpaperState(imageUri = testUri, translateX = 100f, translateY = -50f)
+            WallpaperState.single(testUri, translateX = 100f, translateY = -50f)
         )
-        val state = repo.wallpaperState.first()
-        assertEquals(100f, state.translateX)
-        assertEquals(-50f, state.translateY)
+        val layer = repo.wallpaperState.first().layers.single()
+        assertEquals(100f, layer.translateX)
+        assertEquals(-50f, layer.translateY)
     }
 
     @Test
     fun `saveWallpaperState overwrites previous wallpaper`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 2.0f))
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri2, scale = 1.5f))
-        val state = repo.wallpaperState.first()
-        assertEquals(testUri2, state.imageUri)
-        assertEquals(1.5f, state.scale)
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
+        repo.saveWallpaperState(WallpaperState.single(testUri2, scale = 1.5f))
+        val layer = repo.wallpaperState.first().layers.single()
+        assertEquals(testUri2, layer.imageUri)
+        assertEquals(1.5f, layer.scale)
     }
 
-    // ---------- Konsistenz: sync == flow.first() ----------
+    // ---------- Consistency: sync == flow.first() ----------
 
     /**
-     * Die wichtigste Vertrags-Property dieses Repositories: beide Read-Pfade
-     * liefern denselben Wert. Falls jemand eine Cache-Schicht einbaut, die nur
-     * einer der beiden Pfade benutzt, fängt dieser Test das sofort ab.
+     * The most important contract property of this repository: both read paths
+     * return the same value. If someone adds a cache layer that only one path
+     * uses, this test catches it immediately.
      */
     @Test
     fun `getWallpaperStateSync returns same value as wallpaperState first`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 1.75f))
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 1.75f))
 
         val viaFlow = repo.wallpaperState.first()
         val viaSync = repo.getWallpaperStateSync()
@@ -168,8 +161,8 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `getWallpaperStateSync stays in sync after multiple saves`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 1.0f))
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri2, scale = 2.0f))
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 1.0f))
+        repo.saveWallpaperState(WallpaperState.single(testUri2, scale = 2.0f))
 
         assertEquals(repo.wallpaperState.first(), repo.getWallpaperStateSync())
     }
@@ -177,7 +170,7 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `getWallpaperStateSync stays in sync after clearWallpaper`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri))
+        repo.saveWallpaperState(WallpaperState.single(testUri))
         repo.clearWallpaper()
 
         assertEquals(repo.wallpaperState.first(), repo.getWallpaperStateSync())
@@ -188,7 +181,7 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `clearWallpaper resets state to NONE`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 2.0f))
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
         repo.clearWallpaper()
         assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
     }
@@ -203,7 +196,7 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `clearWallpaper can be called multiple times`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri))
+        repo.saveWallpaperState(WallpaperState.single(testUri))
         repo.clearWallpaper()
         repo.clearWallpaper()
         assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
@@ -214,7 +207,7 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `purgeRepository resets state to NONE`() = runTest {
         val repo = createRepository()
-        repo.saveWallpaperState(WallpaperState(imageUri = testUri, scale = 2.0f))
+        repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
         repo.purgeRepository()
         assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
     }

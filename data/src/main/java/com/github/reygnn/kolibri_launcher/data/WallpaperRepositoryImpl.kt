@@ -5,8 +5,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.IoDispatcher
@@ -30,29 +28,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository für Wallpaper-Einstellungen mit DataStore-Persistenz.
+ * Repository for wallpaper settings with DataStore persistence.
  *
- * == BACKWARD COMPATIBILITY ==
- * Bestehende Single-Layer Daten (KEY_WALLPAPER_URI etc.) werden beim Lesen
- * automatisch erkannt und als WallpaperState ohne Layer-Liste geladen.
- * Beim Multi-Layer-Speichern werden die Legacy-Keys mit den Werten von
- * Layer 0 synchronisiert — als Notbett für den Korruptions-Fallback in
- * [parseWallpaperState], wenn LAYERS_JSON unparsbar zurückkommt.
+ * A wallpaper is persisted as a single JSON array under [KEY_LAYERS_JSON].
+ * Each element carries: id, imageUri, scale, translateX/Y, captureSampleSize.
+ * A single-image wallpaper is a one-element array; two-plus layers composite.
  *
- * == MULTI-LAYER ==
- * Layer werden als JSON-Array in einem einzigen DataStore-Key gespeichert.
- * Jedes Layer enthält: id, imageUri, scale, translateX/Y, alpha, blendMode,
- * isVisible, label.
+ * The legacy flat single-layer keys (`wallpaper_uri` etc.) were dropped when
+ * the flat [WallpaperState] representation was removed. There is NO in-code
+ * migration (project Rule 5): an existing single-image wallpaper stored under
+ * those keys is not read back — the sanctioned path across the breaking change
+ * is export → factory reset → restore, and the restore importer still reads the
+ * old flat backup fields (see `BackupRepositoryImpl.importSingleLayerWallpaper`).
+ * The now-unowned legacy keys are swept as orphans by the storage-cleanup.
  *
- * Migrations- und Fallback-Pfade:
- * 1. App-Start: Alte Keys vorhanden, kein LAYERS_JSON → Single-Layer (wie bisher)
- * 2. User fügt Layer hinzu → LAYERS_JSON wird geschrieben, Legacy-Keys
- *    werden mit Layer 0 synchronisiert
- * 3. Nächster App-Start: LAYERS_JSON vorhanden → Multi-Layer
- * 4. User entfernt alle Layer → LAYERS_JSON wird entfernt, zurück zu Single/None
- * 5. Korruptions-Fallback: LAYERS_JSON existiert, ist aber unparsbar →
- *    Repository fällt auf die Layer-0-Synchronisation in den Legacy-Keys
- *    zurück. User sieht in dem Fall nur Layer 0 statt der vollen Komposition.
+ * On a JSON that is present but unparsable, the read falls back to
+ * [WallpaperState.NONE] (no partial single-layer recovery anymore).
  */
 @Singleton
 class WallpaperRepositoryImpl @Inject constructor(
@@ -62,27 +53,11 @@ class WallpaperRepositoryImpl @Inject constructor(
 ) : WallpaperRepository, OwnsSettingsStoreKeys {
 
     override fun ownedExactKeys(): Set<String> = setOf(
-        KEY_WALLPAPER_URI.name,
-        KEY_WALLPAPER_SCALE.name,
-        KEY_WALLPAPER_TRANSLATE_X.name,
-        KEY_WALLPAPER_TRANSLATE_Y.name,
-        KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE.name,
         KEY_LAYERS_JSON.name,
     )
 
     companion object {
-        // --- Legacy Keys (Single-Layer, beibehalten für Migration) ---
-        private val KEY_WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
-        private val KEY_WALLPAPER_SCALE = floatPreferencesKey("wallpaper_scale")
-        private val KEY_WALLPAPER_TRANSLATE_X = floatPreferencesKey("wallpaper_translate_x")
-        private val KEY_WALLPAPER_TRANSLATE_Y = floatPreferencesKey("wallpaper_translate_y")
-
-        // Decode downsample factor the single-layer transform was captured at
-        // (WALLPAPER_RENDER_RES_SPEC §4-Y). Absent = legacy field-less transform.
-        private val KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE =
-            intPreferencesKey("wallpaper_capture_sample_size")
-
-        // --- Multi-Layer Key ---
+        // The single wallpaper key: a JSON array of layers.
         private val KEY_LAYERS_JSON = stringPreferencesKey("wallpaper_layers_json")
 
         // Defaults
@@ -136,116 +111,61 @@ class WallpaperRepositoryImpl @Inject constructor(
     private fun Preferences.filterToWallpaperKeys(): Preferences {
         val out = mutablePreferencesOf()
         this[KEY_LAYERS_JSON]?.let { out[KEY_LAYERS_JSON] = it }
-        this[KEY_WALLPAPER_URI]?.let { out[KEY_WALLPAPER_URI] = it }
-        this[KEY_WALLPAPER_SCALE]?.let { out[KEY_WALLPAPER_SCALE] = it }
-        this[KEY_WALLPAPER_TRANSLATE_X]?.let { out[KEY_WALLPAPER_TRANSLATE_X] = it }
-        this[KEY_WALLPAPER_TRANSLATE_Y]?.let { out[KEY_WALLPAPER_TRANSLATE_Y] = it }
-        this[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE]?.let { out[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
         return out.toPreferences()
     }
 
     /**
-     * Parst den WallpaperState aus den DataStore Preferences.
-     * Prüft zuerst auf Multi-Layer (JSON), dann Fallback auf Single-Layer Keys.
+     * Parses the [WallpaperState] from the layers JSON. Empty/absent JSON is
+     * [WallpaperState.NONE]; an unparsable JSON also collapses to NONE (no
+     * partial single-layer recovery — the legacy flat keys are gone).
      */
     private fun parseWallpaperState(preferences: Preferences): WallpaperState {
         val layersJson = preferences[KEY_LAYERS_JSON]
+        if (layersJson.isNullOrBlank()) return WallpaperState.NONE
 
-        if (!layersJson.isNullOrBlank()) {
-            return try {
-                val layers = parseLayersFromJson(layersJson)
-                if (layers.isNotEmpty()) {
-                    val validLayers = layers.filter { layer ->
-                        val uriString = layer.imageUri
-                        // A layer without a URI shows nothing — keeping it would
-                        // create a state that is technically multi-layer but
-                        // displays no wallpaper (isMultiLayer && !hasWallpaper).
-                        if (uriString == null) {
-                            Timber.w("Dropping layer without image URI (id='${layer.id}')")
-                            return@filter false
-                        }
-                        val uri = uriString.toUri()
-                        // Defensive: non-file URIs should not exist in the
-                        // state (copyToInternal converts everything to file://
-                        // before persistence). If one slips through — old
-                        // version, bad restore, remapped volume — drop the
-                        // layer rather than crashing at setImageURI.
-                        if (uri.scheme != "file") {
-                            Timber.w(
-                                "Dropping layer with non-file URI (scheme='${uri.scheme}', " +
-                                        "id='${layer.id}') — likely old-version or restore artifact"
-                            )
-                            return@filter false
-                        }
-                        wallpaperFileManager.fileExists(uri)
-                    }
-                    if (validLayers.isEmpty()) {
-                        Timber.w("All layer files missing — resetting wallpaper")
-                        WallpaperState.NONE
-                    } else {
-                        if (validLayers.size < layers.size) {
-                            Timber.w(
-                                "${layers.size - validLayers.size} layer file(s) missing — " +
-                                        "removed from state (files not found on disk)"
-                            )
-                        }
-                        WallpaperState(layers = validLayers)
-                    }
-                } else {
-                    parseSingleLayerState(preferences)
+        return try {
+            val layers = parseLayersFromJson(layersJson)
+            val validLayers = layers.filter { layer ->
+                val uriString = layer.imageUri
+                // A layer without a URI shows nothing — keeping it would create a
+                // state that has layers but displays no wallpaper.
+                if (uriString == null) {
+                    Timber.w("Dropping layer without image URI (id='${layer.id}')")
+                    return@filter false
                 }
-            } catch (e: Throwable) {
-                // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
-                // Highlight this case more visibly: the user may have configured
-                // several layers and will now suddenly see only one (or none).
-                // Logging here is non-fatal but helps post-mortem diagnosis.
-                Timber.w(
-                    e,
-                    "Multi-layer wallpaper state corrupted — falling back to single-layer. " +
-                            "User may see only Layer 0 of their previous composition."
-                )
-                TimberWrapper.silentError(e, "Error parsing layers JSON, falling back to single-layer")
-                parseSingleLayerState(preferences)
+                val uri = uriString.toUri()
+                // Defensive: non-file URIs should not exist in the state
+                // (copyToInternal converts everything to file:// before
+                // persistence). If one slips through — old version, bad restore,
+                // remapped volume — drop the layer rather than crashing at
+                // setImageURI.
+                if (uri.scheme != "file") {
+                    Timber.w(
+                        "Dropping layer with non-file URI (scheme='${uri.scheme}', " +
+                                "id='${layer.id}') — likely old-version or restore artifact"
+                    )
+                    return@filter false
+                }
+                wallpaperFileManager.fileExists(uri)
             }
-        }
-
-        return parseSingleLayerState(preferences)
-    }
-
-    /**
-     * Liest den Single-Layer State aus den Legacy-Keys.
-     */
-    private fun parseSingleLayerState(preferences: Preferences): WallpaperState {
-        val uriString = preferences[KEY_WALLPAPER_URI]
-
-        return if (uriString.isNullOrBlank()) {
+            if (validLayers.isEmpty()) {
+                Timber.w("No valid layer files — resetting wallpaper")
+                WallpaperState.NONE
+            } else {
+                if (validLayers.size < layers.size) {
+                    Timber.w(
+                        "${layers.size - validLayers.size} layer file(s) missing — " +
+                                "removed from state (files not found on disk)"
+                    )
+                }
+                WallpaperState(layers = validLayers)
+            }
+        } catch (e: Throwable) {
+            // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
+            // The user may have configured several layers and will now see none.
+            // Logging here is non-fatal but helps post-mortem diagnosis.
+            TimberWrapper.silentError(e, "Error parsing layers JSON — resetting wallpaper")
             WallpaperState.NONE
-        } else {
-            val uri = uriString.toUri()
-            // Defensive: we always convert to file:// via copyToInternal. A
-            // content:// URI reaching persistence points to either a very
-            // old app version, an out-of-band restore, or a volume rename
-            // (e.g. `content://media/external_primary/...` after SD-card
-            // remap). Rendering these often throws at setImageURI time,
-            // so treat them as "no wallpaper" and let the user re-pick.
-            if (uri.scheme != "file") {
-                Timber.w(
-                    "Non-file wallpaper URI in state (scheme='${uri.scheme}') — " +
-                            "resetting. Likely an old-version leftover or restored backup."
-                )
-                return WallpaperState.NONE
-            }
-            if (!wallpaperFileManager.fileExists(uri)) {
-                Timber.w("Wallpaper file missing: $uri — resetting")
-                return WallpaperState.NONE
-            }
-            WallpaperState(
-                imageUri = uriString,
-                scale = preferences[KEY_WALLPAPER_SCALE] ?: DEFAULT_SCALE,
-                translateX = preferences[KEY_WALLPAPER_TRANSLATE_X] ?: DEFAULT_TRANSLATE,
-                translateY = preferences[KEY_WALLPAPER_TRANSLATE_Y] ?: DEFAULT_TRANSLATE,
-                captureSampleSize = preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE]
-            )
         }
     }
 
@@ -271,15 +191,12 @@ class WallpaperRepositoryImpl @Inject constructor(
     override suspend fun saveWallpaperState(state: WallpaperState) {
         try {
             dataStore.edit { preferences ->
-                if (state.isMultiLayer) {
-                    // ── Multi-Layer speichern ──
-                    saveMultiLayerState(preferences, state)
-                } else if (state.imageUri != null) {
-                    // ── Single-Layer speichern (Legacy) ──
-                    saveSingleLayerState(preferences, state)
+                if (state.hasWallpaper) {
+                    preferences[KEY_LAYERS_JSON] = layersToJson(state.layers).toString()
+                    Timber.d("Saved ${state.layers.size} wallpaper layer(s)")
                 } else {
-                    // ── Kein Wallpaper → alles entfernen ──
-                    removeAllKeys(preferences)
+                    // No wallpaper → remove the key.
+                    preferences.remove(KEY_LAYERS_JSON)
                 }
             }
         } catch (e: CancellationException) {
@@ -287,59 +204,6 @@ class WallpaperRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error saving wallpaper state")
         }
-    }
-
-    /**
-     * Speichert Multi-Layer State als JSON.
-     * Legacy-Keys werden ebenfalls aktualisiert (Layer 0 als Fallback).
-     */
-    private fun saveMultiLayerState(preferences: MutablePreferences, state: WallpaperState) {
-        // JSON-Array der Layer
-        val jsonArray = layersToJson(state.layers)
-        preferences[KEY_LAYERS_JSON] = jsonArray.toString()
-
-        // Legacy-Keys mit Layer 0 synchronisieren (Korruptions-Fallback).
-        val firstLayer = state.layers.firstOrNull { it.hasImage }
-        val firstLayerUri = firstLayer?.imageUri
-        if (firstLayer != null && firstLayerUri != null) {
-            preferences[KEY_WALLPAPER_URI] = firstLayerUri
-            preferences[KEY_WALLPAPER_SCALE] = firstLayer.scale
-            preferences[KEY_WALLPAPER_TRANSLATE_X] = firstLayer.translateX
-            preferences[KEY_WALLPAPER_TRANSLATE_Y] = firstLayer.translateY
-            firstLayer.captureSampleSize
-                ?.let { preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
-                ?: preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
-        } else {
-            // Kein Layer hat ein Bild → Legacy-Keys räumen, sonst würde
-            // ein späterer Korruptions-Fallback in parseWallpaperState
-            // ein altes Single-Layer-Wallpaper aus einer längst beendeten
-            // Konfiguration zurückbringen.
-            preferences.remove(KEY_WALLPAPER_URI)
-            preferences.remove(KEY_WALLPAPER_SCALE)
-            preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
-            preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
-            preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
-        }
-
-        Timber.d("Saved ${state.layers.size} wallpaper layers")
-    }
-
-    /**
-     * Speichert Single-Layer State in die Legacy-Keys.
-     * Entfernt den Multi-Layer JSON-Key.
-     */
-    private fun saveSingleLayerState(preferences: MutablePreferences, state: WallpaperState) {
-        // saveWallpaperState only routes here when state.imageUri != null.
-        preferences[KEY_WALLPAPER_URI] = state.imageUri ?: ""
-        preferences[KEY_WALLPAPER_SCALE] = state.scale
-        preferences[KEY_WALLPAPER_TRANSLATE_X] = state.translateX
-        preferences[KEY_WALLPAPER_TRANSLATE_Y] = state.translateY
-        state.captureSampleSize
-            ?.let { preferences[KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE] = it }
-            ?: preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
-
-        // Multi-Layer Key entfernen (wir sind im Single-Modus)
-        preferences.remove(KEY_LAYERS_JSON)
     }
 
     // ===========================================
@@ -373,15 +237,8 @@ class WallpaperRepositoryImpl @Inject constructor(
         }
     }
 
-    /**
-     * Entfernt alle Wallpaper-Keys (Single + Multi).
-     */
+    /** Removes the wallpaper key. */
     private fun removeAllKeys(preferences: MutablePreferences) {
-        preferences.remove(KEY_WALLPAPER_URI)
-        preferences.remove(KEY_WALLPAPER_SCALE)
-        preferences.remove(KEY_WALLPAPER_TRANSLATE_X)
-        preferences.remove(KEY_WALLPAPER_TRANSLATE_Y)
-        preferences.remove(KEY_WALLPAPER_CAPTURE_SAMPLE_SIZE)
         preferences.remove(KEY_LAYERS_JSON)
     }
 
