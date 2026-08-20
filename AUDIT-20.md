@@ -615,7 +615,10 @@ ausgeklammert (s. o.).
 > `ACCEPTED_LIMITATIONS.md` §5), F13 **behoben** (`toSingleLayer`-Collapse am
 > Commit-Rand), F15 **behoben/entschieden** (Single-Layer-Warm-Pfad via `refillCache`
 > ergänzt; Multi-Layer-Restore-Timing S1 bewusst akzeptiert). Offen bleiben
-> **F10** (Release-Blocker), **F11**, **F12**.
+> **F10** (Release-Blocker), **F11**, **F12**. Aus der anschließenden
+> On-Device-Verifikation kamen zwei Nachträge (fünfter Durchgang): **F16**
+> (Single-Layer-Transform-Stale-Frame) **behoben**, **F17** (Wallpaper als
+> eigener Restore-Punkt) **umgesetzt**.
 >
 > **F15 ist der einzige Fund dieses Abschnitts, der aus einer Geräte-Beobachtung
 > stammt statt aus dem Lesen** — und er hat eine Leseanalyse widerlegt: die
@@ -692,6 +695,8 @@ Cache tatsächlich gebraucht wird.
 | **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): bedingter `toSingleLayer` am Commit-Rand |
 | **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ✅ BEHOBEN/ENTSCHIEDEN (2026-08-20): Single-Warm-Pfad via `refillCache`; Multi-Timing (S1) bewusst akzeptiert |
 | **F14** | Halbfertige Feature-Fläche | `WallpaperDelegate.kt:993-1006` (Setter) + `WallpaperLayer.kt:112-125` (`AVAILABLE_BLEND_MODES`) | Layer-**Alpha**, **Blend-Modus** und **Sichtbarkeit** sind modelliert, persistiert, backup-fest und gerendert — aber **kein UI ruft die Setter auf**. In Produktion ist damit jeder Layer `alpha == 1f` / `blendModeName == null` / `isVisible == true`; die 12 Blend-Modi haben null Konsumenten. Trägt bereits Folge-Argumentation (F13, `ACCEPTED_LIMITATIONS.md` §1), die ihre Verfügbarkeit voraussetzt | `low` | CONFIRMED | ✅ ENTSCHIEDEN (2026-08-19): alle drei UI-los, Editor transform-only (§5); Modell-Felder bleiben dormant |
+| **F16** | State-Propagation | `WallpaperDelegate.onSaveWallpaperTransform` (`:503`) | **Single-Layer-Transform-Save zeigt kurz das alte Wallpaper.** Nur Scale/Position ändern + Save → der Homescreen regressiert einen Frame auf den alten Transform. Ursache: Single-Save schrieb nur async nach DataStore, aktualisierte `_wallpaperState` nicht synchron; der Commit-Re-Render (HomeFragment Observer 8) las den alten State. Multi hat den Bug nicht (`applyState`). Aus der On-Device-Verifikation | `med` | CONFIRMED (Beobachtung) | ✅ BEHOBEN (2026-08-20): Save über `commit()` synchron |
+| **F17** | Restore-Granularität | `BackupDataAssembler` Phase 7 + `ImportOptions` + Import-Dialog | Das Wallpaper hing im Restore in „Theme Settings", nicht separat wählbar. Kein Defekt — Feature-Lücke aus der (c)-Frage (F15-Follow-on): ein aktives Wallpaper soll nur bei **explizit gewähltem** Backup-Wallpaper überschrieben werden | `low` (Enhancement) | — | ✅ UMGESETZT (2026-08-20): eigene Phase 7b / Checkbox `importWallpaper` |
 
 ---
 
@@ -1044,6 +1049,54 @@ gratis — ein greenwall-Cutout komponiert korrekt über einem chiaroscuro-Bild 
   (`ZoomableImageView.handleLayerTap:1165`). Ohne Layer-Liste/Cycler wäre ein
   versteckter Layer, der nicht gerade aktiv ist, unerreichbar — der Toggle würde
   ihn stranden. Ein „Hide"-Toggle bräuchte erst einen ganzen Layer-Navigator.
+
+---
+
+### F16 — Single-Layer-Transform-Save zeigt kurz das alte Wallpaper · `med` · CONFIRMED (Beobachtung) → BEHOBEN (2026-08-20)
+
+`ui/main/delegate/WallpaperDelegate.kt` (`onSaveWallpaperTransform`)
+
+Aus der On-Device-Verifikation der F13–F15-Fixes (fünfter Durchgang, nicht aus einem
+Review-Lesen). **Beobachtet:** Bei einem Single-Layer-Wallpaper nur Scale/Position
+ändern und Save drücken → der Homescreen zeigt einen kurzen Moment den **alten**
+Transform (alte Position/Größe), bevor er auf den neuen springt.
+
+**Ursache — asymmetrischer Save-Pfad.** `onSaveWallpaperTransform` (Single-Layer)
+persistierte nur nach DataStore und ließ `_wallpaperState.value` **unangetastet**; die
+In-Memory-Aktualisierung kam erst async über die DataStore-Emission. Der
+Commit-getriggerte Re-Render (`HomeFragment` Observer 8, gefeuert vom Edit-Mode-Flag)
+läuft aber **synchron** direkt danach und las damit den noch alten Transform — der
+`SwitchToSingleLayer`-Plan wandte den alten Transform an und überschrieb sogar die
+schon-korrekte Live-Matrix, bis die Emission korrigierte. Der Multi-Layer-Pfad
+(`onSaveLayerTransform` → `commit` → `applyState`) setzt `_wallpaperState` synchron und
+hatte den Bug nie.
+
+**Behoben (2026-08-20):** `onSaveWallpaperTransform` läuft jetzt symmetrisch über den
+`commit()`-Core (synchrones `applyState` + async Persist) statt über den nur-async
+`saveWallpaperStateUseCase.updateTransform` (der dabei als toter Convenience-Wrapper
+entfiel). Der Commit-Re-Render sieht den neuen Transform im ersten Frame.
+Vorbestehender Bug, unabhängig von F15.
+
+---
+
+### F17 — Wallpaper-Restore nicht separat wählbar (an „Theme Settings" gekoppelt) · `low` (Enhancement) → UMGESETZT (2026-08-20)
+
+`data/BackupDataAssembler` Phase 7 + `domain/model/ImportOptions` + `ui/backup` Import-Dialog
+
+Kein Audit-Defekt, sondern ein Follow-on aus der F15-Untersuchung des (c)-Falls
+(„was passiert beim Restore mit / ohne Wallpaper"). **Befund:** Der Restore ist zwar
+schon selektiv (9 Kategorie-Checkboxen), aber das **Wallpaper war in „Theme Settings"
+gebündelt** — man konnte es nicht separat ab- oder anwählen. Damit war die (c)-Absicht
+(„ein aktives Wallpaper nur überschreiben, wenn das Backup ein Wallpaper trägt **und**
+der User es auswählt") nicht vollständig bedienbar.
+
+**Umgesetzt (2026-08-20):** Das Wallpaper ist jetzt ein **eigener** Restore-Punkt —
+eigene Checkbox „Hintergrundbild" / „Wallpaper", herausgelöst in eine eigene
+Assembler-**Phase 7b** (`if (options.importWallpaper)`), unabhängig von den
+Theme-Skalaren. Sichtbar + initial angehakt nur, wenn das Backup ein Wallpaper trägt
+(`preview.hasWallpaper`, war in der Vorschau schon distinct); Abhaken lässt das aktive
+Wallpaper unangetastet. `importWallpaper` defaultet `true` (Back-Compat) und ist Teil
+der `importNothing`-Kette. Theme-Restore rührt das Wallpaper nie an und umgekehrt.
 
 ---
 
