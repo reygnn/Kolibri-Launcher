@@ -41,7 +41,7 @@ class FilenameBuilder(
             clock: () -> Long = System::currentTimeMillis,
         ): FilenameBuilder = FilenameBuilder(
             prefix = AppConstants.BACKUP_FILE_PREFIX,
-            datePattern = AppConstants.DATE_FORMAT_BACKUP_FILENAME,
+            datePattern = AppConstants.DATE_FORMAT_EXPORT_FILENAME,
             extension = AppConstants.BACKUP_FILE_EXTENSION,
             clock = clock,
         )
@@ -50,7 +50,7 @@ class FilenameBuilder(
             clock: () -> Long = System::currentTimeMillis,
         ): FilenameBuilder = FilenameBuilder(
             prefix = AppConstants.USAGE_EXPORT_FILE_PREFIX,
-            datePattern = AppConstants.DATE_FORMAT_USAGE_EXPORT_FILENAME,
+            datePattern = AppConstants.DATE_FORMAT_EXPORT_FILENAME,
             extension = AppConstants.USAGE_EXPORT_FILE_EXTENSION,
             clock = clock,
         )

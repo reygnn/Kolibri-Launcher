@@ -186,8 +186,9 @@ object AppConstants {
     const val USAGE_EXPORT_FILE_EXTENSION = ".json"
 
     // Date Formats
-    const val DATE_FORMAT_BACKUP_FILENAME = "yyyyMMdd_HHmmss"
-    const val DATE_FORMAT_USAGE_EXPORT_FILENAME = "yyyy-MM-dd_HHmmss"
+    // One shared pattern for BOTH export filenames (backup + usage) so the two
+    // can never drift apart again — they used to differ (yyyyMMdd vs yyyy-MM-dd).
+    const val DATE_FORMAT_EXPORT_FILENAME = "yyyy-MM-dd_HHmmss"
     const val DATE_FORMAT_DISPLAY = "dd.MM.yyyy HH:mm"
 
     // UI Limits

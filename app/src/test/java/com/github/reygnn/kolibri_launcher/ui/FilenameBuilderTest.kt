@@ -32,7 +32,7 @@ class FilenameBuilderTest {
     @Test
     fun `forBackup produces documented kolibri_backup name`() = withUtcTimeZone {
         val builder = FilenameBuilder.forBackup(clock = { referenceMillis })
-        assertEquals("kolibri_backup_20240315_103045.zip", builder.build())
+        assertEquals("kolibri_backup_2024-03-15_103045.zip", builder.build())
     }
 
     @Test
@@ -45,7 +45,7 @@ class FilenameBuilderTest {
     fun `filename zero-pads single-digit month day hour minute second`() = withUtcTimeZone {
         val millis = utcMillis(2024, 1, 2, 3, 4, 5)
         assertEquals(
-            "kolibri_backup_20240102_030405.zip",
+            "kolibri_backup_2024-01-02_030405.zip",
             FilenameBuilder.forBackup(clock = { millis }).build(),
         )
         assertEquals(
@@ -64,7 +64,7 @@ class FilenameBuilderTest {
         // This exercises the real production path, not an injected locale.
         withDefaultLocale(Locale.forLanguageTag("ar-SA")) {
             assertEquals(
-                "kolibri_backup_20240315_103045.zip",
+                "kolibri_backup_2024-03-15_103045.zip",
                 FilenameBuilder.forBackup(clock = { referenceMillis }).build(),
             )
         }
@@ -85,7 +85,7 @@ class FilenameBuilderTest {
         current = utcMillis(2025, 6, 15, 12, 34, 56)
         val second = builder.build()
 
-        assertEquals("kolibri_backup_20240101_000000.zip", first)
-        assertEquals("kolibri_backup_20250615_123456.zip", second)
+        assertEquals("kolibri_backup_2024-01-01_000000.zip", first)
+        assertEquals("kolibri_backup_2025-06-15_123456.zip", second)
     }
 }
