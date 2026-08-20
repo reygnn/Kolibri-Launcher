@@ -28,7 +28,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 14 | `Invalid resource ID 0x00000000` Logcat-Noise | **erledigt 2026-08-20** — der Schwall reproduziert auf 0.99.188 nicht mehr (inzident behoben seit dem Mai-Befund); die eine verbliebene Warnung derselben Familie (AppCompat-Widget ohne AppCompat-Theme im `WallpaperFlattener`) via `ContextThemeWrapper(AppTheme)` gefixt, auf Gerät verifiziert. Detail-Sektion §14 unten. | — |
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | **erledigt 2026-08-20** — shared `core/ComponentKey.isValid` (pure-Kotlin, driftfrei über Fake+Impl); malformed Key → `silentError` + `false` statt silent-accept; Regressions-Anker im Contract. Detail-Sektion §15. | — |
 | 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | **won't-do (2026-08-14)** — der aktuelle `extraBufferCapacity = 1` ist korrekt (Event-Bus-Buffered-Regel). `replay = 1` würde einem späten Subscriber das letzte Paket-Event nachspielen (Stale-Replay → redundante Re-Enumeration); der einzige genannte Nutzen war Test-Bequemlichkeit. Produktions-Risiko > Test-Komfort → geschlossen. | — |
-| 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | offen — Cache-Lag widerlegt (2 ms gemessen 2026-05-05), aber das Limbo-Verhalten (kein Holder ⇒ resolveActivity fällt auf best-match zurück) bleibt | klein |
+| 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | **geschlossen 2026-08-20** — kein Code-Fix nötig: UI-Status (`SettingsFragment.updateDefaultLauncherStatus`) nutzt bereits ausschließlich `isRoleHeld(ROLE_HOME)`; `resolveActivity` nur als Permission-Vorfilter mit SecurityException-Netz. Limbo im Production-Pfad nicht erreichbar. Detail-Sektion §17. | — |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
 | 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | **erledigt** — Phase 1 (2026-05-08, commit `9828def`) + Phase 2 (Backup-Schema, 2026-05-08). Tabellen-Status hing hinterher; die Detail-Sektion §21 unten stand längst auf ✅, und der Code ist verdrahtet (BackupDataAssembler Export/Import + BackupSerializer). Verifiziert 2026-08-14. | — |
 
@@ -1797,6 +1797,24 @@ catch fängt sowieso ab.
 Aktuell ist das §17 vermutlich abgeschlossen; ggf. zur
 Snapshot-Schließung mit „nicht reproducibel im Production-Pfad"
 markieren.
+
+**Ergebnis (2026-08-20, geschlossen — kein Code-Fix nötig).** Die offene Frage
+„wird `resolveActivity` irgendwo als UI-Default-Indikator verwendet?" ist
+verifiziert mit Nein — die Empfehlung ist bereits erfüllt:
+- **UI-Status:** `SettingsFragment.updateDefaultLauncherStatus()`
+  (`SettingsFragment.kt:873`) stützt sich ausschließlich auf
+  `roleManager.isRoleHeld(RoleManager.ROLE_HOME)`. Kein `resolveActivity` im
+  UI-Pfad.
+- **Permission-Vorfilter:** `ShortcutRepositoryImpl.isDefaultLauncher()`
+  (`ShortcutRepositoryImpl.kt:34`) nutzt `resolveActivity`, aber nur als
+  Vorfilter vor dem `LauncherApps`-Call (`:48`); ein Fehl-`true` im Limbo führt
+  nur dazu, dass der Call versucht und die `SecurityException` gefangen wird —
+  kein UI-Status.
+
+Die strukturelle Asymmetrie bleibt bestehen, hat aber keine user-sichtbare
+Folge und ist im Production-Pfad (immer ein expliziter HOME-Holder) nicht
+erreichbar. Geschlossen als „nicht im Production-Pfad reproduzierbar,
+Empfehlung bereits im Code".
 
 ---
 
