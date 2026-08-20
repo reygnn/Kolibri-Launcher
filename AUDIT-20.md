@@ -614,8 +614,9 @@ ausgeklammert (s. o.).
 > **Update 2026-08-20:** F14 **entschieden** (alle drei Layer-Regler bleiben UI-los,
 > `ACCEPTED_LIMITATIONS.md` §5), F13 **behoben** (`toSingleLayer`-Collapse am
 > Commit-Rand), F15 **behoben/entschieden** (Single-Layer-Warm-Pfad via `refillCache`
-> ergänzt; Multi-Layer-Restore-Timing S1 bewusst akzeptiert). Offen bleiben
-> **F10** (Release-Blocker), **F11**, **F12**. Aus der anschließenden
+> ergänzt; Multi-Layer-Restore-Timing S1 bewusst akzeptiert), **F11** **behoben**
+> (gemeinsamer `leaveEditMode`-Funnel am Edit-Mode-Ausgang, 2026-08-20). Offen bleiben
+> **F10** (Release-Blocker) und **F12**. Aus der anschließenden
 > On-Device-Verifikation kamen zwei Nachträge (fünfter Durchgang): **F16**
 > (Single-Layer-Transform-Stale-Frame) **behoben**, **F17** (Wallpaper als
 > eigener Restore-Punkt) **umgesetzt**.
@@ -652,7 +653,7 @@ sondern eine Wiedervorlage des ersten.
 | Aktion | Warum neuer Key / leerer Cache | Trigger heute | Lücke |
 |---|---|---|---|
 | **Inhalt: Edit-Commit** (Layer hinzu/weg, Reihenfolge, Pan/Zoom) | Layer-Terme im Hash | Edit-Commit (`:609`) | — |
-| **Inhalt: Edit-Cancel** | Key kann sich geändert haben, ohne dass der persistierte Wert es tut | *keiner* | **F11** |
+| **Inhalt: Edit-Cancel** | Key kann sich geändert haben, ohne dass der persistierte Wert es tut | Edit-Mode-Ausgang (`leaveEditMode`, seit F11-Fix) | ~~F11~~ behoben |
 | **Inhalt: „Hintergrund wählen"** | neue `file://`-URI | *kein Warm* — lazy beim nächsten Decode (`:1603`) | by design, aber siehe F15 |
 | **Inhalt: Backup-Restore** | neuer State | Collect (`:400`) — greift laut Gerätebeobachtung nicht | **F15** |
 | **Auflösung** (Rotation, Falten, Multi-Window) | `widthPx × heightPx` im Hash — **nur** für `composite://`; der Single-Layer-Key kennt keine Maße und überlebt eine Rotation als Treffer | Config-Change (`:558`) | im Edit-Mode ausgesetzt → **F11** |
@@ -689,8 +690,8 @@ Cache tatsächlich gebraucht wird.
 
 | # | Cluster | Ort | Was | Severity | Verdict | Status |
 |---|---|---|---|---|---|---|
-| **F10** | Debug-Residuum | `WallpaperDelegate.kt:733-740` + `HomeFragment.kt:1604-1606` | Die TEMP-Debug-Toasts auf jedem Cache-Fill sind **nicht mehr einer, sondern zwei** (Composite-Warm + Single-Layer-Decode); beide „remove later"-markiert, beide user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
-| **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` (`:772-802`) vs. `onCommitWallpaperEditMode` (`:609`) | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ⛔ OFFEN |
+| **F10** | Debug-Residuum | `WallpaperDelegate.kt` (`refillCache:669`, `warmSingleLayer:722`, `warmComposite:823`) | Die TEMP-Debug-Toasts sind **inzwischen drei, alle im Delegate** (Stand 2026-08-20): zwei auf Cache-**Fill** (Single-Layer-Decode + Composite-Warm) plus einer auf Cache-**Hit** („cache still valid"). Beim F15-Umbau wurde der HomeFragment-Decode-Toast in den Delegate konsolidiert (render-seitiger Lazy-`put` entfiel) und der Hit-Toast kam neu dazu. Alle „remove later"-markiert, alle user-sichtbar in RELEASE | `med` (Release-Blocker) | CONFIRMED | ⛔ OFFEN |
+| **F11** | Warm-Trigger | `WallpaperDelegate.onCancelWallpaperEditMode` vs. `onCommitWallpaperEditMode` | Der **Commit**-Pfad warmt explizit, der **Cancel**-Pfad nicht — verlässt man den Edit-Mode per Abbruch ohne persistierte Änderung, feuert keine DataStore-Emission und damit kein Warm | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): gemeinsamer `leaveEditMode`-Funnel |
 | **F12** | Cache-Residenz | `WallpaperCompositeCache` (`:46-50`, kein Key-Change-Drop) + `warmComposite`-Fehlerpfade (`:683-716`) | Nach einem Auflösungswechsel ist der gecachte Eintrag unter dem alten Key **unerreichbar**; scheitert der Warm für den neuen Key, bleibt die ~10 MB HARDWARE-Bitmap resident, ohne je wieder getroffen zu werden. Die Luminanz wird in genau diesen Fällen gedroppt (`dropLuminanceIfCurrent`), die Bitmap nicht | `low` | CONFIRMED | ⛔ OFFEN |
 | **F13** | Modell / Repräsentation | `WallpaperState.withRemovedLayer` (`:233-238`) + `isMultiLayer` (`:157`) | Single→Multi ist eine **Einbahnstraße**: Layer runterlöschen kollabiert nie zurück, also ist ein State mit **genau einem** Layer weiterhin `isMultiLayer` und nimmt den Flatten- statt den Decode-Cache-Pfad. Ein pauschaler Collapse wäre verlustbehaftet (`alpha`/`blendModeName`/`isVisible`/`label` existieren nur pro Layer) — was durch F14 aktuell allerdings hypothetisch ist | `low` | CONFIRMED | ✅ BEHOBEN (2026-08-20): bedingter `toSingleLayer` am Commit-Rand |
 | **F15** | Warm-Trigger | `WallpaperDelegate.maybeWarmComposite` (`:629`) + `HomeFragment.loadBitmapFromUri` (`:1603`) | **Backup-Restore aktualisiert den Cache nicht.** Am Gerät beobachtet: nach einem Restore mit Wallpaper wird erst beim nächsten drawer→home nachgefüllt. Code-verifiziert für den Single-Layer-Fall — der Warm ist multi-layer-only, für ein Single-Layer-Wallpaper existiert **kein** proaktiver Pfad, der Fill hängt am nächsten Decode. Multi-Layer-Fall: Ursache offen | `med` | CONFIRMED (Beobachtung) | ✅ BEHOBEN/ENTSCHIEDEN (2026-08-20): Single-Warm-Pfad via `refillCache`; Multi-Timing (S1) bewusst akzeptiert |
@@ -700,40 +701,51 @@ Cache tatsächlich gebraucht wird.
 
 ---
 
-### F10 — Zwei TEMP-Debug-Toasts statt einem · `med` (Release-Blocker) · CONFIRMED
+### F10 — Drei TEMP-Debug-Toasts statt einem · `med` (Release-Blocker) · CONFIRMED
 
-`app/ui/main/delegate/WallpaperDelegate.kt:733-740` + `app/ui/home/HomeFragment.kt:1604-1606`
+`app/ui/main/delegate/WallpaperDelegate.kt` — `refillCache:669`, `warmSingleLayer:722`,
+`warmComposite:823`
 
-Der im Kopf dieses Dokuments dreimal bewusst ausgeklammerte TEMP-Toast (ursprünglich
-`8faa14a3`, ein Site) hat sich mit Commit `e73f2096` auf **zwei** Sites vermehrt — und
-genau deshalb steht er jetzt hier drin: „separat als Ein-Zeilen-Blocker behandeln"
-funktioniert nicht mehr, wenn die Zeile sich vermehrt.
+Der im Kopf dieses Dokuments bewusst ausgeklammerte TEMP-Toast (ursprünglich `8faa14a3`,
+ein Site) hat sich mit `e73f2096` auf zwei vermehrt — und ist **beim F15-Umbau auf drei
+gewachsen, alle im Delegate** (Stand 2026-08-20). Genau deshalb steht er hier drin:
+„separat als Ein-Zeilen-Blocker behandeln" trägt nicht, wenn die Zeile sich vermehrt.
+
+Die drei aktuellen Sites (alle in `WallpaperDelegate`, seit der F15-Vereinheitlichung auf
+`refillCache` als einzigem Cache-Schreiber; der frühere render-seitige `HomeFragment`-Toast
+ist mit dem Lazy-`put` entfallen und in den Decode-Warm gewandert):
 
 ```kotlin
-// WallpaperDelegate.warmComposite — nach dem key-gated put
+// 1) refillCache — Single-Layer-Cache-HIT (transform-only Edit, nichts neu dekodiert)
+scope.sendEvent(UiEvent.ShowToastFromString("Single-layer cache still valid"))
+
+// 2) warmSingleLayer — nach dem Single-Layer-Decode-put
 scope.sendEvent(
-    UiEvent.ShowToastFromString("Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})")
+    UiEvent.ShowToastFromString("Single-layer cache filled (${m.widthPixels}x${m.heightPixels})")
 )
 
-// HomeFragment.loadBitmapFromUri — nach dem Single-Layer-put
-view?.post { context?.showToastSafe("Single-layer cache filled") }
+// 3) warmComposite — nach dem key-gated Composite-put ($what = Single-layer|Composite)
+scope.sendEvent(
+    UiEvent.ShowToastFromString("$what cache filled (${metrics.widthPixels}x${metrics.heightPixels})")
+)
 ```
 
-Beide sind unbedingt (kein `BuildConfig.DEBUG`-Gate), beide mit hartkodiertem
+Alle drei sind unbedingt (kein `BuildConfig.DEBUG`-Gate), alle mit hartkodiertem
 englischem String (also auch an der Localization-Parität vorbei, die für echte
-UI-Strings gilt), beide in RELEASE sichtbar. Der Delegate-Toast feuert bei jedem
-Cold-Start-Warm, jedem Edit-Commit und jeder Rotation; der HomeFragment-Toast bei
-jedem Single-Layer-Erstdecode.
+UI-Strings gilt), alle in RELEASE sichtbar. Sie feuern bei jedem Cold-Start-Warm, jedem
+Edit-Commit/-Cancel, jeder Rotation und jedem Single-Layer-Erstdecode.
 
 Fachlich waren sie das richtige Instrument — die Frage „wie oft wird der Composite
-tatsächlich neu geflattet?" ließ sich ohne Perfetto-Trace sonst nicht beantworten, und
-die Auflösung im Text trennt rotationsgetriebene Refills von den übrigen. Sie sind
+tatsächlich neu geflattet?" ließ sich ohne Perfetto-Trace sonst nicht beantworten, die
+Auflösung im Text trennt rotationsgetriebene Refills von den übrigen, und der
+Hit-Toast belegt, dass „kein Fill-Toast" **nicht** „nicht gecacht" heißt. Sie sind
 nur nie wieder rausgeflogen.
 
-**Fix:** Beide Sites samt Kommentarblock entfernen. Wenn das Signal weiter gebraucht
+**Fix:** Alle drei Sites samt Kommentarblock entfernen. Wenn das Signal weiter gebraucht
 wird, ist die Trace-Sektion aus `54815cee` (`LaunchTrace.WALLPAPER_WARM`) der
 dauerhafte Ersatz — sie misst dasselbe, ohne UI. **Vor dem nächsten Release
-erledigen.**
+erledigen.** (Die Toasts bleiben bis dahin bewusst stehen — Entfernen erst auf
+ausdrückliche Freigabe.)
 
 ---
 
@@ -769,6 +781,21 @@ aufrufen, symmetrisch zum Commit. Es ist bereits idempotent (Cache-Hit ⇒ No-Op
 Single-Flight über `backfillInProgress`), der Aufruf kostet im Normalfall also nichts.
 Sauberer wäre, den Warm generell an „Edit-Mode verlassen" statt an die beiden Exits
 einzeln zu hängen — dann kann kein dritter Exit-Pfad ihn erneut vergessen.
+
+**Behoben (2026-08-20, `fix/composite-warm-on-editmode-exit`).** Die sauberere Variante
+umgesetzt: neu `private fun leaveEditMode(finalState)` als **einziger** Edit-Mode-Ausgang
+— setzt `_isWallpaperEditMode = false` und ruft `refillCache(finalState)`. **Beide** Exits
+(`onCommitWallpaperEditMode`, `onCancelWallpaperEditMode`) enden jetzt über diesen Funnel
+mit dem State, in den sie zurückkehren (Commit den — ggf. via F13 kollabierten —
+committed State, Cancel den restaurierten Snapshot; `commit()`/Snapshot-Restore setzen
+`_wallpaperState` synchron, der Funnel liest also den korrekten Ziel-State). Damit kann
+kein dritter Exit-Pfad den Warm vergessen, und der No-op-Cancel-nach-Rotation-Fall ist
+geschlossen. `refillCache` ist idempotent + single-flighted, der redundante Warm auf einem
+normalen Commit/Cancel (der ohnehin emittiert) kostet nichts. Regressionstest
+`onCancelWallpaperEditMode warms the display cache via the exit funnel` in
+`WallpaperDelegateTest` (permanent-miss-Cache, AtomicInteger-Flatten-Counter: Cancel muss
+einen zweiten Warm über `leaveEditMode` durchdrücken — die früher fehlende
+„Cancel ⇒ Warm"-Abdeckung). Rein JVM.
 
 ---
 

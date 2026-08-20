@@ -355,6 +355,48 @@ class WallpaperDelegateTest {
         verify { luminanceSignal.emit(null) }
     }
 
+    /**
+     * AUDIT-20 F11: leaving edit mode is a single funnel ([WallpaperDelegate.leaveEditMode])
+     * that refills the display cache for BOTH commit and cancel. A no-op cancel restores an
+     * unchanged state and produces no DataStore emission, so this explicit warm is the only
+     * trigger that re-fills after a config change (rotate/fold) that was deferred while
+     * editing — without it the composite stays cold for the new resolution until some later
+     * emission. Modeled with a permanently-missing cache so every refill warms; the counter
+     * proves the cancel path added a second warm on top of start()'s.
+     */
+    @Test
+    fun `onCancelWallpaperEditMode warms the display cache via the exit funnel`() = runTest {
+        val flattenCalls = AtomicInteger(0)
+        val bitmap: Bitmap = mockk(relaxed = true)
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } coAnswers {
+            flattenCalls.incrementAndGet()
+            bitmap
+        }
+        val multi = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // permanent miss -> every refill warms
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+        assertEquals("start warms once via the collect loop", 1, flattenCalls.get())
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCancelWallpaperEditMode() // unchanged snapshot -> no emission; the funnel must warm
+        advanceUntilIdle()
+
+        assertEquals("cancel must trigger a second warm through leaveEditMode", 2, flattenCalls.get())
+    }
+
     // ===========================================
     // SET WALLPAPER IMAGE
     // ===========================================
@@ -1102,7 +1144,11 @@ class WallpaperDelegateTest {
         val layer: WallpaperLayerState = mockk {
             every { imageUri } returns layerUri
         }
-        val newState: WallpaperState = mockk {
+        // Relaxed: commit now refills the display cache synchronously through the F11 exit
+        // funnel, which reads isMultiLayer/imageUri on this committed state. The unstubbed
+        // defaults (isMultiLayer=false, imageUri=null) make cacheKeyOrNull return null, so the
+        // refill early-returns — this test is about the deferred file deletion, not the warm.
+        val newState: WallpaperState = mockk(relaxed = true) {
             every { layers } returns listOf(mockk())
             every { hasWallpaper } returns true
             // Commit calls toSingleLayer() (F13); this mock state does not collapse.

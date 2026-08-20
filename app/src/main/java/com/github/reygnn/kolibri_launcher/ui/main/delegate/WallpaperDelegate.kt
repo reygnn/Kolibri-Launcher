@@ -601,7 +601,6 @@ class WallpaperDelegate(
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
         editSnapshot = null
-        _isWallpaperEditMode.value = false
 
         // F13: a wallpaper edited down to a single layer collapses back to the
         // single-layer representation, so the next render takes the cheaper
@@ -609,29 +608,27 @@ class WallpaperDelegate(
         // No-op unless exactly one layer remains — see WallpaperState.toSingleLayer.
         // Done at the commit boundary, not per removal, so the live editor never
         // desyncs from a mid-session single-layer state. commit() applies
-        // synchronously, so the snapshot below already sees the collapsed state.
+        // synchronously, so leaveEditMode below already sees the collapsed state.
         val current = _wallpaperState.value
         val collapsed = current.toSingleLayer()
         if (collapsed !== current) {
             commit("Error collapsing single-layer wallpaper", Mutation(collapsed))
         }
 
-        // Snapshot the committed state now; the flatten below reads it.
-        val committedState = _wallpaperState.value
-
-        scope.launchSafe("Error committing wallpaper edit") {
-            // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
-            // internally guarded (never throws), so a bad delete can't abort the
-            // batch and no per-file wrapper is needed (Rule 11).
-            if (filesToDelete.isNotEmpty()) {
+        if (filesToDelete.isNotEmpty()) {
+            scope.launchSafe("Error committing wallpaper edit") {
+                // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
+                // internally guarded (never throws), so a bad delete can't abort the
+                // batch and no per-file wrapper is needed (Rule 11).
                 withContext(ioDispatcher) {
                     filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
                 }
             }
-            // Refill the display cache for the committed wallpaper (single-layer decode or
-            // multi-layer composite) so drawer->home is a cache hit, not a re-decode (§9.3).
-            refillCache(committedState)
         }
+
+        // Exit edit mode + warm the display cache for the committed state through the
+        // single funnel (AUDIT-20 F11).
+        leaveEditMode(_wallpaperState.value)
     }
 
     /**
@@ -868,22 +865,44 @@ class WallpaperDelegate(
         pendingRemovalsOnCancel.clear()
         pendingRemovalsOnCommit.clear()
         editSnapshot = null
-        _isWallpaperEditMode.value = false
 
-        if (snapshot == null && filesToDelete.isEmpty()) return
-
-        scope.launchSafe("Error canceling wallpaper edit") {
-            if (snapshot != null) {
-                saveWallpaperStateUseCase(snapshot)
-            }
-            // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
-            // internally guarded (never throws) — no per-file wrapper (Rule 11).
-            if (filesToDelete.isNotEmpty()) {
-                withContext(ioDispatcher) {
-                    filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+        // Persist the restored snapshot / delete session-added files only when there is
+        // something to do; the exit + cache warm below runs unconditionally (AUDIT-20 F11).
+        if (snapshot != null || filesToDelete.isNotEmpty()) {
+            scope.launchSafe("Error canceling wallpaper edit") {
+                if (snapshot != null) {
+                    saveWallpaperStateUseCase(snapshot)
+                }
+                // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
+                // internally guarded (never throws) — no per-file wrapper (Rule 11).
+                if (filesToDelete.isNotEmpty()) {
+                    withContext(ioDispatcher) {
+                        filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
+                    }
                 }
             }
         }
+
+        // Exit edit mode + warm the display cache for the restored state through the single
+        // funnel (AUDIT-20 F11). A no-op cancel (unchanged snapshot) produces no DataStore
+        // emission, so this is the only trigger that re-warms after a config change
+        // (rotate/fold) that was deferred while editing.
+        leaveEditMode(_wallpaperState.value)
+    }
+
+    /**
+     * Single exit point for edit mode (AUDIT-20 F11). Clears the edit flag and refills the
+     * display cache for [finalState] — the state the launcher returns to. Hanging the warm
+     * here rather than on each exit means no exit path (commit, cancel, or a future third
+     * one) can leave the composite cold: [refillCache] is deferred during edit mode (a
+     * rotate/fold config change returns early), and a no-op cancel restores an unchanged
+     * state that produces no DataStore emission to re-trigger the warm. Idempotent — a cache
+     * hit is a no-op and the refill is single-flighted — so the redundant warm on a normal
+     * commit/cancel (which also emits) costs nothing.
+     */
+    private fun leaveEditMode(finalState: WallpaperState) {
+        _isWallpaperEditMode.value = false
+        refillCache(finalState)
     }
 
     /**
