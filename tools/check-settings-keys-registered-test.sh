@@ -227,6 +227,30 @@ else
   echo "✓ Fixture 8: unregistered exact key directly above a prefix key still flags (not misclassified)."
 fi
 
+# ── Fixture 9: a non-setOf override (`ownedExactKeys() = emptySet()`) placed
+#    BEFORE a later setOf-bearing method must NOT let collect_setof_body borrow
+#    that later body. OMEGA is an unregistered exact key whose name collides with
+#    a token in ownedKeyPrefixes' body; it MUST still flag (round-4 finding). ──
+f9="$tmpdir/BorrowRepositoryImpl.kt"
+cat > "$f9" <<'EOF'
+class BorrowRepositoryImpl : OwnsSettingsStoreKeys {
+    private object PreferencesKeys {
+        val OMEGA = booleanPreferencesKey("omega")
+    }
+    override fun ownedExactKeys(): Set<String> = emptySet()
+    override fun ownedKeyPrefixes(): Set<String> = setOf(AppConstants.OMEGA)
+}
+EOF
+expected9="$f9:3:         val OMEGA = booleanPreferencesKey(\"omega\")"
+actual9=$(awk -f "$awk_script" "$f9")
+if [ "$actual9" != "$expected9" ]; then
+  echo "✗ Fixture 9 (setOf body borrow across methods) regression:"
+  diff <(printf '%s\n' "$expected9") <(printf '%s\n' "$actual9") || true
+  fail=1
+else
+  echo "✓ Fixture 9: emptySet() override does not borrow a later method's setOf body; OMEGA flags."
+fi
+
 if [ "$fail" -eq 0 ]; then
   echo "✓ settings-keys-registered awk: all fixtures behaved as expected."
   exit 0

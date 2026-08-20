@@ -47,10 +47,16 @@ function collect_setof_body(fname,   n, start, region, i, c, p, depth, j, ch, bo
     }
     if (start == 0) return ""
 
+    # Bound the region to THIS function's own expression: stop at the next member
+    # `fun` declaration. Otherwise a non-setOf override (`= emptySet()`,
+    # `mutableSetOf`, `buildSet{}`, delegation) would let the walker borrow a LATER
+    # method's `setOf(...)` as the keep-list, and a declared key whose name collides
+    # with a token in that wrong body would escape the check (data-loss direction).
     region = ""
     for (i = start; i <= NR; i++) {
         c = lines[i]
         sub(/\/\/.*$/, "", c)
+        if (i > start && c ~ /(^|[^A-Za-z0-9_])fun[[:space:]]/) break   # next function
         region = region " " c
     }
 
