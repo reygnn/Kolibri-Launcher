@@ -72,7 +72,8 @@ B: §13 inkl. `:data:test`-Move, C: §11/§12). Der ehemalige
 „`androidTest/` leer"-Deckler ist seit Mai auch erledigt (16 Tests
 Stand 2026-05-06). Wenn der User trotzdem Arbeit will, gibt es keinen
 offensichtlichen Default mehr — frag was er will. Mögliche Anker: die
-verbleibenden kleinen Einträge in der Tabelle (§14-§17, §19), der
+verbleibenden kleinen Einträge in der Tabelle (§14-§17; §19 seit
+2026-08-21 obsolet — Code entfernt), der
 Quartals-Recheck §10 (2026-Q3), oder ein neuer Audit-Pass für eine
 aktuelle Score-Bestandsaufnahme.
 
@@ -126,8 +127,12 @@ Score-Bump 2026-05-06 nach androidTest-Bring-up: der ehemalige
   `withTimeoutOrNull { first { isNotEmpty() } } ?: error(...)`
   Pattern lebt jetzt zentral in `INSTALLED_APPS_PRIME_TIMEOUT_MS`
   (KDoc nennt alle drei Sites). F3 (`LayoutDelegate.splitModeThreshold`,
-  niedrigere Severity, self-correcting) bleibt als §19 in der
-  TODO-Tabelle bewusst offen.
+  niedrigere Severity, self-correcting) wurde als §19 bewusst offen
+  gelassen — **obsolet seit 2026-08-21**: der Split-Mode-Layout-Pfad
+  wurde entfernt, `LayoutDelegate` hält heute nur noch die
+  Layout-Settings-StateFlows (scale/padding/font-bold/top-margin/
+  favorites-alignment). `splitModeThreshold` existiert nirgends mehr im
+  Source; §19 ist damit gegenstandslos (Code weg, nicht gefixt).
 - **Test-Infrastruktur hardening** (siehe `INSTRUMENTED_TESTING_NOTES.kt`
   Punkte 9-11): `androidx.test:core` muss explizit auf
   `${libs.versions.androidxTest.get()}` ge-`force`-d werden gegen
