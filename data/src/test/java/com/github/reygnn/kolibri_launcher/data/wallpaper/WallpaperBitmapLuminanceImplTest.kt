@@ -171,6 +171,34 @@ class WallpaperBitmapLuminanceImplTest {
             )
         }
 
+    @Test
+    fun `fixture checkerboard-diagonal-png — high-frequency black-white collapses to mid-gray`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The device-sized diagonal black/white checkerboard (1080x2424,
+            // the on-device readability stress wallpaper). It is fully opaque,
+            // so the coverage gate passes and a classification is ALWAYS
+            // produced — the system-wallpaper signal is never reached.
+            //
+            // The classified SIDE is deliberately not pinned: a 50/50 bimodal
+            // pattern sits on the LUMINANCE_THRESHOLD (0.5) knife-edge, so which
+            // side it falls is not a stable contract. What IS stable is the
+            // median magnitude: the 32x32 bilinear downscale averages each
+            // black/white cell to mid-gray, so the WCAG median collapses to
+            // ~0.21 (measured) — well below the LIGHT threshold yet far above
+            // the near-black AMOLED floor (< 0.05). This is exactly the AUTO
+            // limitation the text-outline (0.99.193) exists to cover: neither a
+            // single text colour nor a scrim can win here, so readability is
+            // solved at the glyph edge instead. Band chosen with margin.
+            stubContentResolverFromResource("/wallpaper/checkerboard_diagonal.png")
+            val result = luminance.compute("file:///checkerboard_diagonal.png")
+            assertNotNull("expected non-null for fully-opaque image", result)
+            assertTrue(
+                "expected a mid-gray median (~0.21), distinct from near-black " +
+                    "AMOLED and below the LIGHT threshold, got $result",
+                result!! in 0.05f..0.5f,
+            )
+        }
+
     // Note: `BitmapFactory.decodeStream` on malformed bytes is not
     // testable here — Robolectric's shadow returns a stub bitmap
     // for any input, so the JVM-side decode-failure path can't be
