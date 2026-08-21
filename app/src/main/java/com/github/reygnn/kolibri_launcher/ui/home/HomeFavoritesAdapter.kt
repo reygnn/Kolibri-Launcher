@@ -6,7 +6,6 @@ import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import androidx.core.graphics.ColorUtils
@@ -18,6 +17,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.kolibri_launcher.ui.util.OutlinedButton
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 
 /**
@@ -63,6 +63,7 @@ class HomeFavoritesAdapter(
         val isBold: Boolean,
         val textColor: Int,
         val shadowColor: Int,
+        val outlineWidthPx: Float,
         val alignment: FavoritesAlignment,
     )
 
@@ -128,7 +129,7 @@ class HomeFavoritesAdapter(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
         }
-        val button = Button(container.context).apply {
+        val button = OutlinedButton(container.context).apply {
             background = null
             includeFontPadding = false
             minHeight = 0
@@ -213,12 +214,7 @@ class HomeFavoritesAdapter(
             )
             typeface = if (styling.isBold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             setTextColor(subtlePressColor(styling.textColor))
-            setShadowLayer(
-                AppConstants.SHADOW_RADIUS_APPS,
-                AppConstants.SHADOW_DX,
-                AppConstants.SHADOW_DY,
-                styling.shadowColor,
-            )
+            setOutline(styling.outlineWidthPx, styling.shadowColor)
         }
     }
 
@@ -234,7 +230,7 @@ class HomeFavoritesAdapter(
      */
     inner class ViewHolder(
         container: FrameLayout,
-        val button: Button,
+        val button: OutlinedButton,
     ) : RecyclerView.ViewHolder(container) {
 
         init {
@@ -294,6 +290,7 @@ class HomeFavoritesAdapter(
             isBold = AppConstants.FALLBACK_FONT_BOLD,
             textColor = AppConstants.DEFAULT_TEXT_COLOR,
             shadowColor = AppConstants.DEFAULT_TEXT_COLOR,
+            outlineWidthPx = 0f,
             alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
         )
 

@@ -920,6 +920,7 @@ class HomeFragment : Fragment() {
             isBold = isCurrentFontBold,
             textColor = colors.textColor,
             shadowColor = colors.shadowColor,
+            outlineWidthPx = AppConstants.TEXT_OUTLINE_WIDTH_DP * resources.displayMetrics.density,
             alignment = currentFavoritesAlignment,
         )
     }
@@ -950,34 +951,21 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
 
         val textColor = colors.textColor
-        val shadowColor = colors.shadowColor
+        // Outline colour reuses the tonal shadowColor (TRANSPARENT when the user
+        // disables the text-shadow setting → outline off). See TextOutline.
+        val outlineColor = colors.shadowColor
+        val outlineWidthPx = AppConstants.TEXT_OUTLINE_WIDTH_DP * resources.displayMetrics.density
 
-        // Per-line try/catches removed per Rule 11 — setTextColor /
-        // setShadowLayer are pure property writes on never-null Views
-        // from the binding.
+        // Per-line try/catches removed per Rule 11 — setTextColor / setOutline
+        // are pure property writes on never-null Views from the binding.
         binding.timeText.setTextColor(textColor)
-        binding.timeText.setShadowLayer(
-            AppConstants.SHADOW_RADIUS_TIME,
-            AppConstants.SHADOW_DX,
-            AppConstants.SHADOW_DY,
-            shadowColor,
-        )
+        binding.timeText.setOutline(outlineWidthPx, outlineColor)
 
         binding.dateText.setTextColor(textColor)
-        binding.dateText.setShadowLayer(
-            AppConstants.SHADOW_RADIUS_DATE,
-            AppConstants.SHADOW_DX_SMALL,
-            AppConstants.SHADOW_DY_SMALL,
-            shadowColor,
-        )
+        binding.dateText.setOutline(outlineWidthPx, outlineColor)
 
         binding.batteryText.setTextColor(textColor)
-        binding.batteryText.setShadowLayer(
-            AppConstants.SHADOW_RADIUS_BATTERY,
-            AppConstants.SHADOW_DX_SMALL,
-            AppConstants.SHADOW_DY_SMALL,
-            shadowColor,
-        )
+        binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
         updateCalendarChipsColors(colors)
         updateFavoriteButtonColors(colors)

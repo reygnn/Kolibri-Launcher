@@ -46,7 +46,7 @@
             android:orientation="vertical"
             android:gravity="start">
 
-            <TextView
+            <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
                 android:id="@+id/timeText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -62,7 +62,7 @@
                 android:gravity="center_vertical"
                 android:layout_marginTop="@dimen/spacing_small">
 
-                <TextView
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
                     android:id="@+id/dateText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -71,7 +71,7 @@
                     android:textColor="@color/default_text_color"
                     android:padding="@dimen/touch_target_padding" />
 
-                <TextView
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
                     android:id="@+id/batteryText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

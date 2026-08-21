@@ -51,6 +51,7 @@ class HomeFavoritesAdapterBindingTest {
         isBold = bold,
         textColor = color,
         shadowColor = 0xFF000000.toInt(),
+        outlineWidthPx = 3f,
         alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
     )
 

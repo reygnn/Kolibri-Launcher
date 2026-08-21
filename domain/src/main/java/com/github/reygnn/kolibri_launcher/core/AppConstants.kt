@@ -13,15 +13,19 @@ object AppConstants {
     // UI Constants
     const val DOUBLE_CLICK_THRESHOLD = 300L
 
-    // Text Shadow Constants (verwendet in HomeFragment)
-    const val SHADOW_RADIUS_TIME = 4f      // Für grosse Zeit-Anzeige
-    const val SHADOW_RADIUS_DATE = 3f      // Für Datum
-    const val SHADOW_RADIUS_BATTERY = 3f   // Für Batterie-Anzeige
+    // Text Shadow Constants — still used by the AppDrawer labels (AppDrawerAdapter),
+    // which paint over a solid surface rather than the wallpaper. The home screen
+    // uses the outline below instead.
     const val SHADOW_RADIUS_APPS = 3f      // Für App-Buttons
     const val SHADOW_DX = 2f               // X-Offset für Zeit und Apps
     const val SHADOW_DY = 2f               // Y-Offset für Zeit und Apps
-    const val SHADOW_DX_SMALL = 1f         // X-Offset für Datum und Batterie
-    const val SHADOW_DY_SMALL = 1f         // Y-Offset für Datum und Batterie
+
+    // Text outline width (dp) for the home clock / date / battery / favorites.
+    // A thin hard stroke around the glyphs, painted via TextOutline instead of a
+    // drop shadow: background-independent (never dims the wallpaper) and wins
+    // contrast locally against black and white pixels at once. Half of it shows
+    // outside the glyph edge, so keep it small. Multiply by display density for px.
+    const val TEXT_OUTLINE_WIDTH_DP = 1.5f
 
     // Alpha-Wert für den gedrückten Zustand der Favoriten Buttons (0-255).
     // 180 = ~70% Sichtbarkeit. Subtiles Feedback ("Breathing"), kein harter Blitz.
