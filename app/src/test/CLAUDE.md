@@ -49,8 +49,13 @@ für alle Repository-Interfaces abfängt. Namens-Schema:
 
 ### Status je Repository
 
-Alle 16 Repository-Interfaces sind behandelt — 12 mit Contract-Pair,
-4 mit ADR-only-Begründung:
+Aktuell **18** Repository-Interfaces, jedes behandelt — jedes trägt entweder
+das Contract-Triple oder einen ADR-Marker (`NO CONTRACT TEST (ADR)` /
+`NO IMPL CONTRACT TEST (ADR)`). Die **Vollständigkeit erzwingt
+`./gradlew checkConventions`** (`tools/check-contract-triple.sh`) — der Linter
+ist die Quelle der Wahrheit, nicht diese Zählung. Die Tabelle unten ist eine
+Momentaufnahme und kann der erzwungenen Realität nachlaufen; bei Zweifel gilt
+der Linter:
 
 | Interface              | Contract | Impl-CT | Kommentar |
 |------------------------|:--------:|:-------:|-----------|

@@ -23,7 +23,8 @@ probably find one.
 
 ## Requirements
 
-- **Android 16** (API 36). `minSdk = compileSdk = targetSdk = 36`.
+- **Android 16+** — `minSdk = 36`; compiled and targeted against API 37
+  (Android 17). Exact levels in `app/build.gradle.kts`.
   No backwards-compat shims. If your device is older, this launcher
   won't install.
 - **JDK 21** to build. Lower JDKs fail at the Robolectric / SDK-36
@@ -151,7 +152,8 @@ Cycles eliminated in the cycle-elimination branches (see TODO.md
 - **Material 3** + AndroidX. View Binding, no Compose.
 - **Navigation Component** for fragment transitions inside the
   HOME activity.
-- **ACRA 5.13.1** for crash reporting (self-hosted, opt-in).
+- **ACRA** for crash reporting (self-hosted, opt-in; version pinned in
+  `gradle/libs.versions.toml`).
 
 ### Testing
 

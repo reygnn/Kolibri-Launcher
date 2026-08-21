@@ -20,18 +20,22 @@ testing reference.
 
 ## Stack
 
-- Kotlin 2.3.21, Android Views + ViewBinding (**no Compose**), Material 3
+- Kotlin, Android Views + ViewBinding (**no Compose**), Material 3
 - Min SDK 36 (Android 16); Target 37 / Compile 37 (Android 17) — lifted
   2026-07-18 for `core-ktx 1.19.0`, pinned in `gradle/libs.versions.toml`. No
   compatibility shims.
 - JDK 21 (Robolectric requires it for SDK 36)
-- MVVM + Clean Architecture, **DI via Hilt 2.60.1** (KSP2, kapt-free)
+- MVVM + Clean Architecture, **DI via Hilt** (KSP2, kapt-free)
 - Persistence: Jetpack DataStore Preferences (no SharedPreferences)
-- Crash reporting: ACRA 5.13.1, self-hosted, opt-in
+- Crash reporting: ACRA, self-hosted, opt-in
 - Coroutines/Flows throughout; UI state as `StateFlow`, events as `SharedFlow`
 - Tests: JUnit 4, **MockK** (Mockito has been fully migrated away), Turbine,
   kotlinx-coroutines-test, Robolectric (only for `android.net.Uri`-touching
   impls)
+
+Exact dependency versions are pinned in `gradle/libs.versions.toml` (with the
+`DO NOT CHANGE` rationale on each) — read them there, not here; this summary
+carries names only so it cannot drift against the catalog.
 
 ## Build & test
 
@@ -73,7 +77,7 @@ in `:app`.
   core/                   AppConstants, ColorMath, KolibriLog, TimberWrapper,
                           AppUpdateSignal, Qualifiers, CoerceExtensions
   domain/repository/      interfaces (FavoritesRepository,
-                          CrashReportConsentRepository, …) — ~19 of them
+                          CrashReportConsentRepository, …) — 18 of them
   domain/usecase/         ~55 fine-grained use cases (GetDrawerAppsUseCase,
                           Get/SetCrashReportConsent +
                           GetCrashReportConsentState, …)
@@ -297,12 +301,14 @@ activities.
    completeness gate. Regression-tested via
    `tools/check-settings-keys-registered-test.sh` (manual rerun, not a CI gate).
 
-6. **Respect the version pins in `app/build.gradle.kts`.** Many dependencies
-   carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE` comments
-   (Hilt 2.60.1, ACRA 5.13.1, fragment-ktx 1.8.9, JUnit 4.13.2,
-   materialVersion 1.14.0, kotlinTestVersion 2.3.21, coreTestingVersion 2.2.0).
-   These markers are not suggestions — violating them breaks builds or tests.
-   `minSdk = 36`, `compileSdk = targetSdk = 37` are also fixed.
+6. **Respect the version pins in `gradle/libs.versions.toml`.** Many
+   dependencies carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE`
+   comments (Hilt, ACRA, fragment-ktx, JUnit, Material, kotlin-test,
+   core-testing, …). These markers are not suggestions — violating them breaks
+   builds or tests. Read the exact versions and the reason each is frozen in
+   the catalog, not here — a hardcoded list in this file drifts, the catalog is
+   the single source of truth. `minSdk = 36`, `compileSdk = targetSdk = 37` are
+   fixed in `app/build.gradle.kts`.
 
 7. **`KolibriLauncherApp` is multi-layer crash-safe by design.** The style
    (catching `Throwable` instead of `Exception`, the coroutine
@@ -818,16 +824,17 @@ duplicating it only invites drift (AUDIT-13). See the top-of-file
 
 ### Other mandatory points
 
-- **New tests are MockK only.** Mockito has been migrated away; do not
-  bring it back.
-- **Never use `advanceUntilIdle()` against a `WhileSubscribed` flow** — it
-  runs past the timeout and drops the upstream. Use
-  `testScheduler.runCurrent()` instead.
-- **A `MutableSharedFlow()` with no subscriber in test setup → buffer
-  overflow.** The first emission suspends. Fix: `BufferOverflow.DROP_OLDEST`
-  or Turbine.
-- **Contract-test pattern for every new repository interface.** No
-  shortcuts unless there is a justified exception in the contract KDoc.
+Named here; the authoritative statement **and the fix for each** live once in
+the test docs — same delegation as the dispatcher rule above, so a change is
+edited in one place, not three:
+
+- **MockK only, never Mockito** — `TESTING_CONVENTIONS.kt` (MOCKK section).
+- **The two coroutine-test traps** — `advanceUntilIdle()` against a
+  `WhileSubscribed` flow, and an unbuffered `MutableSharedFlow()` with no
+  subscriber in test setup — with their fixes in `TESTING_CONVENTIONS.kt` and
+  `app/src/test/CLAUDE.md`.
+- **Contract-test triple for every new repository interface** (Rule 2) —
+  pattern and justified exemptions in `app/src/test/CLAUDE.md`.
 
 > The old *"repository takes a `shareIn` external-scope parameter → set
 > `externalScope = null` in tests"* note was removed: the DATASTORE_READ_SPEC
@@ -879,38 +886,16 @@ or `bundleRelease` and pushes the mapping to ACRA.
 
 ---
 
-## Git workflow: branch before non-trivial work
+## Git workflow
 
-Larger changes — **bigger bugfixes, refactorings, new features, anything that
-touches multiple files or could plausibly be reverted as a unit** — must
-happen on a dedicated branch, never directly on `main`. Trivial edits (typo
-fix, single-line tweak, doc nit) can stay on the current branch.
+The full rules — branch before non-trivial work, the `fix/refactor/feature/
+chore/test` prefixes, "when in doubt ask before starting", and the
+confirm-before-deleting-a-merged-branch step — live in the global
+`~/.claude/CLAUDE.md` and are **not restated here** (they are identical across
+every project in this family; duplicating them only invites drift).
 
-When in doubt, **stop and ask the user before starting**. It is always
-cheaper to confirm than to realize mid-implementation that the work is on
-the wrong branch.
-
-**Workflow:**
-
-1. Before writing code, propose a branch name that fits the topic and ask
-   for confirmation. Suggested prefixes:
-   - `fix/<slug>` — bugfix
-   - `refactor/<slug>` — refactoring
-   - `feature/<slug>` — new feature
-   - `chore/<slug>` — tooling, build, dependencies
-   - `test/<slug>` — test-only changes
-2. Create the branch from an up-to-date `main` (or the appropriate base)
-   and switch to it before the first edit.
-3. If you notice mid-task that you are still on `main`, stop and remind
-   the user — do not silently keep working.
-
-The branch-name proposal is a suggestion; the user has the final say.
-
-**After a fast-forward merge into `main`:** switch back to `main` and ask
-the user whether the merged branch should be deleted both locally and on
-the remote. Do not delete branches silently with `git branch -d` or
-`git push origin --delete` — even after a merge, an open PR, ongoing review,
-or historical reference may still hang on the branch. Always confirm first.
+Project delta: this is a **solo workflow** — no PRs; a branch merges directly
+into `main` once the maintainer signs off (memory `feedback-git-workflow`).
 
 ---
 

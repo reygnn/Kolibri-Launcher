@@ -139,7 +139,7 @@ Claude sessions in parallel, each playing a distinct role:
 
 The same proposal has to clear three independent perspectives before
 it lands. Visible artifacts of this methodology in the repository:
-[AUDIT.md](AUDIT.md) is direct Auditor-session output (an external
+[AUDIT.md](docs/audits/AUDIT.md) is direct Auditor-session output (an external
 Senior Android Engineer perspective with a BLOCKER/MAJOR/MINOR/NIT
 scale, refreshed 2026-05-04). The "Auditor Snapshot" section in
 [TODO.md](TODO.md) and the documented score formula come from the
@@ -234,7 +234,7 @@ way out, then deleted with the rest.)
 
 ## Coda — Ash's review as the unconscious target
 
-The fictional Ash review at the top of [REVIEWS.md](REVIEWS.md) was
+The fictional Ash review at the top of [REVIEWS.md](docs/history/REVIEWS.md) was
 added almost on day one. It was not a programmatic spec the project
 worked toward; it was an early articulation of a craft intuition the
 user kept reaching for at each decision point. Conscious planning, as
@@ -252,12 +252,12 @@ not feature scope creep.
 > "I admire its purity. A launcher unclouded by widgets, legacy code,
 > or delusions of necessity. A structural perfection matched only by
 > its efficiency."
-> — Ash, Android Science Officer, [REVIEWS.md](REVIEWS.md)
+> — Ash, Android Science Officer, [REVIEWS.md](docs/history/REVIEWS.md)
 
 ---
 
 *Architecture rules live in [CLAUDE.md](CLAUDE.md), current
 work-in-progress in [TODO.md](TODO.md), known unfixable issues in
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md), and fictional reviews in
-[REVIEWS.md](REVIEWS.md). The why-Claude collaboration story is in
+[REVIEWS.md](docs/history/REVIEWS.md). The why-Claude collaboration story is in
 [WHY_CLAUDE.md](WHY_CLAUDE.md).*
