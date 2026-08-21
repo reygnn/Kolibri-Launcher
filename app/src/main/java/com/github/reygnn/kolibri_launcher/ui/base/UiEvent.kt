@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.base
 
+import android.widget.Toast
 import androidx.annotation.StringRes
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 
@@ -8,7 +9,16 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  */
 sealed class UiEvent {
     data class ShowToast(@param:StringRes val messageResId: Int) : UiEvent()
-    data class ShowToastFromString(val message: String) : UiEvent()
+
+    /**
+     * @param duration one of [Toast.LENGTH_SHORT] / [Toast.LENGTH_LONG]. Defaults to
+     * `LENGTH_LONG` so existing user-facing callers keep their behaviour; the wallpaper
+     * cache debug toasts (F10) opt into `LENGTH_SHORT`.
+     */
+    data class ShowToastFromString(
+        val message: String,
+        val duration: Int = Toast.LENGTH_LONG,
+    ) : UiEvent()
     object NavigateUp : UiEvent()
 
     object ShowAppDrawer : UiEvent()

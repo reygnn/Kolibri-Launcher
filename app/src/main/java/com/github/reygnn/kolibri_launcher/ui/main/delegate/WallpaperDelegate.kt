@@ -147,6 +147,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCa
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
 import android.graphics.Bitmap
+import android.widget.Toast
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
 import kotlinx.coroutines.CancellationException
@@ -668,7 +669,9 @@ class WallpaperDelegate(
             // "not cached". Removed together with the fill toasts once verified (F10).
             if (state.layerCount == 1) {
                 scope.launchSafe("Error signalling single-layer cache hit") {
-                    scope.sendEvent(UiEvent.ShowToastFromString("Single-layer cache still valid"))
+                    scope.sendEvent(
+                        UiEvent.ShowToastFromString("Single-layer cache still valid", Toast.LENGTH_SHORT)
+                    )
                 }
             }
             return
@@ -721,7 +724,10 @@ class WallpaperDelegate(
             // unified refill is verified 100% on-device. Symmetric with the composite warm's toast.
             val m = context.resources.displayMetrics
             scope.sendEvent(
-                UiEvent.ShowToastFromString("Single-layer cache filled (${m.widthPixels}x${m.heightPixels})")
+                UiEvent.ShowToastFromString(
+                    "Single-layer cache filled (${m.widthPixels}x${m.heightPixels})",
+                    Toast.LENGTH_SHORT,
+                )
             )
         }
     }
@@ -815,7 +821,8 @@ class WallpaperDelegate(
             // fills via warmSingleLayer under its file:// key.
             scope.sendEvent(
                 UiEvent.ShowToastFromString(
-                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})"
+                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})",
+                    Toast.LENGTH_SHORT,
                 )
             )
         }

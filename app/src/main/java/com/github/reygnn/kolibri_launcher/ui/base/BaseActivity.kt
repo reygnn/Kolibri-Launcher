@@ -138,7 +138,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 val now = System.currentTimeMillis()
                 if (now - lastUiEventToastTime >= TOAST_THROTTLE_MS) {
                     lastUiEventToastTime = now
-                    showToastSafe(event.message, Toast.LENGTH_LONG)
+                    showToastSafe(event.message, event.duration)
                 } else {
                     if (BuildConfig.DEBUG) {
                         Timber.d("UiEvent toast throttled: ${event.message}")
