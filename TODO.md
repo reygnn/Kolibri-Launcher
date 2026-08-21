@@ -2010,6 +2010,19 @@ bleibt). Hysterese wurde im Scope-Register als eigener Punkt
 gedroppt (kein dynamischer Layer-Input geplant), würde hier aber
 am gleichen Mechanismus hängen.
 
+**Gescheiterter Scrim-/Luminanz-Blend-Anlauf (2026-08-21).** Auf diesem
+Terrain (Wallpaper-Classifier/Luminanz) wurde ein Greenfield-Rewrite
+versucht: Scrim-Render + Text-Outline auf Basis von
+`PerceivedBackground`/`ScrimState` (`WALLPAPER_LUMINANCE_BLEND_SPEC` /
+`WALLPAPER_SCRIM_INTEGRATION_SPEC`, 5 Increments + adversariale
+Fixtures). Der Ansatz war ein Fehlschlag und wurde per `git reset --hard`
+auf `276670ed` aus `main` entfernt (statt Tokens in den Rückbau zu
+stecken). Der komplette verworfene Stand hängt am lokalen Tag
+**`backup/scrim-attempt-ba2f1804`** (HEAD war `ba2f1804`) — dort sind
+Specs, Modelle (`ScrimState`), `ScrimRenderCalculator` und die
+Contrast-Math auffindbar, falls die Ideen je wieder aufgegriffen werden.
+Nur lokal, nicht gepusht.
+
 ---
 
 ## 23. (erledigt 2026-08-20) Tote ACRA-Consent-Keys im `settingsDataStore` bei Bestands-Installs
