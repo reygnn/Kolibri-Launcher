@@ -346,3 +346,77 @@ editor stays transform-only exactly as before — this deleted only always-defau
 plumbing, no behaviour change. §1 above was reconciled in the same change (the
 classifier's layer-level alpha/blend dominance gate is gone; only the pixel-level
 coverage gate remains).
+
+---
+
+## 6. Home-screen text readability is glyph-outline protection, not adaptive colour alone
+
+- **Status:** 🟢 Resolved / Intentional design (v0.99.193) — this entry locks the
+  rationale so the three rejected alternatives are not re-litigated.
+- **Affected:** Home clock / date / battery / favorite labels — the text that sits
+  directly over the wallpaper (`HomeFragment.updateAllColors`,
+  `HomeFavoritesAdapter.applyStyling`, `ui/util/TextOutline.kt`).
+
+### The decision
+
+Home-screen legibility over an arbitrary wallpaper is guaranteed by a **thin hard
+glyph outline** (`OutlinedTextView` / `OutlinedButton`, `TEXT_OUTLINE_WIDTH_DP`),
+NOT by the AUTO light/dark text colour. The two mechanisms have split roles:
+
+- **The AUTO classifier picks the *aesthetic* colour** (`ClassifyWallpaperUseCase`
+  → white on DARK, black on LIGHT). Since the outline now guarantees legibility on
+  either choice, the classifier is **advisory** for home text — it only selects the
+  nicer of two already-legible colours. It stays *load-bearing* only for the
+  AppDrawer, which paints a solid surface (`WallpaperSurface.toSurface`) and so
+  genuinely needs one global LIGHT/DARK answer.
+- **The outline provides the legibility guarantee**, background-independent, at the
+  glyph edge.
+
+### Three alternatives deliberately rejected
+
+1. **A global scrim / wallpaper dim.** Tried as a greenfield rewrite and reverted
+   (TODO §22): a scrim that forces a global luminance target over-darkens an
+   already-dark wallpaper (the maintainer's 93%-black daily wallpaper went muddy)
+   while only helping extreme ones. Wrong layer — it touches the wallpaper.
+2. **Local / per-region contrast** (sample wallpaper luminance under each label's
+   bounding box, colour per-label). Rejected on performance *and* UX: favorites are
+   a scrollable RecyclerView with left/centre/right alignment over a zoomable,
+   pannable, multi-layer wallpaper, so the region under a label changes per frame —
+   forcing per-frame bitmap sampling and, worse, black↔white **colour flicker** as
+   labels scroll across light/dark bands. The outline delivers the same *local*
+   contrast at the glyph level for free (GPU stroke), with none of that cost.
+3. **Inverting to protection-first in code** (drop the classifier→home-colour
+   wiring, render constant white + outline). Rejected as churn for a micro-saving:
+   the classifier cannot be deleted (AppDrawer needs it; it also integrates the
+   platform `HINT_SUPPORTS_DARK_TEXT` signal, the correct API), and constant white
+   text reads *worse* than black on a genuinely light wallpaper. The color-for-
+   aesthetics + outline-for-guarantee split is the sweet spot; formalising the
+   inversion would remove quality, not complexity.
+
+The diagonal-checkerboard fixture (`data/src/test/resources/wallpaper/`,
+`WallpaperBitmapLuminanceImplTest`) is the standing proof that *any* global
+single-colour approach has an inherent ceiling — neither LIGHT nor DARK wins on a
+high-frequency bimodal wallpaper — which is exactly why the guarantee lives at the
+glyph, not in the classifier.
+
+### Accepted caveat
+
+The outline is gated by the user's text-shadow setting (when off, `shadowColor` is
+`TRANSPARENT` → outline off; see `ObserveUiColorsUseCase.calculateTonalShadowColor`).
+A user who disables it deliberately falls back to colour-only legibility — their
+choice, not a defect.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Home text stops sitting directly over the wallpaper (e.g. a solid/translucent
+  surface is introduced behind it, like the AppDrawer) — then the classifier
+  becomes load-bearing again and the outline may be redundant there.
+- A future Android release exposes a cheap per-region text-protection or
+  contrast-guaranteed on-wallpaper text API — at which point local contrast (alt. 2)
+  becomes affordable and worth revisiting.
+- Someone proposes a scrim again — this entry plus TODO §22 is the answer; do not
+  re-spend tokens rediscovering the 93%-black failure.
+- The outline is ever removed or made non-default — legibility would again rest
+  solely on the classifier, reopening the checkerboard-class failure.
