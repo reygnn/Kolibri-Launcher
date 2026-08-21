@@ -2010,18 +2010,33 @@ bleibt). Hysterese wurde im Scope-Register als eigener Punkt
 gedroppt (kein dynamischer Layer-Input geplant), würde hier aber
 am gleichen Mechanismus hängen.
 
-**Gescheiterter Scrim-/Luminanz-Blend-Anlauf (2026-08-21).** Auf diesem
-Terrain (Wallpaper-Classifier/Luminanz) wurde ein Greenfield-Rewrite
-versucht: Scrim-Render + Text-Outline auf Basis von
-`PerceivedBackground`/`ScrimState` (`WALLPAPER_LUMINANCE_BLEND_SPEC` /
-`WALLPAPER_SCRIM_INTEGRATION_SPEC`, 5 Increments + adversariale
-Fixtures). Der Ansatz war ein Fehlschlag und wurde per `git reset --hard`
-auf `276670ed` aus `main` entfernt (statt Tokens in den Rückbau zu
-stecken). Der komplette verworfene Stand hängt am lokalen Tag
-**`backup/scrim-attempt-ba2f1804`** (HEAD war `ba2f1804`) — dort sind
-Specs, Modelle (`ScrimState`), `ScrimRenderCalculator` und die
-Contrast-Math auffindbar, falls die Ideen je wieder aufgegriffen werden.
-Nur lokal, nicht gepusht.
+**Gescheiterter Scrim-/Luminanz-Blend-Anlauf (2026-08-21) — gelöst via
+Text-Outline (0.99.193).** Auf diesem Terrain (Wallpaper-Classifier/
+Luminanz) wurde zuerst ein Greenfield-Rewrite versucht: Scrim-Render +
+Text-Outline auf Basis von `PerceivedBackground`/`ScrimState`
+(`WALLPAPER_LUMINANCE_BLEND_SPEC` / `WALLPAPER_SCRIM_INTEGRATION_SPEC`,
+5 Increments + adversariale Fixtures). Der Ansatz war ein Fehlschlag und
+wurde per `git reset --hard` auf `276670ed` aus `main` entfernt (statt
+Tokens in den Rückbau zu stecken). Kern des Scheiterns: der Scrim erzwang
+ein globales Luminanz-Ziel und dunkelte damit ein ohnehin dunkles
+Wallpaper (93 % Schwarz) voll ab — auf Extrem-Wallpapern top, im Alltag
+unbrauchbar.
+
+Die Lesbarkeit wurde stattdessen auf der **Glyphen-Ebene** gelöst, nicht
+auf der Hintergrund-Ebene: ein dünner harter Text-Stroke
+(`TextOutline` / `OutlinedTextView` / `OutlinedButton`, 1.5 dp) ersetzt an
+Uhr / Datum / Akku / Favoriten-Labels den gerichteten Drop-Shadow.
+Hintergrund-unabhängig (dunkelt nichts ab) und gewinnt lokal gleichzeitig
+gegen Schwarz und Weiß — der einzige Mechanismus, der Streifen-Härtetest
+*und* 93 %-Schwarz besteht. On-device auf beiden verifiziert, ausgeliefert
+in **0.99.193** (Commit `2efb4114`).
+
+Der verworfene Scrim-Stand hing am lokalen Tag
+`backup/scrim-attempt-ba2f1804` (HEAD `ba2f1804`); der Tag wurde nach dem
+Outline-Fix **gelöscht** (2026-08-21), der Commit ist damit nur noch über
+das Reflog bis zum nächsten `git gc` erreichbar. Wer die Scrim-Ideen
+(`ScrimState`, `ScrimRenderCalculator`, Contrast-Math) je wieder braucht,
+holt sie aus dem Reflog, bevor GC greift — sonst sind sie weg.
 
 ---
 
