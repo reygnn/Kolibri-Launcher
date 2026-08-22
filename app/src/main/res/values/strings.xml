@@ -191,6 +191,7 @@
     <string name="customize_colors_and_shadow">Colors &amp; Shadow</string>
     <string name="more_settings">More Settings</string>
     <string name="text_shadow">Text Shadow</string>
+    <string name="wallpaper_scrim">Wallpaper dimming</string>
     <string name="text_color">Text Color</string>
     <string name="color_automatic">Automatic</string>
 

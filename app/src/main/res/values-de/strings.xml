@@ -184,6 +184,7 @@
     <string name="customize_colors_and_shadow">Farben &amp; Schatten</string>
     <string name="more_settings">Weitere Einstellungen</string>
     <string name="text_shadow">Textschatten</string>
+    <string name="wallpaper_scrim">Hintergrund abdunkeln</string>
     <string name="text_color">Textfarbe</string>
     <string name="color_automatic">Automatisch</string>
 

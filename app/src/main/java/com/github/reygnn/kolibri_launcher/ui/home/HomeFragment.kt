@@ -627,6 +627,9 @@ class HomeFragment : Fragment() {
             // own outer catch as the orchestration boundary.
             wallpaperEditController?.applyEditMode(isEditMode)
             applyWallpaperEditModeToGestures(isEditMode)
+            // Re-evaluate the scrim: it must be hidden while adjusting the
+            // wallpaper (so the user sees its true appearance) and restored after.
+            applyScrim()
             // Swap representation ONLY on an actual toggle: EDIT shows the real
             // layers, DISPLAY shows the flattened composite (Option D §9.4). On the
             // initial STARTED emission (e.g. drawer→home view re-creation) Observer 7
@@ -653,6 +656,38 @@ class HomeFragment : Fragment() {
             wallpaperEditController?.applyFabPosition(position)
         }
 
+        // Observer: user-controlled wallpaper scrim. Its own collector (drives a
+        // View alpha, not the layout cache) — edit-mode gating is handled in
+        // applyScrim, re-triggered by Observer 8 above.
+        collectOnStarted(
+            flow = viewModel.wallpaperScrimAlphaState,
+            errorTag = "wallpaper scrim",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) {
+            if (_binding == null) return@collectOnStarted
+            applyScrim()
+        }
+
+    }
+
+    /**
+     * Applies the user's wallpaper scrim to the [R.id.wallpaperScrim] overlay.
+     * Pure decision delegated to [ScrimRender]: hidden in wallpaper edit mode or
+     * at a zero-rounding alpha, otherwise an opaque-black fill with the strength
+     * in the alpha byte (View alpha stays 1 → no offscreen saveLayer).
+     */
+    private fun applyScrim() {
+        val binding = _binding ?: return
+        val color = ScrimRender.colorOrNull(
+            alpha = viewModel.wallpaperScrimAlphaState.value,
+            isEditMode = viewModel.isWallpaperEditMode.value,
+        )
+        if (color == null) {
+            binding.wallpaperScrim.visibility = View.GONE
+        } else {
+            binding.wallpaperScrim.setBackgroundColor(color)
+            binding.wallpaperScrim.visibility = View.VISIBLE
+        }
     }
 
     private fun observeLayoutChanges() {

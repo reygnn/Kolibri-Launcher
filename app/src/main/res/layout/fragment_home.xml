@@ -13,6 +13,16 @@
         android:scaleType="matrix"
         android:visibility="gone" />
 
+    <!-- Layer 0.5: user-controlled home scrim. Above the wallpaper, below the
+         content. Alpha is baked into the background colour (View alpha stays 1 →
+         no offscreen saveLayer). GONE unless the user set a non-zero scrim and
+         not in wallpaper edit mode; driven by HomeFragment.applyScrim. -->
+    <View
+        android:id="@+id/wallpaperScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <!-- Layer 1: Bestehender Content -->
     <!--
       Wrapped in HomeGestureLayout (since 2026-05-07) so that the

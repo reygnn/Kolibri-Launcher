@@ -29,6 +29,7 @@ import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class ColorCustomizationDialogFragment : DialogFragment() {
@@ -63,6 +64,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
         // Logik zusammengefasst
         setupShadowSwitch()
+        setupScrimSlider()
         setupPalettes()
         observeChanges()
         observeWallpaperSurface()
@@ -128,6 +130,46 @@ class ColorCustomizationDialogFragment : DialogFragment() {
                 viewModel.onSetTextShadowEnabled(isChecked)
             }
         }
+    }
+
+    /**
+     * User-controlled wallpaper scrim (opt-in dim, default 0). Sits next to the
+     * shadow toggle because both are text-legibility-over-wallpaper controls: the
+     * outline (shadow) is the guarantee, the scrim is the escalation for extreme
+     * wallpapers where the outline alone is marginal.
+     */
+    private fun setupScrimSlider() {
+        binding.sliderWallpaperScrim.apply {
+            valueFrom = AppConstants.WALLPAPER_SCRIM_ALPHA_MIN
+            valueTo = AppConstants.WALLPAPER_SCRIM_ALPHA_MAX
+            addOnChangeListener { _, value, fromUser ->
+                if (fromUser) viewModel.onSetWallpaperScrimAlpha(value)
+            }
+        }
+
+        collectOnStarted(
+            flow = viewModel.wallpaperScrimAlphaState,
+            errorTag = "wallpaperScrim",
+            coroutineContext = Dispatchers.Main,
+        ) { alpha ->
+            if (_binding == null) return@collectOnStarted
+            // Snap onto the slider's step grid + range before assigning: Material
+            // Slider throws IllegalArgumentException for an off-grid / out-of-range
+            // value (e.g. a hand-edited backup import). App-written values are
+            // always on-grid, so this is purely a robustness guard.
+            val snapped = snapScrimToSliderGrid(alpha)
+            if (binding.sliderWallpaperScrim.value != snapped) {
+                binding.sliderWallpaperScrim.value = snapped
+            }
+        }
+    }
+
+    private fun snapScrimToSliderGrid(alpha: Float): Float {
+        val min = AppConstants.WALLPAPER_SCRIM_ALPHA_MIN
+        val max = AppConstants.WALLPAPER_SCRIM_ALPHA_MAX
+        val clamped = alpha.coerceIn(min, max)
+        val steps = ((clamped - min) / SCRIM_SLIDER_STEP).roundToInt()
+        return (min + steps * SCRIM_SLIDER_STEP).coerceIn(min, max)
     }
 
     /**
@@ -262,6 +304,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         // Verhindert, dass der Listener noch Events feuert, während der View stirbt.
         if (_binding != null) {
             binding.dragHandle.setOnTouchListener(null)
+            binding.sliderWallpaperScrim.clearOnChangeListeners()
 
             // Container leeren hilft dem GC zusätzlich
             binding.colorPaletteContainer.removeAllViews()
@@ -272,5 +315,10 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         _binding = null
 
         super.onDestroyView()
+    }
+
+    companion object {
+        // Must match the Slider's stepSize in dialog_color_customization.xml.
+        private const val SCRIM_SLIDER_STEP = 0.05f
     }
 }
