@@ -47,6 +47,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
@@ -64,7 +65,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorU
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase

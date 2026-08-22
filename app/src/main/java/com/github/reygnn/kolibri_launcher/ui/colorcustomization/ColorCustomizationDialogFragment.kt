@@ -26,10 +26,10 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
 import dagger.hilt.android.AndroidEntryPoint
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.kolibri_launcher.ui.home.ScrimRender
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class ColorCustomizationDialogFragment : DialogFragment() {
@@ -153,23 +153,14 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             coroutineContext = Dispatchers.Main,
         ) { alpha ->
             if (_binding == null) return@collectOnStarted
-            // Snap onto the slider's step grid + range before assigning: Material
-            // Slider throws IllegalArgumentException for an off-grid / out-of-range
-            // value (e.g. a hand-edited backup import). App-written values are
-            // always on-grid, so this is purely a robustness guard.
-            val snapped = snapScrimToSliderGrid(alpha)
+            // Snap onto the slider's step grid + range before assigning (Material
+            // Slider throws on an off-grid / out-of-range value, e.g. a hand-edited
+            // backup import). See ScrimRender.snapAlphaToSliderGrid.
+            val snapped = ScrimRender.snapAlphaToSliderGrid(alpha)
             if (binding.sliderWallpaperScrim.value != snapped) {
                 binding.sliderWallpaperScrim.value = snapped
             }
         }
-    }
-
-    private fun snapScrimToSliderGrid(alpha: Float): Float {
-        val min = AppConstants.WALLPAPER_SCRIM_ALPHA_MIN
-        val max = AppConstants.WALLPAPER_SCRIM_ALPHA_MAX
-        val clamped = alpha.coerceIn(min, max)
-        val steps = ((clamped - min) / SCRIM_SLIDER_STEP).roundToInt()
-        return (min + steps * SCRIM_SLIDER_STEP).coerceIn(min, max)
     }
 
     /**
@@ -315,10 +306,5 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         _binding = null
 
         super.onDestroyView()
-    }
-
-    companion object {
-        // Must match the Slider's stepSize in dialog_color_customization.xml.
-        private const val SCRIM_SLIDER_STEP = 0.05f
     }
 }

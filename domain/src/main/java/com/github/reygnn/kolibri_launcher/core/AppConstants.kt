@@ -38,6 +38,10 @@ object AppConstants {
     // User-controlled home wallpaper scrim (opt-in dim for extreme wallpapers).
     const val WALLPAPER_SCRIM_ALPHA_MIN = 0.0f
     const val WALLPAPER_SCRIM_ALPHA_MAX = 0.5f
+    // Slider granularity. The Slider's android:stepSize in
+    // dialog_color_customization.xml MUST mirror this literal (XML can't
+    // reference a Kotlin const).
+    const val WALLPAPER_SCRIM_ALPHA_STEP = 0.05f
 
 
     const val VERTICAL_PADDING_SCALE_MIN = 0.0f

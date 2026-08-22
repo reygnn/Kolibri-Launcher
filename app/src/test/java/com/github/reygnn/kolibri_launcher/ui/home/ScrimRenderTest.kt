@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -41,5 +42,49 @@ class ScrimRenderTest {
     @Test
     fun `negative alpha is clamped to null`() {
         assertNull(ScrimRender.colorOrNull(alpha = -1f, isEditMode = false))
+    }
+
+    // --- snapAlphaToSliderGrid ---
+
+    @Test
+    fun `on-grid value passes through unchanged`() {
+        assertEquals(0.25f, ScrimRender.snapAlphaToSliderGrid(0.25f), 0.0001f)
+    }
+
+    @Test
+    fun `off-grid value snaps to nearest step`() {
+        // 0.42 → nearest 0.05 step = 0.40
+        assertEquals(0.40f, ScrimRender.snapAlphaToSliderGrid(0.42f), 0.0001f)
+        // 0.43 → nearest 0.05 step = 0.45
+        assertEquals(0.45f, ScrimRender.snapAlphaToSliderGrid(0.43f), 0.0001f)
+    }
+
+    @Test
+    fun `below-min snaps to min`() {
+        assertEquals(
+            AppConstants.WALLPAPER_SCRIM_ALPHA_MIN,
+            ScrimRender.snapAlphaToSliderGrid(-1f),
+            0.0001f
+        )
+    }
+
+    @Test
+    fun `above-max snaps to max`() {
+        assertEquals(
+            AppConstants.WALLPAPER_SCRIM_ALPHA_MAX,
+            ScrimRender.snapAlphaToSliderGrid(99f),
+            0.0001f
+        )
+    }
+
+    @Test
+    fun `snapped result is always within slider range`() {
+        var v = AppConstants.WALLPAPER_SCRIM_ALPHA_MIN
+        while (v <= AppConstants.WALLPAPER_SCRIM_ALPHA_MAX + 0.001f) {
+            val snapped = ScrimRender.snapAlphaToSliderGrid(v)
+            assertEquals(true, snapped >= AppConstants.WALLPAPER_SCRIM_ALPHA_MIN)
+            assertEquals(true, snapped <= AppConstants.WALLPAPER_SCRIM_ALPHA_MAX)
+            v += 0.017f
+        }
     }
 }

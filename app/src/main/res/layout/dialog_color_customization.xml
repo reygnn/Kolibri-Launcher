@@ -38,6 +38,9 @@
             android:textColor="?attr/colorOnSurface"
             android:textSize="16sp" />
 
+        <!-- valueFrom/valueTo are overwritten at runtime from
+             AppConstants.WALLPAPER_SCRIM_ALPHA_MIN/MAX; stepSize must mirror
+             AppConstants.WALLPAPER_SCRIM_ALPHA_STEP (XML can't reference a const). -->
         <com.google.android.material.slider.Slider
             android:id="@+id/slider_wallpaper_scrim"
             android:layout_width="match_parent"
