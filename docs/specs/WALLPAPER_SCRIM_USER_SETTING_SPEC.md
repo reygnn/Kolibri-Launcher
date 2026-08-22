@@ -44,6 +44,17 @@ bright half, where white text needs help) and leaves the already-good dark half
 visually almost untouched. No gradient, no per-region sampling, no
 luminance-driven target needed — the asymmetry does the work for free.
 
+**The benefit is directional — it aids LIGHT text, not dark.** A uniform black
+scrim uniformly *worsens* black-on-dark contrast. That is fine for the reference
+case (white text over the bright bottom half) and harmless on the dark half at
+minimal α, but because the scrim is deliberately decoupled from the classifier
+(§1 non-goals), a *large* scrim on a median-≈0.5 wallpaper where the advisory
+classifier picked black text would actively degrade the dark region. This is
+another reason the value is a small user-set reserve, default 0 — not a large or
+automatic dim. State this honestly; do not oversell it as a universal legibility
+guarantee (the outline is the guarantee; the scrim only eases the light-text
+case).
+
 ### Non-goals (explicit)
 
 - **NOT** the reverted 2026-08-21 approach. That scrim was **automatic and
@@ -66,10 +77,13 @@ luminance-driven target needed — the asymmetry does the work for free.
 
 ### What we deliberately keep from the old attempt
 
-One lesson only, from the discarded `ScrimRenderCalculator`: **bake the strength
-into the alpha byte of the background colour and keep `View.alpha = 1f`** — a
-non-1 `View.alpha` on a full-screen view forces an offscreen `saveLayer` buffer.
-Everything else from the old attempt is discarded.
+One lesson only: **bake the strength into the alpha byte of the background colour
+and keep `View.alpha = 1f`.** Rationale on its own terms (the discarded
+`ScrimRenderCalculator` was git-reset away and its backup tag deleted, so it is
+not a live reference): a non-1 `View.alpha` on a full-screen leaf view forces the
+renderer to allocate an offscreen `saveLayer` buffer to composite it; a solid
+background colour whose alpha byte carries the strength composites directly with
+no buffer. Everything else from the old attempt is discarded.
 
 ---
 
@@ -164,6 +178,9 @@ suspend fun setWallpaperScrimAlpha(alpha: Float)
 **C. `domain/usecase/LayoutSettingsUseCase.kt`**
 - In `GetLayoutSettingsUseCase` (line 12–16): add
   `val wallpaperScrimAlpha: Flow<Float> = repository.wallpaperScrimAlphaStateFlow`.
+- **Update the stale header comment** at line 8 (`// 1. Get Layout Settings (Alle
+  5 Flows)`): it becomes 6 flows. Rewrite in English (a German rewrite trips
+  `checkRule13`), e.g. `// 1. Get Layout Settings (all layout flows)`.
 - New setter class beside `SetLayoutScaleUseCase` (line 20–22):
 ```kotlin
 class SetWallpaperScrimAlphaUseCase @Inject constructor(private val repository: SettingsRepository) {
@@ -172,7 +189,15 @@ class SetWallpaperScrimAlphaUseCase @Inject constructor(private val repository: 
 ```
 
 **D. `domain/model/BackupData.kt`** (near line 99, `val layoutScale: Float? = null`):
-add `val wallpaperScrimAlpha: Float? = null,` to the settings backup model.
+add the field to the settings backup model **with the snake_case alias every
+sibling field carries** (line 98–99 shows `layoutScale` with `@JsonNames`):
+```kotlin
+@JsonNames("wallpaper_scrim_alpha")
+val wallpaperScrimAlpha: Float? = null,
+```
+Omitting `@JsonNames` still round-trips (export writes the camelCase property,
+import reads both via `getStrictFloat`) but breaks the model's
+camelCase-write / snake_case-alias convention — add it to mirror `layoutScale`.
 
 ### 5.2 `:data` — impl (3 mandatory registration sites), backup read/write/parse
 
@@ -367,22 +392,52 @@ collectOnStarted(
 
 ## 6. Tests
 
+Two classes of test work: **new coverage** and **MANDATORY existing-test fixups**.
+The fixups are NOT optional — because `LayoutDelegate` subscribes the new
+`getLayoutSettingsUseCase.wallpaperScrimAlpha` flow *eagerly* at construction
+(`stateIn(SharingStarted.Eagerly)`, §5.3-H), and the setter use case becomes a
+required constructor param, the existing delegate/VM tests **fail to compile and
+throw `MockKException` at construction** until fixed. Step 3 (`:app:test`) cannot
+pass otherwise.
+
+### 6.1 New coverage
 - **`ScrimRenderTest.kt`** (new, JVM) — §4.
 - **`SettingsRepositoryContract.kt`** (testFixtures) — add three tests mirroring
-  layoutScale (default emit line 97, set-reflects-in-flow line 157, reset line
-  221) for `wallpaperScrimAlpha`. This flows into both
+  layoutScale (default emit ~line 97, set-reflects-in-flow ~line 157, reset ~line
+  221) for `wallpaperScrimAlpha`. Flows into both
   `FakeSettingsRepositoryContractTest` and `SettingsRepositoryImplContractTest`
   automatically (Rule 2 triple).
 - **`FakeSettingsRepository.kt`** (testFixtures) — add the backing
   `MutableStateFlow`, the `var`, the override flow, the override setter, and the
   reset line (mirror lines 56/95–97/140/164–165/218).
-- **Backup tests** — `BackupDataAssembler*Test.kt` / any `BackupSerializer` test
-  should gain scrim round-trip coverage (export → import restores the value;
-  absent field → default).
-- **`LayoutDelegate` / `LauncherViewModel` tests** — extend existing delegate/VM
-  tests to cover the new state + setter (coercion clamps to MIN/MAX).
+- **`LayoutDelegateTest` / `LauncherViewModel` tests** — add positive coverage for
+  the new state + setter (coercion clamps to MIN/MAX).
+
+### 6.2 MANDATORY fixups to existing tests (compile/runtime breakers)
+- **New required ctor arg `setWallpaperScrimAlphaUseCase`** — add at ALL SIX
+  construction sites or `:app` test compilation fails:
+  `LauncherViewModelContractTest.kt:244`, `LauncherViewModelTest.kt:240`,
+  `LauncherViewModelDoomsdayTest.kt:156`, `LauncherViewModelSecurityTest.kt:169`,
+  `MonolithicLauncherViewModelTest.kt:273`, and `LayoutDelegateTest.kt:76`.
+- **Stub the new eager Get-flow in every NON-relaxed `getLayoutSettingsUseCase`
+  mock** or it throws `MockKException` at construction — add
+  `every { wallpaperScrimAlpha } returns flowOf(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)`
+  to: `LauncherViewModelContractTest.kt:204`, `LauncherViewModelTest.kt:179`,
+  `LauncherViewModelDoomsdayTest.kt:113`, `LauncherViewModelSecurityTest.kt:133`,
+  and the ~5 non-relaxed blocks in `LayoutDelegateTest.kt` (53, 136, 154, 180,
+  200). `MonolithicLauncherViewModelTest.kt:202` is a *relaxed* mock → needs only
+  the ctor arg, no stub.
+- **`BackupSerializerRoundTripTest.kt` `FULLY_POPULATED`** (lines 46–92) asserts
+  whole-object equality (`assertThat(parsed!!.settings).isEqualTo(FULLY_POPULATED)`).
+  A nullable-default-null field left out of `FULLY_POPULATED` round-trips
+  null→null and the test passes while covering NOTHING. **Add a distinctive
+  non-default value** (e.g. `wallpaperScrimAlpha = 0.42f`) so the guard actually
+  exercises the new field and its strict-parse alias.
+- **Backup round-trip** — `BackupDataAssembler*Test.kt`: export → import restores
+  the value; absent field → default.
 - Purge/keep-list tests (`DataStoreMaintenanceRepositoryImplTest`, purge
-  completeness) pass automatically once §5.2-E sites 2 & 3 are done.
+  completeness) pass automatically once §5.2-E sites 2 & 3 are done — but if any
+  asserts an exact keep-list *count*, bump it by one.
 
 ---
 
@@ -400,11 +455,18 @@ Specifically:
 - `check-strings-parity.awk` — needs §5.4 (both locales).
 - `checkRule13` — all new comments/KDoc English (this file too is English).
 
-**Not triggered:** no new broad `catch`, so no `cancel_files` / `oom_files` /
-Rule-11 whitelist entry needed. `LayoutDelegate` already uses the
-`if (e is CancellationException) throw e` guard voluntarily; mirror it (it is not
-on the `cancel_files` list, so this is consistency, not enforcement). No
-`preferences.xml` entry (layoutScale has none either — dialog-driven).
+The new `LayoutDelegate` state adds a `Flow.catch { }` arm that logs at report
+level (`silentError`). That arm **is globally enforced** by
+`tools/check-flow-catch-rethrow.awk` (Rule 11): a logging `.catch` arm must
+rethrow `CancellationException` first. So the `if (e is CancellationException)
+throw e` line in §5.3-H is **required, not optional** — omit it and
+`checkConventions` fails. (This is separate from the `cancel_files` positive
+list, which covers `try/catch` clauses; `LayoutDelegate` is not on that list and
+does not need to be — no new broad `try/catch`.)
+
+**Not triggered:** no new broad `try/catch`, so no `cancel_files` / `oom_files` /
+Rule-11 whitelist entry needed. No `preferences.xml` entry (layoutScale has none
+either — dialog-driven).
 
 ---
 
@@ -450,4 +512,13 @@ directly over the wallpaper … the classifier becomes load-bearing again").
   yes) — or leave it out so a layout reset doesn't silently undo a legibility
   aid the user relies on? (Purge/factory-reset still clears it regardless.)
 - **String wording** (`layout_wallpaper_scrim`): "Wallpaper dimming" vs
-  "Background dimming" vs "Legibility dim".
+  "Background dimming". Avoid "Legibility dim" — it oversells the scrim as a
+  legibility guarantee (that is the outline's job; the scrim only eases the
+  light-text case, see §1).
+- **Off-grid slider values:** `stepSize = 0.05` but the restore/setter coerce
+  only to MIN/MAX, not to the grid. A hand-edited or legacy backup value not on
+  the 0.05 grid, assigned to the Material `Slider`, throws
+  `IllegalArgumentException` (caught by `safeRun`/`silentError` → rethrows in
+  DEBUG). Shared with the existing sliders and the app's own exports are always
+  on-grid, so acceptable as-is; snap to step in restore/setter only if strictness
+  is wanted.
