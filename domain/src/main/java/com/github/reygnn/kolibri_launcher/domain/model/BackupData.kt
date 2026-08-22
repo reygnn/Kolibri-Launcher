@@ -97,6 +97,8 @@ data class LauncherSettings(
     val textShadowEnabled: Boolean? = null,
     @JsonNames("layout_scale")
     val layoutScale: Float? = null,
+    @JsonNames("wallpaper_scrim_alpha")
+    val wallpaperScrimAlpha: Float? = null,
     @JsonNames("vertical_padding_scale")
     val verticalPaddingScale: Float? = null,
     @JsonNames("is_font_bold")

@@ -26,6 +26,7 @@ class LayoutSettingsUseCasesTest {
     private lateinit var repository: SettingsRepository
 
     private val layoutScaleFlow = MutableStateFlow(1.0f)
+    private val wallpaperScrimAlphaFlow = MutableStateFlow(0.0f)
     private val verticalPaddingFlow = MutableStateFlow(1.0f)
     private val isFontBoldFlow = MutableStateFlow(false)
     private val contentTopMarginFlow = MutableStateFlow(1.0f)
@@ -36,6 +37,7 @@ class LayoutSettingsUseCasesTest {
         MockKAnnotations.init(this)
 
         every { repository.layoutScaleStateFlow } returns layoutScaleFlow
+        every { repository.wallpaperScrimAlphaStateFlow } returns wallpaperScrimAlphaFlow
         every { repository.verticalPaddingStateFlow } returns verticalPaddingFlow
         every { repository.isFontBoldStateFlow } returns isFontBoldFlow
         every { repository.contentTopMarginScaleFlow } returns contentTopMarginFlow
@@ -47,6 +49,7 @@ class LayoutSettingsUseCasesTest {
         val useCase = GetLayoutSettingsUseCase(repository)
 
         assertSame(layoutScaleFlow, useCase.layoutScale)
+        assertSame(wallpaperScrimAlphaFlow, useCase.wallpaperScrimAlpha)
         assertSame(verticalPaddingFlow, useCase.verticalPadding)
         assertSame(isFontBoldFlow, useCase.isFontBold)
         assertSame(contentTopMarginFlow, useCase.contentTopMargin)
@@ -58,6 +61,13 @@ class LayoutSettingsUseCasesTest {
         val useCase = SetLayoutScaleUseCase(repository)
         useCase(1.5f)
         coVerify { repository.setLayoutScale(1.5f) }
+    }
+
+    @Test
+    fun `SetWallpaperScrimAlphaUseCase - delegates to repository`() = runTest {
+        val useCase = SetWallpaperScrimAlphaUseCase(repository)
+        useCase(0.3f)
+        coVerify { repository.setWallpaperScrimAlpha(0.3f) }
     }
 
     @Test

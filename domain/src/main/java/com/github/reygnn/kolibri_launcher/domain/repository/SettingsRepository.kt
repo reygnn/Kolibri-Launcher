@@ -27,6 +27,9 @@ interface SettingsRepository : Purgeable {
     val layoutScaleStateFlow: Flow<Float>
     suspend fun setLayoutScale(scale: Float)
 
+    val wallpaperScrimAlphaStateFlow: Flow<Float>
+    suspend fun setWallpaperScrimAlpha(alpha: Float)
+
     val verticalPaddingStateFlow: Flow<Float>
     suspend fun setVerticalPadding(scale: Float)
 

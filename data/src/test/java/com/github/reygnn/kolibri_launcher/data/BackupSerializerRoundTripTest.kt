@@ -54,6 +54,7 @@ class BackupSerializerRoundTripTest {
             chipBackgroundColor = -222,
             textShadowEnabled = true,
             layoutScale = 1.33f,
+            wallpaperScrimAlpha = 0.42f,
             verticalPaddingScale = 0.77f,
             isFontBold = true,
             contentTopMarginScale = 1.11f,

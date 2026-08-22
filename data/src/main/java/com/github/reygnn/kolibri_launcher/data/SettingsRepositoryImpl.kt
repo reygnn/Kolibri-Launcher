@@ -59,6 +59,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Float Keys
         val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
+        val WALLPAPER_SCRIM_ALPHA =
+            floatPreferencesKey(AppConstants.PrefKeys.WALLPAPER_SCRIM_ALPHA)
         val VERTICAL_PADDING_SCALE =
             floatPreferencesKey(AppConstants.PrefKeys.VERTICAL_PADDING_SCALE)
         val CONTENT_TOP_MARGIN_SCALE =
@@ -86,6 +88,7 @@ class SettingsRepositoryImpl @Inject constructor(
         PreferenceKeys.TEXT_COLOR.name,
         PreferenceKeys.CHIP_BACKGROUND_COLOR.name,
         PreferenceKeys.LAYOUT_SCALE.name,
+        PreferenceKeys.WALLPAPER_SCRIM_ALPHA.name,
         PreferenceKeys.VERTICAL_PADDING_SCALE.name,
         PreferenceKeys.CONTENT_TOP_MARGIN_SCALE.name,
     )
@@ -229,6 +232,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setLayoutScale(scale: Float) =
         putValue(PreferenceKeys.LAYOUT_SCALE, scale)
 
+    override val wallpaperScrimAlphaStateFlow: Flow<Float> =
+        valueFlow(PreferenceKeys.WALLPAPER_SCRIM_ALPHA, AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+
+    override suspend fun setWallpaperScrimAlpha(alpha: Float) =
+        putValue(PreferenceKeys.WALLPAPER_SCRIM_ALPHA, alpha)
+
     override val verticalPaddingStateFlow: Flow<Float> =
         valueFlow(PreferenceKeys.VERTICAL_PADDING_SCALE, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
 
@@ -278,6 +287,7 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.TEXT_COLOR)
             preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
             preferences.remove(PreferenceKeys.LAYOUT_SCALE)
+            preferences.remove(PreferenceKeys.WALLPAPER_SCRIM_ALPHA)
             preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
             preferences.remove(PreferenceKeys.IS_FONT_BOLD)
             preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)

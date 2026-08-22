@@ -35,6 +35,10 @@ object AppConstants {
     const val LAYOUT_SCALE_MIN = 0.0f
     const val LAYOUT_SCALE_MAX = 2.0f
 
+    // User-controlled home wallpaper scrim (opt-in dim for extreme wallpapers).
+    const val WALLPAPER_SCRIM_ALPHA_MIN = 0.0f
+    const val WALLPAPER_SCRIM_ALPHA_MAX = 0.5f
+
 
     const val VERTICAL_PADDING_SCALE_MIN = 0.0f
     const val VERTICAL_PADDING_SCALE_MAX = 2.0f
@@ -46,6 +50,8 @@ object AppConstants {
 
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
     const val DEFAULT_LAYOUT_SCALE = 0.05f
+    // Opt-in: scrim off by default keeps already-dark wallpapers untouched.
+    const val DEFAULT_WALLPAPER_SCRIM_ALPHA = 0.0f
     const val DEFAULT_VERTICAL_PADDING_FACTOR = 0.6f
     const val DEFAULT_FONT_BOLD = true
     const val DEFAULT_TOP_MARGIN = 0f
@@ -226,6 +232,7 @@ object AppConstants {
 
         // Layout & Scaling
         const val LAYOUT_SCALE = "layout_scale"
+        const val WALLPAPER_SCRIM_ALPHA = "wallpaper_scrim_alpha"
         const val VERTICAL_PADDING_SCALE = "vertical_padding_scale"
         const val CONTENT_TOP_MARGIN_SCALE = "content_top_margin_scale"
         const val FAVORITES_ALIGNMENT = "favorites_alignment"

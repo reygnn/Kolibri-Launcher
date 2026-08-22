@@ -159,6 +159,7 @@ class BackupSerializer @Inject constructor() {
                 backup.settings.chipBackgroundColor != null ||
                 backup.settings.textShadowEnabled != null ||
                 backup.settings.layoutScale != null ||
+                backup.settings.wallpaperScrimAlpha != null ||
                 backup.settings.verticalPaddingScale != null ||
                 backup.settings.isFontBold != null ||
                 backup.settings.contentTopMarginScale != null ||
@@ -321,6 +322,7 @@ class BackupSerializer @Inject constructor() {
             textColor = settings.getStrictInt("textColor", "text_color") ?: base.textColor,
             chipBackgroundColor = settings.getStrictInt("chipBackgroundColor", "chip_bg_color") ?: base.chipBackgroundColor,
             layoutScale = settings.getStrictFloat("layoutScale", "layout_scale") ?: base.layoutScale,
+            wallpaperScrimAlpha = settings.getStrictFloat("wallpaperScrimAlpha", "wallpaper_scrim_alpha") ?: base.wallpaperScrimAlpha,
             verticalPaddingScale = settings.getStrictFloat("verticalPaddingScale", "vertical_padding_scale") ?: base.verticalPaddingScale,
             contentTopMarginScale = settings.getStrictFloat("contentTopMarginScale", "top_margin_scale") ?: base.contentTopMarginScale,
             wallpaperUri = settings.getStrictString("wallpaperUri", "wallpaper_uri") ?: base.wallpaperUri,
@@ -387,7 +389,7 @@ class BackupSerializer @Inject constructor() {
             }
 
             val floatFields = listOf(
-                "layout_scale", "vertical_padding_scale", "top_margin_scale",
+                "layout_scale", "wallpaper_scrim_alpha", "vertical_padding_scale", "top_margin_scale",
                 "wallpaper_scale", "wallpaper_translate_x", "wallpaper_translate_y",
             )
             for (field in floatFields) {

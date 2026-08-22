@@ -104,6 +104,16 @@ abstract class SettingsRepositoryContract {
     }
 
     @Test
+    fun `fresh repository emits default wallpaperScrimAlpha`() = runTest {
+        val repo = createRepository()
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
+            repo.wallpaperScrimAlphaStateFlow.first(),
+            0.0001f
+        )
+    }
+
+    @Test
     fun `fresh repository has onboarding not completed`() = runTest {
         val repo = createRepository()
         assertFalse(repo.onboardingCompletedFlow.first())
@@ -159,6 +169,14 @@ abstract class SettingsRepositoryContract {
         val newScale = AppConstants.DEFAULT_LAYOUT_SCALE + 0.25f
         repo.setLayoutScale(newScale)
         assertEquals(newScale, repo.layoutScaleStateFlow.first(), 0.0001f)
+    }
+
+    @Test
+    fun `setWallpaperScrimAlpha reflects in flow`() = runTest {
+        val repo = createRepository()
+        val newAlpha = AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA + 0.25f
+        repo.setWallpaperScrimAlpha(newAlpha)
+        assertEquals(newAlpha, repo.wallpaperScrimAlphaStateFlow.first(), 0.0001f)
     }
 
     @Test
@@ -219,6 +237,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         repo.setTextColor(0xDEADBEEF.toInt())
         repo.setLayoutScale(AppConstants.DEFAULT_LAYOUT_SCALE + 0.5f)
+        repo.setWallpaperScrimAlpha(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA + 0.3f)
         repo.setFontBold(!AppConstants.DEFAULT_FONT_BOLD)
 
         repo.purgeRepository()
@@ -227,6 +246,11 @@ abstract class SettingsRepositoryContract {
         assertEquals(
             AppConstants.DEFAULT_LAYOUT_SCALE,
             repo.layoutScaleStateFlow.first(),
+            0.0001f
+        )
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
+            repo.wallpaperScrimAlphaStateFlow.first(),
             0.0001f
         )
         assertEquals(AppConstants.DEFAULT_FONT_BOLD, repo.isFontBoldStateFlow.first())

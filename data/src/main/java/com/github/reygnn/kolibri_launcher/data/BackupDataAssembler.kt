@@ -98,6 +98,7 @@ class BackupDataAssembler @Inject constructor(
         val textShadowEnabled = settingsRepository.textShadowEnabledFlow.first()
         val chipBackgroundColor = settingsRepository.chipBackgroundColorFlow.first()
         val layoutScale = settingsRepository.layoutScaleStateFlow.first()
+        val wallpaperScrimAlpha = settingsRepository.wallpaperScrimAlphaStateFlow.first()
         val verticalPaddingScale = settingsRepository.verticalPaddingStateFlow.first()
         val isFontBold = settingsRepository.isFontBoldStateFlow.first()
         val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
@@ -136,6 +137,7 @@ class BackupDataAssembler @Inject constructor(
             swipeRightApp = swipeRightApp,
             textColor = textColor,
             layoutScale = layoutScale,
+            wallpaperScrimAlpha = wallpaperScrimAlpha,
             verticalPaddingScale = verticalPaddingScale,
             isFontBold = isFontBold,
             contentTopMarginScale = contentTopMarginScale,
@@ -316,6 +318,9 @@ class BackupDataAssembler @Inject constructor(
 
             backup.settings.layoutScale?.let {
                 settingsRepository.setLayoutScale(it.coerceInSafe(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX))
+            }
+            backup.settings.wallpaperScrimAlpha?.let {
+                settingsRepository.setWallpaperScrimAlpha(it.coerceInSafe(AppConstants.WALLPAPER_SCRIM_ALPHA_MIN, AppConstants.WALLPAPER_SCRIM_ALPHA_MAX))
             }
             backup.settings.verticalPaddingScale?.let {
                 settingsRepository.setVerticalPadding(it.coerceInSafe(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX))

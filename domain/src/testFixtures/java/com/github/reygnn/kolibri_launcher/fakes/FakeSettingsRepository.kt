@@ -54,6 +54,7 @@ class FakeSettingsRepository : SettingsRepository {
     private val colorFlow = MutableStateFlow(AppConstants.DEFAULT_TEXT_COLOR)
     private val chipBgColorFlow = MutableStateFlow(AppConstants.DEFAULT_CHIP_BG_COLOR)
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
+    private val wallpaperScrimAlphaFlow = MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     private val isFontBoldFlow = MutableStateFlow(AppConstants.DEFAULT_FONT_BOLD)
     private val contentTopMarginFlow = MutableStateFlow(AppConstants.DEFAULT_TOP_MARGIN)
@@ -95,6 +96,10 @@ class FakeSettingsRepository : SettingsRepository {
     var layoutScale: Float
         get() = layoutScaleFlow.value
         set(value) { layoutScaleFlow.value = value }
+
+    var wallpaperScrimAlpha: Float
+        get() = wallpaperScrimAlphaFlow.value
+        set(value) { wallpaperScrimAlphaFlow.value = value }
 
     var verticalPadding: Float
         get() = verticalPaddingFlow.value
@@ -138,6 +143,7 @@ class FakeSettingsRepository : SettingsRepository {
     override val textColorFlow: Flow<Int> = colorFlow
     override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
     override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
+    override val wallpaperScrimAlphaStateFlow: Flow<Float> = wallpaperScrimAlphaFlow
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
     override val isFontBoldStateFlow: Flow<Boolean> = isFontBoldFlow
     override val contentTopMarginScaleFlow: Flow<Float> = contentTopMarginFlow
@@ -163,6 +169,10 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setLayoutScale(scale: Float) {
         layoutScale = scale
+    }
+
+    override suspend fun setWallpaperScrimAlpha(alpha: Float) {
+        wallpaperScrimAlpha = alpha
     }
 
     override suspend fun setVerticalPadding(scale: Float) {
@@ -216,6 +226,7 @@ class FakeSettingsRepository : SettingsRepository {
         chipBgColor = AppConstants.DEFAULT_CHIP_BG_COLOR
 
         layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
+        wallpaperScrimAlpha = AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA
         verticalPadding = AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR
         isFontBold = AppConstants.DEFAULT_FONT_BOLD
         contentTopMargin = AppConstants.DEFAULT_TOP_MARGIN
