@@ -137,10 +137,11 @@ class HomeGestureLayout @JvmOverloads constructor(
      *
      * Detection IS consumption: a confirmed double tap is a committed gesture,
      * so it owns the rest of the touch sequence regardless of what the app does
-     * with it. Whether the clipboard action is enabled is decided later and
-     * elsewhere ([GestureDelegate]); the touch layer deliberately knows nothing
-     * about it, which is what keeps a single setting from being interpreted in
-     * two places. The one modal exception is handled by the `onDoubleTap`
+     * with it. What the double tap ultimately does (today: open the
+     * upcoming-events dialog) is decided later and elsewhere ([GestureDelegate]);
+     * the touch layer deliberately knows nothing about it, which keeps the
+     * gesture's meaning from being interpreted in two places. The one modal
+     * exception is handled by the `onDoubleTap`
      * null-check in the detector: in wallpaper-edit mode the double tap has no
      * listener, so it does not consume and the long-press stays free as the
      * EXIT gesture.

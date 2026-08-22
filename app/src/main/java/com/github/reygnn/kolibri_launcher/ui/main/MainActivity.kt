@@ -977,7 +977,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     /**
      * Upcoming time-based events (alarms + calendar) dialog for the home
-     * double-tap / events-indicator tap. Same top-anchored, wallpaper-aware,
+     * double-tap (the events indicator is a passive symbol, not a trigger). Same top-anchored, wallpaper-aware,
      * blur-behind presentation as [showRecentAppsDialog]. Rows are glyph-prefixed
      * by type via [TimeEventFormatter.formatEventRow] and actionable: an alarm row
      * opens the clock app, a calendar row opens the calendar. An empty list is a
@@ -988,7 +988,23 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (events.isEmpty()) return
 
         val is24Hour = DateFormat.is24HourFormat(this)
-        val labels = events.map { timeEventFormatter.formatEventRow(it, is24Hour) }
+        val labels = events.map { event ->
+            // Untitled events carry an empty title from :data (which holds no display
+            // strings); resolve the localized fallback here by type.
+            val titled = if (event.title.isBlank()) {
+                event.copy(
+                    title = getString(
+                        when (event.type) {
+                            TimeBasedEventType.ALARM -> R.string.events_fallback_alarm
+                            TimeBasedEventType.CALENDAR -> R.string.events_fallback_calendar
+                        }
+                    )
+                )
+            } else {
+                event
+            }
+            timeEventFormatter.formatEventRow(titled, is24Hour)
+        }
 
         // Same wallpaper-aware theming reasoning as showRecentAppsDialog: the row
         // layout's ?attr/colorOnSurface must resolve against the dialog overlay,
@@ -1086,8 +1102,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (isFinishing || isDestroyed) return
         currentDialog?.dismiss()
         // Clear the reference on dismiss, so a dismissed dialog — and whatever
-        // its button lambdas captured, up to 8 KB of clipboard text in the
-        // clipboard case — is not retained until the next dialog happens to
+        // its button lambdas captured (e.g. the recent-apps or upcoming-events
+        // list) — is not retained until the next dialog happens to
         // open. This Activity is HOME, so onDestroy effectively never runs.
         // Callers that need their own dismiss logic assign currentDialog
         // directly instead of going through here.

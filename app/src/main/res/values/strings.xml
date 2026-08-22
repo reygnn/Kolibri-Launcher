@@ -103,7 +103,9 @@
     <string name="recent_apps_title">Recent apps</string>
     <string name="recent_apps_empty">No recently opened apps yet</string>
     <string name="events_dialog_title">Upcoming</string>
-    <string name="events_indicator_content_description">Show upcoming alarms and events</string>
+    <string name="events_indicator_content_description">Upcoming alarms and events</string>
+    <string name="events_fallback_alarm">Alarm</string>
+    <string name="events_fallback_calendar">Event</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App Information</string>

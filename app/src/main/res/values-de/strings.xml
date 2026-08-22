@@ -98,7 +98,9 @@
     <string name="recent_apps_title">Zuletzt geöffnet</string>
     <string name="recent_apps_empty">Noch keine kürzlich geöffneten Apps</string>
     <string name="events_dialog_title">Anstehend</string>
-    <string name="events_indicator_content_description">Anstehende Alarme und Termine anzeigen</string>
+    <string name="events_indicator_content_description">Anstehende Alarme und Termine</string>
+    <string name="events_fallback_alarm">Alarm</string>
+    <string name="events_fallback_calendar">Termin</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App-Informationen</string>

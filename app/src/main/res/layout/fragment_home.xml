@@ -91,16 +91,16 @@
                     android:padding="@dimen/touch_target_padding"
                     android:layout_marginStart="@dimen/spacing_medium" />
 
-                <!-- Subtle indicator: replaces the old alarm/calendar chip row.
-                     GONE unless upcoming time-based events exist; tapping it (or a
-                     home double-tap) opens the events dialog. Tinted to the current
-                     text colour in HomeFragment.updateAllColors. -->
+                <!-- Passive status symbol (NOT clickable): replaces the old
+                     alarm/calendar chip row. GONE unless upcoming time-based events
+                     exist; it only signals that events exist — the dialog opens via
+                     the home double-tap. Tinted to the current text colour in
+                     HomeFragment.updateAllColors. -->
                 <ImageView
                     android:id="@+id/eventsIndicator"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/spacing_medium"
-                    android:padding="@dimen/touch_target_padding"
                     android:src="@drawable/ic_events_indicator"
                     android:contentDescription="@string/events_indicator_content_description"
                     android:visibility="gone" />

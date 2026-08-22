@@ -112,8 +112,11 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
             val nextAlarm = alarmManager.nextAlarmClock ?: return null
 
             TimeBasedEvent(
+                // Empty = "no title". The UI layer resolves a localized fallback by
+                // type (an alarm has no per-instance title from AlarmClock); keeping
+                // a display string out of :data honours the no-Android-resources rule.
                 triggerTimeMillis = nextAlarm.triggerTime,
-                title = "Alarm",
+                title = "",
                 type = TimeBasedEventType.ALARM
             )
         } catch (e: Exception) { // CancellationException ist hier unwahrscheinlich, aber Exception fängt alles außer Errors
@@ -172,7 +175,9 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                         try {
                             events.add(
                                 CalendarEvent(
-                                    title = cursor.getString(titleIdx) ?: "Event",
+                                    // Empty = untitled → UI resolves a localized
+                                    // fallback (no display strings in :data).
+                                    title = cursor.getString(titleIdx).orEmpty(),
                                     startTimeMillis = cursor.getLong(beginIdx),
                                     endTimeMillis = cursor.getLong(endIdx)
                                 )

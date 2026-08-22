@@ -115,6 +115,27 @@ class GestureDelegateTest {
         assertTrue(sentEvents.all { it is UiEvent.ShowTimeBasedEventsDialog })
     }
 
+    @Test
+    fun `onDoubleTap reads the snapshot at tap-time, not construction-time`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // Pins the documented freshness contract: the delegate is built once per
+            // session but must reflect the CURRENT events (alarms fire / new ones
+            // appear after construction). Build while empty, change the snapshot,
+            // then tap — the dialog must carry the NEW list. A refactor that captured
+            // the list at construction would emit the (empty) construction-time value
+            // and fail here.
+            currentEvents = emptyList()
+            val delegate = createDelegate()
+
+            val later = listOf(alarm("Later"))
+            currentEvents = later
+
+            delegate.onDoubleTap()
+            advanceUntilIdle()
+
+            assertEquals(listOf(UiEvent.ShowTimeBasedEventsDialog(later)), sentEvents)
+        }
+
     // ===========================================
     // FLING UP
     // ===========================================

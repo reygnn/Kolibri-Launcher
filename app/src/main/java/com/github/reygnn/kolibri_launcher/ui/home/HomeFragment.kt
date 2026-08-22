@@ -979,9 +979,9 @@ class HomeFragment : Fragment() {
     /**
      * Toggles the subtle events indicator that replaced the old alarm/calendar
      * chip row: a single glyph shown only when upcoming time-based events exist.
-     * Tapping it (or a home double-tap) opens the events dialog — see
-     * [setupDoubleTapActions] and `GestureDelegate.onDoubleTap`. Pure View
-     * property writes (Rule 11).
+     * It is a PASSIVE status symbol — not clickable; the events dialog opens via
+     * the home double-tap (`GestureDelegate.onDoubleTap`), the bell just signals
+     * that events exist. Pure View property writes (Rule 11).
      */
     private fun updateEventsIndicator(events: List<TimeBasedEvent>) {
         if (_binding == null) return
@@ -1032,7 +1032,7 @@ class HomeFragment : Fragment() {
      * Sets the [HomeGestureLayout] callbacks that share the wallpaper-edit-mode
      * lifecycle (nulled while editing): the four directional swipes (up = app
      * drawer, down = recent apps, left/right = swipe actions) plus double-tap
-     * (clipboard action). Called once during initial wiring and again each
+     * (upcoming-events dialog). Called once during initial wiring and again each
      * time the user leaves wallpaper-edit mode (see
      * [applyWallpaperEditModeToGestures]). Long-press is wired separately in
      * [setupHomeGestures] because it must stay live in edit mode.
@@ -1095,12 +1095,10 @@ class HomeFragment : Fragment() {
             }
         })
 
-        // Single tap on the subtle events indicator opens the same upcoming-events
-        // dialog as a home double-tap (shared viewModel.onDoubleTap path). Pure
-        // listener registration — no throw to guard (Rule 11).
-        binding.eventsIndicator.setOnClickListener {
-            viewModel.onDoubleTap()
-        }
+        // The events indicator is a passive status symbol — deliberately NOT
+        // clickable. The events dialog opens only via the home double-tap
+        // (GestureDelegate.onDoubleTap); the bell just signals that upcoming
+        // alarms/events exist. See updateEventsIndicator.
     }
 
     /**

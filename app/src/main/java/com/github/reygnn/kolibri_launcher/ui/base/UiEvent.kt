@@ -32,9 +32,9 @@ sealed class UiEvent {
 
     /**
      * Show the upcoming time-based events (alarms + calendar) in a dialog.
-     * Fired by a home double-tap or a tap on the events indicator; only sent
-     * when the list is non-empty (an empty list means no indicator and a
-     * silent double-tap).
+     * Fired by a home double-tap; only sent when the list is non-empty (an empty
+     * list means no indicator and a silent double-tap). The events indicator is a
+     * passive symbol, not a trigger.
      */
     data class ShowTimeBasedEventsDialog(val events: List<TimeBasedEvent>) : UiEvent()
     object RefreshAppDrawer : UiEvent()

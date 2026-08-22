@@ -138,13 +138,18 @@ Reopen this entry if any of the following changes:
 
 ---
 
-## 2. Clipboard read pulls a URI-backed clip in whole
+## 2. (Resolved by removal) Clipboard read pulls a URI-backed clip in whole
 
-- **Status:** 🟡 Intentional / Documented
+- **Status:** ✅ Resolved by removal (0.99.196) — the double-tap clipboard
+  feature was deleted when the home double-tap was repurposed to open the
+  upcoming-events dialog. `MainActivity.readClipboard`, `ClipboardReader`,
+  `ClipboardActionResolver` and the whole vertical are gone, so the unbounded
+  URI read no longer exists. The historical explanation is kept below for
+  context.
 - **Frequency:** Rare — needs a multi-megabyte, URI-backed `text/*` clip
-- **Affected:** `MainActivity.readClipboard` (double-tap clipboard action)
+- **Affected:** `MainActivity.readClipboard` (double-tap clipboard action) — removed
 
-### Explanation
+### Explanation (historical)
 
 `readClipboard` calls `ClipData.Item.coerceToText`, and
 `ClipboardActionResolver.resolve` then discards everything past its
@@ -454,3 +459,57 @@ Reopen this entry if any of the following changes:
   is a different design; this trigger is about the automatic form.)
 - The outline is ever removed or made non-default — legibility would again rest
   solely on the classifier, reopening the checkerboard-class failure.
+
+---
+
+## 7. Upcoming-events dialog is gesture-only — not reachable via an accessibility service (TalkBack)
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Accessibility-service (TalkBack / Switch Access) users only, and
+  only while upcoming alarms/calendar events exist
+- **Affected:** the events indicator (a passive status symbol) + the home
+  double-tap that opens `MainActivity.showTimeBasedEventsDialog`
+
+### Explanation
+
+The events indicator bell is a **passive** status symbol — deliberately not
+clickable (see `HomeFragment.updateEventsIndicator` / `setupDoubleTapActions`).
+The upcoming-events dialog opens **only** via the home double-tap, which is a raw
+`GestureDetector.onDoubleTap` on `HomeGestureLayout`. TalkBack does not deliver a
+raw double-tap to a view's `GestureDetector`: its double-tap synthesizes an
+`ACTION_CLICK` on the currently accessibility-focused node, and the home root is
+not an accessibility-clickable node. So with an accessibility service enabled the
+bell is announced ("Upcoming alarms and events") but the dialog cannot be opened
+from the launcher.
+
+An earlier design had the bell clickable (which TalkBack *can* activate), but that
+clickable target was 36 dp — below the 48 dp touch-target minimum for sighted
+touch. The bell was made passive to resolve that; the accessibility side effect is
+the trade recorded here.
+
+### Why it is accepted
+
+Kolibri is a **gesture-first** launcher: every primary action — swipe up (app
+drawer), swipe down (recent apps), swipe left/right (swipe actions), double-tap,
+long-press — runs through the same raw `HomeGestureLayout` GestureDetector, none of
+which is TalkBack-reachable. The events dialog being gesture-only is consistent
+with that established posture, not a one-off gap. Adding a lone accessibility
+action just for this dialog would be an accessibility island in an otherwise
+gesture-only surface. Crucially, the dialog is a **convenience aggregator**: every
+row deep-links into the clock or calendar app, and those upcoming alarms/events
+remain fully reachable — and fully accessible — in those native apps. No unique
+data or function is lost, only the aggregated shortcut. The indicator's
+`contentDescription` is phrased as a status ("Upcoming alarms and events"), not an
+action, so it does not advertise a button that isn't there.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- The launcher gains general accessibility-service navigation for its gestures
+  (e.g. accessibility actions on the home surface) — then wiring the events dialog
+  into that scheme is consistent rather than an island, and should be done.
+- The events dialog ever surfaces information that is **not** also reachable in the
+  native clock/calendar apps (i.e. it stops being a pure aggregator).
+- Feedback from an assistive-technology user indicates the announced-but-unopenable
+  bell is a real obstacle in practice.
