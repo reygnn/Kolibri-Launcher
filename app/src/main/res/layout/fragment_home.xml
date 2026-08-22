@@ -113,21 +113,27 @@
 
     </LinearLayout>
 
-    <!-- Passive events indicator (NOT clickable): pinned to the top-right, next
-         to the clock. Shown only when upcoming time-based events exist; it just
-         signals that events exist — the dialog opens via the home double-tap. A
-         sibling of rootLayout (ConstraintLayout child) so it stays in the corner
-         regardless of the favorites alignment, which shifts the time block.
-         Anchored to rootLayout, which carries the system-bar insets as padding;
-         the status bar is hidden on home so no top-inset offset is needed. Tinted
-         to the text colour in HomeFragment.updateAllColors. -->
-    <ImageView
+    <!-- Passive events indicator (NOT clickable): a bold "!" pinned top-right,
+         next to the clock. Shown only when upcoming time-based events exist; it
+         just signals that events exist — the dialog opens via the home double-tap.
+         A text glyph in an OutlinedTextView, so it inherits the SAME adaptive
+         glyph-outline + text-colour treatment as the clock/date/battery
+         (HomeFragment.updateAllColors) — no drawable, legible over any wallpaper.
+         Sibling of rootLayout (ConstraintLayout child) so it stays in the corner
+         regardless of the favorites alignment. Anchored to rootLayout, which
+         carries the system-bar insets as padding; the status bar is hidden on
+         home so no top-inset offset is needed. contentDescription overrides the
+         "!" glyph for TalkBack. -->
+    <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
         android:id="@+id/eventsIndicator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="90dp"
+        android:layout_marginTop="80dp"
         android:layout_marginEnd="@dimen/layout_padding"
-        android:src="@drawable/ic_events_indicator"
+        android:text="!"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:textColor="@color/default_text_color"
         android:contentDescription="@string/events_indicator_content_description"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="@id/rootLayout"

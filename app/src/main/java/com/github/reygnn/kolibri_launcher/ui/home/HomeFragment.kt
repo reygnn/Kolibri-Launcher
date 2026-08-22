@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.net.Uri
@@ -958,7 +957,11 @@ class HomeFragment : Fragment() {
         binding.batteryText.setTextColor(textColor)
         binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
-        binding.eventsIndicator.imageTintList = ColorStateList.valueOf(textColor)
+        // The events indicator is a text glyph ("!") in an OutlinedTextView, so it
+        // gets the exact same adaptive treatment as the clock/date/battery: text
+        // colour + the tonal contrast outline (background-independent legibility).
+        binding.eventsIndicator.setTextColor(textColor)
+        binding.eventsIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
     }
 
