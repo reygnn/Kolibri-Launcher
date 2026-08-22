@@ -1586,6 +1586,93 @@ class WallpaperDelegateTest {
         verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
     }
 
+    // ===========================================
+    // wallpaperImageChanged signal (scrim-reset offer)
+    // ===========================================
+
+    @Test
+    fun `onClearWallpaper signals wallpaper image changed`() = runTest {
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onClearWallpaper()
+        advanceUntilIdle()
+
+        assertEquals(1, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `onSetWallpaperImage outside edit mode signals immediately`() = runTest {
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onSetWallpaperImage(testUri)          // picker path, no session
+        advanceUntilIdle()
+
+        assertEquals(1, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `an in-session image change signals on commit, not before`() = runTest {
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+        assertEquals("deferred while editing (scrim is hidden there)", 0, events.size)
+
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+        assertEquals("surfaces on commit", 1, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `transform-only commit does not signal`() = runTest {
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCommitWallpaperEditMode()           // no image mutation -> no emit
+        advanceUntilIdle()
+
+        assertEquals(0, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `cancel after an in-session image change does not signal`() = runTest {
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+        delegate.onCancelWallpaperEditMode()           // rollback -> no emit
+        advanceUntilIdle()
+
+        assertEquals(0, events.size)
+        job.cancel()
+    }
+
     @Test
     fun `onSetWallpaperEditMode(true) behaves like onEnterWallpaperEditMode`() = runTest {
         // Regression guard: legacy API must still snapshot the state

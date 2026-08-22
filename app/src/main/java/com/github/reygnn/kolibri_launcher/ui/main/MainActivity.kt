@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /*
  * =============================================================================
@@ -395,6 +396,16 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         lifecycleScope.launch(mainActivityExceptionHandler) {
             resolveWallpaperSurfaceUseCase().collect { classification ->
                 currentSurfaceClassification = classification
+            }
+        }
+
+        // Offer to reset a leftover wallpaper scrim after the wallpaper image was
+        // cleared or replaced (only fires when the scrim is non-zero — see
+        // LauncherViewModel.offerScrimResetEvents), so a dim tuned for an extreme
+        // wallpaper doesn't silently darken a fresh, normal one.
+        lifecycleScope.launch(mainActivityExceptionHandler) {
+            viewModel.offerScrimResetEvents.collect { currentAlpha ->
+                offerScrimReset(currentAlpha)
             }
         }
 
@@ -1242,6 +1253,25 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 viewModel.onClearWallpaper()
             }
             .setNegativeButton(getString(R.string.cancel), null)
+        showDialog(builder)
+    }
+
+    /**
+     * Offers to reset the wallpaper scrim after the wallpaper image changed while a
+     * non-zero dim is set (gated in [LauncherViewModel.offerScrimResetEvents]). An
+     * offer, never a silent override: the user may deliberately keep the dim.
+     * Routed through [showDialog] for the same window-teardown tracking as the
+     * remove-wallpaper confirm.
+     */
+    private fun offerScrimReset(currentAlpha: Float) {
+        val percent = (currentAlpha * 100f).roundToInt()
+        val builder = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
+            .setTitle(getString(R.string.scrim_reset_offer_title))
+            .setMessage(getString(R.string.scrim_reset_offer_message, percent))
+            .setPositiveButton(getString(R.string.scrim_reset_offer_confirm)) { _, _ ->
+                viewModel.onSetWallpaperScrimAlpha(0f)
+            }
+            .setNegativeButton(getString(R.string.scrim_reset_offer_keep), null)
         showDialog(builder)
     }
 

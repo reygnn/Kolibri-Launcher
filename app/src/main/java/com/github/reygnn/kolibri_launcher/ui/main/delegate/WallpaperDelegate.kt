@@ -155,9 +155,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 
@@ -203,6 +206,21 @@ class WallpaperDelegate(
 
     private val _isWallpaperEditMode = MutableStateFlow(false)
     val isWallpaperEditMode: StateFlow<Boolean> = _isWallpaperEditMode.asStateFlow()
+
+    /**
+     * Fires when the wallpaper IMAGE content changed — a new/replaced image
+     * ([onSetWallpaperImage]), an added layer ([onAddWallpaperLayer]), or a full
+     * clear ([onClearWallpaper]). A pan/zoom-only edit ([onSaveWallpaperTransform])
+     * and a cancelled session do NOT fire. A change made inside an edit session is
+     * DEFERRED to commit (see [signalImageChanged] / [sessionImageChanged]); a
+     * standalone change (the picker path, no session) fires immediately. Neutral
+     * signal: the ViewModel decides what to do with it (offer to reset the wallpaper
+     * scrim when it is non-zero, so a leftover dim doesn't silently darken a fresh,
+     * non-extreme wallpaper). Buffered (extraBufferCapacity) so the emit never
+     * suspends — the emitters run outside a collector-guaranteed context.
+     */
+    private val _wallpaperImageChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val wallpaperImageChanged: SharedFlow<Unit> = _wallpaperImageChanged.asSharedFlow()
 
     /**
      * One-shot signal that the next state emission carries a layer that
@@ -261,6 +279,15 @@ class WallpaperDelegate(
      * null when not in an edit session.
      */
     private var editSnapshot: WallpaperState? = null
+
+    /**
+     * Set when an image mutation (set/add) happens DURING an edit session, so the
+     * scrim-reset offer is deferred to [onCommitWallpaperEditMode] instead of popping
+     * over the edit UI (where the scrim is hidden anyway). Reset on enter/commit/cancel.
+     * A standalone (non-edit) image change emits immediately instead — see
+     * [signalImageChanged].
+     */
+    private var sessionImageChanged = false
 
     /**
      * Guards the lazy cache refill ([refillCache]) against CONCURRENT runs: true
@@ -494,6 +521,8 @@ class WallpaperDelegate(
             return@launchSafe
         }
         setWallpaperImageUseCase(internalUri.toString())
+        // A new/replaced image → offer a scrim reset (deferred to commit if in a session).
+        signalImageChanged()
         // No success toast: the new wallpaper IS the confirmation — it is on screen
         // before any toast could be read. The previous one showed the picked file's
         // DISPLAY_NAME, which on a SAF/cloud provider is an opaque temporary name.
@@ -563,6 +592,10 @@ class WallpaperDelegate(
             _wallpaperState.value = WallpaperState.NONE
         }
         scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
+        // The image content is gone → offer a scrim reset (so a leftover dim doesn't
+        // darken the now-revealed system wallpaper). Clear runs outside a session, so
+        // this surfaces immediately.
+        signalImageChanged()
     }
 
     /**
@@ -594,6 +627,7 @@ class WallpaperDelegate(
         editSnapshot = _wallpaperState.value
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
+        sessionImageChanged = false
         _isWallpaperEditMode.value = true
     }
 
@@ -602,11 +636,33 @@ class WallpaperDelegate(
      * from [onRemoveWallpaperLayer] are carried out, orphan tracking
      * is discarded, and in-memory state stays as-is (already persisted).
      */
+    /**
+     * Routes an image-content change to the scrim-reset offer: immediately when NOT
+     * in an edit session (the picker path — the change is already on the settled home
+     * screen), or deferred to [onCommitWallpaperEditMode] when mid-session so the
+     * offer doesn't cover the edit UI (where the scrim is hidden anyway).
+     */
+    private fun signalImageChanged() {
+        if (_isWallpaperEditMode.value) {
+            sessionImageChanged = true
+        } else {
+            _wallpaperImageChanged.tryEmit(Unit)
+        }
+    }
+
     fun onCommitWallpaperEditMode() {
         val filesToDelete = pendingRemovalsOnCommit.toSet()
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
         editSnapshot = null
+
+        // An image mutation during the session (deferred by [signalImageChanged] so
+        // the offer doesn't pop mid-edit, where the scrim is hidden anyway) surfaces
+        // now that the user is back on the settled home screen.
+        if (sessionImageChanged) {
+            sessionImageChanged = false
+            _wallpaperImageChanged.tryEmit(Unit)
+        }
 
         // No representation collapse needed anymore (was AUDIT-20 F13): a wallpaper
         // edited down to one layer already IS the canonical single-image form, so
@@ -870,6 +926,8 @@ class WallpaperDelegate(
         pendingRemovalsOnCancel.clear()
         pendingRemovalsOnCommit.clear()
         editSnapshot = null
+        // Rolled back → any in-session image change is void, no offer.
+        sessionImageChanged = false
 
         // Persist the restored snapshot / delete session-added files only when there is
         // something to do; the exit + cache warm below runs unconditionally (AUDIT-20 F11).
@@ -982,6 +1040,8 @@ class WallpaperDelegate(
             )
             applyState(mutation)
             persist(mutation)
+            // Added a layer → image content changed (deferred to commit in a session).
+            signalImageChanged()
         }
     }
 

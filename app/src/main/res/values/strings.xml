@@ -192,6 +192,10 @@
     <string name="more_settings">More Settings</string>
     <string name="text_shadow">Text Shadow</string>
     <string name="wallpaper_scrim">Wallpaper dimming</string>
+    <string name="scrim_reset_offer_title">Wallpaper dimming</string>
+    <string name="scrim_reset_offer_message">Wallpaper dimming is still on (%1$d%%). Reset it for the new wallpaper?</string>
+    <string name="scrim_reset_offer_confirm">Reset</string>
+    <string name="scrim_reset_offer_keep">Keep</string>
     <string name="text_color">Text Color</string>
     <string name="color_automatic">Automatic</string>
 

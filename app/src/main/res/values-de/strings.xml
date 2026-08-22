@@ -185,6 +185,10 @@
     <string name="more_settings">Weitere Einstellungen</string>
     <string name="text_shadow">Textschatten</string>
     <string name="wallpaper_scrim">Hintergrund abdunkeln</string>
+    <string name="scrim_reset_offer_title">Hintergrund abdunkeln</string>
+    <string name="scrim_reset_offer_message">Das Abdunkeln ist noch aktiv (%1$d%%). Für das neue Wallpaper zurücksetzen?</string>
+    <string name="scrim_reset_offer_confirm">Zurücksetzen</string>
+    <string name="scrim_reset_offer_keep">Behalten</string>
     <string name="text_color">Textfarbe</string>
     <string name="color_automatic">Automatisch</string>
 

@@ -91,7 +91,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -292,6 +294,19 @@ class LauncherViewModel @Inject constructor(
 
     val wallpaperState: StateFlow<WallpaperState> get() = wallpaperDelegate.wallpaperState
     val isWallpaperEditMode: StateFlow<Boolean> get() = wallpaperDelegate.isWallpaperEditMode
+
+    /**
+     * Emits the current scrim alpha (as a value to display) whenever the wallpaper
+     * image changed (cleared or replaced) AND a non-zero scrim is set — the UI then
+     * offers to reset the scrim so a leftover dim doesn't darken a fresh, non-extreme
+     * wallpaper. Silent when the scrim is already 0 (nothing to offer). Coordinated
+     * here because it needs both delegates: the image-change signal (WallpaperDelegate)
+     * and the scrim value (ThemingDelegate).
+     */
+    val offerScrimResetEvents: Flow<Float> =
+        wallpaperDelegate.wallpaperImageChanged.mapNotNull {
+            wallpaperScrimAlphaState.value.takeIf { alpha -> alpha > 0f }
+        }
     val pendingFocusLayerId: StateFlow<String?> get() = wallpaperDelegate.pendingFocusLayerId
     val fabPosition: StateFlow<FabPosition> get() = wallpaperDelegate.fabPosition
 

@@ -14,6 +14,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
@@ -117,6 +118,7 @@ class LauncherViewModelTest {
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
     private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
+    private lateinit var getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase
     private lateinit var getFabPositionUseCase: GetFabPositionUseCase
     private lateinit var saveFabPositionUseCase: SaveFabPositionUseCase
     private lateinit var wallpaperFileManager: WallpaperFileManager
@@ -199,6 +201,7 @@ class LauncherViewModelTest {
         saveWallpaperStateUseCase = mockk(relaxed = true)
         setWallpaperImageUseCase = mockk(relaxed = true)
         clearWallpaperUseCase = mockk(relaxed = true)
+        getWallpaperScrimAlphaUseCase = mockk(relaxed = true)
         getFabPositionUseCase = mockk(relaxed = true)
         every { getFabPositionUseCase.invoke() } returns emptyFlow()
         saveFabPositionUseCase = mockk(relaxed = true)
@@ -239,7 +242,7 @@ class LauncherViewModelTest {
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
         setLayoutScaleUseCase = setLayoutScaleUseCase,
-        getWallpaperScrimAlphaUseCase = mockk(relaxed = true),
+        getWallpaperScrimAlphaUseCase = getWallpaperScrimAlphaUseCase,
         setWallpaperScrimAlphaUseCase = mockk(relaxed = true),
         setVerticalPaddingUseCase = setVerticalPaddingUseCase,
         setFontBoldUseCase = setFontBoldUseCase,
@@ -674,6 +677,42 @@ class LauncherViewModelTest {
 
         coVerify { wallpaperFileManager.clearAll() }
         coVerify { clearWallpaperUseCase.invoke() }
+    }
+
+    @Test
+    fun `offerScrimResetEvents emits current alpha when scrim is nonzero and wallpaper changes`() = runTest {
+        every { getWallpaperScrimAlphaUseCase.invoke() } returns flowOf(0.25f)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        val offers = mutableListOf<Float>()
+        val collectorJob = launch(UnconfinedTestDispatcher()) {
+            vm.offerScrimResetEvents.collect { offers.add(it) }
+        }
+
+        vm.onClearWallpaper()
+        advanceUntilIdle()
+
+        assertEquals(listOf(0.25f), offers)
+        collectorJob.cancel()
+    }
+
+    @Test
+    fun `offerScrimResetEvents stays silent when scrim is zero`() = runTest {
+        // getWallpaperScrimAlphaUseCase is a relaxed mock -> empty flow -> scrim stays 0.
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        val offers = mutableListOf<Float>()
+        val collectorJob = launch(UnconfinedTestDispatcher()) {
+            vm.offerScrimResetEvents.collect { offers.add(it) }
+        }
+
+        vm.onClearWallpaper()
+        advanceUntilIdle()
+
+        assertTrue(offers.isEmpty())
+        collectorJob.cancel()
     }
 
     @Test
