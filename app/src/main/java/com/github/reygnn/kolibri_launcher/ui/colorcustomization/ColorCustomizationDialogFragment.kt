@@ -4,9 +4,11 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import com.github.reygnn.kolibri_launcher.ui.util.configureBottomSheetWindow
 import com.github.reygnn.kolibri_launcher.ui.util.enableDialogDrag
+import com.github.reygnn.kolibri_launcher.ui.util.fadeTo
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.tintTextViews
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -24,6 +26,7 @@ import com.github.reygnn.kolibri_launcher.ui.util.toSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.home.ScrimRender
@@ -142,9 +145,32 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         binding.sliderWallpaperScrim.apply {
             valueFrom = AppConstants.WALLPAPER_SCRIM_ALPHA_MIN
             valueTo = AppConstants.WALLPAPER_SCRIM_ALPHA_MAX
-            addOnChangeListener { _, value, fromUser ->
-                if (fromUser) viewModel.onSetWallpaperScrimAlpha(value)
+
+            addOnChangeListener { slider, value, fromUser ->
+                if (fromUser) {
+                    // Tactile tick per step while dragging.
+                    slider.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+                    viewModel.onSetWallpaperScrimAlpha(value)
+                }
             }
+
+            // While dragging, fully hide the dialog so the scrim result over the
+            // wallpaper is visible immediately. The dialog window has no dim
+            // (FLAG_DIM_BEHIND is cleared in configureBottomSheetWindow), so an
+            // alpha-0 root reveals the live home screen; an alpha-0 View still
+            // receives touches, so the drag keeps tracking. Stronger than the
+            // Layout & Size dialog, which only fades to 0.2.
+            addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(slider: Slider) {
+                    _binding?.root?.fadeTo(0f)
+                }
+
+                override fun onStopTrackingTouch(slider: Slider) {
+                    _binding?.root?.fadeTo(1f)
+                    // Confirm the committed value.
+                    slider.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+            })
         }
 
         collectOnStarted(
@@ -296,6 +322,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         if (_binding != null) {
             binding.dragHandle.setOnTouchListener(null)
             binding.sliderWallpaperScrim.clearOnChangeListeners()
+            binding.sliderWallpaperScrim.clearOnSliderTouchListeners()
 
             // Container leeren hilft dem GC zusätzlich
             binding.colorPaletteContainer.removeAllViews()
