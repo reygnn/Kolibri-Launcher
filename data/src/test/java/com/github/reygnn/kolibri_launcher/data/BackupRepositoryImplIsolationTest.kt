@@ -75,7 +75,6 @@ class BackupRepositoryImplIsolationTest {
 
     // Settings Baseline
     private val baselineColor = Color.BLACK
-    private val baselineChipColor = Color.DKGRAY
     private val baselineShadow = true
     private val baselineScale = 1.0f
     private val baselinePadding = 1.0f
@@ -98,7 +97,6 @@ class BackupRepositoryImplIsolationTest {
 
     // Settings Target
     private val targetColor = Color.MAGENTA
-    private val targetChipColor = Color.CYAN
     private val targetShadow = false
     private val targetScale = 1.5f
     private val targetPadding = 0.5f
@@ -165,7 +163,6 @@ class BackupRepositoryImplIsolationTest {
         fakeSwipeRepo.swipeRightApp = baselineSwipeRight
 
         fakeSettingsRepo.color = baselineColor
-        fakeSettingsRepo.chipBgColor = baselineChipColor
         fakeSettingsRepo.shadow = baselineShadow
         fakeSettingsRepo.layoutScale = baselineScale
         fakeSettingsRepo.verticalPadding = baselinePadding
@@ -188,7 +185,6 @@ class BackupRepositoryImplIsolationTest {
             swipeLeftApp = targetSwipeLeft,
             swipeRightApp = targetSwipeRight,
             textColor = targetColor,
-            chipBackgroundColor = targetChipColor,
             textShadowEnabled = targetShadow,
             layoutScale = targetScale,
             verticalPaddingScale = targetPadding,
@@ -363,7 +359,6 @@ class BackupRepositoryImplIsolationTest {
 
         // CHANGED:
         assertThat(fakeSettingsRepo.color).isEqualTo(targetColor)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(targetChipColor)
         assertThat(fakeSettingsRepo.shadow).isEqualTo(targetShadow)
         assertThat(fakeSettingsRepo.layoutScale).isEqualTo(targetScale)
         assertThat(fakeSettingsRepo.verticalPadding).isEqualTo(targetPadding)
@@ -481,7 +476,6 @@ class BackupRepositoryImplIsolationTest {
 
     private fun assertThemeUnchanged() {
         assertThat(fakeSettingsRepo.color).isEqualTo(baselineColor)
-        assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(baselineChipColor)
         assertThat(fakeSettingsRepo.shadow).isEqualTo(baselineShadow)
         assertThat(fakeSettingsRepo.layoutScale).isEqualTo(baselineScale)
         assertThat(fakeSettingsRepo.verticalPadding).isEqualTo(baselinePadding)

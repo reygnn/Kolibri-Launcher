@@ -20,8 +20,6 @@ interface SettingsRepository : Purgeable {
     val textColorFlow: Flow<Int>
     suspend fun setTextColor(color: Int)
 
-    val chipBackgroundColorFlow: Flow<Int>
-    suspend fun setChipBackgroundColor(color: Int)
     val layoutScaleStateFlow: Flow<Float>
     suspend fun setLayoutScale(scale: Float)
 

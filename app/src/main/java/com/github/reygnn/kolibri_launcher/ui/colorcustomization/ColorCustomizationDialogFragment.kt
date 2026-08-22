@@ -44,9 +44,8 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     @Inject
     lateinit var resolveWallpaperSurfaceUseCase: ResolveWallpaperSurfaceUseCase
 
-    // Zwei separate Listen für die UI-Zustände der Paletten
+    // UI-Zustand der Textfarben-Palette
     private val textSwatchViews = mutableMapOf<Int, MaterialCardView>()
-    private val chipBgSwatchViews = mutableMapOf<Int, MaterialCardView>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -110,17 +109,16 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
     /**
      * Walks the dialog tree and tints every [TextView] outside the
-     * swatch containers. The swatch containers (`color_palette_container`
-     * and `chip_bg_palette_container`) hold colour-preview cards whose
-     * background colour is the actual swatch — we must not overwrite
-     * those, and there is no TextView inside them anyway. Skipping
-     * them keeps the sweep cheap and future-proof against item layouts
-     * that ever add a text label inside a swatch.
+     * swatch container. The swatch container (`color_palette_container`)
+     * holds colour-preview cards whose background colour is the actual
+     * swatch — we must not overwrite those, and there is no TextView
+     * inside them anyway. Skipping it keeps the sweep cheap and
+     * future-proof against item layouts that ever add a text label
+     * inside a swatch.
      */
     private fun applyForegroundColorToLabels(root: ViewGroup, color: Int) {
         root.tintTextViews(color) { child ->
-            child.id == R.id.color_palette_container ||
-                child.id == R.id.chip_bg_palette_container
+            child.id == R.id.color_palette_container
         }
     }
 
@@ -190,24 +188,14 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     }
 
     /**
-     * Setzt beide Farbpaletten auf (Textfarbe und Chip-Hintergrund).
+     * Setzt die Textfarben-Palette auf.
      */
     private fun setupPalettes() {
-        // 1. Palette für Textfarbe füllen
         populatePalette(
             container = binding.colorPaletteContainer,
             swatchMap = textSwatchViews,
             onColorSelected = { color ->
                 viewModel.onSetTextColor(color)
-            }
-        )
-
-        // 2. Palette für Chip-Hintergrund füllen
-        populatePalette(
-            container = binding.chipBgPaletteContainer,
-            swatchMap = chipBgSwatchViews,
-            onColorSelected = { color ->
-                viewModel.onSetChipBackgroundColor(color)
             }
         )
     }
@@ -257,7 +245,7 @@ class ColorCustomizationDialogFragment : DialogFragment() {
     }
 
     /**
-     * Startet die Beobachtung beider Farb-Flows.
+     * Startet die Beobachtung des Textfarben-Flows.
      */
     private fun observeChanges() {
         collectOnStarted(
@@ -266,7 +254,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
             coroutineContext = Dispatchers.Main,
         ) { colorsState ->
             updateSelectedSwatchUI(colorsState.textColor, textSwatchViews)
-            updateSelectedSwatchUI(colorsState.chipBackgroundColor, chipBgSwatchViews)
         }
     }
 
@@ -315,7 +302,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
         // 1. Manuelle Referenzen auf Views löschen
         // Das ist wichtig, weil die Maps Views halten, die wiederum Listener auf 'this' haben.
         textSwatchViews.clear()
-        chipBgSwatchViews.clear()
 
         // 2. Listener vom DragHandle entfernen (optional, aber sauber)
         // Verhindert, dass der Listener noch Events feuert, während der View stirbt.
@@ -326,7 +312,6 @@ class ColorCustomizationDialogFragment : DialogFragment() {
 
             // Container leeren hilft dem GC zusätzlich
             binding.colorPaletteContainer.removeAllViews()
-            binding.chipBgPaletteContainer.removeAllViews()
         }
 
         // 3. Binding nullen

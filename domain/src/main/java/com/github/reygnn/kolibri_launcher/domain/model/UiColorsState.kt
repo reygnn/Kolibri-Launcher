@@ -7,6 +7,5 @@ package com.github.reygnn.kolibri_launcher.domain.model
  */
 data class UiColorsState(
     val textColor: Int = 0xFFFFFFFF.toInt(),
-    val shadowColor: Int = 0xFF000000.toInt(),
-    val chipBackgroundColor: Int = 0
+    val shadowColor: Int = 0xFF000000.toInt()
 )

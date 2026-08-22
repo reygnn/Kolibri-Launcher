@@ -51,7 +51,6 @@ class BackupSerializerRoundTripTest {
             swipeLeftApp = "com.a/A",
             swipeRightApp = "com.b/B",
             textColor = -111,
-            chipBackgroundColor = -222,
             textShadowEnabled = true,
             layoutScale = 1.33f,
             wallpaperScrimAlpha = 0.42f,
@@ -115,8 +114,8 @@ class BackupSerializerRoundTripTest {
         val json = serializer.encodeToJsonString(BackupData(settings = FULLY_POPULATED))
 
         assertThat(json).contains("\"swipeLeftApp\":")
-        assertThat(json).contains("\"chipBackgroundColor\":")
+        assertThat(json).contains("\"textColor\":")
         assertThat(json).doesNotContain("\"swipe_left_app\":")
-        assertThat(json).doesNotContain("\"chip_bg_color\":")
+        assertThat(json).doesNotContain("\"text_color\":")
     }
 }

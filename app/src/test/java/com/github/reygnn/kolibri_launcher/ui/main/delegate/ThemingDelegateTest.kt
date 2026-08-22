@@ -7,7 +7,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
@@ -46,7 +45,6 @@ class ThemingDelegateTest {
     private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
     private lateinit var setTextColorUseCase: SetTextColorUseCase
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-    private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
     private lateinit var getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase
     private lateinit var setWallpaperScrimAlphaUseCase: SetWallpaperScrimAlphaUseCase
@@ -59,7 +57,6 @@ class ThemingDelegateTest {
         observeUiColorsUseCase = mockk(relaxed = true)
         setTextColorUseCase = mockk(relaxed = true)
         setTextShadowEnabledUseCase = mockk(relaxed = true)
-        setChipBackgroundColorUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
         getWallpaperScrimAlphaUseCase = mockk(relaxed = true)
         setWallpaperScrimAlphaUseCase = mockk(relaxed = true)
@@ -80,7 +77,6 @@ class ThemingDelegateTest {
         observeUiColorsUseCase = observeUiColorsUseCase,
         setTextColorUseCase = setTextColorUseCase,
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
-        setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         getWallpaperScrimAlphaUseCase = getWallpaperScrimAlphaUseCase,
         setWallpaperScrimAlphaUseCase = setWallpaperScrimAlphaUseCase,
@@ -219,39 +215,6 @@ class ThemingDelegateTest {
     // ===========================================
     // SET CHIP BACKGROUND COLOR
     // ===========================================
-
-    @Test
-    fun `onSetChipBackgroundColor calls useCase with correct color`() = runTest {
-        val color = 0xFFFF0000.toInt()
-        val delegate = createDelegate()
-
-        delegate.onSetChipBackgroundColor(color)
-        advanceUntilIdle()
-
-        coVerify { setChipBackgroundColorUseCase.invoke(color) }
-    }
-
-    @Test
-    fun `onSetChipBackgroundColor shows error toast on failure`() = runTest {
-        coEvery { setChipBackgroundColorUseCase(any()) } throws RuntimeException("Fail")
-
-        val delegate = createDelegate()
-
-        delegate.onSetChipBackgroundColor(0xFF0000)
-        advanceUntilIdle()
-
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
-    }
-
-    @Test
-    fun `onSetChipBackgroundColor sends no event on success`() = runTest {
-        val delegate = createDelegate()
-
-        delegate.onSetChipBackgroundColor(0xFF0000)
-        advanceUntilIdle()
-
-        assertTrue(sentEvents.isEmpty())
-    }
 
     // ===========================================
     // QUERY: TEXT SHADOW ENABLED

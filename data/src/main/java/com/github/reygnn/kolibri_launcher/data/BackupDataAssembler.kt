@@ -96,7 +96,6 @@ class BackupDataAssembler @Inject constructor(
 
         val textColor = settingsRepository.textColorFlow.first()
         val textShadowEnabled = settingsRepository.textShadowEnabledFlow.first()
-        val chipBackgroundColor = settingsRepository.chipBackgroundColorFlow.first()
         val layoutScale = settingsRepository.layoutScaleStateFlow.first()
         val wallpaperScrimAlpha = settingsRepository.wallpaperScrimAlphaStateFlow.first()
         val verticalPaddingScale = settingsRepository.verticalPaddingStateFlow.first()
@@ -142,7 +141,6 @@ class BackupDataAssembler @Inject constructor(
             contentTopMarginScale = contentTopMarginScale,
             favoritesAlignment = favoritesAlignment.name,
             wallpaperSurfaceMode = wallpaperSurfaceMode.name,
-            chipBackgroundColor = chipBackgroundColor,
             textShadowEnabled = textShadowEnabled,
             wallpaperUri = wallpaperUri,
             wallpaperScale = wallpaperScale,
@@ -310,7 +308,6 @@ class BackupDataAssembler @Inject constructor(
         var droppedWallpaperLayers = 0
         if (options.importThemeSettings) {
             backup.settings.textColor?.let { settingsRepository.setTextColor(it) }
-            backup.settings.chipBackgroundColor?.let { settingsRepository.setChipBackgroundColor(it) }
             backup.settings.textShadowEnabled?.let { settingsRepository.setTextShadowEnabled(it) }
             backup.settings.isFontBold?.let { settingsRepository.setFontBold(it) }
 

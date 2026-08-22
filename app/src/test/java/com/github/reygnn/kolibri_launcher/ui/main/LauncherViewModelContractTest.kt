@@ -37,7 +37,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -123,7 +122,6 @@ class LauncherViewModelContractTest {
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var setTextColorUseCase: SetTextColorUseCase
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-    private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var setLayoutScaleUseCase: SetLayoutScaleUseCase
     private lateinit var setVerticalPaddingUseCase: SetVerticalPaddingUseCase
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
@@ -157,7 +155,6 @@ class LauncherViewModelContractTest {
         handleSwipeActionUseCase = mockk(relaxed = true)
         setTextColorUseCase = mockk(relaxed = true)
         setTextShadowEnabledUseCase = mockk(relaxed = true)
-        setChipBackgroundColorUseCase = mockk(relaxed = true)
         setLayoutScaleUseCase = mockk(relaxed = true)
         setVerticalPaddingUseCase = mockk(relaxed = true)
         setFontBoldUseCase = mockk(relaxed = true)
@@ -233,7 +230,6 @@ class LauncherViewModelContractTest {
             observeUiColorsUseCase = observeUiColorsUseCase,
             setTextColorUseCase = setTextColorUseCase,
             setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
-            setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
             observeInstalledAppsUseCase = observeInstalledAppsUseCase,
             getAutoLaunchSettingUseCase = getAutoLaunchSettingUseCase,
             observeHomeSettingsUseCase = observeHomeSettingsUseCase,
@@ -586,7 +582,6 @@ class LauncherViewModelContractTest {
 
         vm.onSetTextColor(0xFF0000)
         vm.onSetTextShadowEnabled(true)
-        vm.onSetChipBackgroundColor(0x00FF00)
         vm.onSetLayoutScale(0.7f)
         vm.onSetVerticalPadding(0.4f)
         vm.onSetFontBold(true)
@@ -595,7 +590,6 @@ class LauncherViewModelContractTest {
 
         coVerify { setTextColorUseCase.invoke(0xFF0000) }
         coVerify { setTextShadowEnabledUseCase.invoke(true) }
-        coVerify { setChipBackgroundColorUseCase.invoke(0x00FF00) }
         coVerify { setLayoutScaleUseCase.invoke(0.7f) }
         coVerify { setVerticalPaddingUseCase.invoke(0.4f) }
         coVerify { setFontBoldUseCase.invoke(true) }

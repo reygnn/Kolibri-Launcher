@@ -31,9 +31,8 @@ class ObserveUiColorsUseCase @Inject constructor(
         return combine(
             settingsRepository.textColorFlow,
             settingsRepository.textShadowEnabledFlow,
-            settingsRepository.chipBackgroundColorFlow,
             classifyWallpaperUseCase(),
-        ) { userColor, shadowEnabled, chipColor, classification ->
+        ) { userColor, shadowEnabled, classification ->
             // Pure Color-Math und Bitops — kann nicht werfen. Ein
             // Programmierfehler propagiert zum Consumer (BaseViewModel
             // mit launchSafe). Frühere Throwable-Catches hier waren
@@ -55,8 +54,7 @@ class ObserveUiColorsUseCase @Inject constructor(
 
             UiColorsState(
                 textColor = finalTextColor,
-                shadowColor = finalShadowColor,
-                chipBackgroundColor = chipColor
+                shadowColor = finalShadowColor
             )
         }
     }

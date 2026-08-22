@@ -145,7 +145,6 @@ class LauncherViewModelDoomsdayTest {
         observeUiColorsUseCase = observeUiColorsUseCase,
         setTextColorUseCase = mockk(relaxed = true),
         setTextShadowEnabledUseCase = mockk(relaxed = true),
-        setChipBackgroundColorUseCase = mockk(relaxed = true),
         observeInstalledAppsUseCase = observeInstalledAppsUseCase,
         getAutoLaunchSettingUseCase = mockk(relaxed = true),
         observeHomeSettingsUseCase = observeHomeSettingsUseCase,

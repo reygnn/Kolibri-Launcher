@@ -156,7 +156,6 @@ class BackupSerializer @Inject constructor() {
             hasSwipeLeft = backup.settings.swipeLeftApp != null,
             hasSwipeRight = backup.settings.swipeRightApp != null,
             hasThemeSettings = backup.settings.textColor != null ||
-                backup.settings.chipBackgroundColor != null ||
                 backup.settings.textShadowEnabled != null ||
                 backup.settings.layoutScale != null ||
                 backup.settings.wallpaperScrimAlpha != null ||
@@ -319,7 +318,6 @@ class BackupSerializer @Inject constructor() {
             swipeLeftApp = settings.getStrictString("swipeLeftApp", "swipe_left_app") ?: base.swipeLeftApp,
             swipeRightApp = settings.getStrictString("swipeRightApp", "swipe_right_app") ?: base.swipeRightApp,
             textColor = settings.getStrictInt("textColor", "text_color") ?: base.textColor,
-            chipBackgroundColor = settings.getStrictInt("chipBackgroundColor", "chip_bg_color") ?: base.chipBackgroundColor,
             layoutScale = settings.getStrictFloat("layoutScale", "layout_scale") ?: base.layoutScale,
             wallpaperScrimAlpha = settings.getStrictFloat("wallpaperScrimAlpha", "wallpaper_scrim_alpha") ?: base.wallpaperScrimAlpha,
             verticalPaddingScale = settings.getStrictFloat("verticalPaddingScale", "vertical_padding_scale") ?: base.verticalPaddingScale,
@@ -375,7 +373,7 @@ class BackupSerializer @Inject constructor() {
 
             val settings = root.getJSONObject("settings")
 
-            val intFields = listOf("text_color", "chip_bg_color")
+            val intFields = listOf("text_color")
             for (field in intFields) {
                 if (settings.has(field) && !settings.isNull(field)) {
                     val value = settings.get(field)

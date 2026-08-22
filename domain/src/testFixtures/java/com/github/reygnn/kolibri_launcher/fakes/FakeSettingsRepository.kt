@@ -52,7 +52,6 @@ class FakeSettingsRepository : SettingsRepository {
     // Visual Settings Defaults
     private val shadowFlow = MutableStateFlow(AppConstants.DEFAULT_TEXT_SHADOW_ENABLED)
     private val colorFlow = MutableStateFlow(AppConstants.DEFAULT_TEXT_COLOR)
-    private val chipBgColorFlow = MutableStateFlow(AppConstants.DEFAULT_CHIP_BG_COLOR)
     private val layoutScaleFlow = MutableStateFlow(AppConstants.DEFAULT_LAYOUT_SCALE)
     private val wallpaperScrimAlphaFlow = MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
     private val verticalPaddingFlow = MutableStateFlow(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
@@ -81,9 +80,6 @@ class FakeSettingsRepository : SettingsRepository {
         get() = colorFlow.value
         set(value) { colorFlow.value = value }
 
-    var chipBgColor: Int
-        get() = chipBgColorFlow.value
-        set(value) { chipBgColorFlow.value = value }
 
     var layoutScale: Float
         get() = layoutScaleFlow.value
@@ -133,7 +129,6 @@ class FakeSettingsRepository : SettingsRepository {
 
     override val textShadowEnabledFlow: Flow<Boolean> = shadowFlow
     override val textColorFlow: Flow<Int> = colorFlow
-    override val chipBackgroundColorFlow: Flow<Int> = chipBgColorFlow
     override val layoutScaleStateFlow: Flow<Float> = layoutScaleFlow
     override val wallpaperScrimAlphaStateFlow: Flow<Float> = wallpaperScrimAlphaFlow
     override val verticalPaddingStateFlow: Flow<Float> = verticalPaddingFlow
@@ -153,10 +148,6 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setTextColor(color: Int) {
         this.color = color
-    }
-
-    override suspend fun setChipBackgroundColor(color: Int) {
-        this.chipBgColor = color
     }
 
     override suspend fun setLayoutScale(scale: Float) {
@@ -211,7 +202,6 @@ class FakeSettingsRepository : SettingsRepository {
 
         color = AppConstants.DEFAULT_TEXT_COLOR
         shadow = AppConstants.DEFAULT_TEXT_SHADOW_ENABLED
-        chipBgColor = AppConstants.DEFAULT_CHIP_BG_COLOR
 
         layoutScale = AppConstants.DEFAULT_LAYOUT_SCALE
         wallpaperScrimAlpha = AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA

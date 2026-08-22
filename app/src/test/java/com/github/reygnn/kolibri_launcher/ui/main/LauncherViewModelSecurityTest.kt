@@ -22,7 +22,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
@@ -79,7 +78,6 @@ class LauncherViewModelSecurityTest {
     private lateinit var setFontBoldUseCase: SetFontBoldUseCase
     private lateinit var setTextColorUseCase: SetTextColorUseCase
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-    private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var toggleFavoriteUseCase: ToggleFavoriteUseCase
     private lateinit var hideAppUseCase: HideAppUseCase
     private lateinit var recordAppLaunchUseCase: RecordAppLaunchUseCase
@@ -97,7 +95,6 @@ class LauncherViewModelSecurityTest {
         setFontBoldUseCase = mockk(relaxed = true)
         setTextColorUseCase = mockk(relaxed = true)
         setTextShadowEnabledUseCase = mockk(relaxed = true)
-        setChipBackgroundColorUseCase = mockk(relaxed = true)
         toggleFavoriteUseCase = mockk(relaxed = true)
         hideAppUseCase = mockk(relaxed = true)
         recordAppLaunchUseCase = mockk(relaxed = true)
@@ -158,7 +155,6 @@ class LauncherViewModelSecurityTest {
             observeUiColorsUseCase = observeUiColorsUseCase,
             setTextColorUseCase = setTextColorUseCase,
             setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
-            setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
             observeInstalledAppsUseCase = observeInstalledAppsUseCase,
             getAutoLaunchSettingUseCase = mockk(relaxed = true),
             observeHomeSettingsUseCase = observeHomeSettingsUseCase,

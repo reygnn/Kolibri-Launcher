@@ -230,7 +230,6 @@ object AppConstants {
 
         // Visuals
         const val TEXT_COLOR = "text_color"
-        const val CHIP_BACKGROUND_COLOR = "chip_background_color"
         const val TEXT_SHADOW_ENABLED = "text_shadow_enabled"
         const val IS_FONT_BOLD = "is_font_bold"
 
@@ -277,7 +276,6 @@ object AppConstants {
 
     // Default Values für Settings
     const val DEFAULT_TEXT_COLOR = 0 // 0 = Transparent/Nicht gesetzt
-    const val DEFAULT_CHIP_BG_COLOR = 0
     const val DEFAULT_TEXT_SHADOW_ENABLED = true
 
     const val DEFAULT_SHOW_CALENDAR = false

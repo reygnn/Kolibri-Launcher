@@ -342,13 +342,6 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `chipBackgroundColorFlow - defaults to 0 and updates correctly`() = runTest {
-        Assert.assertEquals(0, settingsManager.chipBackgroundColorFlow.first())
-        settingsManager.setChipBackgroundColor(-1)
-        Assert.assertEquals(-1, settingsManager.chipBackgroundColorFlow.first())
-    }
-
-    @Test
     fun `isFontBoldStateFlow - updates correctly`() = runTest {
         settingsManager.setFontBold(true)
         assertTrue(settingsManager.isFontBoldStateFlow.first())

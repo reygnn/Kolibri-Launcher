@@ -107,7 +107,6 @@ class BackupRepositoryImplStrictTest {
               "timestamp": "THIS_STRING_BREAKS_KOTLINX_SERIALIZATION",
               "settings": {
                 "text_color": -65536,
-                "chip_bg_color": -16777216,
                 "favoriteComponents": [],
                 "favoritesOrder": [],
                 "hiddenComponents": []

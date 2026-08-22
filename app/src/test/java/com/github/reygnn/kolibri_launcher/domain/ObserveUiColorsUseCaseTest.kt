@@ -149,21 +149,6 @@ class ObserveUiColorsUseCaseTest {
     }
 
     // =========================================================================
-    // Chip Background Color
-    // =========================================================================
-
-    @Test
-    fun `chip background color is passed through`() = runTest {
-        val chipColor = Color.MAGENTA
-        settingsRepository.setChipBackgroundColor(chipColor)
-
-        useCase().test {
-            assertThat(awaitItem().chipBackgroundColor).isEqualTo(chipColor)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    // =========================================================================
     // Reactivity
     // =========================================================================
 

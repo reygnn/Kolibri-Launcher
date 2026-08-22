@@ -91,8 +91,6 @@ data class LauncherSettings(
 
     @JsonNames("text_color")
     val textColor: Int? = null,
-    @JsonNames("chip_bg_color")
-    val chipBackgroundColor: Int? = null,
     @JsonNames("text_shadow_enabled")
     val textShadowEnabled: Boolean? = null,
     @JsonNames("layout_scale")

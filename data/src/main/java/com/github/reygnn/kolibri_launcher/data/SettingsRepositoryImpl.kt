@@ -53,7 +53,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Int Keys
         val TEXT_COLOR = intPreferencesKey(AppConstants.PrefKeys.TEXT_COLOR)
-        val CHIP_BACKGROUND_COLOR = intPreferencesKey(AppConstants.PrefKeys.CHIP_BACKGROUND_COLOR)
 
         // Float Keys
         val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
@@ -83,7 +82,6 @@ class SettingsRepositoryImpl @Inject constructor(
         PreferenceKeys.AUTO_LAUNCH_APP.name,
         PreferenceKeys.ROTATION_LOCKED.name,
         PreferenceKeys.TEXT_COLOR.name,
-        PreferenceKeys.CHIP_BACKGROUND_COLOR.name,
         PreferenceKeys.LAYOUT_SCALE.name,
         PreferenceKeys.WALLPAPER_SCRIM_ALPHA.name,
         PreferenceKeys.VERTICAL_PADDING_SCALE.name,
@@ -187,12 +185,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setTextColor(color: Int) =
         putValue(PreferenceKeys.TEXT_COLOR, color)
 
-    override val chipBackgroundColorFlow: Flow<Int> =
-        valueFlow(PreferenceKeys.CHIP_BACKGROUND_COLOR, AppConstants.DEFAULT_CHIP_BG_COLOR)
-
-    override suspend fun setChipBackgroundColor(color: Int) =
-        putValue(PreferenceKeys.CHIP_BACKGROUND_COLOR, color)
-
     override val showCalendarEventFlow: Flow<Boolean> =
         valueFlow(PreferenceKeys.SHOW_CALENDAR_EVENT, AppConstants.DEFAULT_SHOW_CALENDAR)
 
@@ -275,7 +267,6 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)
-            preferences.remove(PreferenceKeys.CHIP_BACKGROUND_COLOR)
             preferences.remove(PreferenceKeys.LAYOUT_SCALE)
             preferences.remove(PreferenceKeys.WALLPAPER_SCRIM_ALPHA)
             preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)

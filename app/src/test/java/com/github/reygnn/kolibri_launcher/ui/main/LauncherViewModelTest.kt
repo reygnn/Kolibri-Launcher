@@ -34,7 +34,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
@@ -100,7 +99,6 @@ class LauncherViewModelTest {
     private lateinit var observeUiColorsUseCase: ObserveUiColorsUseCase
     private lateinit var setTextColorUseCase: SetTextColorUseCase
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
-    private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var observeInstalledAppsUseCase: ObserveInstalledAppsUseCase
     private lateinit var getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase
     private lateinit var observeHomeSettingsUseCase: ObserveHomeSettingsUseCase
@@ -164,7 +162,6 @@ class LauncherViewModelTest {
 
         setTextColorUseCase = mockk(relaxed = true)
         setTextShadowEnabledUseCase = mockk(relaxed = true)
-        setChipBackgroundColorUseCase = mockk(relaxed = true)
 
         observeInstalledAppsUseCase = mockk(relaxed = true)
         every { observeInstalledAppsUseCase.invoke() } returns emptyFlow()
@@ -232,7 +229,6 @@ class LauncherViewModelTest {
         observeUiColorsUseCase = observeUiColorsUseCase,
         setTextColorUseCase = setTextColorUseCase,
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
-        setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         observeInstalledAppsUseCase = observeInstalledAppsUseCase,
         getAutoLaunchSettingUseCase = getAutoLaunchSettingUseCase,
         observeHomeSettingsUseCase = observeHomeSettingsUseCase,
@@ -542,16 +538,6 @@ class LauncherViewModelTest {
         coVerify { setTextShadowEnabledUseCase.invoke(true) }
     }
 
-    @Test
-    fun `onSetChipBackgroundColor delegates to themingDelegate`() = runTest {
-        val vm = createViewModel()
-        advanceUntilIdle()
-
-        vm.onSetChipBackgroundColor(0x00FF00)
-        advanceUntilIdle()
-
-        coVerify { setChipBackgroundColorUseCase.invoke(0x00FF00) }
-    }
 
     @Test
     fun `isTextShadowEnabled delegates to themingDelegate`() = runTest {

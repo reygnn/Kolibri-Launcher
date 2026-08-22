@@ -77,7 +77,6 @@ class BackupRepositoryImplNamingConventionTest {
     @Test
     fun `export - uses camelCase for all setting keys`() = runTest {
         fakeSettingsRepo.setTextColor(-123456)
-        fakeSettingsRepo.setChipBackgroundColor(-654321)
         fakeSettingsRepo.setTextShadowEnabled(true)
         fakeSettingsRepo.setLayoutScale(1.5f)
 
@@ -85,13 +84,11 @@ class BackupRepositoryImplNamingConventionTest {
 
         // Verify camelCase is used
         assertThat(json).contains("\"textColor\":")
-        assertThat(json).contains("\"chipBackgroundColor\":")
         assertThat(json).contains("\"textShadowEnabled\":")
         assertThat(json).contains("\"layoutScale\":")
 
         // Verify snake_case is NOT used
         assertThat(json).doesNotContain("\"text_color\":")
-        assertThat(json).doesNotContain("\"chip_bg_color\":")
         assertThat(json).doesNotContain("\"text_shadow_enabled\":")
         assertThat(json).doesNotContain("\"layout_scale\":")
     }
@@ -124,7 +121,6 @@ class BackupRepositoryImplNamingConventionTest {
                 "version": "1.0.0",
                 "settings": {
                     "textColor": -111111,
-                    "chipBackgroundColor": -222222,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -139,7 +135,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111111)
-        assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-222222)
     }
 
     // ========================================================================
@@ -153,7 +148,6 @@ class BackupRepositoryImplNamingConventionTest {
                 "version": "1.0.0",
                 "settings": {
                     "text_color": -333333,
-                    "chip_bg_color": -444444,
                     "favoriteComponents": [],
                     "favoritesOrder": [],
                     "hiddenComponents": []
@@ -168,7 +162,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-333333)
-        assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-444444)
     }
 
     @Test
@@ -308,14 +301,12 @@ class BackupRepositoryImplNamingConventionTest {
     fun `importFromJson ignores malformed mixed case keys`() = runTest {
         // Initiale Werte setzen
         fakeSettingsRepo.setTextColor(-111)
-        fakeSettingsRepo.setChipBackgroundColor(-222)
 
         val mixedCaseJson = """
         {
           "version": "1.0.0",
           "settings": {
             "text_Color": -123456,
-            "chipBackground_color": -654321,
             "favoriteComponents": [],
             "hiddenComponents": []
           }
@@ -331,7 +322,6 @@ class BackupRepositoryImplNamingConventionTest {
 
         // Werte sollten UNVERÄNDERT sein (malformed keys ignoriert)
         assertThat(fakeSettingsRepo.textColorFlow.first()).isEqualTo(-111)
-        assertThat(fakeSettingsRepo.chipBackgroundColorFlow.first()).isEqualTo(-222)
     }
 
     // --- Helper ---

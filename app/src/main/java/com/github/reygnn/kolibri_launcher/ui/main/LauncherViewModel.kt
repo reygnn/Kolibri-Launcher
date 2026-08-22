@@ -60,7 +60,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
@@ -121,7 +120,6 @@ class LauncherViewModel @Inject constructor(
     observeUiColorsUseCase: ObserveUiColorsUseCase,
     setTextColorUseCase: SetTextColorUseCase,
     setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase,
-    setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     observeInstalledAppsUseCase: ObserveInstalledAppsUseCase,
     getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase,
     observeHomeSettingsUseCase: ObserveHomeSettingsUseCase,
@@ -214,7 +212,6 @@ class LauncherViewModel @Inject constructor(
         observeUiColorsUseCase = observeUiColorsUseCase,
         setTextColorUseCase = setTextColorUseCase,
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
-        setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
         getWallpaperScrimAlphaUseCase = getWallpaperScrimAlphaUseCase,
         setWallpaperScrimAlphaUseCase = setWallpaperScrimAlphaUseCase,
@@ -392,7 +389,6 @@ class LauncherViewModel @Inject constructor(
 
     fun onSetTextColor(color: Int) = themingDelegate.onSetTextColor(color)
     fun onSetTextShadowEnabled(isEnabled: Boolean) = themingDelegate.onSetTextShadowEnabled(isEnabled)
-    fun onSetChipBackgroundColor(color: Int) = themingDelegate.onSetChipBackgroundColor(color)
     suspend fun isTextShadowEnabled(): Boolean = themingDelegate.isTextShadowEnabled()
 
     // ===========================================

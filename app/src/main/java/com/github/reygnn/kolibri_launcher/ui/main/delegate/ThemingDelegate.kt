@@ -20,7 +20,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
@@ -34,14 +33,13 @@ import kotlinx.coroutines.flow.stateIn
 
 /**
  * Delegate responsible for UI theming:
- * color observation, text color, text shadow, chip background,
+ * color observation, text color, text shadow, wallpaper scrim,
  * and AppDrawer surface resolution.
  */
 class ThemingDelegate(
     private val observeUiColorsUseCase: ObserveUiColorsUseCase,
     private val setTextColorUseCase: SetTextColorUseCase,
     private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase,
-    private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase,
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
     getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase,
     private val setWallpaperScrimAlphaUseCase: SetWallpaperScrimAlphaUseCase,
@@ -117,13 +115,6 @@ class ThemingDelegate(
         defaultErrorToast = R.string.error_generic
     ) {
         setTextShadowEnabledUseCase(isEnabled)
-    }
-
-    fun onSetChipBackgroundColor(color: Int) = scope.launchSafe(
-        errorMessage = "Error setting chip background color",
-        defaultErrorToast = R.string.error_generic
-    ) {
-        setChipBackgroundColorUseCase(color)
     }
 
     fun onSetWallpaperScrimAlpha(alpha: Float) = scope.launchSafe(

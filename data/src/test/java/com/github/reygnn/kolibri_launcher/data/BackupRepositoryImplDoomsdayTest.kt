@@ -116,12 +116,10 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - only theme settings - imports only theme`() = runTest {
         fakeSettingsRepo.color = Color.BLACK
-        fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
 
         val backup = createTestBackup(
             textColor = Color.GREEN,
-            chipBackgroundColor = Color.MAGENTA,
             textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
@@ -139,7 +137,6 @@ class BackupRepositoryImplDoomsdayTest {
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
@@ -246,7 +243,6 @@ class BackupRepositoryImplDoomsdayTest {
         fakeSwipeActionsRepo.swipeLeftApp = "com.app3/com.app3.MainActivity"
         fakeSwipeActionsRepo.swipeRightApp = "com.app4/com.app4.MainActivity"
         fakeSettingsRepo.color = Color.RED
-        fakeSettingsRepo.chipBgColor = Color.GREEN
         fakeSettingsRepo.shadow = false
         fakeSettingsRepo.autoShowKeyboard = true
         fakeSettingsRepo.autoLaunchApp = true
@@ -261,7 +257,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(backup.settings.swipeLeftApp).isNotNull()
         Truth.assertThat(backup.settings.swipeRightApp).isNotNull()
         Truth.assertThat(backup.settings.textColor).isEqualTo(Color.RED)
-        Truth.assertThat(backup.settings.chipBackgroundColor).isEqualTo(Color.GREEN)
         Truth.assertThat(backup.settings.textShadowEnabled).isFalse()
         Truth.assertThat(backup.settings.autoShowKeyboard).isTrue()
         Truth.assertThat(backup.settings.autoLaunchApp).isTrue()
@@ -462,13 +457,11 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - only theme settings - does not import favorites`() = runTest {
         fakeSettingsRepo.color = Color.BLACK
-        fakeSettingsRepo.chipBgColor = Color.BLACK
         fakeSettingsRepo.shadow = true
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = Color.GREEN,
-            chipBackgroundColor = Color.MAGENTA,
             textShadowEnabled = false
         )
         val jsonString = json.encodeToString(backup)
@@ -487,7 +480,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
 
         Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
@@ -814,7 +806,6 @@ class BackupRepositoryImplDoomsdayTest {
             swipeLeft = "com.app1/com.app1.MainActivity",
             swipeRight = "com.app2/com.app2.MainActivity",
             textColor = Color.YELLOW,
-            chipBackgroundColor = Color.RED,
             textShadowEnabled = false,
             autoShowKeyboard = true,
             autoLaunchApp = true
@@ -834,7 +825,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNotNull()
         Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNotNull()
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.YELLOW)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.RED)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
         Truth.assertThat(fakeSettingsRepo.autoShowKeyboard).isTrue()
         Truth.assertThat(fakeSettingsRepo.autoLaunchApp).isTrue()
@@ -843,13 +833,11 @@ class BackupRepositoryImplDoomsdayTest {
     @Test
     fun `importFromJson - old backup without theme keys - does not change theme`() = runTest {
         fakeSettingsRepo.color = Color.CYAN
-        fakeSettingsRepo.chipBgColor = Color.BLUE
         fakeSettingsRepo.shadow = false
 
         val backup = createTestBackup(
             favorites = setOf("com.app1/com.app1.MainActivity"),
             textColor = null,
-            chipBackgroundColor = null,
             textShadowEnabled = null
         )
         val oldBackupJson = json.encodeToString(backup)
@@ -860,7 +848,6 @@ class BackupRepositoryImplDoomsdayTest {
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.CYAN)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.BLUE)
         Truth.assertThat(fakeSettingsRepo.shadow).isFalse()
     }
 
@@ -1063,8 +1050,7 @@ class BackupRepositoryImplDoomsdayTest {
 
         val backup = createTestBackup(
             appVersion = "0.5.0", // Ältere Version
-            textColor = Color.RED,
-            chipBackgroundColor = Color.YELLOW
+            textColor = Color.RED
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1080,7 +1066,6 @@ class BackupRepositoryImplDoomsdayTest {
 
         // Check: Theme wurde übernommen
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.RED)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.YELLOW)
     }
 
     @Test
@@ -1092,8 +1077,7 @@ class BackupRepositoryImplDoomsdayTest {
 
         val backup = createTestBackup(
             appVersion = "1.0.0", // Gleiche Version
-            textColor = Color.BLUE,
-            chipBackgroundColor = Color.MAGENTA
+            textColor = Color.BLUE
         )
         val jsonString = json.encodeToString(backup)
 
@@ -1104,7 +1088,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.BLUE)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.MAGENTA)
     }
 
     @Test
@@ -1118,8 +1101,7 @@ class BackupRepositoryImplDoomsdayTest {
 
         val backup = createTestBackup(
             appVersion = "2.0.0", // Neuere Version (z.B. Beta)
-            textColor = Color.GREEN,
-            chipBackgroundColor = Color.CYAN
+            textColor = Color.GREEN
         )
         // Hinweis: Wenn wir hier manuell JSON bauen würden mit einem unbekannten Key "holographicMode = true",
         // würde der Test prüfen, ob der Parser nicht abstürzt. Da wir das Objekt serialisieren,
@@ -1134,7 +1116,6 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
         Truth.assertThat(fakeSettingsRepo.color).isEqualTo(Color.GREEN)
-        Truth.assertThat(fakeSettingsRepo.chipBgColor).isEqualTo(Color.CYAN)
     }
 
     // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
@@ -1668,7 +1649,6 @@ class BackupRepositoryImplDoomsdayTest {
         swipeLeft: String? = null,
         swipeRight: String? = null,
         textColor: Int? = null,
-        chipBackgroundColor: Int? = null,
         textShadowEnabled: Boolean? = null,
         layoutScale: Float? = null,
         verticalPaddingScale: Float? = null,
@@ -1691,7 +1671,6 @@ class BackupRepositoryImplDoomsdayTest {
                 swipeLeftApp = swipeLeft,
                 swipeRightApp = swipeRight,
                 textColor = textColor,
-                chipBackgroundColor = chipBackgroundColor,
                 textShadowEnabled = textShadowEnabled,
                 layoutScale = layoutScale,
                 verticalPaddingScale = verticalPaddingScale,

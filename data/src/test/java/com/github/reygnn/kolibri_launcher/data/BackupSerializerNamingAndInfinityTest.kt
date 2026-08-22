@@ -117,12 +117,12 @@ class BackupSerializerNamingAndInfinityTest {
     @Test
     fun `encode writes camelCase scalar keys, never snake_case`() {
         val json = serializer.encodeToJsonString(
-            BackupData(settings = LauncherSettings(chipBackgroundColor = -222, layoutScale = 1.25f)),
+            BackupData(settings = LauncherSettings(textColor = -222, layoutScale = 1.25f)),
         )
 
-        assertThat(json).contains("\"chipBackgroundColor\":")
+        assertThat(json).contains("\"textColor\":")
         assertThat(json).contains("\"layoutScale\":")
-        assertThat(json).doesNotContain("\"chip_bg_color\":")
+        assertThat(json).doesNotContain("\"text_color\":")
         assertThat(json).doesNotContain("\"layout_scale\":")
     }
 

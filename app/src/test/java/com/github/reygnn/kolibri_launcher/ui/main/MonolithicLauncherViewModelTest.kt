@@ -46,7 +46,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
@@ -181,7 +180,6 @@ class MonolithicLauncherViewModelTest {
     private val observeUiColorsUseCase: ObserveUiColorsUseCase = mockk(relaxed = true)
     private val setTextColorUseCase: SetTextColorUseCase = mockk(relaxed = true)
     private val setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase = mockk(relaxed = true)
-    private val setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase = mockk(relaxed = true)
     private val observeInstalledAppsUseCase: ObserveInstalledAppsUseCase = mockk(relaxed = true)
     private val getAutoLaunchSettingUseCase: GetAutoLaunchSettingUseCase = mockk(relaxed = true)
     private val getAutoShowKeyboardSettingUseCase: GetAutoShowKeyboardSettingUseCase = mockk(relaxed = true)
@@ -262,7 +260,6 @@ class MonolithicLauncherViewModelTest {
             observeUiColorsUseCase,
             setTextColorUseCase,
             setTextShadowEnabledUseCase,
-            setChipBackgroundColorUseCase,
             observeInstalledAppsUseCase,
             getAutoLaunchSettingUseCase,
             observeHomeSettingsUseCase,
@@ -1248,16 +1245,6 @@ class MonolithicLauncherViewModelTest {
         coVerify { setTextShadowEnabledUseCase.invoke(false) }
     }
 
-    @Test
-    fun `onSetChipBackgroundColor - calls UseCase with correct color`() = runTest {
-        setupViewModel()
-        advanceUntilIdle()
-
-        viewModel.onSetChipBackgroundColor(Color.BLUE)
-        advanceUntilIdle()
-
-        coVerify { setChipBackgroundColorUseCase.invoke(Color.BLUE) }
-    }
 
     @Test
     fun `onAppInfoError - emits correct error event`() = runTest {

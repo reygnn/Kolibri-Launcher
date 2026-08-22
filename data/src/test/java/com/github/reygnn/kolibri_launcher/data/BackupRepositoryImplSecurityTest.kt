@@ -397,9 +397,9 @@ class BackupRepositoryImplSecurityTest {
     }
 
     @Test
-    fun `attack - maximum unsigned int for chipBackgroundColor - should handle`() = runTest {
+    fun `attack - maximum unsigned int for textColor - should handle`() = runTest {
         // 0xFFFFFFFF = 4294967295 als unsigned, -1 als signed
-        val maliciousJson = validBackupJson(extras = "\"chipBackgroundColor\": 4294967295")
+        val maliciousJson = validBackupJson(extras = "\"textColor\": 4294967295")
 
         val result = backupManager.importFromJson(
             maliciousJson,
@@ -1047,7 +1047,6 @@ class BackupRepositoryImplSecurityTest {
                     "swipeLeftApp": null,
                     "swipeRightApp": null,
                     "textColor": null,
-                    "chipBackgroundColor": null,
                     "layoutScale": null,
                     "verticalPaddingScale": null,
                     "contentTopMarginScale": null,
