@@ -90,20 +90,6 @@
                     android:textColor="@color/default_text_color"
                     android:padding="@dimen/touch_target_padding"
                     android:layout_marginStart="@dimen/spacing_medium" />
-
-                <!-- Passive status symbol (NOT clickable): replaces the old
-                     alarm/calendar chip row. GONE unless upcoming time-based events
-                     exist; it only signals that events exist — the dialog opens via
-                     the home double-tap. Tinted to the current text colour in
-                     HomeFragment.updateAllColors. -->
-                <ImageView
-                    android:id="@+id/eventsIndicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/spacing_medium"
-                    android:src="@drawable/ic_events_indicator"
-                    android:contentDescription="@string/events_indicator_content_description"
-                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 
@@ -126,6 +112,26 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- Passive events indicator (NOT clickable): pinned to the top-right, next
+         to the clock. Shown only when upcoming time-based events exist; it just
+         signals that events exist — the dialog opens via the home double-tap. A
+         sibling of rootLayout (ConstraintLayout child) so it stays in the corner
+         regardless of the favorites alignment, which shifts the time block.
+         Anchored to rootLayout, which carries the system-bar insets as padding;
+         the status bar is hidden on home so no top-inset offset is needed. Tinted
+         to the text colour in HomeFragment.updateAllColors. -->
+    <ImageView
+        android:id="@+id/eventsIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="90dp"
+        android:layout_marginEnd="@dimen/layout_padding"
+        android:src="@drawable/ic_events_indicator"
+        android:contentDescription="@string/events_indicator_content_description"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/rootLayout"
+        app:layout_constraintEnd_toEndOf="@id/rootLayout" />
 
     </com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
 

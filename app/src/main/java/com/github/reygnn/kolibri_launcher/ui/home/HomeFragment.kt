@@ -813,9 +813,9 @@ class HomeFragment : Fragment() {
 
         // The old alarm/calendar chip row was a separate block whose height had to
         // be measured and compensated for here. Its replacement — the events
-        // indicator — lives inline in the date/battery row inside timeContainer, so
-        // it contributes no extra vertical block: the favorites top margin now
-        // derives solely from the user's preferred content margin (no chip term).
+        // indicator — is a top-right corner overlay (a ConstraintLayout sibling of
+        // rootLayout), so it contributes no extra vertical block: the favorites top
+        // margin now derives solely from the user's preferred content margin.
         val newMargin = contentSpacingCalculator.calculate(
             currentUserPreferredMarginPx,
             0,
