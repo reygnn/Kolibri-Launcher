@@ -64,7 +64,9 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorU
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
@@ -128,6 +130,8 @@ class LauncherViewModel @Inject constructor(
     getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase,
     getLayoutSettingsUseCase: GetLayoutSettingsUseCase,
     setLayoutScaleUseCase: SetLayoutScaleUseCase,
+    getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase,
+    setWallpaperScrimAlphaUseCase: SetWallpaperScrimAlphaUseCase,
     setVerticalPaddingUseCase: SetVerticalPaddingUseCase,
     setFontBoldUseCase: SetFontBoldUseCase,
     setContentTopMarginUseCase: SetContentTopMarginUseCase,
@@ -210,6 +214,8 @@ class LauncherViewModel @Inject constructor(
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
+        getWallpaperScrimAlphaUseCase = getWallpaperScrimAlphaUseCase,
+        setWallpaperScrimAlphaUseCase = setWallpaperScrimAlphaUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
         appDrawerSurfaceLightColor = ContextCompat.getColor(context, R.color.app_drawer_surface_light),
         appDrawerSurfaceDarkColor = ContextCompat.getColor(context, R.color.app_drawer_surface_dark),
@@ -278,6 +284,7 @@ class LauncherViewModel @Inject constructor(
     val appDrawerSurfaceState: StateFlow<ResolvedBackground> get() = themingDelegate.appDrawerSurfaceState
 
     val layoutScaleState: StateFlow<Float> get() = layoutDelegate.layoutScaleState
+    val wallpaperScrimAlphaState: StateFlow<Float> get() = themingDelegate.wallpaperScrimAlphaState
     val verticalPaddingState: StateFlow<Float> get() = layoutDelegate.verticalPaddingState
     val isFontBoldState: StateFlow<Boolean> get() = layoutDelegate.isFontBoldState
     val contentTopMarginState: StateFlow<Float> get() = layoutDelegate.contentTopMarginState
@@ -378,6 +385,7 @@ class LauncherViewModel @Inject constructor(
     // ===========================================
 
     fun onSetLayoutScale(scale: Float) = layoutDelegate.onSetLayoutScale(scale)
+    fun onSetWallpaperScrimAlpha(alpha: Float) = themingDelegate.onSetWallpaperScrimAlpha(alpha)
     fun onSetVerticalPadding(factor: Float) = layoutDelegate.onSetVerticalPadding(factor)
     fun onSetFontBold(isBold: Boolean) = layoutDelegate.onSetFontBold(isBold)
     fun onSetContentTopMargin(scale: Float) = layoutDelegate.onSetContentTopMargin(scale)

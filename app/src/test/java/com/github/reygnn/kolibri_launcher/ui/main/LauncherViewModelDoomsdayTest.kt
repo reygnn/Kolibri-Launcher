@@ -155,6 +155,8 @@ class LauncherViewModelDoomsdayTest {
         getTextShadowEnabledUseCase = mockk(relaxed = true),
         getLayoutSettingsUseCase = getLayoutSettingsUseCase,
         setLayoutScaleUseCase = mockk(relaxed = true),
+        getWallpaperScrimAlphaUseCase = mockk(relaxed = true),
+        setWallpaperScrimAlphaUseCase = mockk(relaxed = true),
         setVerticalPaddingUseCase = mockk(relaxed = true),
         setFontBoldUseCase = mockk(relaxed = true),
         setContentTopMarginUseCase = mockk(relaxed = true),

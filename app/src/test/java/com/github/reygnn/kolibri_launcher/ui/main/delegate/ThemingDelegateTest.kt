@@ -1,13 +1,16 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetChipBackgroundColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -45,6 +48,8 @@ class ThemingDelegateTest {
     private lateinit var setTextShadowEnabledUseCase: SetTextShadowEnabledUseCase
     private lateinit var setChipBackgroundColorUseCase: SetChipBackgroundColorUseCase
     private lateinit var getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase
+    private lateinit var getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase
+    private lateinit var setWallpaperScrimAlphaUseCase: SetWallpaperScrimAlphaUseCase
     private lateinit var resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase
 
     @Before
@@ -56,6 +61,10 @@ class ThemingDelegateTest {
         setTextShadowEnabledUseCase = mockk(relaxed = true)
         setChipBackgroundColorUseCase = mockk(relaxed = true)
         getTextShadowEnabledUseCase = mockk(relaxed = true)
+        getWallpaperScrimAlphaUseCase = mockk(relaxed = true)
+        setWallpaperScrimAlphaUseCase = mockk(relaxed = true)
+        every { getWallpaperScrimAlphaUseCase() } returns
+                flowOf(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
         resolveAppDrawerSurfaceUseCase = mockk(relaxed = true)
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
                 flowOf(LuminanceClassification.DARK)
@@ -73,6 +82,8 @@ class ThemingDelegateTest {
         setTextShadowEnabledUseCase = setTextShadowEnabledUseCase,
         setChipBackgroundColorUseCase = setChipBackgroundColorUseCase,
         getTextShadowEnabledUseCase = getTextShadowEnabledUseCase,
+        getWallpaperScrimAlphaUseCase = getWallpaperScrimAlphaUseCase,
+        setWallpaperScrimAlphaUseCase = setWallpaperScrimAlphaUseCase,
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
         appDrawerSurfaceLightColor = APP_DRAWER_LIGHT_TEST_COLOR,
         appDrawerSurfaceDarkColor = APP_DRAWER_DARK_TEST_COLOR,
@@ -262,5 +273,68 @@ class ThemingDelegateTest {
         val delegate = createDelegate()
 
         assertFalse(delegate.isTextShadowEnabled())
+    }
+
+    // ===========================================
+    // WALLPAPER SCRIM ALPHA
+    // ===========================================
+
+    @Test
+    fun `wallpaperScrimAlphaState starts with default value`() = runTest {
+        val delegate = createDelegate()
+        advanceUntilIdle()
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
+            delegate.wallpaperScrimAlphaState.value,
+            0.0001f
+        )
+    }
+
+    @Test
+    fun `wallpaperScrimAlphaState reflects flow updates`() = runTest {
+        val scrimFlow = MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+        every { getWallpaperScrimAlphaUseCase() } returns scrimFlow
+
+        val delegate = createDelegate()
+        advanceUntilIdle()
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
+            delegate.wallpaperScrimAlphaState.value,
+            0.0001f
+        )
+
+        scrimFlow.value = 0.3f
+        advanceUntilIdle()
+        assertEquals(0.3f, delegate.wallpaperScrimAlphaState.value, 0.0001f)
+    }
+
+    @Test
+    fun `onSetWallpaperScrimAlpha delegates coerced value`() = runTest {
+        val delegate = createDelegate()
+
+        delegate.onSetWallpaperScrimAlpha(0.25f)
+        advanceUntilIdle()
+
+        coVerify { setWallpaperScrimAlphaUseCase.invoke(0.25f) }
+    }
+
+    @Test
+    fun `onSetWallpaperScrimAlpha coerces above-max to max`() = runTest {
+        val delegate = createDelegate()
+
+        delegate.onSetWallpaperScrimAlpha(99f)
+        advanceUntilIdle()
+
+        coVerify { setWallpaperScrimAlphaUseCase.invoke(AppConstants.WALLPAPER_SCRIM_ALPHA_MAX) }
+    }
+
+    @Test
+    fun `onSetWallpaperScrimAlpha coerces below-min to min`() = runTest {
+        val delegate = createDelegate()
+
+        delegate.onSetWallpaperScrimAlpha(-5f)
+        advanceUntilIdle()
+
+        coVerify { setWallpaperScrimAlphaUseCase.invoke(AppConstants.WALLPAPER_SCRIM_ALPHA_MIN) }
     }
 }

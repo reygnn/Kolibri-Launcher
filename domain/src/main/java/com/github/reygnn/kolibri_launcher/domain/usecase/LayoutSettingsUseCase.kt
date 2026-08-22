@@ -5,12 +5,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-// 1. Get Layout Settings (all layout flows)
+// 1. Get Layout Settings (Alle 5 Flows)
 class GetLayoutSettingsUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
     val layoutScale: Flow<Float> = repository.layoutScaleStateFlow
-    val wallpaperScrimAlpha: Flow<Float> = repository.wallpaperScrimAlphaStateFlow
     val verticalPadding: Flow<Float> = repository.verticalPaddingStateFlow
     val isFontBold: Flow<Boolean> = repository.isFontBoldStateFlow
     val contentTopMargin: Flow<Float> = repository.contentTopMarginScaleFlow
@@ -20,10 +19,6 @@ class GetLayoutSettingsUseCase @Inject constructor(
 // 2. Setters
 class SetLayoutScaleUseCase @Inject constructor(private val repository: SettingsRepository) {
     suspend operator fun invoke(scale: Float) = repository.setLayoutScale(scale)
-}
-
-class SetWallpaperScrimAlphaUseCase @Inject constructor(private val repository: SettingsRepository) {
-    suspend operator fun invoke(alpha: Float) = repository.setWallpaperScrimAlpha(alpha)
 }
 
 class SetVerticalPaddingUseCase @Inject constructor(private val repository: SettingsRepository) {

@@ -168,6 +168,8 @@ class LauncherViewModelSecurityTest {
             getTextShadowEnabledUseCase = mockk(relaxed = true),
             getLayoutSettingsUseCase = getLayoutSettingsUseCase,
             setLayoutScaleUseCase = setLayoutScaleUseCase,
+            getWallpaperScrimAlphaUseCase = mockk(relaxed = true),
+            setWallpaperScrimAlphaUseCase = mockk(relaxed = true),
             setVerticalPaddingUseCase = setVerticalPaddingUseCase,
             setFontBoldUseCase = setFontBoldUseCase,
             setContentTopMarginUseCase = setContentTopMarginUseCase,

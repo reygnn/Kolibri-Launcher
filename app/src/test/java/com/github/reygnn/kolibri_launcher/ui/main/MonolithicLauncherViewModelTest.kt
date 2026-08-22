@@ -35,6 +35,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
@@ -53,6 +54,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
@@ -272,6 +274,8 @@ class MonolithicLauncherViewModelTest {
             getTextShadowEnabledUseCase,
             getLayoutSettingsUseCase,
             setLayoutScaleUseCase,
+            mockk<GetWallpaperScrimAlphaUseCase>(relaxed = true),
+            mockk<SetWallpaperScrimAlphaUseCase>(relaxed = true),
             setVerticalPaddingUseCase,
             setFontBoldUseCase,
             setContentTopMarginUseCase,
