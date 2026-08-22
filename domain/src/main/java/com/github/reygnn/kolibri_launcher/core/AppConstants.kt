@@ -25,7 +25,7 @@ object AppConstants {
     // drop shadow: background-independent (never dims the wallpaper) and wins
     // contrast locally against black and white pixels at once. Half of it shows
     // outside the glyph edge, so keep it small. Multiply by display density for px.
-    const val TEXT_OUTLINE_WIDTH_DP = 1.5f
+    const val TEXT_OUTLINE_WIDTH_DP = 2.0f
 
     // Alpha-Wert für den gedrückten Zustand der Favoriten Buttons (0-255).
     // 180 = ~70% Sichtbarkeit. Subtiles Feedback ("Breathing"), kein harter Blitz.
