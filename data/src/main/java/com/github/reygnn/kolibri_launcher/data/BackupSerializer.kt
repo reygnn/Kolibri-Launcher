@@ -76,21 +76,25 @@ class BackupSerializer @Inject constructor() {
      */
     fun parseBackupData(jsonString: String): BackupData? {
         if (!validateJsonTypes(jsonString)) {
-            Timber.w("Type validation failed - rejecting malformed backup")
+            // DEBUG, not WARN: a rejected malformed file is an EXPECTED outcome
+            // of the user picking a non-backup / hand-edited file, not an app
+            // fault. AcraTree forwards WARN+ to ACRA, so a WARN here files a
+            // false-positive crash report on every wrong-file pick.
+            Timber.d("Type validation failed - rejecting malformed backup")
             return null
         }
 
         val backup = try {
             json.decodeFromString<BackupData>(jsonString)
         } catch (e: SerializationException) {
-            // Timber.w (not silentError): an expected, recoverable condition
-            // for legacy / hand-edited backups — the strict-parsing fallback
-            // is *meant* to handle this. silentError would throw in DEBUG
-            // (`crashInDebug`) and tear down the recovery path itself.
-            Timber.w(e, "kotlinx.serialization failed, trying strict parsing")
+            // DEBUG, not WARN (see validateJsonTypes above): a kotlinx failure is
+            // the EXPECTED trigger for the strict-parsing fallback (legacy /
+            // hand-edited backups). silentError would throw in DEBUG and tear
+            // down the recovery path; WARN would false-positive-report to ACRA.
+            Timber.d(e, "kotlinx.serialization failed, trying strict parsing")
             return tryStrictParsing(jsonString)
         } catch (e: IllegalArgumentException) {
-            Timber.w(e, "Invalid argument, trying strict parsing")
+            Timber.d(e, "Invalid argument, trying strict parsing")
             return tryStrictParsing(jsonString)
         }
 
@@ -187,14 +191,17 @@ class BackupSerializer @Inject constructor() {
         return try {
             parseStrictly(jsonString)
         } catch (e: JSONException) {
-            // Timber.w (not silentError): both kotlinx and strict paths
-            // failed → user-supplied backup is malformed beyond recovery.
-            // Returning null is the contract. Programmer-error semantics
-            // do not apply — this is external-input failure.
-            Timber.w(e, "Strict parsing failed")
+            // DEBUG, not WARN: both kotlinx and strict paths failed → the
+            // user-supplied file is malformed beyond recovery. Returning null is
+            // the contract; this is an EXPECTED external-input failure, not an
+            // app fault. AcraTree forwards WARN+ to ACRA, so WARN here would file
+            // a false-positive crash report on every wrong-file pick (this path
+            // is reached for exactly the same bad files as the kotlinx catch
+            // above, i.e. two reports per pick before this fix).
+            Timber.d(e, "Strict parsing failed")
             null
         } catch (e: NumberFormatException) {
-            Timber.w(e, "Number format error in strict parsing")
+            Timber.d(e, "Number format error in strict parsing")
             null
         }
     }
