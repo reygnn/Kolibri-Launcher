@@ -1641,14 +1641,64 @@ class WallpaperDelegateTest {
 
     @Test
     fun `transform-only commit does not signal`() = runTest {
-        val delegate = createDelegate()
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(WallpaperState.single("file:///a.jpg"))
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
         val events = mutableListOf<Unit>()
         val job = launch(mainDispatcherRule.testDispatcher) {
             delegate.wallpaperImageChanged.collect { events.add(it) }
         }
 
         delegate.onEnterWallpaperEditMode()
-        delegate.onCommitWallpaperEditMode()           // no image mutation -> no emit
+        delegate.onSaveWallpaperTransform(scale = 1.5f, translateX = 10f, translateY = 20f)
+        delegate.onCommitWallpaperEditMode()           // pan/zoom only -> no emit
+        advanceUntilIdle()
+
+        assertEquals(0, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `removing a layer in session does not signal on commit`() = runTest {
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///a.jpg"),
+                WallpaperLayerState(imageUri = "file:///b.jpg"),
+            ),
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)             // a removal is not "a new wallpaper"
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        assertEquals(0, events.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `onSetWallpaperImage does not signal when the copy fails`() = runTest {
+        coEvery { wallpaperFileManager.copyToInternal(any()) } returns null
+        val delegate = createDelegate()
+        val events = mutableListOf<Unit>()
+        val job = launch(mainDispatcherRule.testDispatcher) {
+            delegate.wallpaperImageChanged.collect { events.add(it) }
+        }
+
+        delegate.onSetWallpaperImage(testUri)          // copy fails -> early return, no emit
         advanceUntilIdle()
 
         assertEquals(0, events.size)

@@ -216,8 +216,11 @@ class WallpaperDelegate(
      * standalone change (the picker path, no session) fires immediately. Neutral
      * signal: the ViewModel decides what to do with it (offer to reset the wallpaper
      * scrim when it is non-zero, so a leftover dim doesn't silently darken a fresh,
-     * non-extreme wallpaper). Buffered (extraBufferCapacity) so the emit never
-     * suspends — the emitters run outside a collector-guaranteed context.
+     * non-extreme wallpaper). `extraBufferCapacity = 1` keeps the emit non-suspending;
+     * with `replay = 0` it does NOT retain a value across a zero-subscriber window —
+     * that's fine because every emit path here happens while MainActivity's collector
+     * is subscribed (it collects for the whole Activity lifetime), so the buffer only
+     * smooths delivery to an already-active collector.
      */
     private val _wallpaperImageChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val wallpaperImageChanged: SharedFlow<Unit> = _wallpaperImageChanged.asSharedFlow()
@@ -632,11 +635,6 @@ class WallpaperDelegate(
     }
 
     /**
-     * Exits edit mode and commits the session: deferred file deletions
-     * from [onRemoveWallpaperLayer] are carried out, orphan tracking
-     * is discarded, and in-memory state stays as-is (already persisted).
-     */
-    /**
      * Routes an image-content change to the scrim-reset offer: immediately when NOT
      * in an edit session (the picker path — the change is already on the settled home
      * screen), or deferred to [onCommitWallpaperEditMode] when mid-session so the
@@ -650,6 +648,11 @@ class WallpaperDelegate(
         }
     }
 
+    /**
+     * Exits edit mode and commits the session: deferred file deletions
+     * from [onRemoveWallpaperLayer] are carried out, orphan tracking
+     * is discarded, and in-memory state stays as-is (already persisted).
+     */
     fun onCommitWallpaperEditMode() {
         val filesToDelete = pendingRemovalsOnCommit.toSet()
         pendingRemovalsOnCommit.clear()

@@ -403,6 +403,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // cleared or replaced (only fires when the scrim is non-zero — see
         // LauncherViewModel.offerScrimResetEvents), so a dim tuned for an extreme
         // wallpaper doesn't silently darken a fresh, normal one.
+        //
+        // Deliberately a plain lifecycleScope.launch, NOT repeatOnLifecycle(STARTED):
+        // the source is a replay=0 SharedFlow, and the picker path emits immediately.
+        // A STARTED-scoped collector would unsubscribe while STOPPED and miss that
+        // one-shot emit. showDialog carries the finishing/destroyed teardown guard.
         lifecycleScope.launch(mainActivityExceptionHandler) {
             viewModel.offerScrimResetEvents.collect { currentAlpha ->
                 offerScrimReset(currentAlpha)
