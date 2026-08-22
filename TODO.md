@@ -1608,3 +1608,42 @@ zuerst** (Zieldesign vs. Mittelweg), dann umsetzen.
 
 ---
 
+## 24. (offen) Events-Indikator: „saubere" Vertikal-Verankerung an die Uhr statt Fixwert
+
+**Ist-Zustand.** Die Glocke (`eventsIndicator`) ist ein Ecken-Overlay oben rechts
+— ein ConstraintLayout-Geschwister von `rootLayout` in `HomeGestureLayout`,
+entkoppelt vom `timeContainer` (damit sie die Favoriten-Ausrichtung nicht
+mitmacht und den `#3`-Clip nicht mehr hat). Vertikal sitzt sie per **hartem
+`marginTop = 90dp`** oben bündig zur 60sp-Uhr. Der Wert ist *gemessen* (aus einem
+Screenshot per Pixel→dp-Umrechnung abgegriffen), nicht aus Font-Metriken
+hergeleitet: `layout_padding` (24) + `spacing_xlarge` (48) = 72dp Line-Box-Oberkante,
+plus ~18dp Ascent-Polsterung bis zur sichtbaren Ziffern-Oberkante.
+
+**Problem.** Der Fixwert ist auf **60sp @ 1× Systemschrift** getunt. Bei großer
+System-Schriftgröße wandert die echte Ziffern-Oberkante nach unten, die Glocke
+bleibt bei 90dp → Fehlausrichtung (Glocke zu hoch). Rein kosmetisch, aber die
+gleiche Skalierungs-Unsauberkeit wie beim alten `#3`.
+
+**Warum nicht trivial.** Ein echtes Constraint der Glocke an die Uhr
+(`layout_constraintTop_toTopOf="@id/timeText"`) geht **nicht** direkt: die Glocke
+ist Kind von `HomeGestureLayout` (ConstraintLayout), `timeText` steckt zwei Ebenen
+tiefer in `rootLayout` (LinearLayout) — ConstraintLayout kann nur auf **Geschwister**
+verweisen.
+
+**Skizze (zwei Wege).**
+- **A — strukturell:** Uhr-Zeile (mind. `timeText`) auf die Ebene von
+  `HomeGestureLayout` heben, sodass die Glocke `top_toTopOf="@id/timeText"`
+  verankern kann. Zieht die Favoriten-Ausrichtung (`applyTimeContainerAlignment`
+  spiegelt sie auf `timeContainer`) in Mitleidenschaft — müsste mitgezogen werden.
+- **B — in Code (pragmatischer):** Overlay lassen, aber den Vertikal-Offset im
+  Layout-Listener aus der *gemessenen* Uhr-Position setzen (`timeText.top` lesen →
+  Glocken-`translationY`/`topMargin`). Schrift-skalierungs-fest ohne
+  Struktur-Umbau; Kosten: ein Post-Layout-Read + Neuberechnung bei
+  Konfig-/Font-Änderung.
+
+**Trigger.** Angehen, wenn (a) ein Nutzer mit großer Systemschrift die
+Fehlausrichtung meldet, oder (b) die Uhr-Größe je konfigurierbar wird. Bis dahin
+ist der 90dp-Fixwert bewusst akzeptiert (Normalfall passt).
+
+---
+
