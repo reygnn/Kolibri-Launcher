@@ -1558,3 +1558,53 @@ luminanz-getriebene* Form — nicht diesen manuellen Regler.
 
 ---
 
+## 23. (offen) ACRA-Reporting vom Log-Level entkoppeln — WARN-Politik geradeziehen
+
+**Problem.** `AcraTree` leitet heute alles **≥ WARN** an ACRA weiter
+(`silentError`, `Timber.w/.e`, `KolibriLog.w/.e`). Damit ist „wird gemeldet"
+an das Log-Level gekoppelt — aber das Level beantwortet *„wie laut/schlimm"*,
+nicht *„muss ein Entwickler handeln"*. Genau bei **WARN** laufen die beiden
+Achsen am weitesten auseinander: WARN wird sowohl für „verdächtig, evtl. Bug"
+(will Report) als auch für „erwartete/behandelte Degradation oder schlechter
+Fremd-Input" (Rauschen, darf **nicht** melden — und zwar *pro User-Aktion*
+flutendes Rauschen) benutzt.
+
+**Evidenz.** Der Malformed-Backup-Import-Bug (behoben in 0.99.197, commit
+`6227fad3`): eine vom User gewählte Nicht-Backup-Datei → `Timber.w` im
+Reject-Pfad → ACRA-Report pro Fehlgriff (sogar zwei, kotlinx- + strict-Fail).
+Der Fix war ein *lokales* Herunterstufen der betroffenen WARNs auf DEBUG —
+Symptombekämpfung, nicht die Wurzel. Jede neue `Timber.w` in einem `catch`
+ist ein potentieller False-Positive, der erst in RELEASE sichtbar wird
+(Whack-a-Mole).
+
+**Kern-Widerspruch mit den eigenen Regeln.** Rule 9/11 sagen: ein echter
+gefangener Bug/Programmierfehler gehört durch `silentError` (laut in DEBUG,
+gemeldet in RELEASE). Umkehrschluss: wer bewusst `Timber.w` statt
+`silentError` schreibt, *behauptet* „erwartet & behandelt". Das trotzdem zu
+melden, verrät genau diese Absicht. Das `bare Timber.e`-Whitelist für
+Crash-Infra-Dateien (in `tools/check-conventions.sh`) ist ein *Symptom*
+derselben Kopplung — plain `Timber.e` meldet heute doppelt, deshalb muss man
+Ausnahmen pflegen.
+
+**Zieldesign (Empfehlung).** Reporting **vom Level entkoppeln**: `AcraTree`
+leitet nur explizit melde-würdig Markiertes weiter (`silentError` + uncaught
+crashes), plain `Timber.d/i/w/e` = nur lokal. Damit verschwindet die
+WARN-False-Positive-Klasse *by construction*, und das `bare Timber.e`-Whitelist
+wird überflüssig. Melde nach **Absicht**, nicht nach Level.
+
+**Pragmatischer Mittelweg** (falls volle Entkopplung zu viel Refactor ist):
+Level-basiert bleiben, aber WARN abdrehen — **E → ACRA, W → nein, I/D → nein**;
+die seltene echt-verdächtige WARN explizit zu `silentError` eskalieren.
+
+**Fußnote.** Selbst ERROR ist nicht sauber — auch `Log.e` kann ein *erwarteter*
+Fehler sein (Netz weg). Erwartete Fehler gehören als **Werte** zurückgegeben
+(AUDIT-10-Muster: `ConsentReadResult`/`WriteResult`), nicht geloggt — dann
+erreichen sie ACRA nie, egal welches Level.
+
+**Scope.** `crashreporting/ingestion/AcraTree`, `core/TimberWrapper`, die
+`bare Timber.e`-Regel in `tools/check-conventions.sh` (würde bei Entkopplung
+obsolet), plus ein Sweep der bestehenden WARN-Melde-Stellen. **Entscheidung
+zuerst** (Zieldesign vs. Mittelweg), dann umsetzen.
+
+---
+
