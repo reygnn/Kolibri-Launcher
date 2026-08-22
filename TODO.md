@@ -1541,5 +1541,20 @@ das Reflog bis zum nächsten `git gc` erreichbar. Wer die Scrim-Ideen
 (`ScrimState`, `ScrimRenderCalculator`, Contrast-Math) je wieder braucht,
 holt sie aus dem Reflog, bevor GC greift — sonst sind sie weg.
 
+**Manueller Opt-in-Scrim ausgeliefert (2026-08-22, `feature/user-wallpaper-scrim`).**
+Ein *anderer* Ansatz als der oben gescheiterte: ein user-gesetzter,
+default-0-Alpha-Regler (Slider im Colors & Shadow-Dialog neben dem
+Shadow-Toggle), **kein** globales Luminanz-Ziel, **keine** Classifier-Kopplung
+(`ScrimRender` ist ein dummes Alpha→ARGB-Mapping), home-only, im Wallpaper-Edit-
+Modus versteckt. Die 93%-Schwarz-Falle tritt strukturell nicht ein (der User
+lässt den Regler auf 0). Die uniforme `L→L·(1−α)`-Asymmetrie dämpft absolut
+stärker in hellen Regionen und rettet damit überproportional die Problemzone
+(heller Text auf hellem Wallpaper), während dunkle Bereiche fast unberührt
+bleiben. Design + jede Registrierungs-Site:
+`docs/specs/WALLPAPER_SCRIM_USER_SETTING_SPEC.md`; §6 in
+`ACCEPTED_LIMITATIONS.md` entsprechend nachgezogen. Der oben dokumentierte
+Trigger „do not re-litigate the scrim" betrifft weiterhin die *automatische/
+luminanz-getriebene* Form — nicht diesen manuellen Regler.
+
 ---
 

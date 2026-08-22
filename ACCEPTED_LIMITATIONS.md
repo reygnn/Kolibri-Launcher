@@ -374,10 +374,13 @@ NOT by the AUTO light/dark text colour. The two mechanisms have split roles:
 
 ### Three alternatives deliberately rejected
 
-1. **A global scrim / wallpaper dim.** Tried as a greenfield rewrite and reverted
-   (TODO §22): a scrim that forces a global luminance target over-darkens an
-   already-dark wallpaper (the maintainer's 93%-black daily wallpaper went muddy)
-   while only helping extreme ones. Wrong layer — it touches the wallpaper.
+1. **An *automatic*, luminance-driven global scrim.** Tried as a greenfield rewrite
+   and reverted (TODO §22): a scrim that *forces a global luminance target*
+   over-darkens an already-dark wallpaper (the maintainer's 93%-black daily wallpaper
+   went muddy) while only helping extreme ones. Wrong layer — it touches the
+   wallpaper, and it does so *automatically*. **This rejection is specifically of the
+   automatic/luminance-coupled form.** A *manual, opt-in, default-0* scrim is a
+   different animal and now exists — see the update below.
 2. **Local / per-region contrast** (sample wallpaper luminance under each label's
    bounding box, colour per-label). Rejected on performance *and* UX: favorites are
    a scrollable RecyclerView with left/centre/right alignment over a zoomable,
@@ -399,6 +402,31 @@ single-colour approach has an inherent ceiling — neither LIGHT nor DARK wins o
 high-frequency bimodal wallpaper — which is exactly why the guarantee lives at the
 glyph, not in the classifier.
 
+### Update — a *manual* opt-in scrim now exists (distinct from rejected alt. 1)
+
+A user-controlled wallpaper scrim was added as an **opt-in, default-0, manual**
+dim (slider in the colors & shadow dialog, next to the text-shadow toggle;
+`ThemingDelegate.wallpaperScrimAlphaState`, `ScrimRender`, `HomeFragment.applyScrim`,
+`R.id.wallpaperScrim`). It is deliberately **not** the reverted alt. 1:
+
+- **No automatic luminance target.** It is a fixed alpha the user picks; nothing
+  forces a global target. The 93%-black-wallpaper failure mode is structurally
+  absent because that user simply leaves the slider at 0 (nothing changes).
+- **Not coupled to the classifier.** `ScrimRender` is a dumb alpha→ARGB mapping;
+  the scrim value never feeds `ClassifyWallpaperUseCase` / `WallpaperBitmapLuminance`
+  (that coupling *was* the reverted `WALLPAPER_LUMINANCE_BLEND_SPEC`).
+- **The outline is still the legibility guarantee.** The scrim only *eases* the
+  light-text-on-bright-wallpaper case (see the asymmetry note in
+  `docs/specs/WALLPAPER_SCRIM_USER_SETTING_SPEC.md`); it is a reserve for the
+  extreme tail (e.g. a bimodal dark-top / white-bottom wallpaper where the thin
+  outline is marginal on the bright half), not a replacement for the outline.
+
+**This formally trips the first re-evaluation trigger below** (a translucent
+surface now sits behind the home text). The core decision still stands: the
+outline remains the guarantee and the classifier stays *advisory* for home text,
+because the scrim is off by default, is not luminance-coupled, and does not touch
+the outline. The trigger is noted as *satisfied-and-accepted*, not ignored.
+
 ### Accepted caveat
 
 The outline is gated by the user's text-shadow setting (when off, `shadowColor` is
@@ -412,11 +440,17 @@ Reopen this entry if any of the following changes:
 
 - Home text stops sitting directly over the wallpaper (e.g. a solid/translucent
   surface is introduced behind it, like the AppDrawer) — then the classifier
-  becomes load-bearing again and the outline may be redundant there.
+  becomes load-bearing again and the outline may be redundant there. **Partially
+  satisfied-and-accepted:** the manual opt-in scrim (see the Update above) is such
+  a translucent surface, but it is off by default and the outline still carries the
+  guarantee, so the classifier stays advisory. Revisit only if the scrim is ever
+  made *default-on* or *automatic*.
 - A future Android release exposes a cheap per-region text-protection or
   contrast-guaranteed on-wallpaper text API — at which point local contrast (alt. 2)
   becomes affordable and worth revisiting.
-- Someone proposes a scrim again — this entry plus TODO §22 is the answer; do not
-  re-spend tokens rediscovering the 93%-black failure.
+- Someone proposes an *automatic / luminance-driven* scrim again — this entry plus
+  TODO §22 is the answer; do not re-spend tokens rediscovering the 93%-black
+  failure. (The *manual* opt-in scrim already shipped — see the Update above — and
+  is a different design; this trigger is about the automatic form.)
 - The outline is ever removed or made non-default — legibility would again rest
   solely on the classifier, reopening the checkerboard-class failure.
