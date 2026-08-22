@@ -153,8 +153,6 @@ data class LauncherSettings(
     val autoShowKeyboard: Boolean? = null,
     @JsonNames("auto_launch_app")
     val autoLaunchApp: Boolean? = null,
-    @JsonNames("double_tap_clipboard_enabled")
-    val doubleTapClipboardEnabled: Boolean? = null,
 
     /**
      * Persisted as the [SortOrder] enum's `name` string (`"ALPHABETICAL"`

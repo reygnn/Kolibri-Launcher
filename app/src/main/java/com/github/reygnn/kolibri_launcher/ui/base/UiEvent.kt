@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui.base
 import android.widget.Toast
 import androidx.annotation.StringRes
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 
 /**
  * Definiert alle einmaligen Events, die ein ViewModel an die UI senden kann.
@@ -28,7 +29,14 @@ sealed class UiEvent {
     object OpenBatterySettings : UiEvent()
     data class LaunchApp(val app: AppInfo) : UiEvent()
     data class ShowRecentApps(val apps: List<AppInfo>) : UiEvent()
-    object PerformClipboardAction : UiEvent()
+
+    /**
+     * Show the upcoming time-based events (alarms + calendar) in a dialog.
+     * Fired by a home double-tap or a tap on the events indicator; only sent
+     * when the list is non-empty (an empty list means no indicator and a
+     * silent double-tap).
+     */
+    data class ShowTimeBasedEventsDialog(val events: List<TimeBasedEvent>) : UiEvent()
     object RefreshAppDrawer : UiEvent()
     data object ShowCustomizationOptions : UiEvent()
     data object ShowColorPickerDialog : UiEvent()

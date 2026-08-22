@@ -1,7 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.util.Calendar
@@ -79,6 +82,32 @@ class TimeEventFormatterTest {
 
         assertEquals("9:00 AM", formatter.formatCalendarTime(morning, false, testLocale))
         assertEquals("9:00 PM", formatter.formatCalendarTime(evening, false, testLocale))
+    }
+
+    @Test
+    fun `formatEventRow - alarm uses bell glyph and alarm rounding`() {
+        // 07:00:30 → alarm rounding bumps to 07:01
+        val time = createTime(7, 0, 30, 0)
+        val event = TimeBasedEvent(time, "Alarm", TimeBasedEventType.ALARM)
+
+        val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
+
+        assertTrue("expected bell glyph, was: $row", row.startsWith("⏰"))
+        assertTrue("expected rounded alarm time, was: $row", row.contains("07:01"))
+        assertTrue("expected title, was: $row", row.contains("Alarm"))
+    }
+
+    @Test
+    fun `formatEventRow - calendar uses calendar glyph and does not round`() {
+        // 14:30:30 → calendar keeps 14:30 (no rounding)
+        val time = createTime(14, 30, 30, 0)
+        val event = TimeBasedEvent(time, "Standup", TimeBasedEventType.CALENDAR)
+
+        val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
+
+        assertTrue("expected calendar glyph, was: $row", row.startsWith("📅"))
+        assertTrue("expected unrounded time, was: $row", row.contains("14:30"))
+        assertTrue("expected title, was: $row", row.contains("Standup"))
     }
 
     // --- Helper ---

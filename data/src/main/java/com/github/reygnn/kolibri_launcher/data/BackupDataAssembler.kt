@@ -111,7 +111,6 @@ class BackupDataAssembler @Inject constructor(
         val showAlarm = settingsRepository.showAlarmFlow.first()
         val autoShowKeyboard = settingsRepository.autoShowKeyboardFlow.first()
         val autoLaunchApp = settingsRepository.autoLaunchAppFlow.first()
-        val doubleTapClipboardEnabled = settingsRepository.doubleTapClipboardEnabledFlow.first()
         val sortOrder = settingsRepository.sortOrderFlow.first()
         val rotationLocked = settingsRepository.rotationLockedFlow.first()
 
@@ -154,7 +153,6 @@ class BackupDataAssembler @Inject constructor(
             showAlarm = showAlarm,
             autoShowKeyboard = autoShowKeyboard,
             autoLaunchApp = autoLaunchApp,
-            doubleTapClipboardEnabled = doubleTapClipboardEnabled,
             sortOrder = sortOrder.name,
             rotationLocked = rotationLocked,
         )
@@ -388,9 +386,6 @@ class BackupDataAssembler @Inject constructor(
         if (options.importQualityOfLife) {
             backup.settings.autoShowKeyboard?.let { settingsRepository.setAutoShowKeyboard(it) }
             backup.settings.autoLaunchApp?.let { settingsRepository.setAutoLaunchApp(it) }
-            backup.settings.doubleTapClipboardEnabled?.let {
-                settingsRepository.setDoubleTapClipboard(it)
-            }
 
             backup.settings.sortOrder?.let { name ->
                 try {

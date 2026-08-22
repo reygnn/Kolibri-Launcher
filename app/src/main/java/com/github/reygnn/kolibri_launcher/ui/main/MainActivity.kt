@@ -1,9 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
-import android.app.SearchManager
 import android.content.BroadcastReceiver
-import android.content.ClipDescription
-import android.content.ClipboardManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -14,16 +11,14 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.text.format.DateFormat
 import android.view.ContextThemeWrapper
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.WindowManager
 import android.widget.ArrayAdapter
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
-import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -35,11 +30,14 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
+import com.github.reygnn.kolibri_launcher.ui.home.TimeEventFormatter
 import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
@@ -232,6 +230,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     private var navController: NavController? = null
     private var isReceiverRegistered = false
     private var currentDialog: androidx.appcompat.app.AlertDialog? = null
+
+    // Pure JVM formatter for the upcoming-events dialog rows (glyph + time + title).
+    private val timeEventFormatter = TimeEventFormatter()
 
     // Idempotency flags
     private var isInitialized = false
@@ -783,23 +784,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
 
                 is UiEvent.OpenClock -> {
-                    startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+                    openClockApp()
                 }
 
                 is UiEvent.OpenCalendar -> {
-                    try {
-                        val builder = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
-                        ContentUris.appendId(builder, System.currentTimeMillis())
-                        startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
-                    } catch (e: Throwable) {
-                        // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-                        // Inner catch kept (Expected error, four-category
-                        // frame): outer Catchall would log but not Toast,
-                        // so the user-visible "no calendar app" recovery
-                        // would be lost.
-                        TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
-                        showToastSafe(R.string.error_no_calendar_app)
-                    }
+                    openCalendarApp()
                 }
 
                 is UiEvent.OpenBatterySettings -> {
@@ -810,8 +799,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     showRecentAppsDialog(event.apps)
                 }
 
-                is UiEvent.PerformClipboardAction -> {
-                    performClipboardAction()
+                is UiEvent.ShowTimeBasedEventsDialog -> {
+                    showTimeBasedEventsDialog(event.events)
                 }
 
                 is UiEvent.LaunchApp -> {
@@ -947,105 +936,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     }
 
     /**
-     * Double-tap on the home screen: read the clipboard and do the obvious
-     * thing with it — open a URL, dial a number (DIAL only, never CALL),
-     * compose an email, or fall back to a web search. Classification is the
-     * pure [ClipboardActionResolver]; here we only map the result to an Intent
-     * and launch it via startActivitySafely. Empty clipboard → a short toast.
-     *
-     * The read runs on [Dispatchers.IO]: for a URI-backed clip (a file copied
-     * from a gallery / cloud provider) `coerceToText` opens the item through
-     * ContentResolver and reads the stream, i.e. a blocking binder call into a
-     * possibly cold foreign provider — not something to do on the UI thread of
-     * the HOME activity.
-     */
-    private fun performClipboardAction() {
-        lifecycleScope.launch(mainActivityExceptionHandler) {
-            // Both the read AND the classification run off the main thread:
-            // coerceToText can do a blocking ContentResolver round-trip, and
-            // the resolver runs several regexes over up to 8 KB. This is the
-            // HOME activity — a stall here is a frozen home screen.
-            val read = withContext(Dispatchers.IO) { readClipboard() }
-
-            // Never act on a clip the source app marked sensitive (password
-            // managers set this): the WebSearch fallback would otherwise hand
-            // a password to the user's search provider.
-            if (read.isSensitive) {
-                showToastSafe(R.string.clipboard_sensitive)
-                return@launch
-            }
-
-            val action = withContext(Dispatchers.Default) {
-                ClipboardActionResolver.resolve(read.text)
-            }
-            if (action == null) {
-                showToastSafe(R.string.clipboard_empty)
-                return@launch
-            }
-
-            showClipboardActionDialog(action)
-        }
-    }
-
-    /**
-     * Builds the Intent for a [ClipboardLaunchSpec]. Pure glue: every decision
-     * — action, URI shape, fallback, label — was already made in [launchSpec],
-     * where a JVM test can reach it.
-     */
-    private fun intentFor(spec: ClipboardLaunchSpec): Intent {
-        val intent = Intent(spec.intentAction)
-        // normalizeScheme(): IntentFilter matches schemes CASE-SENSITIVELY, so
-        // an autocapitalised `Https://…` resolves to no browser without this.
-        spec.dataUri?.let { intent.data = it.toUri().normalizeScheme() }
-        spec.queryExtra?.let { intent.putExtra(SearchManager.QUERY, it) }
-        return intent
-    }
-
-    private fun fallbackIntentFor(spec: ClipboardLaunchSpec): Intent? =
-        spec.fallbackUri?.let { Intent(Intent.ACTION_VIEW, it.toUri()) }
-
-    /**
-     * Shows one line of the copied text plus the proposed action, so nothing
-     * is launched — and nothing leaves the device — before the user has seen
-     * what it is. That is also what makes the classifier's unavoidable
-     * ambiguity harmless (`install.sh` is both a filename and a valid domain).
-     *
-     * "Share" is offered alongside because it is the one action that can never
-     * be wrong for arbitrary text, and unlike ACTION_WEB_SEARCH it always
-     * resolves. There is deliberately no Cancel button: tapping outside
-     * dismisses, which is the lighter gesture for the common "not now" case.
-     */
-    private fun showClipboardActionDialog(action: ClipboardAction) {
-        val spec = action.launchSpec()
-
-        // Inflate against the DIALOG theme, not the Activity's. The layout's
-        // ?attr/colorOnSurface would otherwise resolve against AppTheme, which
-        // follows system night mode, while the dialog surface follows wallpaper
-        // luminance — light wallpaper plus system dark mode then paints the
-        // preview near-white on near-white. Same fix as showRecentAppsDialog.
-        val dialogStyle = wallpaperAwareDialogStyle()
-        val themedInflater = LayoutInflater.from(ContextThemeWrapper(this, dialogStyle))
-        val previewView = themedInflater.inflate(R.layout.dialog_clipboard_action, null)
-        previewView.findViewById<TextView>(R.id.clipboardPreview).text = action.displayText
-
-        showDialog(
-            MaterialAlertDialogBuilder(this, dialogStyle)
-                .setTitle(R.string.clipboard_action_title)
-                .setView(previewView)
-                .setNeutralButton(R.string.clipboard_action_share) { _, _ ->
-                    runDialogAction("Error sharing clipboard text") {
-                        shareClipboardText(action.displayText)
-                    }
-                }
-                .setPositiveButton(spec.confirmLabel) { _, _ ->
-                    runDialogAction("Error launching clipboard action") {
-                        startActivitySafely(intentFor(spec), fallbackIntentFor(spec))
-                    }
-                },
-        )
-    }
-
-    /**
      * Runs a dialog button's body behind a catch.
      *
      * A `DialogInterface.OnClickListener` is a system callback: it runs outside
@@ -1066,29 +956,74 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         }
     }
 
-    private fun shareClipboardText(text: String) {
-        val send = Intent(Intent.ACTION_SEND)
-            .setType("text/plain")
-            .putExtra(Intent.EXTRA_TEXT, text)
-        startActivitySafely(
-            Intent.createChooser(send, getString(R.string.clipboard_action_share)),
-        )
+    private fun openClockApp() {
+        startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
     }
 
-    private fun readClipboard(): ClipboardRead =
-        ClipboardReader.read(
-            clip = getSystemService(ClipboardManager::class.java)?.primaryClip,
-            isSensitive = {
-                it.description?.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true
-            },
-            // coerceToText hands back item.text outright for a plain-text clip,
-            // but reads a URI-backed one to EOF even though resolve() caps at
-            // 8 KB. Knowingly accepted — ACCEPTED_LIMITATIONS.md §2 explains why
-            // the obvious MIME pre-check would not help.
-            coerceFirstItem = {
-                it.takeIf { clip -> clip.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)
-            },
-        )
+    private fun openCalendarApp() {
+        try {
+            val builder = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
+            ContentUris.appendId(builder, System.currentTimeMillis())
+            startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
+        } catch (e: Throwable) {
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
+            // Inner catch kept (Expected error, four-category frame): the
+            // user-visible "no calendar app" recovery would be lost if this
+            // propagated to the outer Catchall, which logs but does not Toast.
+            TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
+            showToastSafe(R.string.error_no_calendar_app)
+        }
+    }
+
+    /**
+     * Upcoming time-based events (alarms + calendar) dialog for the home
+     * double-tap / events-indicator tap. Same top-anchored, wallpaper-aware,
+     * blur-behind presentation as [showRecentAppsDialog]. Rows are glyph-prefixed
+     * by type via [TimeEventFormatter.formatEventRow] and actionable: an alarm row
+     * opens the clock app, a calendar row opens the calendar. An empty list is a
+     * no-op (the caller only fires this for a non-empty list).
+     */
+    private fun showTimeBasedEventsDialog(events: List<TimeBasedEvent>) {
+        if (isFinishing || isDestroyed) return
+        if (events.isEmpty()) return
+
+        val is24Hour = DateFormat.is24HourFormat(this)
+        val labels = events.map { timeEventFormatter.formatEventRow(it, is24Hour) }
+
+        // Same wallpaper-aware theming reasoning as showRecentAppsDialog: the row
+        // layout's ?attr/colorOnSurface must resolve against the dialog overlay,
+        // not the Activity theme, or text can vanish when wallpaper luminance and
+        // system night mode diverge.
+        val rowContext = ContextThemeWrapper(this, wallpaperAwareDialogStyle())
+        val adapter = ArrayAdapter(rowContext, R.layout.item_recent_app, R.id.recent_app_name, labels)
+        val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
+            .setTitle(getString(R.string.events_dialog_title))
+            .setAdapter(adapter) { _, which ->
+                runDialogAction("Error opening event target") {
+                    when (events[which].type) {
+                        TimeBasedEventType.ALARM -> openClockApp()
+                        TimeBasedEventType.CALENDAR -> openCalendarApp()
+                    }
+                }
+            }
+            .setOnDismissListener { if (currentDialog == it) currentDialog = null }
+            .create()
+        dialog.window?.let { w ->
+            w.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+            w.setWindowAnimations(R.style.DialogAnimationFromTop)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            w.setDimAmount(0.55f)
+            if (windowManager.isCrossWindowBlurEnabled) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                w.attributes = w.attributes.apply {
+                    blurBehindRadius = (32 * resources.displayMetrics.density).toInt()
+                }
+            }
+        }
+        currentDialog?.dismiss()
+        currentDialog = dialog
+        dialog.show()
+    }
 
     /**
      * Recent-apps dialog for the swipe-down gesture. Anchored to the top of

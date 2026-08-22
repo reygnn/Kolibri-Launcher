@@ -36,7 +36,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
@@ -178,7 +177,6 @@ class MonolithicLauncherViewModelTest {
     private val toggleSortOrderUseCase: ToggleSortOrderUseCase = mockk(relaxed = true)
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase = mockk(relaxed = true)
     private val getRecentAppsUseCase: GetRecentAppsUseCase = mockk(relaxed = true)
-    private val observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
     private val observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase = mockk(relaxed = true)
     private val observeUiColorsUseCase: ObserveUiColorsUseCase = mockk(relaxed = true)
     private val setTextColorUseCase: SetTextColorUseCase = mockk(relaxed = true)
@@ -260,7 +258,6 @@ class MonolithicLauncherViewModelTest {
             toggleSortOrderUseCase,
             handleSwipeActionUseCase,
             getRecentAppsUseCase,
-            observeDoubleTapClipboardSettingUseCase,
             observeTimeBasedEventsUseCase,
             observeUiColorsUseCase,
             setTextColorUseCase,

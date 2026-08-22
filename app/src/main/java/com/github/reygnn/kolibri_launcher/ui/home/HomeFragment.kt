@@ -10,9 +10,7 @@ import android.content.res.Resources
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
 import android.text.format.DateFormat
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,7 +19,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -36,7 +33,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
@@ -56,7 +52,6 @@ import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
-import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -196,7 +191,7 @@ import javax.inject.Inject
  *     setupGestures' setOnTouchListener and
  *     DoubleClickListener.onClick. Both are documented inline. The
  *     same trade-off applies in per-item recovery loops
- *     (renderFavorites, updateTimeBasedChips, createAppButton outer
+ *     (renderFavorites, createAppButton outer
  *     catches): one bad item shouldn't break the whole list.
  *
  *
@@ -307,7 +302,6 @@ class HomeFragment : Fragment() {
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
     private var currentFavoritesAlignment: FavoritesAlignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
     private var currentUserPreferredMarginPx: Int = 0
-    private var lastSpacingInput: SpacingInput? = null
 
     // ===========================================
     // CONTEXT MENU STATE
@@ -355,9 +349,7 @@ class HomeFragment : Fragment() {
 
     private val layoutCalculator = LayoutCalculator()
     private val topMarginCalculator = TopMarginCalculator()
-    private val chipBackgroundCalculator = ChipBackgroundCalculator()
     private val contentSpacingCalculator = ContentSpacingCalculator()
-    private val timeFormatter = TimeEventFormatter()
     private val wallpaperViewBinder = WallpaperViewBinder(
         // suspend loader: the decode runs off the main thread. The binder only
         // calls it for plans that actually load bitmaps (SwitchToSingleLayer /
@@ -499,9 +491,6 @@ class HomeFragment : Fragment() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         Timber.d("⟳ Configuration changed - orientation=${newConfig.orientation}")
-        // Invalidate the spacing cache so the next layout pass recomputes
-        // margin / padding for the new configuration.
-        lastSpacingInput = null
         // v4 §3a/R2: display metrics changed -> the composite key changed, so any cached
         // composite is now wrong-resolution and misses. Re-render the current state (a miss
         // falls to the correct per-layer path) and request a warm at the new resolution; the
@@ -593,7 +582,7 @@ class HomeFragment : Fragment() {
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { events ->
             if (_binding == null) return@collectOnStarted
-            updateTimeBasedChips(events)
+            updateEventsIndicator(events)
         }
 
         // Observer 5: Colors
@@ -813,64 +802,31 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Berechnet den finalen Margin basierend auf User-Wunsch UND Chips-Status.
-     * Sollte aufgerufen werden, wenn sich:
-     * 1. Der User-Margin ändert (Settings)
-     * 2. Die Chips ändern (Events geladen)
-     */
-    /**
-     * ELEGANT FIXED: Kein unnötiges 'post', wenn wir noch gar nicht sichtbar waren.
+     * Computes the favorites top margin from the user's preferred content margin.
+     * Call it whenever that setting changes; also invoked once when events load
+     * (kept for symmetry, though the events indicator no longer affects spacing).
      */
     private fun updateDynamicSpacing() {
         if (_binding == null) return
 
-        val chipsContainer = binding.calendarEventsScroll
         val favoritesContainer = binding.favoritesContainer
 
-        // Logik in eine lokale Funktion kapseln, damit wir sie direkt oder via post rufen können
-        fun applySpacing() {
-            if (_binding == null) return
+        // The old alarm/calendar chip row was a separate block whose height had to
+        // be measured and compensated for here. Its replacement — the events
+        // indicator — lives inline in the date/battery row inside timeContainer, so
+        // it contributes no extra vertical block: the favorites top margin now
+        // derives solely from the user's preferred content margin (no chip term).
+        val newMargin = contentSpacingCalculator.calculate(
+            currentUserPreferredMarginPx,
+            0,
+            false
+        )
 
-            val areChipsVisible = chipsContainer.isVisible
-            val currentChipsHeight = if (areChipsVisible) chipsContainer.height else 0
-
-            val input = SpacingInput(
-                userPreferredMarginPx = currentUserPreferredMarginPx,
-                chipsHeightPx = currentChipsHeight,
-                areChipsVisible = areChipsVisible
-            )
-
-            // Cache-Check
-            if (input == lastSpacingInput) return
-
-            val newMargin = contentSpacingCalculator.calculate(
-                input.userPreferredMarginPx,
-                input.chipsHeightPx,
-                input.areChipsVisible
-            )
-
-            lastSpacingInput = input
-
-            val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams
-            if (params != null) {
-                if (params.topMargin != newMargin) {
-                    Timber.d("📏 Spacing applied: ${params.topMargin} → $newMargin")
-                    params.topMargin = newMargin
-                    favoritesContainer.layoutParams = params
-                }
-            }
-        }
-
-        // DER CRITICAL FIX:
-        // Wenn der View noch nicht "laid out" ist (z.B. beim Starten des Fragments),
-        // setzen wir die Params SOFORT. Das Layout-System nutzt diese Werte dann für den allerersten Pass.
-        // Kein Post = Kein Frame Delay = Kein Flackern.
-        if (!favoritesContainer.isLaidOut || favoritesContainer.isInLayout) {
-            applySpacing()
-        } else {
-            // Wenn der View schon steht und wir z.B. auf eine Höhenänderung der Chips warten müssen,
-            // ist post() weiterhin sicherer, um die neuen Masse abzugreifen.
-            favoritesContainer.post { applySpacing() }
+        val params = favoritesContainer.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        if (params.topMargin != newMargin) {
+            Timber.d("📏 Spacing applied: ${params.topMargin} → $newMargin")
+            params.topMargin = newMargin
+            favoritesContainer.layoutParams = params
         }
     }
 
@@ -1002,22 +958,8 @@ class HomeFragment : Fragment() {
         binding.batteryText.setTextColor(textColor)
         binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
-        updateCalendarChipsColors(colors)
+        binding.eventsIndicator.imageTintList = ColorStateList.valueOf(textColor)
         updateFavoriteButtonColors(colors)
-    }
-
-    private fun updateCalendarChipsColors(colors: UiColorsState) {
-        if (_binding == null) return
-
-        // Both inner and outer try/catch blocks removed per Rule 11 —
-        // childCount + getChildAt + safe-cast + property writes are
-        // pure code paths.
-        for (i in 0 until binding.calendarChipsContainer.childCount) {
-            val view = binding.calendarChipsContainer.getChildAt(i)
-            if (view is Chip) {
-                configureChipColorOnly(view, colors)
-            }
-        }
     }
 
     /**
@@ -1031,168 +973,21 @@ class HomeFragment : Fragment() {
     }
 
     // ============================================================================
-    // TIME-BASED CHIPS
+    // TIME-BASED EVENTS INDICATOR
     // ============================================================================
 
-    private fun updateTimeBasedChips(events: List<TimeBasedEvent>) {
+    /**
+     * Toggles the subtle events indicator that replaced the old alarm/calendar
+     * chip row: a single glyph shown only when upcoming time-based events exist.
+     * Tapping it (or a home double-tap) opens the events dialog — see
+     * [setupDoubleTapActions] and `GestureDelegate.onDoubleTap`. Pure View
+     * property writes (Rule 11).
+     */
+    private fun updateEventsIndicator(events: List<TimeBasedEvent>) {
         if (_binding == null) return
 
-        // Outer try/catch removed per Rule 11 — body is View property
-        // writes + a per-item creation loop with its own catch. Inner
-        // getDimensionPixelSize and per-item chip-creation catches stay
-        // (legit Resources fallback + per-item recovery).
-        binding.calendarEventsScroll.visibility = View.GONE
-        binding.calendarChipsContainer.removeAllViews()
-
-        if (events.isEmpty()) {
-            updateDynamicSpacing()
-            return
-        }
-
-        val ctx = context ?: return
-        val colors = viewModel.uiColorsState.value
-
-        val layoutPadding = try {
-            resources.getDimensionPixelSize(R.dimen.layout_padding) * 2
-        } catch (e: Resources.NotFoundException) {
-            // Narrowed from Throwable — same tight-around-getDimensionPixelSize
-            // pattern used in applyTopMargin / applyLayoutToExistingViews /
-            // createAppButton above. Silent fallback to 0 means chips render
-            // with extra horizontal slack, no user-visible breakage.
-            0
-        }
-
-        val availableWidth = resources.displayMetrics.widthPixels - layoutPadding
-        val chipMaxWidth = (availableWidth * AppConstants.CHIP_MAX_WIDTH_FACTOR).toInt()
-
-        for (event in events) {
-            try {
-                val chip = when (event.type) {
-                    TimeBasedEventType.ALARM -> createAlarmChip(ctx, event, colors, chipMaxWidth)
-                    TimeBasedEventType.CALENDAR -> createCalendarChip(ctx, event, colors, chipMaxWidth)
-                }
-
-                if (chip != null) {
-                    binding.calendarChipsContainer.addView(chip)
-                }
-            } catch (e: Throwable) {
-                // Catch kept (Expected error, four-category frame): per-item chip
-                // creation + addView; one failing event must not abort the loop.
-                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-                TimberWrapper.silentError(e, "Error creating chip")
-            }
-        }
-
-        binding.calendarEventsScroll.visibility = View.VISIBLE
+        binding.eventsIndicator.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
         updateDynamicSpacing()
-    }
-
-    // Both methods below: try/catch removed per Rule 11 — body is
-    // pure View property writes + a pure calculator call. Chip is
-    // never null at the call sites (filtered by `is Chip` checks).
-
-    private fun configureChip(chip: Chip, colors: UiColorsState, chipMaxWidth: Int) {
-        chip.ellipsize = TextUtils.TruncateAt.END
-        chip.maxWidth = chipMaxWidth
-        chip.isSingleLine = true
-
-        val finalChipBgColor = chipBackgroundCalculator.calculate(
-            chipBackgroundColor = colors.chipBackgroundColor,
-            textColorInt = colors.textColor,
-        )
-        chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-
-        chip.setTextColor(colors.textColor)
-        chip.isCloseIconVisible = false
-        chip.isCheckable = false
-        chip.chipStrokeWidth = AppConstants.CHIP_STROKE_WIDTH
-        chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-        chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, AppConstants.CHIP_TEXT_SIZE_SP)
-        chip.chipMinHeight = chip.resources.getDimension(R.dimen.chip_min_height)
-    }
-
-    private fun configureChipColorOnly(chip: Chip, colors: UiColorsState) {
-        val finalChipBgColor = chipBackgroundCalculator.calculate(
-            chipBackgroundColor = colors.chipBackgroundColor,
-            textColorInt = colors.textColor,
-        )
-        chip.chipBackgroundColor = ColorStateList.valueOf(finalChipBgColor)
-        chip.setTextColor(colors.textColor)
-        chip.chipStrokeColor = ColorStateList.valueOf(colors.textColor)
-    }
-
-    private fun createAlarmChip(
-        context: Context,
-        event: TimeBasedEvent,
-        colors: UiColorsState,
-        chipMaxWidth: Int
-    ): Chip? {
-        // Inner try/catch around timeFormatter removed per Rule 11 —
-        // formatAlarmTime is pure JVM Kotlin (covered by TimeEventFormatter
-        // tests), DateFormat.is24HourFormat is a system-API getter that
-        // does not throw. The previous "fallback to title-only on
-        // formatter crash" was a programmer-error swallow that papered
-        // over potential bugs while the silentError-DEBUG-throw made
-        // the fallback unreachable in DEBUG anyway. Outer catch around
-        // Chip(...).apply remains as per-item recovery (Chip construction
-        // can throw on resource lookup or themed-context issues).
-        return try {
-            Chip(context).apply {
-                val is24Hour = DateFormat.is24HourFormat(context)
-
-                // PURE LOGIC DELEGATION:
-                // The calculation lives isolated and tested in the formatter.
-                // We pass only raw data here.
-                val timeString = timeFormatter.formatAlarmTime(
-                    triggerTimeMillis = event.triggerTimeMillis,
-                    is24Hour = is24Hour
-                    // locale defaults to the device's; pass it here if needed.
-                )
-
-                text = "$timeString ${event.title}"
-
-                // Visuelles Styling (existierende Methode)
-                configureChip(this, colors, chipMaxWidth)
-            }
-        } catch (e: Throwable) {
-            // Catch kept (Expected error, four-category frame): Chip construction can
-            // throw on resource lookup / themed-context issues; per-item recovery to null.
-            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-            TimberWrapper.silentError(e, "Error creating alarm chip instance")
-            null
-        }
-    }
-
-    private fun createCalendarChip(
-        context: Context,
-        event: TimeBasedEvent,
-        colors: UiColorsState,
-        chipMaxWidth: Int
-    ): Chip? {
-        // Inner try/catch around timeFormatter removed per Rule 11 —
-        // same reasoning as createAlarmChip above. Outer per-item
-        // recovery catch retained.
-        return try {
-            Chip(context).apply {
-                val is24Hour = DateFormat.is24HourFormat(context)
-
-                // PURE LOGIC DELEGATION:
-                val timeString = timeFormatter.formatCalendarTime(
-                    triggerTimeMillis = event.triggerTimeMillis,
-                    is24Hour = is24Hour
-                )
-
-                text = "$timeString ${event.title}"
-
-                configureChip(this, colors, chipMaxWidth)
-            }
-        } catch (e: Throwable) {
-            // Catch kept (Expected error, four-category frame): Chip construction can
-            // throw on resource lookup / themed-context issues; per-item recovery to null.
-            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-            TimberWrapper.silentError(e, "Error creating calendar chip instance")
-            null
-        }
     }
 
     // ============================================================================
@@ -1299,6 +1094,13 @@ class HomeFragment : Fragment() {
                 viewModel.onBatteryDoubleClick()
             }
         })
+
+        // Single tap on the subtle events indicator opens the same upcoming-events
+        // dialog as a home double-tap (shared viewModel.onDoubleTap path). Pure
+        // listener registration — no throw to guard (Rule 11).
+        binding.eventsIndicator.setOnClickListener {
+            viewModel.onDoubleTap()
+        }
     }
 
     /**
@@ -1678,7 +1480,6 @@ class HomeFragment : Fragment() {
 
         // 2. Clear our own references.
         longClickedApp = null
-        lastSpacingInput = null
 
         // The wallpaper-edit overlay (touch interceptor + FAB cluster +
         // commands panel) now lives behind a ViewStub and may never have been

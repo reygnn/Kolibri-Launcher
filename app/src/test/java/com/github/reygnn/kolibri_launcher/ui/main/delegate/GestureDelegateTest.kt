@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -10,9 +10,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -37,7 +35,9 @@ class GestureDelegateTest {
 
     private lateinit var handleSwipeActionUseCase: HandleSwipeActionUseCase
     private lateinit var getRecentAppsUseCase: GetRecentAppsUseCase
-    private lateinit var observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase
+
+    // Snapshot the double-tap gesture reads (mirrors ClockDelegate.timeBasedEvents).
+    private var currentEvents: List<TimeBasedEvent> = emptyList()
 
     @Before
     fun setUp() {
@@ -45,9 +45,7 @@ class GestureDelegateTest {
 
         handleSwipeActionUseCase = mockk(relaxed = true)
         getRecentAppsUseCase = mockk(relaxed = true)
-        observeDoubleTapClipboardSettingUseCase = mockk(relaxed = true)
-        // Default: setting off. Tests that care override this.
-        every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(false)
+        currentEvents = emptyList()
     }
 
     private fun createDelegateScope() = DelegateScope(
@@ -58,16 +56,13 @@ class GestureDelegateTest {
 
     private fun createDelegate() = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
-        observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
+        currentTimeBasedEvents = { currentEvents },
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = createDelegateScope()
     )
 
-    /** Builds a delegate whose clipboard setting reads back as [enabled]. */
-    private fun delegateWithClipboard(enabled: Boolean): GestureDelegate {
-        every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(enabled)
-        return createDelegate()
-    }
+    private fun alarm(title: String = "Alarm") =
+        TimeBasedEvent(triggerTimeMillis = 0L, title = title, type = TimeBasedEventType.ALARM)
 
     @Test
     fun `onSwipeDown emits ShowRecentApps with the recent apps`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -83,84 +78,42 @@ class GestureDelegateTest {
     }
 
     @Test
-    fun `onDoubleTap when enabled emits PerformClipboardAction`() = runTest(mainDispatcherRule.testDispatcher) {
-        val delegate = delegateWithClipboard(enabled = true)
-
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-
-        assertEquals(listOf(UiEvent.PerformClipboardAction), sentEvents)
-    }
-
-    @Test
-    fun `onDoubleTap when disabled points at the setting, never the clipboard`() =
+    fun `onDoubleTap with events emits ShowTimeBasedEventsDialog with the snapshot`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val delegate = delegateWithClipboard(enabled = false)
-
-            delegate.onDoubleTap()
-            advanceUntilIdle()
-
-            // The hint — crucially, no PerformClipboardAction.
-            assertEquals(
-                listOf(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard)),
-                sentEvents,
-            )
-        }
-
-    @Test
-    fun `onDoubleTap when disabled shows the hint only once`() = runTest(mainDispatcherRule.testDispatcher) {
-        val delegate = delegateWithClipboard(enabled = false)
-
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-
-        assertEquals(1, sentEvents.size)
-    }
-
-    @Test
-    fun `onDoubleTap when enabled fires on every tap`() = runTest(mainDispatcherRule.testDispatcher) {
-        // The one-shot flag guards the hint, not the action. An enabled setting
-        // must forward the clipboard on every tap, or the second gesture would
-        // silently do nothing.
-        val delegate = delegateWithClipboard(enabled = true)
-
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-        delegate.onDoubleTap()
-        advanceUntilIdle()
-
-        assertEquals(
-            listOf(UiEvent.PerformClipboardAction, UiEvent.PerformClipboardAction),
-            sentEvents,
-        )
-    }
-
-    @Test
-    fun `onDoubleTap enabled after the hint was shown fires the clipboard action`() =
-        runTest(mainDispatcherRule.testDispatcher) {
-            // User taps while off (sees the hint), flips the setting on, taps
-            // again. The setting is re-read freshly each time, and the one-shot
-            // hint flag must not suppress the now-enabled action.
-            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(false)
+            val events = listOf(alarm())
+            currentEvents = events
             val delegate = createDelegate()
 
             delegate.onDoubleTap()
             advanceUntilIdle()
 
-            every { observeDoubleTapClipboardSettingUseCase() } returns flowOf(true)
-            delegate.onDoubleTap()
-            advanceUntilIdle()
-
-            assertEquals(
-                listOf(
-                    UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard),
-                    UiEvent.PerformClipboardAction,
-                ),
-                sentEvents,
-            )
+            assertEquals(listOf(UiEvent.ShowTimeBasedEventsDialog(events)), sentEvents)
         }
+
+    @Test
+    fun `onDoubleTap with no events is a silent no-op`() = runTest(mainDispatcherRule.testDispatcher) {
+        currentEvents = emptyList()
+        val delegate = createDelegate()
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        assertTrue(sentEvents.isEmpty())
+    }
+
+    @Test
+    fun `onDoubleTap fires on every tap while events exist`() = runTest(mainDispatcherRule.testDispatcher) {
+        currentEvents = listOf(alarm())
+        val delegate = createDelegate()
+
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+        delegate.onDoubleTap()
+        advanceUntilIdle()
+
+        assertEquals(2, sentEvents.size)
+        assertTrue(sentEvents.all { it is UiEvent.ShowTimeBasedEventsDialog })
+    }
 
     // ===========================================
     // FLING UP

@@ -34,11 +34,6 @@
     <dimen name="elevation_card">4dp</dimen>
      
     <!-- =============================================================== -->
-    <!-- == APP DRAWER                                                == -->
-    <!-- =============================================================== -->
-    <dimen name="chip_min_height">32dp</dimen>
-
-    <!-- =============================================================== -->
     <!-- == BOTTOM-SHEET DIALOGS (colour / layout customisation)      == -->
     <!-- =============================================================== -->
     <!-- Shared corner radius so both draggable sheets round identically. -->

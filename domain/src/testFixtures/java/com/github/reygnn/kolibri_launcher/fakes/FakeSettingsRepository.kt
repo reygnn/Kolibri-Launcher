@@ -68,14 +68,6 @@ class FakeSettingsRepository : SettingsRepository {
     private val sortOrderState = MutableStateFlow(SortOrder.TIME_WEIGHTED_USAGE) // Enum Default ist okay
     override val sortOrderFlow: Flow<SortOrder> = sortOrderState
 
-    private val doubleTapClipboardState =
-        MutableStateFlow(AppConstants.DEFAULT_DOUBLE_TAP_CLIPBOARD)
-    override val doubleTapClipboardEnabledFlow: Flow<Boolean> = doubleTapClipboardState
-
-    var doubleTapClipboard: Boolean
-        get() = doubleTapClipboardState.value
-        set(value) { doubleTapClipboardState.value = value }
-
     private val onboardingCompletedState = MutableStateFlow(false) // Onboarding ist per Default immer false (neu)
     override val onboardingCompletedFlow: Flow<Boolean> = onboardingCompletedState
 
@@ -203,10 +195,6 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = isEnabled
     }
 
-    override suspend fun setDoubleTapClipboard(isEnabled: Boolean) {
-        doubleTapClipboard = isEnabled
-    }
-
     override suspend fun setSortOrder(sortOrder: SortOrder) {
         sortOrderState.value = sortOrder
     }
@@ -237,7 +225,6 @@ class FakeSettingsRepository : SettingsRepository {
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
 
         sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
-        doubleTapClipboard = AppConstants.DEFAULT_DOUBLE_TAP_CLIPBOARD
 
         favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
         wallpaperSurfaceModeState.value = AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE

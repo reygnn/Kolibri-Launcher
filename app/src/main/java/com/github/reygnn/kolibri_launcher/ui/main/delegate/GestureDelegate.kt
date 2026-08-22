@@ -9,29 +9,23 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
-import kotlinx.coroutines.flow.first
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 
 /**
  * Delegate responsible for all gesture handling:
  * fling up, swipe down (recent apps), swipe left/right, double-tap
- * (clipboard action), long press, and double-click on clock/date/battery.
+ * (upcoming-events dialog), long press, and double-click on clock/date/battery.
  */
 class GestureDelegate(
     private val getRecentAppsUseCase: GetRecentAppsUseCase,
-    private val observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
+    private val currentTimeBasedEvents: () -> List<TimeBasedEvent>,
     private val handleSwipeActionUseCase: HandleSwipeActionUseCase,
     private val scope: DelegateScope
 ) {
-
-    // --- One-Time Toast Flags ---
-
-    private var enableClipboardToastShown = false
 
     // --- Fling ---
 
@@ -75,33 +69,23 @@ class GestureDelegate(
         scope.sendEvent(UiEvent.ShowCustomizationOptions)
     }
 
-    // --- Double tap: clipboard action ---
+    // --- Double tap: upcoming-events dialog ---
 
     /**
-     * Opt-in (default OFF, see [com.github.reygnn.kolibri_launcher.core.AppConstants.DEFAULT_DOUBLE_TAP_CLIPBOARD]):
-     * the gesture reads the clipboard and can forward its content to a search
-     * provider, so it is never switched on behind the user's back. While
-     * disabled the gesture points at the setting rather than doing nothing
-     * silently — same shape the swipe-down and lock gestures used before they
-     * were removed. The hint shows once per ViewModel/Activity session (the
-     * flag is instance state on this delegate, which lives on
-     * `LauncherViewModel`): it survives configuration changes, but resets when
-     * the Activity is really destroyed.
+     * Opens the upcoming time-based events (alarms + calendar) in a dialog.
      *
-     * Reads the setting freshly here, and this is the ONLY reader of it: whether
-     * the double tap consumes the touch sequence no longer depends on the
-     * setting at all (a detected double tap always consumes — see
-     * `HomeGestureLayout`), so there is no second consumer this read must agree
-     * with, and no divergence window to design around. A stale read here at
-     * worst shows the hint one extra time or misses the clipboard action once;
-     * both self-correct on the next tap and neither can double up a dialog.
+     * Reads the already-collected snapshot from the clock delegate
+     * ([currentTimeBasedEvents]) rather than re-querying — the list is exactly
+     * what drives the home-screen events indicator, so the dialog can never show
+     * something the indicator doesn't. When the list is empty (no indicator
+     * shown) the gesture is a silent no-op; the absence of the indicator is the
+     * feedback. This is a pure snapshot read with no suspension point, so no
+     * `CancellationException` can arise inside the block.
      */
     fun onDoubleTap() = scope.launchSafe("Error on double tap") {
-        if (observeDoubleTapClipboardSettingUseCase().first()) {
-            scope.sendEvent(UiEvent.PerformClipboardAction)
-        } else if (!enableClipboardToastShown) {
-            enableClipboardToastShown = true
-            scope.sendEvent(UiEvent.ShowToast(R.string.toast_enable_double_tap_clipboard))
+        val events = currentTimeBasedEvents()
+        if (events.isNotEmpty()) {
+            scope.sendEvent(UiEvent.ShowTimeBasedEventsDialog(events))
         }
     }
 

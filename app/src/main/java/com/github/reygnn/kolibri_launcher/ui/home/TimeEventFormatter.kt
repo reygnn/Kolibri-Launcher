@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -49,6 +51,25 @@ class TimeEventFormatter {
      */
     fun formatCalendarTime(triggerTimeMillis: Long, is24Hour: Boolean, locale: Locale = Locale.getDefault()): String {
         return formatTimeInternal(triggerTimeMillis, is24Hour, locale)
+    }
+
+    /**
+     * Builds a single glyph-prefixed row label for the time-based-events dialog,
+     * e.g. "⏰  07:00  Alarm" or "📅  14:30  Standup". The leading glyph makes the
+     * event type visually distinguishable in the flat, time-sorted list, and the
+     * time is formatted with the type-appropriate rule (alarms round up seconds,
+     * calendar times do not). Pure JVM logic — no Android dependencies.
+     */
+    fun formatEventRow(event: TimeBasedEvent, is24Hour: Boolean, locale: Locale = Locale.getDefault()): String {
+        val time = when (event.type) {
+            TimeBasedEventType.ALARM -> formatAlarmTime(event.triggerTimeMillis, is24Hour, locale)
+            TimeBasedEventType.CALENDAR -> formatCalendarTime(event.triggerTimeMillis, is24Hour, locale)
+        }
+        val glyph = when (event.type) {
+            TimeBasedEventType.ALARM -> "⏰"
+            TimeBasedEventType.CALENDAR -> "📅"
+        }
+        return "$glyph  $time  ${event.title}"
     }
 
     private fun formatTimeInternal(timeMillis: Long, is24Hour: Boolean, locale: Locale): String {

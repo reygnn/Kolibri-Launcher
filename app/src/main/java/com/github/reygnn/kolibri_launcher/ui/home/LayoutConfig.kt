@@ -11,8 +11,8 @@ package com.github.reygnn.kolibri_launcher.ui.home
  * Our Solution: Let Android Decide!
  *
  * Flow Architecture:
- * 1. User adds favorites / rotates device / chips appear
- *    → renderFavorites() / onConfigurationChanged() / updateTimeBasedChips()
+ * 1. User adds favorites / rotates device
+ *    → renderFavorites() / onConfigurationChanged()
  *
  * 2. After rendering completes (OnGlobalLayoutListener ensures timing)
  *    → checkScrollStateAfterNextLayout() is called

@@ -45,7 +45,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetLayoutSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetTextShadowEnabledUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveDoubleTapClipboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetWallpaperScrimAlphaUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
@@ -118,7 +117,6 @@ class LauncherViewModel @Inject constructor(
     toggleSortOrderUseCase: ToggleSortOrderUseCase,
     handleSwipeActionUseCase: HandleSwipeActionUseCase,
     getRecentAppsUseCase: GetRecentAppsUseCase,
-    observeDoubleTapClipboardSettingUseCase: ObserveDoubleTapClipboardSettingUseCase,
     observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase,
     observeUiColorsUseCase: ObserveUiColorsUseCase,
     setTextColorUseCase: SetTextColorUseCase,
@@ -205,7 +203,9 @@ class LauncherViewModel @Inject constructor(
 
     private val gestureDelegate = GestureDelegate(
         getRecentAppsUseCase = getRecentAppsUseCase,
-        observeDoubleTapClipboardSettingUseCase = observeDoubleTapClipboardSettingUseCase,
+        // Snapshot read of the same list that drives the home events indicator,
+        // so the double-tap dialog can never diverge from what the indicator shows.
+        currentTimeBasedEvents = { clockDelegate.timeBasedEvents.value },
         handleSwipeActionUseCase = handleSwipeActionUseCase,
         scope = delegateScope
     )
