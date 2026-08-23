@@ -959,7 +959,7 @@ class HomeFragment : Fragment() {
         binding.batteryText.setTextColor(textColor)
         binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
-        // The events indicators are text glyphs ("◷" alarm, "◇" calendar) in
+        // The events indicators are text glyphs ("◷" alarm, "○" calendar) in
         // OutlinedTextViews, so each gets the exact same adaptive treatment as the
         // clock/date/battery: text colour + the tonal contrast outline
         // (background-independent legibility).
@@ -986,7 +986,7 @@ class HomeFragment : Fragment() {
 
     /**
      * Toggles the subtle events indicators that replaced the old alarm/calendar
-     * chip row: two glyphs (◷ alarm, ◇ calendar), each shown only when an upcoming
+     * chip row: two glyphs (◷ alarm, ○ calendar), each shown only when an upcoming
      * event of its type exists. They are PASSIVE status symbols — not clickable; the
      * events dialog opens via the home double-tap (`GestureDelegate.onDoubleTap`),
      * the glyphs just signal that events exist.
