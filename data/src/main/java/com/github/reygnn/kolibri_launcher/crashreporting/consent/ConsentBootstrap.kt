@@ -79,6 +79,11 @@ object ConsentBootstrap {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // pre-wiring bare Timber.e (Rule 9): readDecision runs on the pre-Hilt
+            // bootstrap path (attachBaseContext / the onCreate consent gate) BEFORE
+            // KolibriLog is wired and BEFORE AcraTree is planted. reportToAcra
+            // would be a no-op here, and silentError's DEBUG throw would crash the
+            // app before the reporter exists — so this stays a bare Timber.e.
             Timber.e(e, "Failed to read crash-report consent decision from DataStore.")
             ConsentDecision.NeverAsked
         }
@@ -103,6 +108,9 @@ object ConsentBootstrap {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            // pre-wiring bare Timber.e (Rule 9): seedDecision is a @VisibleForTesting
+            // helper invoked only from androidTest to pre-answer the dialog — off
+            // the production path, kept bare for parity with readDecision above.
             Timber.e(e, "Failed to seed crash-report consent decision in DataStore.")
         }
     }

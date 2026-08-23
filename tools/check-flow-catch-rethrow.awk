@@ -8,15 +8,22 @@
 # its lambda when the cancellation originates UPSTREAM (not from the downstream
 # emit) — e.g. a `stateIn(SharingStarted.Eagerly)` flow whose sharing scope is
 # torn down. If that lambda logs the exception (silentError / KolibriLog.w|e /
-# Timber.w|e — all WARN+ and therefore delivered to ACRA via AcraTree) without
-# first rethrowing the cancellation, every teardown files a bogus report: the
-# exact ACRA-flood the project's SettingsRepositoryImpl / DataStoreReadFlow /
-# AppUsageRepositoryImpl arms already guard against with an explicit rethrow.
+# Timber.w|e) without first rethrowing the cancellation, it SWALLOWS normal
+# coroutine control flow: a teardown cancellation is turned into a logged
+# fallback emission instead of propagating. That is a structured-concurrency
+# CORRECTNESS bug, independent of ACRA — the project's SettingsRepositoryImpl /
+# DataStoreReadFlow / AppUsageRepositoryImpl arms already guard against it with
+# an explicit rethrow.
+#
+# (Since §23, report-by-intent: only the silentError arm additionally reaches
+# ACRA — the Timber.w/KolibriLog.w arms are untagged and no longer reported. The
+# correctness bug is identical for every logging arm regardless of level, so the
+# guard is still required for ALL of them; ACRA flooding is no longer the reason.)
 #
 # This makes that discipline enforceable. GLOBAL scan (not a positive list):
-# the shape is precise enough — only a `.catch { }` arm that BOTH logs at
-# report level AND lacks a rethrow guard is flagged. A `.catch { }` that only
-# emits a fallback without logging cannot flood ACRA and is left alone.
+# the shape is precise enough — only a `.catch { }` arm that BOTH logs AND lacks
+# a rethrow guard is flagged. A `.catch { }` that only emits a fallback without
+# logging cannot mask a cancellation as an error and is left alone.
 #
 # == WHAT COUNTS AS A GUARD ==
 #   - an explicit `is CancellationException` test (covers
@@ -29,10 +36,11 @@
 #     (uppercase, constructed) is NOT a guard — Kotlin naming makes the
 #     lowercase-var vs Uppercase-class distinction reliable.
 #
-# == WHAT COUNTS AS A REPORT-LEVEL LOG ==
+# == WHAT COUNTS AS A LOGGING ARM ==
 #   silentError(…), KolibriLog.w(…)/.e(…), Timber.w(…)/.e(…). Debug/info/verbose
-#   (.d/.i/.v) do NOT reach AcraTree's WARN gate, so they are not flood sources
-#   and not required to guard.
+#   (.d/.i/.v) are treated as quiet local logs and left alone — a precision
+#   choice (report-level arms are where a swallowed cancellation masquerading as
+#   an error does real harm), not a claim about which level reaches ACRA.
 #
 # Output format (matches check-conventions.sh):  FILENAME:LINE: <line content>
 # Exit code: always 0 (printing alone signals violations to the caller).

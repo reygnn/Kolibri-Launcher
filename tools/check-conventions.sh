@@ -62,32 +62,41 @@ report() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Rule 9 — bare `Timber.e(` outside the documented crash-handling-
-# infrastructure files. CLAUDE.md Rule 9's exception list:
-#   - KolibriLauncherApp.kt, TimberWrapper.kt
-#   - BaseActivity.kt, BaseViewModel.kt
-#   - ConsentBootstrap.kt (pre-Hilt bootstrap consent read)
-#   - CrashReportingBootstrap.kt (ACRA init + ANR drain + watchdog wiring)
-#   (UncaughtCrashHandler.kt and AcraTree.kt are crash-infra too but use
-#    android.util.Log.e — not Timber.e — precisely to avoid re-entering the
-#    process-wide planted AcraTree, so they need no entry here.)
-#   - BackupFragment's fragment-level CoroutineExceptionHandler (one
-#     line, identified by message text rather than line number so the
-#     check stays robust to imports / blank-line shifts).
-# Anything else uses TimberWrapper.silentError so the throw-in-DEBUG
-# semantic surfaces programmer-error bugs loudly.
+# Rule 9 — bare `Timber.e(` (report-by-intent form, §23). A bare `Timber.e(`
+# neither reaches ACRA (untagged → dropped by AcraTree's intent gate) nor throws
+# in DEBUG — it silently under-reports. Report-worthy errors go through an intent
+# API: `TimberWrapper.silentError` (throw-in-DEBUG + report, SILENT_ERROR tag) or
+# `TimberWrapper.reportToAcra` (report only, no throw, ACRA_REPORT tag); local
+# diagnostics use `Timber.d` / `Timber.w`.
+#
+# So a bare `Timber.e(` is forbidden everywhere — EXCEPT on the pre-wiring
+# bootstrap path (KolibriLog not yet wired / AcraTree not yet planted), marked
+# with a `pre-wiring bare` marker within +/-5 lines (today only ConsentBootstrap).
+# This replaces the former crash-infra file whitelist: those files now use
+# `reportToAcra` (still not a bare `Timber.e`), so the whitelist is obsolete.
+# `android.util.Log.e` swallows (AcraTree, UncaughtCrashHandler) are not matched.
+#
+# Logic in tools/check-intent-gate.awk; regression-tested via
+# tools/check-intent-gate-test.sh (manual rerun, not a CI gate).
 # ─────────────────────────────────────────────────────────────────────────────
-rule9_allowed_files='KolibriLauncherApp\.kt|TimberWrapper\.kt|BaseActivity\.kt|BaseViewModel\.kt|ConsentBootstrap\.kt|CrashReportingBootstrap\.kt'
+intentgate_awk="$script_dir/check-intent-gate.awk"
 
-rule9_hits=$(
-  grep -rn 'Timber\.e(' "${src_roots[@]}" --include='*.kt' \
-    | grep -vE "/($rule9_allowed_files):" \
-    | grep -vE 'BackupFragment\.kt:[0-9]+:.*Uncaught coroutine exception in BackupFragment' \
-    || true
-)
+if [ ! -f "$intentgate_awk" ]; then
+  echo "ERROR: Intent-gate awk script not found: $intentgate_awk" >&2
+  exit 2
+fi
+
+rule9_hits=""
+while IFS= read -r kt; do
+  hits=$(awk -f "$intentgate_awk" "$kt")
+  if [ -n "$hits" ]; then
+    rule9_hits="${rule9_hits}${hits}
+"
+  fi
+done < <(find "${src_roots[@]}" -name '*.kt')
 
 if [ -n "$rule9_hits" ]; then
-  report "Rule 9 — bare \`Timber.e(\` outside documented crash-infrastructure files" "$rule9_hits"
+  report "Rule 9 — bare \`Timber.e(\` without an intent tag or a \`pre-wiring bare\` marker" "${rule9_hits%$'\n'}"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -278,11 +287,15 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # Flow.catch cancellation-rethrow — the coroutine-operator form of the check
 # above, and the one the `catch (Type)` walker cannot see. A `Flow.catch { }`
-# arm that logs at report level (silentError / KolibriLog.w|e / Timber.w|e)
-# without first rethrowing CancellationException floods ACRA on every upstream
-# cancellation (SharingStarted.Eagerly teardown). GLOBAL scan, not a positive
-# list — the shape is precise (only logging arms without a guard flag). Logic
-# in tools/check-flow-catch-rethrow.awk.
+# arm that logs (silentError / KolibriLog.w|e / Timber.w|e) without first
+# rethrowing CancellationException SWALLOWS an upstream cancellation
+# (SharingStarted.Eagerly teardown): normal coroutine control flow is turned into
+# a logged fallback emission — a structured-concurrency correctness bug,
+# independent of ACRA. (Since §23, only the silentError arm additionally reaches
+# ACRA; the Timber.w/KolibriLog.w arms no longer report, but the correctness bug
+# is the same, so the guard is required for ANY logging arm regardless of level.)
+# GLOBAL scan, not a positive list — the shape is precise (only logging arms
+# without a guard flag). Logic in tools/check-flow-catch-rethrow.awk.
 # ─────────────────────────────────────────────────────────────────────────────
 flowcatch_awk="$script_dir/check-flow-catch-rethrow.awk"
 
@@ -301,7 +314,7 @@ while IFS= read -r kt; do
 done < <(find "${src_roots[@]}" -name '*.kt')
 
 if [ -n "$flowcatch_hits" ]; then
-  report "Flow.catch — logging arm without a CancellationException rethrow (floods ACRA on upstream cancellation)" "${flowcatch_hits%$'\n'}"
+  report "Flow.catch — logging arm without a CancellationException rethrow (swallows upstream cancellation)" "${flowcatch_hits%$'\n'}"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
