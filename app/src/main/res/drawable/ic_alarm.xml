@@ -11,10 +11,10 @@
     24-viewport, reserving a ~2-unit margin so the FATTER stroke of the outline
     twin can peek outward without the vector clipping it at the viewport edge (the
     bell feet at y=22 sit only 2 units from the edge — the binding constraint).
-  - strokeWidth 3.75 renders at ~2.0dp on-screen: 3.75 * 0.8(group) * 16/24 = 2.0,
-    where 16dp = events_icon_size(24) - 2*events_icon_padding(4). Resize either
-    dimen and re-derive. The outline twin uses 7.5 (→ ~4.0dp), so its rim peeks
-    (4.0-2.0)/2 = 1.0dp past this fill on every side — i.e. TEXT_OUTLINE_WIDTH_DP/2,
+  - strokeWidth 2.8 renders at ~1.9dp on-screen: 2.8 * 0.8(group) * 20/24 = 1.87,
+    where 20dp = events_icon_size(28) - 2*events_icon_padding(4). Resize either
+    dimen and re-derive. The outline twin uses 5.8 (→ ~3.9dp), so its rim peeks
+    (3.9-1.9)/2 = 1.0dp past this fill on every side — i.e. TEXT_OUTLINE_WIDTH_DP/2,
     exactly matching the text's centered-stroke outline.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -32,28 +32,28 @@
         <!-- Left bell -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 4 6.5 C 3.5 4.5 5 3 7 3" />
 
         <!-- Right bell -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 20 6.5 C 20.5 4.5 19 3 17 3" />
 
         <!-- Left foot -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 7.5 19.5 L 6 22" />
 
         <!-- Right foot -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 16.5 19.5 L 18 22" />
 
@@ -62,13 +62,13 @@
              the adaptive OutlinedImageView outline layer instead. -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:pathData="M 12 21 C 7.0294 21 3 16.9706 3 12 C 3 7.0294 7.0294 3 12 3 C 16.9706 3 21 7.0294 21 12 C 21 16.9706 16.9706 21 12 21 Z" />
 
         <!-- Hands -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineJoin="round"
             android:strokeLineCap="round"
             android:pathData="M 12 7.5 L 12 12 L 15 15" />

@@ -9,7 +9,7 @@
   Geometry note (keep in sync with ic_calendar_outline.xml — same pathData, only a
   fatter strokeWidth and a slightly larger marked-day square there): a <group> scale
   of 0.8 about (12,12) reserves the margin the fatter outline stroke needs inside the
-  24-viewport; strokeWidth 3.75 renders at ~2.0dp on-screen (3.75 * 0.8 * 16/24). See
+  24-viewport; strokeWidth 2.8 renders at ~1.9dp on-screen (2.8 * 0.8 * 20/24). See
   ic_alarm.xml for the full derivation.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -27,27 +27,27 @@
         <!-- Calendar body: stroke only (original white fill dropped for monochrome tinting) -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineJoin="round"
             android:pathData="M 19 4 H 5 C 3.8954 4 3 4.8954 3 6 V 20 C 3 21.1046 3.8954 22 5 22 H 19 C 20.1046 22 21 21.1046 21 20 V 6 C 21 4.8954 20.1046 4 19 4 Z" />
 
         <!-- Top bar -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:pathData="M 3 9 H 21" />
 
         <!-- Left ring binding -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 7 2 V 6" />
 
         <!-- Right ring binding -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="3.75"
+            android:strokeWidth="2.8"
             android:strokeLineCap="round"
             android:pathData="M 17 2 V 6" />
 

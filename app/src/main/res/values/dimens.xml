@@ -38,12 +38,12 @@
          digits, not the view edges).
          NOTE the coupling to the vector stroke: on-screen stroke =
          strokeWidth * 0.8(group) * (size - 2*padding) / 24. The vectors keep
-         strokeWidth 3.75 (fill) / 7.5 (outline) and simply SCALE with this size —
-         at 28dp − 8dp = 20dp content that is ~2.5dp fill and ~1.25dp outline peek
-         (a proportionally larger copy of the icon; the outline still tracks the
-         text's tonal stroke in colour and style). Resize and the whole mark scales
-         together; only re-derive the strokeWidths if you need to hold an ABSOLUTE
-         on-screen line width. -->
+         strokeWidth 2.8 (fill) / 5.8 (outline) and simply SCALE with this size —
+         at 28dp − 8dp = 20dp content that is ~1.9dp fill and ~1.0dp outline peek
+         (= TEXT_OUTLINE_WIDTH_DP/2, matching the clock/date text's outward stroke;
+         the outline tracks the text's tonal stroke in colour and style too). Resize
+         and the whole mark scales together; only re-derive the strokeWidths if you
+         need to hold an ABSOLUTE on-screen line width. -->
     <dimen name="events_icon_size">28dp</dimen>
     <dimen name="events_icon_padding">4dp</dimen>
 

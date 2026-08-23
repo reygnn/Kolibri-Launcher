@@ -5,8 +5,8 @@
   rim too. Composed underneath the fill in ic_calendar_outlined.xml and tinted with
   the adaptive tonal outline colour by OutlinedImageView (crisp single-pass contour).
 
-  strokeWidth 7.5 renders at ~4.0dp on-screen (7.5 * 0.8(group) * 16/24) vs the fill
-  twin's 3.75 (~2.0dp), so strokes peek (4.0-2.0)/2 = 1.0dp = TEXT_OUTLINE_WIDTH_DP/2.
+  strokeWidth 5.8 renders at ~3.9dp on-screen (5.8 * 0.8(group) * 20/24) vs the fill
+  twin's 2.8 (~1.9dp), so strokes peek (3.9-1.9)/2 = 1.0dp = TEXT_OUTLINE_WIDTH_DP/2.
   The marked-day square is grown by 1.875 path units per side (1.875 * 0.8 = 1.5
   viewport = ~1.0dp on-screen) to give the same rim on the filled accent. KEEP stroke
   pathData identical to ic_calendar.xml.
@@ -26,27 +26,27 @@
         <!-- Calendar body -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="7.5"
+            android:strokeWidth="5.8"
             android:strokeLineJoin="round"
             android:pathData="M 19 4 H 5 C 3.8954 4 3 4.8954 3 6 V 20 C 3 21.1046 3.8954 22 5 22 H 19 C 20.1046 22 21 21.1046 21 20 V 6 C 21 4.8954 20.1046 4 19 4 Z" />
 
         <!-- Top bar -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="7.5"
+            android:strokeWidth="5.8"
             android:pathData="M 3 9 H 21" />
 
         <!-- Left ring binding -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="7.5"
+            android:strokeWidth="5.8"
             android:strokeLineCap="round"
             android:pathData="M 7 2 V 6" />
 
         <!-- Right ring binding -->
         <path
             android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="7.5"
+            android:strokeWidth="5.8"
             android:strokeLineCap="round"
             android:pathData="M 17 2 V 6" />
 
