@@ -959,13 +959,14 @@ class HomeFragment : Fragment() {
         binding.batteryText.setTextColor(textColor)
         binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
-        // The events indicators are text glyphs ("◷" alarm, "○" calendar) in
-        // OutlinedTextViews, so each gets the exact same adaptive treatment as the
-        // clock/date/battery: text colour + the tonal contrast outline
-        // (background-independent legibility).
-        binding.alarmIndicator.setTextColor(textColor)
+        // The events indicators are monochrome vector icons (alarm / calendar) in
+        // OutlinedImageViews, so each gets the exact same adaptive treatment as the
+        // clock/date/battery: the icon is tinted to the text colour and given the
+        // tonal contrast outline (background-independent legibility). setIconColor is
+        // the drawable-tint counterpart of setTextColor.
+        binding.alarmIndicator.setIconColor(textColor)
         binding.alarmIndicator.setOutline(outlineWidthPx, outlineColor)
-        binding.calendarIndicator.setTextColor(textColor)
+        binding.calendarIndicator.setIconColor(textColor)
         binding.calendarIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
     }
@@ -986,10 +987,10 @@ class HomeFragment : Fragment() {
 
     /**
      * Toggles the subtle events indicators that replaced the old alarm/calendar
-     * chip row: two glyphs (◷ alarm, ○ calendar), each shown only when an upcoming
-     * event of its type exists. They are PASSIVE status symbols — not clickable; the
-     * events dialog opens via the home double-tap (`GestureDelegate.onDoubleTap`),
-     * the glyphs just signal that events exist.
+     * chip row: two monochrome icons (alarm, calendar), each shown only when an
+     * upcoming event of its type exists. They are PASSIVE status symbols — not
+     * clickable; the events dialog opens via the home double-tap
+     * (`GestureDelegate.onDoubleTap`), the icons just signal that events exist.
      *
      * Toggled INVISIBLE (not GONE) so each keeps its reserved slot: the indicator
      * column has a constant width/height regardless of how many events exist, so the

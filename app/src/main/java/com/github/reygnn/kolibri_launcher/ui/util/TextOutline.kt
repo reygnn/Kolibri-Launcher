@@ -2,12 +2,16 @@ package com.github.reygnn.kolibri_launcher.ui.util
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.BlendMode
+import android.graphics.BlendModeColorFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.drawable.LayerDrawable
 import android.util.AttributeSet
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatButton
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 
 /**
@@ -151,5 +155,102 @@ class OutlinedButton @JvmOverloads constructor(
         outline.endStroke(this)
         isDrawingOutline = false
         super.onDraw(canvas)
+    }
+}
+
+/**
+ * [AppCompatImageView] twin of [OutlinedTextView] for the home-screen event
+ * icons (alarm / calendar). It reproduces the same adaptive, wallpaper-
+ * independent legibility the clock/date/battery get from [OutlinedTextView],
+ * but for a vector drawable instead of a text glyph — so the two event
+ * indicators tint and outline exactly like the text next to them.
+ *
+ * How the crisp contour is achieved: the `src` is a two-layer [LayerDrawable]
+ * (see `ic_*_outlined.xml`) whose BOTTOM layer is a fatter-stroke copy of the
+ * icon and whose TOP layer is the normal fill. This view tints the top layer
+ * with [setIconColor] (the text colour) and every layer beneath it with
+ * [setOutline]'s colour (the tonal contrast). Because the outline is a REAL
+ * wider vector stroke drawn once — not a stack of translated silhouettes — its
+ * edge is as crisp as [TextOutline]'s centered stroke; the fatter stroke peeks a
+ * fixed amount past the fill on every side, which is the drawable analogue of
+ * the text's outward rim. (The earlier multi-copy "shadow" approach was replaced
+ * because 8 translated, sub-pixel-shifted copies read as a soft grey wash next
+ * to the crisp text.) The peek width is baked into the outline drawable's stroke
+ * (tuned to TEXT_OUTLINE_WIDTH_DP/2), so [setOutline]'s `widthPx` is accepted
+ * only to mirror [OutlinedTextView.setOutline] and is otherwise unused here.
+ *
+ * Both colours come from the same `UiColorsState` the text views use
+ * (`HomeFragment.updateAllColors`). When the outline colour is
+ * [Color.TRANSPARENT] (user disabled the text shadow) the outline layer is
+ * simply hidden, leaving the plain fill. A non-layered `src` falls back to a
+ * single icon-coloured tint with no outline.
+ *
+ * Tint mode is [BlendMode.SRC_IN], NOT the `ImageView.setColorFilter(int)`
+ * default of `SRC_ATOP`. The tonal shadow/outline colour is SEMI-TRANSPARENT
+ * (see `ObserveUiColorsUseCase.calculateTonalShadowColor`, e.g. 60 % black), and
+ * `SRC_ATOP` composites a translucent tint OVER the drawable's own opaque white,
+ * letting that white bleed through — the icon outline then rendered lighter than
+ * the text's stroke, which draws the shadow colour directly. `SRC_IN` replaces
+ * the colour and keeps the TINT's alpha (masked by the shape), so the rim
+ * matches the text outline exactly.
+ */
+class OutlinedImageView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
+) : AppCompatImageView(context, attrs, defStyleAttr) {
+
+    private var outlineColor: Int = Color.TRANSPARENT
+    private var iconColor: Int = Color.WHITE
+
+    /** Outline is painted only with a non-transparent colour. */
+    private val isOutlineActive: Boolean
+        get() = outlineColor != Color.TRANSPARENT
+
+    init {
+        // Rest state: fill in its own colour, outline hidden, until the first
+        // updateAllColors emit swaps in the adaptive colours.
+        applyLayerColors()
+    }
+
+    /** Sets the icon (fill) colour — the adaptive text colour of the home screen. */
+    fun setIconColor(color: Int) {
+        iconColor = color
+        applyLayerColors()
+    }
+
+    /**
+     * Sets the outline colour; [Color.TRANSPARENT] hides the outline layer. The
+     * outline WIDTH is baked into the `*_outline` drawable's stroke (see the
+     * vector headers), so [widthPx] is accepted only to mirror
+     * [OutlinedTextView.setOutline] and is not used here.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun setOutline(widthPx: Float, color: Int) {
+        outlineColor = color
+        applyLayerColors()
+    }
+
+    private fun applyLayerColors() {
+        val current = drawable
+        if (current is LayerDrawable && current.numberOfLayers >= 2) {
+            // Convention: the TOP layer is the fill, every layer below it is outline.
+            val fillIndex = current.numberOfLayers - 1
+            current.getDrawable(fillIndex).colorFilter =
+                BlendModeColorFilter(iconColor, BlendMode.SRC_IN)
+            for (i in 0 until fillIndex) {
+                val outlineLayer = current.getDrawable(i)
+                if (isOutlineActive) {
+                    outlineLayer.alpha = 255
+                    outlineLayer.colorFilter = BlendModeColorFilter(outlineColor, BlendMode.SRC_IN)
+                } else {
+                    outlineLayer.alpha = 0
+                }
+            }
+        } else {
+            // Non-layered src: tint the whole drawable, no outline available.
+            current?.colorFilter = BlendModeColorFilter(iconColor, BlendMode.SRC_IN)
+        }
+        invalidate()
     }
 }

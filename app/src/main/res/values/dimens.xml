@@ -25,6 +25,28 @@
     <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
     <dimen name="text_size_hint">14sp</dimen> <!-- Wallpaper-edit hint TextView -->
 
+    <!-- Event indicators (alarm / calendar) next to the clock, drawn by
+         OutlinedImageView from the two-layer ic_*_outlined drawables (fill + crisp
+         outline). The outline rim is baked INSIDE the vector viewport (via a 0.8
+         group scale that reserves margin), so unlike the old multi-copy approach
+         the padding no longer needs to reserve room for it — it only sets the
+         inter-icon gap (2×events_icon_padding = 8dp) and the box inset.
+         The size is tuned so the stacked pair's visible marks span the clock's
+         DIGIT height (~43dp at 60sp), positioned onto the digits by a vertical
+         bias on the packed chain in fragment_home.xml (the timeText view box is
+         much taller than its glyphs due to font padding, so the pair aligns to the
+         digits, not the view edges).
+         NOTE the coupling to the vector stroke: on-screen stroke =
+         strokeWidth * 0.8(group) * (size - 2*padding) / 24. The vectors keep
+         strokeWidth 3.75 (fill) / 7.5 (outline) and simply SCALE with this size —
+         at 28dp − 8dp = 20dp content that is ~2.5dp fill and ~1.25dp outline peek
+         (a proportionally larger copy of the icon; the outline still tracks the
+         text's tonal stroke in colour and style). Resize and the whole mark scales
+         together; only re-derive the strokeWidths if you need to hold an ABSOLUTE
+         on-screen line width. -->
+    <dimen name="events_icon_size">28dp</dimen>
+    <dimen name="events_icon_padding">4dp</dimen>
+
     <!-- Wallpaper-edit overflow panel: slide-in distance for the
          show/hide animation. Density-aware so the offset is visible
          on high-dpi displays. -->

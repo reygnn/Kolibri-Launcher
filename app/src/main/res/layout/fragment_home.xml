@@ -57,10 +57,10 @@
             android:gravity="start">
 
             <!-- Clock row: the clock glyph plus the two passive events indicators
-                 (◷ alarm, ○ calendar) pinned to its trailing side. A ConstraintLayout
-                 (not a horizontal LinearLayout) so each glyph can be EDGE-aligned to
-                 the clock instead of being centred as a block: ◷ top-to-top, ○
-                 bottom-to-bottom of timeText, both in one column just past its end.
+                 (alarm + calendar icons) pinned to its trailing side. A ConstraintLayout
+                 (not a horizontal LinearLayout) so the two icons can form a packed
+                 vertical chain, centred against the clock as a tight pair in one column
+                 just past its end (alarm on top, calendar directly below).
                  Kept INSIDE timeContainer (not a rootLayout corner overlay) so the
                  indicators travel with the START / CENTER / END alignment that
                  HomeFragment.applyTimeContainerAlignment mirrors onto timeContainer
@@ -81,57 +81,64 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent" />
 
-                <!-- Two monochrome glyphs in one column next to the clock, each
-                     EDGE-aligned to it: ◷ top-to-top, ○ bottom-to-bottom of timeText,
-                     so they span the clock's full height instead of clustering in the
-                     middle. Each is shown independently, only when an upcoming event of
-                     its type exists; together they just signal that events exist — the
-                     dialog opens via the home double-tap, the glyphs are pure status
-                     graphics (NOT clickable). OutlinedTextViews, so each inherits the
-                     SAME adaptive glyph-outline + text-colour treatment as the
-                     clock/date/battery (HomeFragment.updateAllColors). includeFontPadding
-                     is off so the glyph box hugs the mark and the top/bottom constraints
-                     land on the visible edges. Each keeps a FIXED slot:
-                     HomeFragment.updateEventsIndicator toggles INVISIBLE (not GONE), so
-                     the column's size stays constant and the clock never shifts when an
-                     event appears/disappears (END/CENTER alignment) — hence the initial
-                     state here is invisible, not gone. Each contentDescription overrides
-                     its glyph for TalkBack. -->
-                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                <!-- Two monochrome vector icons stacked as one PACKED pair next to the
+                     clock — alarm on top, calendar directly below it — via a packed
+                     vertical chain (alarm.top→clock.top, calendar.bottom→clock.bottom,
+                     chainStyle=packed on the head). The events_icon_size is tuned so the
+                     pair's visible marks span the clock's DIGIT height, and a vertical
+                     bias (0.58) on the head slides the pair onto the digits: alarm's top
+                     edge flush with the digit top, calendar's bottom edge flush with the
+                     digit bottom. The bias (not plain centring) is needed because the
+                     timeText view box is much taller than its glyphs — 60sp light has
+                     large asymmetric font padding — so a centred pair would sit low and
+                     loose; the bias re-anchors it to the visible digits. The gap between
+                     the two marks is their two paddings (2×events_icon_padding). Each is
+                     shown independently, only
+                     when an upcoming event of its type exists; together they just signal
+                     that events exist — the dialog opens via the home double-tap, the
+                     icons are pure status graphics (NOT clickable). OutlinedImageViews, so
+                     each inherits the SAME adaptive icon-outline + text-colour treatment
+                     as the clock/date/battery (HomeFragment.updateAllColors) — the
+                     src is a two-layer LayerDrawable (ic_*_outlined): a fatter-stroke
+                     outline layer tinted to the tonal contrast colour, and the fill
+                     tinted to the text colour, giving a crisp single-pass rim (the rim
+                     is baked inside the vector viewport, so no padding is needed to
+                     avoid clipping it). The padding here only sets the inter-icon gap
+                     (2×events_icon_padding) and the box inset. Each keeps a FIXED slot:
+                     HomeFragment.updateEventsIndicator toggles INVISIBLE (not GONE) — an
+                     INVISIBLE view still occupies its chain slot, so the pair's size stays
+                     constant and the clock never shifts when an event appears/disappears
+                     (END/CENTER alignment) — hence the initial state here is invisible,
+                     not gone. Each contentDescription supplies the TalkBack label. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
                     android:id="@+id/alarmIndicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="◷"
-                    android:textSize="40sp"
-                    android:includeFontPadding="false"
-                    android:textColor="@color/default_text_color"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_alarm_outlined"
                     android:contentDescription="@string/events_indicator_alarm_content_description"
                     android:visibility="invisible"
                     android:layout_marginStart="@dimen/spacing_medium"
                     app:layout_constraintStart_toEndOf="@id/timeText"
-                    app:layout_constraintTop_toTopOf="@id/timeText" />
+                    app:layout_constraintTop_toTopOf="@id/timeText"
+                    app:layout_constraintBottom_toTopOf="@id/calendarIndicator"
+                    app:layout_constraintVertical_chainStyle="packed"
+                    app:layout_constraintVertical_bias="0.58" />
 
-                <!-- Calendar mark is ○ (U+25CB WHITE CIRCLE) at the SAME textSize (40sp)
-                     as the alarm ◷. Chosen as the outline counterpart to ◷ (U+25F7, white
-                     circle with upper right quadrant): ○ is geometrically ◷ WITHOUT the
-                     wedge, same Geometric-Shapes block, same NotoSansSymbols2 fallback, so
-                     its outer circle should track ◷'s size and stroke almost exactly — the
-                     axis on which the earlier square glyphs drifted. Keep the textSize equal
-                     to ◷ (stroke scales with textSize), so do NOT resize this to "fix" size
-                     — pick a different glyph instead. (The tonal OutlinedTextView outline is
-                     a fixed dp stroke, already equal on both and independent of textSize.) -->
-                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                <!-- Calendar icon, same box size as the alarm icon, in the same column
+                     (start/end to the alarm icon) and the lower link of the packed chain:
+                     top-to-bottom of the alarm icon, bottom-to-bottom of the clock. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
                     android:id="@+id/calendarIndicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="○"
-                    android:textSize="40sp"
-                    android:includeFontPadding="false"
-                    android:textColor="@color/default_text_color"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_calendar_outlined"
                     android:contentDescription="@string/events_indicator_calendar_content_description"
                     android:visibility="invisible"
                     app:layout_constraintStart_toStartOf="@id/alarmIndicator"
                     app:layout_constraintEnd_toEndOf="@id/alarmIndicator"
+                    app:layout_constraintTop_toBottomOf="@id/alarmIndicator"
                     app:layout_constraintBottom_toBottomOf="@id/timeText" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 

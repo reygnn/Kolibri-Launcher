@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen "upcoming calendar event" indicator — FILL layer. Monochrome line art
+  in ONE colour, tinted at runtime to the adaptive home text colour (OutlinedImageView
+  + HomeFragment.updateAllColors). The #FFFFFFFF here is only a fallback; the colour
+  filter overrides it. The marked-day square is the icon's one solid element so it
+  still reads as a marked date.
+
+  Geometry note (keep in sync with ic_calendar_outline.xml — same pathData, only a
+  fatter strokeWidth and a slightly larger marked-day square there): a <group> scale
+  of 0.8 about (12,12) reserves the margin the fatter outline stroke needs inside the
+  24-viewport; strokeWidth 3.75 renders at ~2.0dp on-screen (3.75 * 0.8 * 16/24). See
+  ic_alarm.xml for the full derivation.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- Calendar body: stroke only (original white fill dropped for monochrome tinting) -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3.75"
+            android:strokeLineJoin="round"
+            android:pathData="M 19 4 H 5 C 3.8954 4 3 4.8954 3 6 V 20 C 3 21.1046 3.8954 22 5 22 H 19 C 20.1046 22 21 21.1046 21 20 V 6 C 21 4.8954 20.1046 4 19 4 Z" />
+
+        <!-- Top bar -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3.75"
+            android:pathData="M 3 9 H 21" />
+
+        <!-- Left ring binding -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3.75"
+            android:strokeLineCap="round"
+            android:pathData="M 7 2 V 6" />
+
+        <!-- Right ring binding -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3.75"
+            android:strokeLineCap="round"
+            android:pathData="M 17 2 V 6" />
+
+        <!-- Marked day (filled accent) -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 7 13 H 11 V 17 H 7 Z" />
+    </group>
+</vector>

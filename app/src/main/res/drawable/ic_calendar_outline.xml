@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OUTLINE layer twin of ic_calendar.xml — SAME stroke pathData with a fatter
+  strokeWidth, plus a slightly LARGER marked-day square so that solid accent gets a
+  rim too. Composed underneath the fill in ic_calendar_outlined.xml and tinted with
+  the adaptive tonal outline colour by OutlinedImageView (crisp single-pass contour).
+
+  strokeWidth 7.5 renders at ~4.0dp on-screen (7.5 * 0.8(group) * 16/24) vs the fill
+  twin's 3.75 (~2.0dp), so strokes peek (4.0-2.0)/2 = 1.0dp = TEXT_OUTLINE_WIDTH_DP/2.
+  The marked-day square is grown by 1.875 path units per side (1.875 * 0.8 = 1.5
+  viewport = ~1.0dp on-screen) to give the same rim on the filled accent. KEEP stroke
+  pathData identical to ic_calendar.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- Calendar body -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="7.5"
+            android:strokeLineJoin="round"
+            android:pathData="M 19 4 H 5 C 3.8954 4 3 4.8954 3 6 V 20 C 3 21.1046 3.8954 22 5 22 H 19 C 20.1046 22 21 21.1046 21 20 V 6 C 21 4.8954 20.1046 4 19 4 Z" />
+
+        <!-- Top bar -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="7.5"
+            android:pathData="M 3 9 H 21" />
+
+        <!-- Left ring binding -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="7.5"
+            android:strokeLineCap="round"
+            android:pathData="M 7 2 V 6" />
+
+        <!-- Right ring binding -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="7.5"
+            android:strokeLineCap="round"
+            android:pathData="M 17 2 V 6" />
+
+        <!-- Marked day (filled accent), grown by 1.875 per side for the rim -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 5.125 11.125 H 12.875 V 18.875 H 5.125 Z" />
+    </group>
+</vector>
