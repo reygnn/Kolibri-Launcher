@@ -402,9 +402,10 @@ impl-only (Rule 11-Notiz in `ACRA_FLOW.md`).
 
 ### A.9 Linter-Delta (Consent-Teil)
 
-- **`tools/check-conventions.sh` Rule-9-Whitelist** (Z. 79): `CrashReportConsentStore\.kt`
-  → **`ConsentBootstrap\.kt`** umbenennen (bleibt auf dem pre-Hilt-Pfad, plain
-  `Timber.e`). Kein weiterer Consent-Eintrag: `ConsentDialog` nutzt `silentError`
+- **`tools/check-conventions.sh` Rule 9** (report-by-intent seit §23): keine
+  Datei-Whitelist mehr. `ConsentBootstrap` bleibt auf dem pre-Hilt-Pfad und
+  behält sein bare `Timber.e` — jetzt über einen `pre-wiring bare`-Marker
+  freigegeben (statt eines Whitelist-Eintrags). `ConsentDialog` nutzt `silentError`
   (off-bootstrap), Repo-Impl nutzt `silentError`.
 - **Rule-11-Whitelist** (`rule11_files`, Z. 179–182): Consent-Seite bringt keine
   broad catches mit Marker-Pflicht (die Impl-`catch (Exception)` sind das
@@ -587,9 +588,9 @@ trifft dort auf Dedup + Rate-Limit) und speist **C** (die Resilienz-Quellen lief
 | Quelle | Belang | ACRA-Eingang |
 |---|---|---|
 | **Uncaught-Crash** | C | ACRAs eigener `UncaughtExceptionHandler` (Auto-Report, voller `reportContent`) |
-| **Geloggter Fehler** (`Timber.e/w(t)`, WARN+) | B | `AcraTree` → `handleSilentException(carrier)` |
-| **Post-mortem ANR** (`ApplicationExitInfo` REASON_ANR) | B | `Timber.e(AnrException)` → `AcraTree` → `handleSilentException` |
-| **Watchdog-Stall** (`WatchdogStallException`, *vor* Kill) | C→B | `Timber.e(WatchdogStallException)` → `AcraTree` |
+| **Intent-getaggter Fehler** (`silentError` / `reportToAcra`) | B | `AcraTree` → `handleSilentException(carrier)` |
+| **Post-mortem ANR** (`ApplicationExitInfo` REASON_ANR) | B | `reportToAcra(AnrException)` → `AcraTree` → `handleSilentException` |
+| **Watchdog-Stall** (`WatchdogStallException`, *vor* Kill) | C→B | `reportToAcra(WatchdogStallException)` → `AcraTree` |
 
 Zwei Quellen sind *B-eigen* (geloggter Fehler, ANR); zwei entstehen in *C*
 (Uncaught, Stall) und laufen nur durch B. `WatchdogStallException` lebt bei C
@@ -601,8 +602,10 @@ Zwei Quellen sind *B-eigen* (geloggter Fehler, ANR); zwei entstehen in *C*
 // crashreporting/ingestion/AcraTree.kt
 internal class AcraTree : Timber.Tree() {
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        // 1. Gate: nur WARN+ MIT Throwable. Kein Consent-Check (B1 — das enabled-Flag gatet).
-        if (priority < Log.WARN || t == null) return
+        // 1. Gate: report BY INTENT (§23) — nur intent-getaggte Einträge MIT
+        //    Throwable, NICHT per Level. Kein Consent-Check (B1 — das enabled-Flag gatet).
+        if (t == null) return
+        if (tag != TimberWrapper.SILENT_LOG_TAG && tag != TimberWrapper.ACRA_REPORT_TAG) return
         try {
             // 2. Carrier: per-Report (B4)
             val carrier = buildAcraReportThrowable(priority, tag, message, t)
@@ -622,8 +625,8 @@ internal class AcraTree : Timber.Tree() {
 > `Timber.e`. `AcraTree` *ist* ein Timber-Tree — ein `Timber.e` in seinem eigenen
 > `catch` re-enterte `AcraTree.log` (Endlos-Rekursion). Und **nicht** `silentError`
 > (Rule 9): ein DEBUG-Throw im Zustellweg landete wieder im selben Pfad. Genau
-> deshalb braucht `AcraTree` **keinen** Rule-9-Whitelist-Eintrag — es verwendet gar
-> kein bare `Timber.e` (siehe B.9). *(RS2, C1)*
+> deshalb wird `AcraTree` vom Intent-Gate-Linter (Rule 9, report-by-intent, §23)
+> gar nicht erfasst — es verwendet kein bare `Timber.e` (siehe B.9). *(RS2, C1)*
 
 - **Nie zusätzlich `handleException(…)`** aufrufen — das wäre terminal + Doppelversand
   (B2, §13). Der einzige Aufruf ist `handleSilentException`.
@@ -655,8 +658,9 @@ fun buildAcraReportThrowable(priority: Int, tag: String?, message: String, cause
 
 internal class LoggedThrowable(message: String, cause: Throwable) : Throwable(message, cause)
 ```
-- Message-Format: `"[W/Tag] OriginalType: message"` (Priority-Buchstabe + Tag +
-  Original-Typ), Original unter „Caused by:".
+- Message-Format: `"[E/SILENT_ERROR] OriginalType: message"` (Priority-Buchstabe
+  + Intent-Tag `SILENT_ERROR`/`ACRA_REPORT` + Original-Typ), Original unter
+  „Caused by:". Der Tag steht NUR in der Message (nicht im Fingerprint, S-2).
 - **Diagnose-Note bei `CancellationException`:** ein Zusatz in der Message, der auf
   den fehlerhaften `catch` zeigt (eine geloggte `CancellationException` ist fast
   immer ein Bug).
@@ -676,7 +680,7 @@ class AnrReporter @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     /** Beim nächsten Start: neue REASON_ANR-AEI seit Watermark, chronologisch,
-     *  je → handler(report). handler = { Timber.e(AnrException(...)) } (→ B.2). */
+     *  je → handler(report). handler = { reportToAcra(AnrException(...)) } (→ B.2). */
     suspend fun reportPendingAnrs(handler: suspend (AnrReport) -> Unit)
     // intern: newAnrsSinceLastReport(), markReported()
 }
@@ -737,13 +741,15 @@ Pfade: `ReportCarrier` → `domain/src/test/.../crashreporting/ingestion/ReportC
 
 | `@Test` | Datei | pinnt |
 |---|---|---|
-| `priority < WARN → kein handleSilentException` | AcraTreeTest | Gate |
-| `t == null → kein handleSilentException` | AcraTreeTest | Gate |
-| `WARN+ mit t → buildCarrier + handleSilentException genau einmal` | AcraTreeTest | B2 |
+| `SILENT_ERROR + t → liefert genau einen Carrier` | AcraTreeTest | Gate/B2 |
+| `ACRA_REPORT + t → liefert` | AcraTreeTest | Gate/B2 |
+| `Intent-Tag + t @WARN → liefert (Level-unabhängig)` | AcraTreeTest | Gate (§23) |
+| `untagged ERROR + t → NICHT geliefert` | AcraTreeTest | Gate (§23, Regression) |
+| `Intent-Tag + null throwable → NICHT geliefert` | AcraTreeTest | Gate |
 | `handleSilentException wirft → geschluckt, kein Rethrow` | AcraTreeTest | C1, RS2 |
 | `AcraTree ruft NIE handleException` | AcraTreeTest / Linter | B2 |
 | `AcraTree liest NIE Consent, kein Throttle` | AcraTreeTest / Linter | B1, B3 |
-| `Carrier: Message "[W/Tag] Type: msg", Original als cause` | ReportCarrierTest | B4 |
+| `Carrier: Message "[E/SILENT_ERROR] Type: msg", Original als cause` | ReportCarrierTest | B4 |
 | `Carrier: CancellationException → Diagnose-Note` | ReportCarrierTest | B4 |
 | `reportContent == exakt die 7 Felder` | Assertion-Test | B5 |
 | `AEI-Read wirft → emptyList, Watermark unverändert` | AnrReporterTest | AN1, C1 |
@@ -754,22 +760,24 @@ Pfade: `ReportCarrier` → `domain/src/test/.../crashreporting/ingestion/ReportC
 
 ### B.9 Linter-Delta (Ingestion-Teil)
 
-- **Rule 9:** **kein** neuer Whitelist-Eintrag. `AcraTree` schluckt mit
-  `android.util.Log.e` (nicht `Timber.e`) → vom `Timber.e`-Detektor gar nicht
-  erfasst. `AnrReporter` nutzt `silentError` (nicht Crash-Infra-exempt; läuft beim
-  nächsten Start, best-effort). `ReportCarrier` wirft nie (pure).
+- **Rule 9 (report-by-intent, §23 — UMGEBAUT):** die frühere Crash-Infra-Datei-
+  Whitelist ist **weg**. Ein bare `Timber.e(` ist überall verboten (meldet nicht,
+  wirft nicht) — Ausnahme nur der Pre-Wiring-Pfad (`ConsentBootstrap`) mit einem
+  `pre-wiring bare`-Marker. Crash-Infra meldet über `TimberWrapper.reportToAcra`
+  (ACRA_REPORT-Tag, kein DEBUG-Throw) → kein bare `Timber.e`. `AcraTree`/
+  `UncaughtCrashHandler` nutzen `android.util.Log.e` → vom Detektor nicht erfasst.
+  Logik: `tools/check-intent-gate.awk`, Fixture: `tools/check-intent-gate-test.sh`.
 - **B2-Linter:** `handleException(`/`handleSilentException(` nur in `AcraTree`
-  erlaubt (kein Zweitaufruf/Doppelversand). *Neuer Check* — nach
-  `tools/check-conventions.sh` (analog zu Toast-Routing).
+  erlaubt (kein Zweitaufruf/Doppelversand). *Optionaler Check* — analog Toast-Routing.
 - **B3-Linter:** kein `ReportThrottle`/`shouldSend` in `AcraTree`; `CrashReportLimiter`
-  existiert nicht mehr. *Neuer/erweiterter Check.*
-- **B4-Linter:** kein `putCustomData(` irgendwo. *Neuer Check.*
+  existiert nicht mehr. *Optionaler Check.*
+- **B4-Linter:** kein `putCustomData(` irgendwo. *Optionaler Check.*
 - **B1-Linter:** kein Consent-Read außerhalb `crashreporting/consent/`.
 
-> **SPEC-DECISION B-1 (neue Linter-Checks) — Default: ja, aber verschiebbar.**
-> B2/B3/B4/B1 sind billige grep-Checks im Stil der bestehenden
-> (`check-conventions.sh`). Empfehlung: mit der Implementierung einführen, nicht
-> vorab. Kein Blocker für die Spec.
+> **SPEC-DECISION B-1 (neue Linter-Checks) — Rule-9-Intent-Gate umgesetzt, Rest
+> verschiebbar.** Der Rule-9-Umbau (Intent-Gate + `pre-wiring bare`-Marker) ist
+> mit §23 eingeführt. B2/B3/B4/B1 bleiben billige grep-Checks im Stil der
+> bestehenden; nach Bedarf nachziehen, kein Blocker.
 
 ---
 
@@ -798,7 +806,8 @@ class UncaughtCrashHandler(
 ) : Thread.UncaughtExceptionHandler {
     override fun uncaughtException(thread: Thread, t: Throwable) {
         if (t is OutOfMemoryError) System.gc()          // Best-effort: Speicher frei, BEVOR ACRA allokiert
-        Timber.e(t, "uncaught")                          // Rule 9: plain Timber.e (Crash-Infra)
+        Log.e(TAG, "uncaught", t)                        // android.util.Log.e, NICHT Timber: ein Timber.e
+                                                         // re-enterte AcraTree → Doppelversand (Rule 9)
         defaultHandler?.uncaughtException(thread, t)     // = ACRA: persist + schedule(:acra) + exitProcess(10)
         // ACRA killt hier bereits. Folgender Kill ist reiner Backstop —
         // nur erreicht, falls ACRA NICHT killte (Admin-Veto / Handler warf):
@@ -938,17 +947,22 @@ object CrashReportingBootstrap {
 | §12·2 | `ACRA.init` → **dann `UncaughtCrashHandler` installieren** | Wrapper delegiert am Reporter vorbei → **kein Report** |
 | §12·3 | `onCreate` fertig → **dann `RecoveryWatchdog.start()`** | Cold-Start-Arbeit killt HOME-Prozess in Restart-Loop |
 
-### C.7 Rule-9-Whitelist-Delta
+### C.7 Rule-9-Delta (report-by-intent, §23)
 
-Neue Crash-Infra-Dateien mit plain `Timber.e` (§5.3) → in `rule9_allowed_files`
-(`tools/check-conventions.sh` Z. 79) ergänzen:
-- `UncaughtCrashHandler\.kt` — der globale Handler (plain `Timber.e`).
-- `RecoveryWatchdog\.kt` — Capture-Swallow (plain `Timber.e`/`Log.e`).
-- `CrashReportingBootstrap\.kt` — Bootstrap-Pfad (ACRA-Init, Consent-Read).
-- (`ConsentBootstrap\.kt` bereits in A.9; `KolibriLauncherApp\.kt` bleibt.)
+Es gibt **keine** Crash-Infra-Datei-Whitelist mehr (`rule9_allowed_files` entfällt).
+Rule 9 ist auf report-by-intent umgestellt: ein bare `Timber.e(` ist überall
+verboten; Crash-Infra meldet über `TimberWrapper.reportToAcra` (ACRA_REPORT-Tag,
+kein DEBUG-Throw), was kein bare `Timber.e` ist.
+- `CrashReportingBootstrap` (ANR-Drain + Watchdog-Delivery + Selbstfehler-Catches)
+  → `reportToAcra`. Kein Eintrag nötig.
+- `RecoveryWatchdog` → Capture-Swallow via `Log.e`; `UncaughtCrashHandler` →
+  `Log.e`. Beide vom `Timber.e`-Detektor nicht erfasst.
+- `ConsentBootstrap` (Pre-Wiring, vor KolibriLog-Wiring/Plant) → einzige bare
+  `Timber.e`, mit `pre-wiring bare`-Marker.
+- `PipelineBacklogProbe`, `LoopGuard` → `silentError` bzw. reine Logik, kein bare
+  `Timber.e`. `AcraTree` → `Log.e` (B.9).
 
-`PipelineBacklogProbe`, `LoopGuard` nutzen **kein** bare `Timber.e` (silentError bzw.
-reine Logik) → kein Eintrag. `AcraTree` ebenfalls nicht (Log.e, B.9).
+Logik: `tools/check-intent-gate.awk`; Fixture: `tools/check-intent-gate-test.sh`.
 
 ### C.8 Test-Inventar
 

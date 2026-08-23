@@ -1558,7 +1558,29 @@ luminanz-getriebene* Form — nicht diesen manuellen Regler.
 
 ---
 
-## 23. (offen) ACRA-Reporting vom Log-Level entkoppeln — WARN-Politik geradeziehen
+## 23. (erledigt 2026-08-23) ACRA-Reporting vom Log-Level entkoppeln — WARN-Politik geradeziehen
+
+**Auflösung (Zieldesign, „report by intent").** `AcraTree` gatet jetzt auf
+**Intent** statt Level: geliefert wird nur, was einen Intent-Tag trägt
+(`SILENT_ERROR` von `silentError`/`silentDeath`, oder das neue `ACRA_REPORT` von
+`TimberWrapper.reportToAcra`) **und** einen Throwable hat. Ein bare `Timber.e/w(t)`
+meldet nicht mehr → die WARN-False-Positive-Klasse ist *by construction* weg.
+
+Zwei-Tag-Design, weil der Tag auch die DEBUG-Dev-Toast-Unterdrückung
+(`BaseActivity`) steuert: `SILENT_ERROR` (meldet + unterdrückt Toast) vs.
+`ACRA_REPORT` (meldet, unterdrückt nicht — Crash-Infra/ANR/Watchdog). Der neue,
+nicht-werfende Helper `reportToAcra` ist der einzige getaggte Melde-Pfad der
+Crash-Infra; Rule 9 ist auf report-by-intent umgebaut (Intent-Gate-Linter
+`tools/check-intent-gate.awk` + `pre-wiring bare`-Marker statt Datei-Whitelist).
+FATAL-Loch geschlossen: `silentDeath(String)` synthetisiert einen Carrier (nur
+diese Overload — `silentError(String)` bleibt bewusst still, sonst Flut-
+Regression durch die ~22 message-only Caller). Doku nachgezogen: ACRA_SPEC.md
+(B.1/B.2/B.4/B.5/B.8/B.9/C.7), ACRA_FLOW.md, CLAUDE.md Rule 9, AUDIT-5 (als
+historisch markiert). Der ursprüngliche Problem-Text bleibt unten als Kontext.
+
+---
+
+
 
 **Problem.** `AcraTree` leitet heute alles **≥ WARN** an ACRA weiter
 (`silentError`, `Timber.w/.e`, `KolibriLog.w/.e`). Damit ist „wird gemeldet"

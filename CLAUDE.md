@@ -324,77 +324,87 @@ activities.
    returns `ConsentDecision.Granted`. Do not change this order. Reports go to
    a private server, never to a third-party service.
 
-9. **Error logging goes through `TimberWrapper`.** Plain `Timber.e(...)`
-   only logs — silent in DEBUG too. Use `TimberWrapper.silentError(e, ...)`
-   instead: same logging, plus throw in DEBUG so bugs are loud during
-   development.
+9. **Error logging goes through `TimberWrapper` — report by intent (§23).**
+   Whether an entry reaches ACRA is decided by INTENT (an explicit tag), not
+   by log level. A bare `Timber.e(...)` neither reports (untagged → dropped by
+   `AcraTree`'s gate) nor throws in DEBUG — it silently under-reports, so it is
+   forbidden (see enforcement). The report-worthy APIs on `TimberWrapper`:
 
-   **Crash-handling-infrastructure exception list.** A handful of files
-   sit *inside* the crash-reporting pipeline: a `silentError` throw there
-   would either recurse into the same path it's supposed to be the safety
-   net for, or land in ACRA's own machinery. These files keep plain
-   `Timber.e`:
+   - `silentError(throwable, message)` — throw in DEBUG **+** report in RELEASE
+     (`SILENT_ERROR` tag). The default for a caught programmer error.
+   - `silentError(message)` (no throwable) — throw in DEBUG, **NOT** reported
+     (a null throwable is dropped by `AcraTree`). The deliberate channel for
+     "loud in DEV, not worth a RELEASE report": self-healing artefacts,
+     expected-degradation guards. If a RELEASE report is wanted, pass a cause.
+   - `reportToAcra(throwable, message)` — report in RELEASE (`ACRA_REPORT` tag),
+     **no** DEBUG throw. For crash-infra that must not re-enter the safety net
+     it guards.
+   - `silentDeath(...)` — `exitProcess(1)` in every build (even DEBUG) **+**
+     report; the message-only overload synthesizes a carrier so the FATAL death
+     actually reaches ACRA (a null throwable would be dropped, then the process
+     would exit invisibly). For lying-state paths (half-migrated DataStore,
+     Activity without ViewModel, HOME-Activity restart loop).
 
-   - `KolibriLauncherApp.kt` — the app-scope `CoroutineExceptionHandler` and
-     the `onCreate` init catches. The original Rule 9 exception. (The global
-     `UncaughtExceptionHandler` and the ACRA init moved out to the two files
-     below in the ACRA rewrite.)
-   - `UncaughtCrashHandler.kt` — the unified (RELEASE+DEBUG) global uncaught
-     handler. Crash-infra, so no `silentError`; but its breadcrumb log uses
-     `android.util.Log.e`, NOT `Timber.e` — a `Timber.e` would re-enter the
-     process-wide planted `AcraTree` and double-send the crash (one silent
-     carrier + one fatal auto-report). Same reason `AcraTree.kt` itself uses
-     `Log.e` in its swallow. Neither needs a bare-`Timber.e` whitelist entry.
-   - `CrashReportingBootstrap.kt` — ACRA init + the ANR drain + watchdog
-     wiring, on the bootstrap path (before/around ACRA being wired).
-   - `TimberWrapper.kt` itself — `silentError` calling itself is a literal
-     loop.
-   - `BaseActivity.kt` and `BaseViewModel.kt` — the
-     `CoroutineExceptionHandler` and the `ErrorEventBus` collector. A
-     throw here escapes the safety-net coroutine and lands at the global
-     uncaught handler, which is exactly what these wrappers exist to
-     prevent.
-   - `ConsentBootstrap.kt` — on the bootstrap path. Its reads happen via
-     `runBlocking` in `attachBaseContext` before Hilt and ACRA are
-     initialised; a DEBUG throw there crashes the app before the reporter
-     is wired. (`ConsentDialog.kt`, the dialog UI helper, used to be
-     listed here but no longer is: after the consent refactor it sits off
-     the bootstrap path and its catches now use `silentError` — the
-     throw-in-DEBUG is wanted there, since a dialog that fails to show must
-     not silently masquerade as a decline. AUDIT-10 #6/#8.)
-   - `BackupFragment.kt` — its fragment-scoped
-     `CoroutineExceptionHandler` (one site only — the rest of the file
-     uses `silentError`). Same recursion shape as `BaseActivity`.
+   Local diagnostics use `Timber.d` / `Timber.w` (never reported).
+
+   **Two intent tags** (a single tag is overloaded — it also gates
+   `BaseActivity`'s DEBUG dev-toast suppression): `SILENT_ERROR`
+   (silentError/silentDeath: routes to ACRA AND suppresses the dev-toast, since
+   it already throws in DEBUG) and `ACRA_REPORT` (reportToAcra: routes, does
+   NOT suppress — those paths don't throw, so the dev-toast is wanted).
+   `AcraTree` delivers iff an entry carries either tag AND a throwable.
+
+   **Crash-infra uses `reportToAcra`, not `silentError`.** A handful of files
+   sit *inside* the crash-reporting pipeline: a `silentError` DEBUG throw there
+   would recurse into the path they are the safety net for. They report via
+   `reportToAcra` (report, no throw):
+
+   - `KolibriLauncherApp.kt` — the app-scope `CoroutineExceptionHandler` and the
+     `onCreate` / lifecycle init catches.
+   - `BaseActivity.kt` and `BaseViewModel.kt` — the `CoroutineExceptionHandler`
+     and the `ErrorEventBus` / event collectors. A throw here escapes the
+     safety-net coroutine and lands at the global uncaught handler, which is
+     exactly what these wrappers exist to prevent.
+   - `BackupFragment.kt` — its fragment-scoped `CoroutineExceptionHandler`.
+   - `CrashReportingBootstrap.kt` — ANR drain + watchdog delivery + their
+     self-failure catches, on the bootstrap path.
+   - `TimberWrapper.kt` itself — the definition site of these APIs.
+   - `UncaughtCrashHandler.kt` and `AcraTree.kt` use `android.util.Log.e`, NOT
+     Timber — a `Timber.e` would re-enter the process-wide planted `AcraTree`
+     and double-send the crash (one silent carrier + one fatal auto-report).
+
+   **The one bare-`Timber.e` exception: the pre-wiring bootstrap path.**
+   `ConsentBootstrap.kt` runs before KolibriLog is wired and before `AcraTree`
+   is planted — `reportToAcra` would be a no-op and `silentError`'s DEBUG throw
+   would crash the app before the reporter exists. It keeps a bare `Timber.e`,
+   flagged with a `pre-wiring bare` marker. (`ConsentDialog.kt`, the dialog UI
+   helper, sits off the bootstrap path and uses `silentError` — the
+   throw-in-DEBUG is wanted there, since a dialog that fails to show must not
+   silently masquerade as a decline. AUDIT-10 #6/#8.)
 
    **Transitive form.** The recursion ban applies to helpers these files
    *invoke* too: a UI fallback called from a `CoroutineExceptionHandler`
-   (e.g. `BackupFragment.showError`) must not contain `silentError`
-   either, or the DEBUG throw simply lands one frame deeper and surfaces
-   as `RuntimeException: Exception while trying to handle coroutine
-   exception`. Document the constraint on the helper itself, not in this
-   rule.
+   (e.g. `BackupFragment.showError`) must not contain `silentError` either, or
+   the DEBUG throw simply lands one frame deeper and surfaces as
+   `RuntimeException: Exception while trying to handle coroutine exception` —
+   use `reportToAcra` or a non-throwing log. Document the constraint on the
+   helper itself, not in this rule.
 
-   New code in any other file: use `silentError`. Adding a new file to
-   this list requires the same recursion-into-the-error-pipeline
-   justification.
+   New code in any other file: use `silentError` (or `reportToAcra` on a
+   crash-infra path). Details and the test escape (`preventCrashForTesting`)
+   live in `core/TimberWrapper.kt`.
 
-   For paths that must not continue with a lying state (half-migrated
-   DataStore, Activity without ViewModel, HOME-Activity restart loop),
-   use `silentDeath` — it logs FATAL and `exitProcess(1)`s in every
-   build, even DEBUG, because outer `catch(Throwable)` blocks would
-   otherwise swallow a throw. Both: details and the test escape
-   (`preventCrashForTesting`) live in `core/TimberWrapper.kt`.
-
-   This rule is enforced by `./gradlew checkConventions` — the linter
-   reports any bare `Timber.e(` outside the exception list, so a new
-   crash-infra file added here also needs an entry in
-   `tools/check-conventions.sh`. Same task also catches Rule 12, the
-   data/ Manager-naming drift, the Rule-11 annotation discipline
-   in whitelisted files (see Rule 11 below), and Toast routing (bare
-   `Toast.makeText(` outside `ui/util/ToastSafe.kt` — every user-facing
-   toast must go through `showToastSafe`, which owns the Samsung
-   StrictMode relax + the Throwable catch); see TODO.md §7 for the
-   full list of automated checks.
+   This rule is enforced by `./gradlew checkConventions`
+   (`tools/check-intent-gate.awk`): a bare `Timber.e(` is flagged everywhere
+   unless it carries a `pre-wiring bare` marker within ±5 lines. The former
+   crash-infra file whitelist is gone — those files use `reportToAcra`, which is
+   not a bare `Timber.e`, so no whitelist entry is needed for new crash-infra.
+   Same task also catches Rule 12, the data/ Manager-naming drift, the Rule-11
+   annotation discipline in whitelisted files (see Rule 11 below), and Toast
+   routing (bare `Toast.makeText(` outside `ui/util/ToastSafe.kt` — every
+   user-facing toast must go through `showToastSafe`, which owns the Samsung
+   StrictMode relax + the Throwable catch); see TODO.md §7 for the full list of
+   automated checks.
 
 10. **Testable logic lives outside Android-runtime classes.** Activities,
     Fragments, BroadcastReceivers, and Services are awkward to unit-test
@@ -559,19 +569,23 @@ activities.
     whenever the cancellation originates UPSTREAM rather than from the
     downstream `emit` (the `stateIn(SharingStarted.Eagerly)` teardown case:
     the flow sits idle in the upstream, so the cancel surfaces there). An
-    arm that then LOGS the exception at report level (`silentError`,
-    `KolibriLog.w`/`.e`, `Timber.w`/`.e` — all WARN+ and delivered to ACRA
-    by `AcraTree`) without first rethrowing the cancellation files a bogus
-    report on every teardown — the same ACRA flood, one per arm. So every
-    logging `Flow.catch` arm must guard first: `if (e is
-    CancellationException) throw e` (the `SettingsRepositoryImpl` form), or
-    a narrowing rethrow that propagates everything non-recoverable
-    (`if (e is IOException) { … } else throw e`, as in `DataStoreReadFlow`
-    / `AppUsageRepositoryImpl`). Enforced by `./gradlew checkConventions`
-    via `tools/check-flow-catch-rethrow.awk` — a GLOBAL scan, because the
-    shape is precise: only an arm that BOTH logs at report level AND lacks
-    a guard flags; a `.catch { }` that merely emits a fallback without
-    logging cannot flood ACRA and is left alone. (The AUDIT-12 follow-on
+    arm that then LOGS the exception (`silentError`, `KolibriLog.w`/`.e`,
+    `Timber.w`/`.e`) without first rethrowing the cancellation SWALLOWS normal
+    coroutine control flow: a teardown cancellation is turned into a logged
+    fallback emission instead of propagating — a structured-concurrency
+    correctness bug, one per arm. (Since §23, report-by-intent: only the
+    `silentError` arm additionally reaches ACRA — the `Timber.w`/`KolibriLog.w`
+    arms are untagged and no longer reported — but the correctness bug is
+    identical for every logging arm, so the guard is required regardless of
+    level; ACRA flooding is no longer the reason.) So every logging `Flow.catch`
+    arm must guard first: `if (e is CancellationException) throw e` (the
+    `SettingsRepositoryImpl` form), or a narrowing rethrow that propagates
+    everything non-recoverable (`if (e is IOException) { … } else throw e`, as in
+    `DataStoreReadFlow` / `AppUsageRepositoryImpl`). Enforced by
+    `./gradlew checkConventions` via `tools/check-flow-catch-rethrow.awk` — a
+    GLOBAL scan, because the shape is precise: only an arm that BOTH logs AND
+    lacks a guard flags; a `.catch { }` that merely emits a fallback without
+    logging cannot mask a cancellation as an error and is left alone. (The AUDIT-12 follow-on
     swept 17 such arms across `LayoutDelegate`, the `Get*AppsUseCase`
     family, `ObserveInstalledAppsUseCase`, and `InstalledAppsRepositoryImpl`
     — the last already guarded the `emit()` cancellation but still logged

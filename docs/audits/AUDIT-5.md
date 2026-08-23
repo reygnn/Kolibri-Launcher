@@ -228,6 +228,12 @@ try {
 } catch (e: Throwable) { … }
 ```
 
+> **Historisch (pre-intent-gating):** dieser Abschnitt beschreibt den
+> damaligen Stand mit `CrashReportLimiter` und dem Level-Gate. Beide sind
+> überholt — der Limiter fiel mit dem ACRA-Rewrite weg, das WARN-Level-Gate
+> mit §23 (report-by-intent; `AcraTree` gatet jetzt auf Intent-Tag). Bewusst
+> als Snapshot eingefroren.
+
 - **Weg A (Zeile 465):** `Timber.e(synthetic, …)` landet im unbedingt
   gepflanzten `AcraTree` (Zeile ~228, „für DEBUG und RELEASE"). Dessen
   `log()` (556–581) lässt Priority ≥ WARN mit non-null Throwable durch,

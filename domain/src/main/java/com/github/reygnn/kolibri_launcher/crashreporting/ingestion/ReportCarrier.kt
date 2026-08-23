@@ -64,9 +64,10 @@ fun buildAcraReportThrowable(
  * Maps an `android.util.Log` priority to its single-letter logcat label.
  *
  * The literals mirror `android.util.Log`, which `:domain` cannot import as a
- * pure-Kotlin module, so each is pinned to its constant below. `AcraTree` only
- * forwards WARN+ (V/D/I are unreachable via that path), but the helper is kept
- * deliberately general.
+ * pure-Kotlin module, so each is pinned to its constant below. Since §23
+ * `AcraTree` gates by INTENT TAG, not level, so any priority can be delivered
+ * (an intent-tagged WARN reports just like an ERROR) — the priority letter is
+ * cosmetic in the header, and this helper's generality is now genuinely used.
  */
 private fun priorityLabel(priority: Int): String = when (priority) {
     2 -> "V" // Log.VERBOSE

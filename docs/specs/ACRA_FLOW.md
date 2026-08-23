@@ -284,7 +284,7 @@ eine davon, ist sie falsch — egal wie plausibel sie aussieht. Die Spalte
 | # | Invariante | Gepinnt durch |
 |---|---|---|
 | **B1** | **Ein einziges Consent-Gate.** B prüft nie selbst Consent; das ACRA-`enabled`-Flag ist die alleinige Durchsetzung. Kein zweiter Check, kein Umgehen von `handleSilentException` mit eigener Sende-Logik. | Linter: kein Consent-Read außerhalb Belang A; `checkConventions` |
-| **B2** | **Ein Zustellweg, kein Doppelversand.** Jede geloggte Quelle läuft durch genau einen Pfad (`Timber.e` → `AcraTree` → `handleSilentException`). Nie zusätzlich direkt `handleException`. | Linter: kein `handleException(`/`handleSilentException(` außer in `AcraTree` |
+| **B2** | **Ein Zustellweg, kein Doppelversand.** Jede geloggte Quelle läuft intent-getaggt durch genau einen Pfad (`silentError`/`reportToAcra` → `AcraTree` → `handleSilentException`). Nie zusätzlich direkt `handleException`. | Linter: kein `handleException(`/`handleSilentException(` außer in `AcraTree` |
 | **B3** | **Kein Client-seitiges Throttling.** Der Client sendet jeden Consent-gateten Report; Flut-Kontrolle (Fingerprint-Dedup **und** Ingestion-Rate-Limit) ist ausschließlich server-seitig. ACRA pact den Versand nicht (verifiziert: `setOverrideDeadline(0)`, `MAX_SEND_REPORTS=5`, Job-Coalescing; §13). | Linter: kein client-seitiger Report-Throttle / `shouldSend` in `AcraTree`; Server-Config (Dedup + Edge-Rate-Limit) |
 | **B4** | **Report-Kontext ist per-Report.** Priority/Tag/Message werden in eine frische Carrier-Exception gefaltet, nie in eine prozess-globale Mutable-Map (`putCustomData`). *(AUDIT-6 #4)* | Linter: kein `putCustomData(`; `ReportCarrier`-Test (pure/JVM) |
 | **B5** | **Minimaler Report-Inhalt.** Nur die in §4.7 gelisteten Felder; kein Logcat-Dump, keine Geräte-ID, keine PII über Modell/Marke/OS hinaus. | `reportContent`-Assertion-Test gegen exakte Feldliste |
@@ -470,9 +470,9 @@ ACRA.errorReporter.setEnabled(decision == Granted)
 | Quelle | Was | ACRA-Eingang |
 |---|---|---|
 | **Uncaught-Crash** | echter, nicht gefangener `Throwable` | ACRAs **eigener** installierter UncaughtExceptionHandler (Auto-Report, voller `reportContent`) |
-| **Geloggter Fehler** | gefangen, aber via `Timber.e/w(t)` (WARN+) geloggt | `AcraTree` → `handleSilentException(carrier)` |
-| **Post-mortem ANR** | `ApplicationExitInfo` REASON_ANR | `Timber.e(AnrException)` → `AcraTree` → `handleSilentException` |
-| **Watchdog-Stall** | Main-Looper > Schwelle stumm (§6) | `Timber.e(WatchdogStallException)` → `AcraTree`, *vor* dem Kill |
+| **Intent-getaggter Fehler** | gefangen + via `silentError` / `reportToAcra` intent-getaggt | `AcraTree` → `handleSilentException(carrier)` |
+| **Post-mortem ANR** | `ApplicationExitInfo` REASON_ANR | `reportToAcra(AnrException)` → `AcraTree` → `handleSilentException` |
+| **Watchdog-Stall** | Main-Looper > Schwelle stumm (§6) | `reportToAcra(WatchdogStallException)` → `AcraTree`, *vor* dem Kill |
 
 Kernaussage: **der Client drosselt nichts.** Jede Quelle sendet (Consent-gated);
 Flut-Kontrolle — Dedup identischer Reports *und* Ingestion-Rate-Limit — ist
@@ -487,9 +487,9 @@ System-ANR-Schwelle (§7 X1) sonst unsichtbar wären (Prinzip 6).
 ### 4.2 Der eine Zustellweg (geloggte Fehler, ANRs, Stalls)
 
 ```
-Timber.e(throwable, msg)                              # der EINZIGE Weg (B2)
+silentError(t, msg) / reportToAcra(t, msg)           # der EINZIGE Weg (B2), intent-getaggt
    └─ AcraTree.log(priority, tag, msg, t):
-        1. Gate:      priority < WARN || t == null  → return (nichts)
+        1. Gate:      t == null → return; tag ∉ {SILENT_ERROR, ACRA_REPORT} → return  # report by intent (§23)
         2. Carrier:   buildAcraReportThrowable(priority, tag, msg, t)   # per-Report (B4)
         3. Zustellen: ACRA.errorReporter.handleSilentException(carrier)
                         └─ persistiert + plant Out-of-process-Versand (:acra, §13); nur wirksam,
@@ -561,7 +561,7 @@ onCreate → reportPendingAnrsAsync (ApplicationScope):
    newAnrsSinceLastReport(): getHistoricalProcessExitReasons filtern
                              (REASON_ANR, timestamp > Watermark), chronologisch,
                              je → AnrReport(desc, importance, getTraceInputStream)
-   je Report:  handler(report) = Timber.e(AnrException(...))  → §4.2
+   je Report:  handler(report) = reportToAcra(AnrException(...))  → §4.2
                markReported(report): Watermark = report.timestamp
 ```
 - **Dedup = Watermark** (`anr_reporter_last_reported_ts` im settingsDataStore):
@@ -631,7 +631,7 @@ und delegiert dann den kritischen Versand+Kill an ACRA:
 handleUncaughtException(thread, t):
    if t is OutOfMemoryError: System.gc()     # Best-effort: Speicher freimachen,
                                              #   BEVOR ACRA einen Report allokiert
-   Timber.e(t, ...)                          # Rule 9: plain Timber.e (Crash-Infra)
+   Log.e(TAG, "uncaught", t)                 # android.util.Log.e, NICHT Timber (re-enterte AcraTree → Doppelversand)
    defaultExceptionHandler.uncaughtException(thread, t)   # = ACRA: persist + schedule(:acra) + exitProcess(10)
    # ACRA killt hier bereits. Der folgende Kill ist reiner Backstop —
    # nur erreicht, falls ACRA NICHT killte (Administrator-Veto auf endApplication / Handler warf):
@@ -697,7 +697,7 @@ verschwinden, Prinzip 6). Der Ablauf beim Trip:
 Trip (Main-Looper hat timeoutMs nicht getickt):
    0. Loop-Guard: killCount(fenster M) >= N ?  → Kill AUSSETZEN, nur Schritt 1–2 (capturen)
    1. Capture:  mainStack = mainThread.stackTrace       # wir sind auf dem Daemon-Thread
-   2. Enqueue:  Timber.e(WatchdogStallException(mainStack))  # → §4.2
+   2. Enqueue:  reportToAcra(WatchdogStallException(mainStack))  # → §4.2
                   → handleSilentException persistiert + plant Out-of-process-Versand (:acra);
                     kleiner File-Write auf dem DAEMON-Thread, nicht dem hängenden Main-Thread
    3. Kill:     recordKill(); killSwitch()   # Process.killProcess + exitProcess(10)
