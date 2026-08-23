@@ -56,14 +56,86 @@
             android:orientation="vertical"
             android:gravity="start">
 
-            <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
-                android:id="@+id/timeText"
+            <!-- Clock row: the clock glyph plus the two passive events indicators
+                 (◷ alarm, ◇ calendar) pinned to its trailing side. A ConstraintLayout
+                 (not a horizontal LinearLayout) so each glyph can be EDGE-aligned to
+                 the clock instead of being centred as a block: ◷ top-to-top, ◇
+                 bottom-to-bottom of timeText, both in one column just past its end.
+                 Kept INSIDE timeContainer (not a rootLayout corner overlay) so the
+                 indicators travel with the START / CENTER / END alignment that
+                 HomeFragment.applyTimeContainerAlignment mirrors onto timeContainer
+                 — the corner overlay was overlapped by the block when END-aligned. -->
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/time_placeholder"
-                android:textSize="@dimen/text_size_time"
-                android:textColor="@color/default_text_color"
-                android:fontFamily="sans-serif-light" />
+                android:layout_height="wrap_content">
+
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/timeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/time_placeholder"
+                    android:textSize="@dimen/text_size_time"
+                    android:textColor="@color/default_text_color"
+                    android:fontFamily="sans-serif-light"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <!-- Two monochrome glyphs in one column next to the clock, each
+                     EDGE-aligned to it: ◷ top-to-top, ◇ bottom-to-bottom of timeText,
+                     so they span the clock's full height instead of clustering in the
+                     middle. Each is shown independently, only when an upcoming event of
+                     its type exists; together they just signal that events exist — the
+                     dialog opens via the home double-tap, the glyphs are pure status
+                     graphics (NOT clickable). OutlinedTextViews, so each inherits the
+                     SAME adaptive glyph-outline + text-colour treatment as the
+                     clock/date/battery (HomeFragment.updateAllColors). includeFontPadding
+                     is off so the glyph box hugs the mark and the top/bottom constraints
+                     land on the visible edges. Each keeps a FIXED slot:
+                     HomeFragment.updateEventsIndicator toggles INVISIBLE (not GONE), so
+                     the column's size stays constant and the clock never shifts when an
+                     event appears/disappears (END/CENTER alignment) — hence the initial
+                     state here is invisible, not gone. Each contentDescription overrides
+                     its glyph for TalkBack. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/alarmIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="◷"
+                    android:textSize="40sp"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/default_text_color"
+                    android:contentDescription="@string/events_indicator_alarm_content_description"
+                    android:visibility="invisible"
+                    android:layout_marginStart="@dimen/spacing_medium"
+                    app:layout_constraintStart_toEndOf="@id/timeText"
+                    app:layout_constraintTop_toTopOf="@id/timeText" />
+
+                <!-- Calendar mark is ◻ (U+25FB WHITE MEDIUM SQUARE) at the SAME textSize
+                     (40sp) as the alarm ◷. Glyph choice is measured, not incidental: in
+                     NotoSansSymbols2 (the font Android falls back to for these geometric
+                     shapes) ◻ renders ~49×48 with stroke 3 — matching ◷'s ~50×50 / stroke 3
+                     on BOTH size and line thickness. The alternatives fail one axis:
+                     □ U+25A1 is too big (59×58), ◽ U+25FD is smaller (34) but thicker-lined
+                     (stroke 4), ◇ U+25C7 is both huge (81) and heavy (stroke 7). Keeping the
+                     textSize equal is what preserves matching line thickness (stroke scales
+                     with textSize), so do NOT resize this to "fix" size — pick a different
+                     glyph instead. (The tonal OutlinedTextView outline is a fixed dp stroke,
+                     already equal on both and independent of textSize.) -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/calendarIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="◻"
+                    android:textSize="40sp"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/default_text_color"
+                    android:contentDescription="@string/events_indicator_calendar_content_description"
+                    android:visibility="invisible"
+                    app:layout_constraintStart_toStartOf="@id/alarmIndicator"
+                    app:layout_constraintEnd_toEndOf="@id/alarmIndicator"
+                    app:layout_constraintBottom_toBottomOf="@id/timeText" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -112,32 +184,6 @@
         </LinearLayout>
 
     </LinearLayout>
-
-    <!-- Passive events indicator (NOT clickable): a bold "!" pinned top-right,
-         next to the clock. Shown only when upcoming time-based events exist; it
-         just signals that events exist — the dialog opens via the home double-tap.
-         A text glyph in an OutlinedTextView, so it inherits the SAME adaptive
-         glyph-outline + text-colour treatment as the clock/date/battery
-         (HomeFragment.updateAllColors) — no drawable, legible over any wallpaper.
-         Sibling of rootLayout (ConstraintLayout child) so it stays in the corner
-         regardless of the favorites alignment. Anchored to rootLayout, which
-         carries the system-bar insets as padding; the status bar is hidden on
-         home so no top-inset offset is needed. contentDescription overrides the
-         "!" glyph for TalkBack. -->
-    <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
-        android:id="@+id/eventsIndicator"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:layout_marginEnd="@dimen/layout_padding"
-        android:text="!"
-        android:textSize="40sp"
-        android:textStyle="bold"
-        android:textColor="@color/default_text_color"
-        android:contentDescription="@string/events_indicator_content_description"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="@id/rootLayout"
-        app:layout_constraintEnd_toEndOf="@id/rootLayout" />
 
     </com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
 

@@ -32,6 +32,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeKey
@@ -812,9 +813,10 @@ class HomeFragment : Fragment() {
 
         // The old alarm/calendar chip row was a separate block whose height had to
         // be measured and compensated for here. Its replacement — the events
-        // indicator — is a top-right corner overlay (a ConstraintLayout sibling of
-        // rootLayout), so it contributes no extra vertical block: the favorites top
-        // margin now derives solely from the user's preferred content margin.
+        // indicators — sits INSIDE timeContainer, in a horizontal row next to the
+        // clock, so it adds no extra vertical block (the clock is taller than the
+        // stacked glyphs): the favorites top margin now derives solely from the
+        // user's preferred content margin.
         val newMargin = contentSpacingCalculator.calculate(
             currentUserPreferredMarginPx,
             0,
@@ -957,11 +959,14 @@ class HomeFragment : Fragment() {
         binding.batteryText.setTextColor(textColor)
         binding.batteryText.setOutline(outlineWidthPx, outlineColor)
 
-        // The events indicator is a text glyph ("!") in an OutlinedTextView, so it
-        // gets the exact same adaptive treatment as the clock/date/battery: text
-        // colour + the tonal contrast outline (background-independent legibility).
-        binding.eventsIndicator.setTextColor(textColor)
-        binding.eventsIndicator.setOutline(outlineWidthPx, outlineColor)
+        // The events indicators are text glyphs ("◷" alarm, "◇" calendar) in
+        // OutlinedTextViews, so each gets the exact same adaptive treatment as the
+        // clock/date/battery: text colour + the tonal contrast outline
+        // (background-independent legibility).
+        binding.alarmIndicator.setTextColor(textColor)
+        binding.alarmIndicator.setOutline(outlineWidthPx, outlineColor)
+        binding.calendarIndicator.setTextColor(textColor)
+        binding.calendarIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
     }
 
@@ -980,16 +985,26 @@ class HomeFragment : Fragment() {
     // ============================================================================
 
     /**
-     * Toggles the subtle events indicator that replaced the old alarm/calendar
-     * chip row: a single glyph shown only when upcoming time-based events exist.
-     * It is a PASSIVE status symbol — not clickable; the events dialog opens via
-     * the home double-tap (`GestureDelegate.onDoubleTap`), the bell just signals
-     * that events exist. Pure View property writes (Rule 11).
+     * Toggles the subtle events indicators that replaced the old alarm/calendar
+     * chip row: two glyphs (◷ alarm, ◇ calendar), each shown only when an upcoming
+     * event of its type exists. They are PASSIVE status symbols — not clickable; the
+     * events dialog opens via the home double-tap (`GestureDelegate.onDoubleTap`),
+     * the glyphs just signal that events exist.
+     *
+     * Toggled INVISIBLE (not GONE) so each keeps its reserved slot: the indicator
+     * column has a constant width/height regardless of how many events exist, so the
+     * clock next to it never shifts when an event appears/disappears — critical under
+     * END alignment, where the right-anchored block would otherwise push the clock
+     * left. `List.any { }` is a pure read and the visibility writes are pure View
+     * property writes (Rule 11).
      */
     private fun updateEventsIndicator(events: List<TimeBasedEvent>) {
         if (_binding == null) return
 
-        binding.eventsIndicator.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
+        val hasAlarm = events.any { it.type == TimeBasedEventType.ALARM }
+        val hasCalendar = events.any { it.type == TimeBasedEventType.CALENDAR }
+        binding.alarmIndicator.visibility = if (hasAlarm) View.VISIBLE else View.INVISIBLE
+        binding.calendarIndicator.visibility = if (hasCalendar) View.VISIBLE else View.INVISIBLE
         updateDynamicSpacing()
     }
 
