@@ -125,6 +125,35 @@ class TimberWrapperTest {
     }
 
     // ------------------------------------------------------------------
+    // reportToAcra — ACRA_REPORT intent tag, no DEBUG throw
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `reportToAcra logs to ACRA_REPORT tag with throwable at ERROR priority`() {
+        val cause = IllegalStateException("infra boom")
+        TimberWrapper.reportToAcra(cause, "wiring failed")
+        assertEquals(1, capturedLogs.size)
+        val entry = capturedLogs[0]
+        assertEquals(Log.ERROR, entry.priority)
+        assertEquals(TimberWrapper.ACRA_REPORT_TAG, entry.tag)
+        assertTrue(
+            "Expected message to start with 'wiring failed', was '${entry.message}'",
+            entry.message.startsWith("wiring failed"),
+        )
+        assertSame(cause, entry.throwable)
+    }
+
+    @Test
+    fun `reportToAcra does not throw even in DEBUG unlike silentError`() {
+        TimberWrapper.preventCrashForTesting.set(false)
+        // isDebugBuild is true (see setup); reportToAcra must still NOT throw — it
+        // is the crash-infra report path that must not re-enter the safety net it
+        // guards. Reaching the assertion without an exception IS the contract.
+        TimberWrapper.reportToAcra(IllegalStateException("x"), "no debug throw")
+        assertEquals(1, capturedLogs.size)
+    }
+
+    // ------------------------------------------------------------------
     // silentError — throw vs no-throw
     // ------------------------------------------------------------------
 
@@ -197,7 +226,10 @@ class TimberWrapperTest {
             fail("Expected RuntimeException")
         } catch (e: RuntimeException) {
             assertEquals("SILENT_DEATH: dying", e.message)
-            assertNull(e.cause)
+            // The message-only overload synthesizes a carrier so the FATAL death
+            // reaches ACRA (a null throwable would be dropped by AcraTree's gate).
+            // That carrier is passed through die()'s cause, so it surfaces here too.
+            assertEquals("dying", e.cause?.message)
         }
     }
 
@@ -230,8 +262,13 @@ class TimberWrapperTest {
         val entry = capturedLogs[0]
         assertEquals(Log.ERROR, entry.priority)
         assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
-        assertEquals("FATAL: foo", entry.message)
-        assertNull(entry.throwable)
+        // The message-only overload now carries a synthesized throwable so the
+        // FATAL reaches ACRA; Timber appends its stack trace, so assert the prefix.
+        assertTrue(
+            "Expected message to start with 'FATAL: foo', was '${entry.message}'",
+            entry.message.startsWith("FATAL: foo"),
+        )
+        assertEquals("foo", entry.throwable?.message)
     }
 
     @Test

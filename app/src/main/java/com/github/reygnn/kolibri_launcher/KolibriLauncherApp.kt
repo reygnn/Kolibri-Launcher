@@ -150,7 +150,7 @@ class KolibriLauncherApp : Application() {
             try {
                 setupStrictMode()
             } catch (e: Throwable) {
-                Timber.e(e, "Error setting up StrictMode")
+                TimberWrapper.reportToAcra(e, "Error setting up StrictMode")
             }
         }
 
@@ -220,7 +220,7 @@ class KolibriLauncherApp : Application() {
             }
             lastLocaleTags = newTags
         } catch (e: Throwable) {
-            Timber.e(e, "Error handling locale change for app-list refresh")
+            TimberWrapper.reportToAcra(e, "Error handling locale change for app-list refresh")
         }
     }
 
@@ -248,10 +248,10 @@ class KolibriLauncherApp : Application() {
     }
 
     private fun registerSystemWallpaperColorsListener() {
-        // Plain Timber.e per Rule 9: KolibriLauncherApp is on the
-        // crash-handling-infrastructure exception list. silentError
-        // would throw in DEBUG and recurse into the same path it's
-        // supposed to be the safety net for.
+        // reportToAcra (ACRA_REPORT intent tag) per Rule 9: KolibriLauncherApp is
+        // on the crash-handling-infrastructure exception list. silentError would
+        // throw in DEBUG and recurse into the same path it's supposed to be the
+        // safety net for; reportToAcra reports without the DEBUG throw.
         try {
             val wallpaperManager = WallpaperManager.getInstance(this)
 
@@ -276,7 +276,7 @@ class KolibriLauncherApp : Application() {
 
             Timber.d("[LIFECYCLE] SystemWallpaperColors listener registered.")
         } catch (e: Throwable) {
-            Timber.e(e, "[LIFECYCLE] Could not wire SystemWallpaperColorsSignal")
+            TimberWrapper.reportToAcra(e, "[LIFECYCLE] Could not wire SystemWallpaperColorsSignal")
         }
     }
 
@@ -290,7 +290,7 @@ class KolibriLauncherApp : Application() {
             }
             systemWallpaperColorsSignal.emit(domain)
         } catch (e: Throwable) {
-            Timber.e(e, "[LIFECYCLE] Could not emit SystemWallpaperColors")
+            TimberWrapper.reportToAcra(e, "[LIFECYCLE] Could not emit SystemWallpaperColors")
         }
     }
 
@@ -321,7 +321,7 @@ class KolibriLauncherApp : Application() {
 
         } catch (e: Throwable) {
             // Sollte eigentlich nie passieren, aber gut für Defensive Programming
-            Timber.e(e, "Error setting up StrictMode")
+            TimberWrapper.reportToAcra(e, "Error setting up StrictMode")
         }
     }
 
@@ -330,7 +330,7 @@ class KolibriLauncherApp : Application() {
         try {
             applicationScope.cancel()
         } catch (e: Throwable) {
-            Timber.e(e, "Error in onTerminate")
+            TimberWrapper.reportToAcra(e, "Error in onTerminate")
         }
     }
 

@@ -1,10 +1,16 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.app.Application
+import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReport
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -12,6 +18,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -84,5 +91,36 @@ class CrashReportingBootstrapProcessGateTest {
         // not attachBaseContext, where applicationContext is null.
         assertEquals(1, consentReads)
         assertEquals(listOf(false, true), enableCalls)
+    }
+
+    @Test
+    fun `ANR drain delivers through the ACRA_REPORT intent tag`() = runTest {
+        val scope = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+
+        // Capture the production delivery lambda passed to reportPendingAnrs so we
+        // can invoke it and observe which intent tag it routes through. Without
+        // this, a future edit reverting the lambda to a plain (untagged) Timber.e
+        // would silently stop ANRs from reaching ACRA with a green suite (§23 [7]).
+        val handlerSlot = slot<suspend (AnrReport) -> Unit>()
+        coEvery { anrReporter.reportPendingAnrs(capture(handlerSlot)) } returns Unit
+
+        val capturedTags = mutableListOf<Pair<String, Throwable?>>()
+        KolibriLog.taggedErrorHandler = { tag, throwable, _ -> capturedTags += tag to throwable }
+        try {
+            runOnCreate(sender = false, scope, granted = true)
+            advanceUntilIdle()
+
+            // Invoke the captured production lambda with a synthetic post-mortem ANR.
+            handlerSlot.captured.invoke(AnrReport(1L, "test anr", 0, "thread dump"))
+
+            assertEquals(1, capturedTags.size)
+            assertEquals(TimberWrapper.ACRA_REPORT_TAG, capturedTags.single().first)
+            assertTrue(
+                "ANR must be delivered as an AnrException",
+                capturedTags.single().second is AnrException,
+            )
+        } finally {
+            KolibriLog.taggedErrorHandler = { _, _, _ -> }
+        }
     }
 }

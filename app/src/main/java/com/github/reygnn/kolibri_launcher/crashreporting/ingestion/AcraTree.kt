@@ -1,13 +1,17 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 
 import android.util.Log
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import org.acra.ACRA
 import timber.log.Timber
 
 /**
  * The one delivery path for logged errors, ANRs and watchdog stalls (B2):
- * `Timber.e/w(t)` at WARN+ with a throwable → a per-report carrier
- * ([buildAcraReportThrowable]) → `handleSilentException`.
+ * an entry carrying an INTENT tag ([TimberWrapper.SILENT_LOG_TAG] or
+ * [TimberWrapper.ACRA_REPORT_TAG]) with a throwable → a per-report carrier
+ * ([buildAcraReportThrowable]) → `handleSilentException`. Reporting is decided
+ * by INTENT (the tag), not by log level — a plain `Timber.e/w(t)` no longer
+ * reaches ACRA (§23, "report by intent").
  *
  * No client-side throttling (B3): every consent-gated report is sent, and
  * flood control (fingerprint dedup + ingestion rate-limit) lives entirely on
@@ -30,9 +34,14 @@ internal class AcraTree(
 ) : Timber.Tree() {
 
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        // Gate: only WARN+ with a throwable. No consent check — the ACRA enabled
+        // Gate: report by intent, not by level (§23). Only entries explicitly
+        // marked with an intent tag AND carrying a throwable are delivered — a
+        // plain Timber.e/w(t) is local-only. No consent check — the ACRA enabled
         // flag gates (B1); no throttle step — flood control is server-side (B3).
-        if (priority < Log.WARN || t == null) {
+        if (t == null) {
+            return
+        }
+        if (tag != TimberWrapper.SILENT_LOG_TAG && tag != TimberWrapper.ACRA_REPORT_TAG) {
             return
         }
         try {

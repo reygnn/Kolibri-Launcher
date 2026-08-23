@@ -15,7 +15,21 @@ import kotlin.system.exitProcess
  */
 object TimberWrapper {
 
+    /**
+     * Intent tag for `silentError` / `silentDeath`: routes the entry to ACRA
+     * AND marks it for DEBUG dev-toast suppression (a silentError already throws
+     * in DEBUG, so a toast would be redundant — see `BaseActivity.handleErrorEvent`).
+     */
     const val SILENT_LOG_TAG = "SILENT_ERROR"
+
+    /**
+     * Intent tag for crash-infra / ANR / watchdog reports delivered via
+     * [reportToAcra]. Routes to ACRA like [SILENT_LOG_TAG] but does NOT suppress
+     * the DEBUG dev-toast: these paths do not throw in DEBUG, so the toast is a
+     * wanted dev signal. `AcraTree` gates on either intent tag; nothing else
+     * reaches ACRA ("report by intent", not by log level).
+     */
+    const val ACRA_REPORT_TAG = "ACRA_REPORT"
 
     // Ein Schalter für Tests. Standardmässig false (aus).
     // AtomicBoolean für Thread-Safety, falls Tests parallel laufen.
@@ -38,15 +52,37 @@ object TimberWrapper {
     /**
      * Loggt einen Fehler, der nur im Logcat erscheinen soll.
      * In DEBUG-Builds wird zusätzlich eine Exception geworfen für sofortige Sichtbarkeit.
+     *
+     * Three-way reporting contract:
+     * - `silentError(throwable, message)` — throw-in-DEBUG **and** report to ACRA
+     *   in RELEASE (SILENT_ERROR tag + non-null throwable, so `AcraTree` delivers).
+     * - [silentError] `(message)` — throw-in-DEBUG **but NOT reported** (no
+     *   throwable → dropped by `AcraTree`'s `t == null` gate). The deliberate
+     *   channel for "programmer error, loud in DEV, not worth a RELEASE report"
+     *   (self-healing artefacts, expected-degradation guards). If a RELEASE report
+     *   is wanted, use the `(throwable, message)` overload with a real cause.
+     * - [silentDeath] — die **and** report (see below).
      */
     fun silentError(throwable: Throwable, message: String) {
         KolibriLog.taggedError(SILENT_LOG_TAG, throwable, message)
         crashInDebug(throwable, message)
     }
 
+    /** Throw-in-DEBUG only, NOT reported to ACRA — see the class contract on the
+     *  `(throwable, message)` overload. */
     fun silentError(message: String) {
         KolibriLog.taggedError(SILENT_LOG_TAG, null, message)
         crashInDebug(null, message)
+    }
+
+    /**
+     * Report to ACRA by intent WITHOUT the DEBUG throw — for crash-infra / ANR /
+     * watchdog that must not re-enter the safety net they guard (Rule 9). Tags
+     * [ACRA_REPORT_TAG] so `AcraTree` routes it; no `crashInDebug`, so it is safe
+     * to call from a `CoroutineExceptionHandler` or the crash pipeline itself.
+     */
+    fun reportToAcra(throwable: Throwable, message: String) {
+        KolibriLog.taggedError(ACRA_REPORT_TAG, throwable, message)
     }
 
     fun silentError(throwable: Throwable) {
@@ -99,8 +135,16 @@ object TimberWrapper {
     // Return-Typ Nothing: der Compiler weiß, dass nach silentDeath kein
     // Code mehr ausgeführt wird — keine if-else Verrenkungen am Aufrufort.
 
+    /**
+     * FATAL death without an existing cause. Synthesizes a carrier so the death
+     * actually reaches ACRA: `die()` routes the cause through
+     * `taggedError(SILENT_LOG_TAG, cause, …)`, and `AcraTree` requires a non-null
+     * throwable — a `null` cause here would be dropped and the death would exit
+     * the process invisibly. The synthetic carrier also becomes the
+     * `preventCrashForTesting` throw cause (tests assert on it).
+     */
     fun silentDeath(message: String): Nothing {
-        die(cause = null, message = message)
+        die(cause = RuntimeException(message), message = message)
     }
 
     fun silentDeath(throwable: Throwable, message: String): Nothing {

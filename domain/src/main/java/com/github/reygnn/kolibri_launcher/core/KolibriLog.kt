@@ -30,7 +30,9 @@ object KolibriLog {
 
     /**
      * Backend for [taggedError]. Default: no-op. Used by
-     * [TimberWrapper.silentError] to attach the SILENT_ERROR tag.
+     * [TimberWrapper.silentError] / [TimberWrapper.silentDeath] to attach the
+     * SILENT_ERROR tag, and by [TimberWrapper.reportToAcra] for the ACRA_REPORT
+     * intent tag (crash-infra / ANR / watchdog).
      */
     @Volatile
     var taggedErrorHandler: (tag: String, throwable: Throwable?, message: String) -> Unit =
@@ -48,7 +50,7 @@ object KolibriLog {
     /**
      * Error log with an explicit tag — same semantics as
      * `Timber.tag(tag).e(throwable, message)`. Used by
-     * [TimberWrapper] for SILENT_ERROR / FATAL paths.
+     * [TimberWrapper] for the SILENT_ERROR / FATAL and ACRA_REPORT intent paths.
      */
     fun taggedError(tag: String, throwable: Throwable?, message: String) =
         taggedErrorHandler(tag, throwable, message)

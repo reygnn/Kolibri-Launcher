@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,14 +17,14 @@ import java.io.IOException
  * would bind to a different public Timber overload). Delivery goes through the
  * injected `deliver` seam, so the decision is verifiable without ACRA.
  *
- * Runs under Robolectric because both Timber's priority levels and AcraTree's
- * `Log.WARN` gate / `Log.e` swallow need the real `android.util.Log` — the
- * bare-JVM stub reads its constants back as 0 and throws from `Log.e`.
+ * Runs under Robolectric because Timber's priority levels and AcraTree's `Log.e`
+ * swallow need the real `android.util.Log` — the bare-JVM stub reads its
+ * constants back as 0 and throws from `Log.e`.
  *
- *  - Gate: only WARN+ WITH a throwable reaches `deliver`; below WARN and
- *    null-throwable are dropped.
- *  - The delivered carrier folds the log context (B2/B4).
- *  - Swallow: a throwing `deliver` does not propagate (C1).
+ * Reporting is by INTENT (§23): an entry is delivered iff it carries an intent
+ * tag ([TimberWrapper.SILENT_LOG_TAG] or [TimberWrapper.ACRA_REPORT_TAG]) AND a
+ * throwable — the log LEVEL is irrelevant. A plain (untagged) `Timber.e/w(t)` is
+ * local-only, even at ERROR. Null-throwable entries are always dropped.
  */
 @RunWith(RobolectricTestRunner::class)
 class AcraTreeTest {
@@ -34,36 +35,60 @@ class AcraTreeTest {
     }
 
     @Test
-    fun `WARN with a throwable delivers exactly one carrier encoding the context`() {
+    fun `SILENT_ERROR-tagged with a throwable delivers exactly one carrier encoding the context`() {
         val delivered = mutableListOf<Throwable>()
         Timber.plant(AcraTree(deliver = { delivered += it }))
 
-        Timber.tag("Tag").w(IOException("x"), "boom")
+        Timber.tag(TimberWrapper.SILENT_LOG_TAG).e(IOException("x"), "boom")
 
         assertEquals(1, delivered.size)
-        // Per-report carrier (B4): message folds "[W/Tag] <type>: <msg>".
+        // Per-report carrier (B4): message folds "[E/SILENT_ERROR] <type>: <msg>".
         // Timber appends the throwable's stack trace to the message before
         // calling log(), so assert the prefix rather than an exact match — the
         // exact carrier format is pinned by ReportCarrierTest.
-        assertTrue(delivered.single().message!!.startsWith("[W/Tag] IOException: boom"))
+        assertTrue(delivered.single().message!!.startsWith("[E/SILENT_ERROR] IOException: boom"))
     }
 
     @Test
-    fun `below WARN is not delivered`() {
+    fun `ACRA_REPORT-tagged with a throwable delivers`() {
         val delivered = mutableListOf<Throwable>()
         Timber.plant(AcraTree(deliver = { delivered += it }))
 
-        Timber.tag("Tag").i(IOException("x"), "just info")
+        Timber.tag(TimberWrapper.ACRA_REPORT_TAG).e(IOException("x"), "infra boom")
+
+        assertEquals(1, delivered.size)
+        assertTrue(delivered.single().message!!.startsWith("[E/ACRA_REPORT] IOException: infra boom"))
+    }
+
+    @Test
+    fun `intent tag is delivered regardless of level - WARN still reports`() {
+        val delivered = mutableListOf<Throwable>()
+        Timber.plant(AcraTree(deliver = { delivered += it }))
+
+        // The gate is intent, not level: a WARN carrying an intent tag delivers.
+        Timber.tag(TimberWrapper.ACRA_REPORT_TAG).w(IOException("x"), "warn but intended")
+
+        assertEquals(1, delivered.size)
+        assertTrue(delivered.single().message!!.startsWith("[W/ACRA_REPORT] IOException: warn but intended"))
+    }
+
+    @Test
+    fun `untagged ERROR with a throwable is NOT delivered - report by intent, not level`() {
+        val delivered = mutableListOf<Throwable>()
+        Timber.plant(AcraTree(deliver = { delivered += it }))
+
+        // The §23 regression guard: a plain Timber.e(t) at ERROR must stay local.
+        Timber.tag("SomeClass").e(IOException("x"), "plain error")
 
         assertTrue(delivered.isEmpty())
     }
 
     @Test
-    fun `null throwable is not delivered`() {
+    fun `intent-tagged null throwable is not delivered`() {
         val delivered = mutableListOf<Throwable>()
         Timber.plant(AcraTree(deliver = { delivered += it }))
 
-        Timber.tag("Tag").e("no throwable")
+        Timber.tag(TimberWrapper.SILENT_LOG_TAG).e("no throwable")
 
         assertTrue(delivered.isEmpty())
     }
@@ -77,7 +102,7 @@ class AcraTreeTest {
         }))
 
         // Must not throw (C1); the swallow's Log.e runs on the real runtime.
-        Timber.tag("Tag").e(IOException("x"), "boom")
+        Timber.tag(TimberWrapper.ACRA_REPORT_TAG).e(IOException("x"), "boom")
 
         assertEquals(1, delivered)
     }

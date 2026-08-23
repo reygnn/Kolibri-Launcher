@@ -6,6 +6,7 @@ import android.util.Log
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
@@ -38,9 +39,11 @@ import java.io.File
  *    then plant the delivery tree, drain post-mortem ANRs, start the watchdog.
  *    The consent gate runs FIRST so the ANR drain sees an enabled reporter.
  *
- * Plain `Timber.e` (not `silentError`) throughout, per Rule 9: this is
- * crash-handling infrastructure on the bootstrap path — a DEBUG throw here would
- * recurse into the very path it is the safety net for.
+ * Report delivery uses [TimberWrapper.reportToAcra] (ACRA_REPORT intent tag, no
+ * DEBUG throw), not `silentError`, per Rule 9: this is crash-handling
+ * infrastructure on the bootstrap path — a DEBUG throw here would recurse into
+ * the very path it is the safety net for. The consent-gate catch keeps
+ * `android.util.Log.e` because it may run before AcraTree is planted.
  */
 object CrashReportingBootstrap {
 
@@ -206,16 +209,17 @@ object CrashReportingBootstrap {
             try {
                 anrReporter.reportPendingAnrs { report ->
                     val description = report.description.ifBlank { "ANR" }
-                    // Single delivery path (Timber.e → AcraTree → handleSilentException).
-                    // No client throttle to bypass (B3). An extra handleException
-                    // here would double-send — don't add one. Rule 9: plain Timber.e.
-                    Timber.e(
+                    // Single delivery path (reportToAcra → ACRA_REPORT tag →
+                    // AcraTree → handleSilentException). No client throttle to
+                    // bypass (B3). An extra handleException here would
+                    // double-send — don't add one. Rule 9: reportToAcra, no DEBUG throw.
+                    TimberWrapper.reportToAcra(
                         AnrException("$description\n\n${report.threadDump.orEmpty()}"),
                         "ANR (post-mortem from ApplicationExitInfo)",
                     )
                 }
             } catch (e: Throwable) {
-                Timber.e(e, "Error walking pending ANRs")
+                TimberWrapper.reportToAcra(e, "Error walking pending ANRs")
             }
         }
     }
@@ -225,10 +229,12 @@ object CrashReportingBootstrap {
             try {
                 RecoveryWatchdog(
                     loopGuard = LoopGuard(File(app.noBackupFilesDir, WATCHDOG_KILL_STORE)),
-                    capture = { stall -> Timber.e(stall, "Main-looper stall (watchdog capture)") },
+                    capture = { stall ->
+                        TimberWrapper.reportToAcra(stall, "Main-looper stall (watchdog capture)")
+                    },
                 ).start()
             } catch (e: Throwable) {
-                Timber.e(e, "Failed to start RecoveryWatchdog")
+                TimberWrapper.reportToAcra(e, "Failed to start RecoveryWatchdog")
             }
         }
     }

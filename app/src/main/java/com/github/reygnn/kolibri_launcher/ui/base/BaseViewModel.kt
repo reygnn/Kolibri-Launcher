@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.base
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -51,7 +52,7 @@ abstract class BaseViewModel<E>(
         } catch (e: CancellationException) {
             throw e  // Coroutine control flow - must re-throw
         } catch (e: Throwable) {
-            Timber.e(e, "Error sending event: $event")
+            TimberWrapper.reportToAcra(e, "Error sending event: $event")
         }
     }
 
@@ -106,7 +107,7 @@ abstract class BaseViewModel<E>(
                 // log and swallow so executeSafe still returns null.
                 // `onError`/`handleError` are non-suspend — no suspension point,
                 // so no CancellationException can reach this catch.
-                Timber.e(handlerError, "Error in custom error handler")
+                TimberWrapper.reportToAcra(handlerError, "Error in custom error handler")
             }
             null
         }
@@ -127,17 +128,17 @@ abstract class BaseViewModel<E>(
     protected open fun handleError(throwable: Throwable, context: String) {
         when (throwable) {
             is OutOfMemoryError -> {
-                Timber.e(throwable, "[$context] OUT OF MEMORY - Critical!")
+                TimberWrapper.reportToAcra(throwable, "[$context] OUT OF MEMORY - Critical!")
                 System.gc()
             }
             is StackOverflowError -> {
-                Timber.e(throwable, "[$context] STACK OVERFLOW - Critical!")
+                TimberWrapper.reportToAcra(throwable, "[$context] STACK OVERFLOW - Critical!")
             }
             is CancellationException -> {
                 Timber.d("[$context] Coroutine cancelled (normal)")
             }
             else -> {
-                Timber.e(throwable, "[$context] Error in ViewModel")
+                TimberWrapper.reportToAcra(throwable, "[$context] Error in ViewModel")
             }
         }
 

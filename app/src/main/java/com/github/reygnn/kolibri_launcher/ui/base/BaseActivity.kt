@@ -51,7 +51,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      * This catches any exceptions that escape the try-catch blocks.
      */
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Timber.e(throwable, "Uncaught coroutine exception in BaseActivity")
+        TimberWrapper.reportToAcra(throwable, "Uncaught coroutine exception in BaseActivity")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,14 +70,14 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                                 throw e  // Coroutine control flow - must re-throw
                             } catch (e: Throwable) {
                                 // Catches Exception and Error (OutOfMemoryError, etc.)
-                                Timber.e(e, "Error handling error event")
+                                TimberWrapper.reportToAcra(e, "Error handling error event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e  // Re-throw
                     } catch (e: Throwable) {
                         // Catches errors in Flow collection itself
-                        Timber.e(e, "Error collecting from ErrorEventBus")
+                        TimberWrapper.reportToAcra(e, "Error collecting from ErrorEventBus")
                     }
                 }
 
@@ -98,13 +98,13 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Throwable) {
-                                Timber.e(e, "Error handling UI event: $event")
+                                TimberWrapper.reportToAcra(e, "Error handling UI event: $event")
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        Timber.e(e, "Error collecting from ViewModel eventFlow")
+                        TimberWrapper.reportToAcra(e, "Error collecting from ViewModel eventFlow")
                     }
                 }
             }
@@ -153,7 +153,7 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
                 } catch (e: Exception) {
                     // `finish()` is a synchronous Android call — no suspension point,
                     // so no CancellationException can reach this catch.
-                    Timber.e(e, "Error finishing activity")
+                    TimberWrapper.reportToAcra(e, "Error finishing activity")
                 }
                 true
             }

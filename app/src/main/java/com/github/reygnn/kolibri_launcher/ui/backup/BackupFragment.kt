@@ -55,7 +55,7 @@ class BackupFragment : Fragment() {
 
     // Exception Handler für alle Coroutines in diesem Fragment
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Timber.e(throwable, "Uncaught coroutine exception in BackupFragment")
+        TimberWrapper.reportToAcra(throwable, "Uncaught coroutine exception in BackupFragment")
         view?.let {
             showError(getString(R.string.error_generic))
         }

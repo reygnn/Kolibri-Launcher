@@ -56,11 +56,12 @@ import javax.inject.Singleton
  * watermark stays put, and the un-reported ANRs are retried next launch.
  *
  * **Best-effort delivery — the retry path does not cover ACRA failures.** The
- * production handler (a `Timber.e` call with an [AnrException] → [AcraTree])
- * deliberately *swallows* any `handleSilentException` failure — reporting never
- * itself crash the app (Rule 7/C1). So a failed ACRA enqueue never reaches the
- * handler boundary: the watermark advances anyway and that post-mortem ANR is
- * dropped. Accepted (if ACRA is broken there are no reports to lose anyway). Do
+ * production handler (a `TimberWrapper.reportToAcra` call with an [AnrException]
+ * → [AcraTree]) deliberately *swallows* any `handleSilentException` failure —
+ * reporting never itself crashes the app (Rule 7/C1). So a failed ACRA enqueue
+ * never reaches the handler boundary: the watermark advances anyway and that
+ * post-mortem ANR is dropped. Accepted (if ACRA is broken there are no reports
+ * to lose anyway). Do
  * **not** make the handler rethrow to "recover" the ANR — that would defeat the
  * crash-infra swallow it sits behind (§4.5).
  */
