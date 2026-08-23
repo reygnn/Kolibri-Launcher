@@ -560,6 +560,35 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }.start()
             true
         }
+
+        // Developer command (§23): fire a silentError → must reach ACRA via
+        // AcraTree with the SILENT_ERROR intent tag. Unlike the throw-test this
+        // does NOT crash (in a RELEASE build silentError only logs + reports —
+        // report by intent), so the tester can then check the ACRA backend for
+        // a `[E/SILENT_ERROR]` carrier while the app stays alive.
+        findPreference<Preference>(AppConstants.PrefKeys.SILENT_ERROR_TEST)?.setOnPreferenceClickListener {
+            showToastSafe(R.string.toast_silent_error_test, Toast.LENGTH_LONG)
+            TimberWrapper.silentError(
+                RuntimeException("ACRA silent-error test from Settings (version ${BuildConfig.VERSION_NAME})"),
+                "ACRA silent-error test",
+            )
+            true
+        }
+
+        // Developer command (§23): fire an untagged Timber.w → must NOT reach
+        // ACRA (the report-by-intent invariant). If a report shows up in the
+        // backend for this, the intent gate has regressed. Timber.w never throws,
+        // so the app stays alive.
+        findPreference<Preference>(AppConstants.PrefKeys.WARN_TEST)?.setOnPreferenceClickListener {
+            showToastSafe(R.string.toast_warn_test, Toast.LENGTH_LONG)
+            Timber.w(
+                RuntimeException(
+                    "ACRA warn test from Settings (version ${BuildConfig.VERSION_NAME}) — should NOT appear in ACRA",
+                ),
+                "ACRA warn test — should NOT be reported",
+            )
+            true
+        }
     }
 
     fun openUrlInCustomTab(context: Context, url: String) {

@@ -272,6 +272,14 @@ object AppConstants {
         // diagnosis arc that motivated these shortcuts).
         const val PIPELINE_STATUS = "pipeline_status"
         const val THROW_TEST_EXCEPTION = "throw_test_exception"
+
+        // §23 report-by-intent verification shortcuts. SILENT_ERROR_TEST fires a
+        // silentError (SILENT_ERROR intent tag) → must reach ACRA via AcraTree.
+        // WARN_TEST fires an untagged Timber.w → must NOT reach ACRA (the §23
+        // core invariant). Neither crashes the app; check the ACRA backend for
+        // the result. Sibling of the throw-test shortcut above.
+        const val SILENT_ERROR_TEST = "silent_error_test"
+        const val WARN_TEST = "warn_test"
     }
 
     // Default Values für Settings

@@ -213,6 +213,12 @@
     <string name="throw_test_exception_title">Test-Exception werfen</string>
     <string name="throw_test_exception_summary">Crasht die App absichtlich, um ACRA-Submission end-to-end zu verifizieren. Nur benutzen wenn du Crash-Reporting testen willst.</string>
     <string name="toast_throwing_test_exception">Test-Exception wird geworfen — App crasht gleich.</string>
+    <string name="silent_error_test_title">Test: Silent Error (soll melden)</string>
+    <string name="silent_error_test_summary">Feuert einen silentError (SILENT_ERROR-Intent-Tag) — muss via AcraTree in ACRA auftauchen. Crasht die App nicht (report by intent, §23).</string>
+    <string name="toast_silent_error_test">Silent Error gefeuert — sollte in ACRA als [E/SILENT_ERROR] erscheinen.</string>
+    <string name="warn_test_title">Test: WARN (soll NICHT melden)</string>
+    <string name="warn_test_summary">Feuert ein untagged Timber.w — darf NICHT in ACRA landen (die report-by-intent-Invariante, §23). Crasht die App nicht.</string>
+    <string name="toast_warn_test">Untagged WARN gefeuert — darf NICHT in ACRA erscheinen.</string>
     
     <string name="swipe_actions_title_screen">Wisch-Aktionen</string>
     <string name="swipe_actions_subtitle_screen">Apps für Links- und Rechts-Wischen zuweisen</string>

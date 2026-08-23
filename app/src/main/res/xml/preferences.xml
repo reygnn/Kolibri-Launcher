@@ -187,6 +187,18 @@
             android:title="@string/throw_test_exception_title"
             android:summary="@string/throw_test_exception_summary"
             app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="silent_error_test"
+            android:title="@string/silent_error_test_title"
+            android:summary="@string/silent_error_test_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="warn_test"
+            android:title="@string/warn_test_title"
+            android:summary="@string/warn_test_summary"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
 </PreferenceScreen>
