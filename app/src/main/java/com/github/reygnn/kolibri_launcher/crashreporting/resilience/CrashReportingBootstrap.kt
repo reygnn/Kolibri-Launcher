@@ -229,13 +229,23 @@ object CrashReportingBootstrap {
             try {
                 RecoveryWatchdog(
                     loopGuard = LoopGuard(File(app.noBackupFilesDir, WATCHDOG_KILL_STORE)),
-                    capture = { stall ->
-                        TimberWrapper.reportToAcra(stall, "Main-looper stall (watchdog capture)")
-                    },
+                    capture = ::deliverWatchdogStall,
                 ).start()
             } catch (e: Throwable) {
                 TimberWrapper.reportToAcra(e, "Failed to start RecoveryWatchdog")
             }
         }
+    }
+
+    /**
+     * Delivery lambda for a watchdog-captured main-looper stall. Extracted so a
+     * test can pin that it routes through [TimberWrapper.reportToAcra] (ACRA_REPORT
+     * intent tag): reverting it to a plain untagged `Timber.e` would silently stop
+     * stall reports with a green suite (the invisible-regression §23 guards against,
+     * symmetric to the ANR-drain lambda).
+     */
+    @VisibleForTesting
+    internal fun deliverWatchdogStall(stall: Throwable) {
+        TimberWrapper.reportToAcra(stall, "Main-looper stall (watchdog capture)")
     }
 }

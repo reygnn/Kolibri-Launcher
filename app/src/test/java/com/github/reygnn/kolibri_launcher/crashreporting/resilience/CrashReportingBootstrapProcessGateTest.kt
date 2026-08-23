@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,6 +120,25 @@ class CrashReportingBootstrapProcessGateTest {
                 "ANR must be delivered as an AnrException",
                 capturedTags.single().second is AnrException,
             )
+        } finally {
+            KolibriLog.taggedErrorHandler = { _, _, _ -> }
+        }
+    }
+
+    @Test
+    fun `watchdog stall capture delivers through the ACRA_REPORT intent tag`() {
+        // Symmetric to the ANR test: pins that the watchdog capture delivery
+        // routes through reportToAcra (ACRA_REPORT), so reverting it to a plain
+        // untagged Timber.e would go red instead of silently dropping stalls.
+        val capturedTags = mutableListOf<Pair<String, Throwable?>>()
+        KolibriLog.taggedErrorHandler = { tag, throwable, _ -> capturedTags += tag to throwable }
+        try {
+            val stall = RuntimeException("main-looper stall")
+            CrashReportingBootstrap.deliverWatchdogStall(stall)
+
+            assertEquals(1, capturedTags.size)
+            assertEquals(TimberWrapper.ACRA_REPORT_TAG, capturedTags.single().first)
+            assertSame(stall, capturedTags.single().second)
         } finally {
             KolibriLog.taggedErrorHandler = { _, _, _ -> }
         }

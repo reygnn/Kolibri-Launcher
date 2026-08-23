@@ -21,7 +21,7 @@ import kotlin.system.exitProcess
  * a self-killed stall (C3/X1). Therefore the watchdog captures the report
  * itself, BEFORE the kill: `mainThread.stackTrace` folded into a
  * [WatchdogStallException] and handed to the [capture] seam (wired to
- * `Timber.e` → AcraTree). That is a small file write on the DAEMON thread, not
+ * `reportToAcra` → AcraTree). That is a small file write on the DAEMON thread, not
  * the hung main thread; the persisted report survives the kill and is sent
  * out-of-process. Capture is swallowed — the kill has priority (ST1).
  *
@@ -51,7 +51,7 @@ import kotlin.system.exitProcess
  * @param timeoutMs how long the main looper may be silent before "hung". Default
  *   8 s — between the system's ~5 s input-ANR threshold and the ~10 s broadcast
  *   threshold (§6). @param loopGuard cross-restart kill counter. @param capture
- *   sink for the stall report (prod: `Timber.e`). @param mainThread the thread
+ *   sink for the stall report (prod: `reportToAcra`). @param mainThread the thread
  *   whose stack is captured. @param killSwitch what to do on trip (prod:
  *   `killProcess` + `exitProcess(10)`); injected so tests verify the path
  *   without killing the JVM.

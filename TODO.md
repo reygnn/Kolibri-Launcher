@@ -643,9 +643,10 @@ in 9 Files. Linter wurde gebaut um diese Klasse dauerhaft zu beenden.
 
 **Geprüfte Rules (3 von 6 ursprünglich gelisteten):**
 
-- **Rule 9** — bare `Timber.e(` außerhalb der dokumentierten
-  Crash-Infra-Files. Match-by-Message für die BackupFragment-Carve-Out
-  (statt Line-Number-Pin).
+- **Rule 9** (report-by-intent, §23) — bare `Timber.e(` ist überall verboten
+  (meldet nicht, wirft nicht); Ausnahme nur der Pre-Wiring-Pfad mit
+  `pre-wiring bare`-Marker. Logik: `tools/check-intent-gate.awk` (die frühere
+  Crash-Infra-Datei-Whitelist + BackupFragment-Carve-Out sind weg).
 - **Rule 12** — kein `Timber.Forest.*`.
 - **Naming** — `*Manager`-Klassen in `data/` außer `WallpaperFileManager`
   (einzige verbliebene Ausnahme nach dem `DataMigrationManager`-Removal).

@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.base
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
@@ -180,8 +181,12 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      */
     private fun handleErrorEvent(event: Event<ErrorData>) {
         event.getContentIfNotHandled()?.let { errorData ->
-            // Skip silent errors
-            if (errorData.tag == TimberWrapper.SILENT_LOG_TAG) {
+            // Skip the dev-toast for silentError entries only (they already throw
+            // in DEBUG, so a toast is redundant). Crash-infra reports carry the
+            // ACRA_REPORT tag instead and DO get the dev-toast — that asymmetry is
+            // the reason for the two-tag design (§23), pinned by
+            // isDevToastSuppressed's test.
+            if (isDevToastSuppressed(errorData.tag)) {
                 return@let
             }
 
@@ -202,4 +207,18 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
     // the calls above resolve to it via this Activity's Context receiver. It
     // owns the Samsung StrictMode workaround + the Throwable catch, shared with
     // the Fragment overload so both paths behave identically.
+
+    companion object {
+        /**
+         * Whether an ErrorEventBus entry's tag suppresses the DEBUG dev-toast.
+         * ONLY `SILENT_ERROR` (silentError/silentDeath) suppresses — those already
+         * throw in DEBUG, so a toast is redundant. `ACRA_REPORT` (reportToAcra
+         * crash-infra) and any other/absent tag do NOT suppress: the dev-toast is
+         * a wanted signal there. This asymmetry is the whole point of the two-tag
+         * design (§23); extracted as a pure predicate so both branches are pinned.
+         */
+        @VisibleForTesting
+        internal fun isDevToastSuppressed(tag: String?): Boolean =
+            tag == TimberWrapper.SILENT_LOG_TAG
+    }
 }

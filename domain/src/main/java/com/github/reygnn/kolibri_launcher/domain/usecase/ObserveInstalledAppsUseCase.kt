@@ -66,9 +66,13 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                                 // from cache stays silent, so a package settling during
                                 // a system update does not flood ACRA (Rule-9). The
                                 // loader logs a debug breadcrumb only; this no-cache
-                                // branch is the single report site.
+                                // branch is the single report site — a genuine
+                                // developer-must-act fault (launcher shows no apps), so
+                                // it goes through reportToAcra (ACRA_REPORT intent tag,
+                                // report-by-intent §23) rather than a bare WARN, which
+                                // an untagged log no longer delivers.
                                 if (installedAppsStateRepository.getCurrentApps().isEmpty()) {
-                                    KolibriLog.w(load.cause, "App load failed and no cache available")
+                                    TimberWrapper.reportToAcra(load.cause, "App load failed and no cache available")
                                     emit(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
                                 } else {
                                     KolibriLog.d("App load failed; keeping last good list")

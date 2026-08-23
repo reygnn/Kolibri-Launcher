@@ -664,15 +664,22 @@ capturen* —, damit ein *deterministischer* Post-`onCreate`-Wedge (den der
 `onCreate`-Gate-Start nicht abfängt) das Gerät nicht in eine Kill-Restart-Schleife
 zwingt.
 
-### 5.3 Rule-9-Ausnahme (plain `Timber.e`)
+### 5.3 Rule 9 — report by intent (§23)
 
-Dateien *im* Crash-Pfad nutzen plain `Timber.e` statt `silentError`, weil ein
-DEBUG-Throw dort in genau den Pfad rekursieren würde, der das Safety-Net *ist*:
-App-Bootstrap, `TimberWrapper`, `Base{Activity,ViewModel}`,
-Consent-Bootstrap-Read, `BackupFragment`-Handler, Watchdog-Capture. Überall
-sonst: `silentError` (laut in DEBUG). Enforcement: `checkConventions` (Rule-9-
-Whitelist) — jede neue Crash-Infra-Datei braucht dort einen Eintrag mit
-Rekursions-Begründung.
+Dateien *im* Crash-Pfad dürfen nicht `silentError` nutzen, weil dessen
+DEBUG-Throw in genau den Pfad rekursierte, der das Safety-Net *ist*
+(App-Bootstrap, `Base{Activity,ViewModel}`, `BackupFragment`-Handler,
+`CrashReportingBootstrap`-ANR/Watchdog). Sie melden stattdessen über
+`TimberWrapper.reportToAcra` (ACRA_REPORT-Tag, **kein** DEBUG-Throw) — das ist
+kein bare `Timber.e`. Überall sonst: `silentError` (laut in DEBUG).
+
+Ein bare `Timber.e` meldet nach §23 gar nicht mehr (untagged → vom Intent-Gate
+verworfen) und wirft auch nicht — es ist überall **verboten**. Einzige Ausnahme:
+der Pre-Wiring-Pfad (`ConsentBootstrap`, vor KolibriLog-Wiring/AcraTree-Plant),
+freigegeben durch einen `pre-wiring bare`-Marker. `UncaughtCrashHandler` und
+`AcraTree` nutzen `android.util.Log.e` (nicht Timber → kein Re-Entry in AcraTree).
+Enforcement: `checkConventions` via `tools/check-intent-gate.awk` (die frühere
+Datei-Whitelist entfällt).
 
 ### 5.4 Resilienz-Fehler (Sad)
 

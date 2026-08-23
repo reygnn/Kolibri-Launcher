@@ -184,7 +184,7 @@ class KolibriLauncherApp : Application() {
         // AppDrawer's AUTO surface mode (and any future surface that wants
         // to react to system-wallpaper colour-hint changes). Listener +
         // initial poll, both inside the same outer catch — Rule 7 paranoia
-        // applies, and Rule 9's plain-Timber.e exception covers this file.
+        // applies; the catch reports via reportToAcra (Rule 9, no DEBUG throw).
         // No unregister: Application.onTerminate isn't called on real
         // devices, and the signal is a process-lifetime singleton.
         // Traced (cold-start): WallpaperManager IPC (getInstance +
@@ -201,10 +201,11 @@ class KolibriLauncherApp : Application() {
      * re-enumerates on its own — trigger a refresh here (AUDIT-19 F5, the path
      * that replaced the per-`onStart` re-enumeration).
      *
-     * Plain `Timber.e` per Rule 9 (this file is on the crash-infra exception
-     * list). The guarded body is synchronous — `applicationScope.launch` only
-     * schedules; the suspend `triggerAppsUpdate` runs inside the coroutine, not
-     * in the try — so no `CancellationException` arm is needed.
+     * Reports via `reportToAcra` per Rule 9 (crash-infra: no DEBUG throw, so it
+     * can't recurse into the safety net). The guarded body is synchronous —
+     * `applicationScope.launch` only schedules; the suspend `triggerAppsUpdate`
+     * runs inside the coroutine, not in the try — so no `CancellationException`
+     * arm is needed.
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)

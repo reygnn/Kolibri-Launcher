@@ -39,10 +39,11 @@ class BackupSerializerMalformedInputTest {
 
     private val serializer = BackupSerializer()
 
-    private val recordedTags = mutableListOf<String?>()
+    private data class LogEntry(val priority: Int, val tag: String?)
+    private val recorded = mutableListOf<LogEntry>()
     private val recordingTree = object : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-            recordedTags.add(tag)
+            recorded.add(LogEntry(priority, tag))
         }
     }
 
@@ -65,9 +66,12 @@ class BackupSerializerMalformedInputTest {
 
         assertThat(result).isNull()
         // Report by intent (§23): only SILENT_ERROR / ACRA_REPORT-tagged entries
-        // reach ACRA. A malformed-file reject may log locally (even at WARN) but
-        // must never carry an intent tag.
+        // reach ACRA. A malformed-file reject must never carry an intent tag...
         val intentTags = setOf(TimberWrapper.SILENT_LOG_TAG, TimberWrapper.ACRA_REPORT_TAG)
-        assertThat(recordedTags.filter { it in intentTags }).isEmpty()
+        assertThat(recorded.filter { it.tag in intentTags }).isEmpty()
+        // ...and must STILL log locally at WARN (untagged) for diagnostics — so
+        // the assertion above can't pass vacuously by the path going silent.
+        // WARN = 5 (android.util.Log). The tag is null (untagged local WARN).
+        assertThat(recorded.any { it.priority >= 5 && it.tag !in intentTags }).isTrue()
     }
 }
