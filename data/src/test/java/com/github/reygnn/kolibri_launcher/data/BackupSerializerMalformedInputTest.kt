@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Assume.assumeTrue
@@ -14,9 +15,13 @@ import timber.log.Timber
  * Regression guard for the ACRA false-positive that fired twice in production:
  * a malformed / non-backup file the user picks for preview/import is an
  * EXPECTED external-input failure. [BackupSerializer.parseBackupData] returns
- * null (the contract) and must NOT log at WARN+ — AcraTree forwards WARN+ to
- * ACRA, so a WARN turned every wrong-file pick into a crash report (two per
- * pick: one from the kotlinx catch, one from the strict-parse catch).
+ * null (the contract) and must NOT emit an INTENT-tagged log.
+ *
+ * Since §23 (report by intent), AcraTree forwards only entries carrying an
+ * intent tag (SILENT_ERROR / ACRA_REPORT), NOT by log level. So the reject path
+ * may log locally at WARN (that no longer reaches ACRA) — what it must never do
+ * is carry an intent tag, which would turn every wrong-file pick back into a
+ * crash report.
  *
  * Robolectric: parseBackupData runs org.json (type validation + strict merge),
  * an Android-provided class.
@@ -34,10 +39,10 @@ class BackupSerializerMalformedInputTest {
 
     private val serializer = BackupSerializer()
 
-    private val recordedPriorities = mutableListOf<Int>()
+    private val recordedTags = mutableListOf<String?>()
     private val recordingTree = object : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-            recordedPriorities.add(priority)
+            recordedTags.add(tag)
         }
     }
 
@@ -52,15 +57,17 @@ class BackupSerializerMalformedInputTest {
     }
 
     @Test
-    fun `backup missing settings returns null without WARN-or-higher logs`() {
+    fun `backup missing settings returns null without an intent-tagged log`() {
         // Reproduces both reported crashes: kotlinx fails ("Field 'settings' is
         // required … missing") → strict fallback fails ("Missing required field:
-        // settings") → null. Neither may log at report level.
+        // settings") → null. Neither may carry an intent tag (that would report).
         val result = serializer.parseBackupData("""{"version":"1.0.0"}""")
 
         assertThat(result).isNull()
-        // Timber priorities mirror android.util.Log: WARN = 5, ERROR = 6,
-        // ASSERT = 7. Anything >= WARN(5) is delivered to ACRA by AcraTree.
-        assertThat(recordedPriorities.filter { it >= 5 }).isEmpty()
+        // Report by intent (§23): only SILENT_ERROR / ACRA_REPORT-tagged entries
+        // reach ACRA. A malformed-file reject may log locally (even at WARN) but
+        // must never carry an intent tag.
+        val intentTags = setOf(TimberWrapper.SILENT_LOG_TAG, TimberWrapper.ACRA_REPORT_TAG)
+        assertThat(recordedTags.filter { it in intentTags }).isEmpty()
     }
 }
