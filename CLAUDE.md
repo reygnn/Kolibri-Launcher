@@ -314,12 +314,15 @@ activities.
    (catching `Throwable` instead of `Exception`, the coroutine
    `ExceptionHandler`, the global handler, OOM recovery) is intentional — do
    not "clean it up" or simplify. New critical init paths follow the same pattern: wrap each
-   block in `try { … } catch (e: Throwable) { … }`. Because this file is crash-infra
-   (Rule 9), its catches report via `TimberWrapper.reportToAcra(e, ...)` (ACRA_REPORT
-   tag, no DEBUG throw) rather than `silentError`, whose DEBUG throw would recurse into
-   the very path it guards. Inside the global crash handler itself
-   (`UncaughtCrashHandler`), `android.util.Log.e` is used — not Timber, to avoid
-   re-entering the planted `AcraTree` and double-sending — see Rule 9 for why.
+   block in `try { … } catch (e: Throwable) { … }`. The **safety-net** catches in this
+   crash-infra file (the coroutine `ExceptionHandler`, the lifecycle callbacks) report via
+   `TimberWrapper.reportToAcra(e, ...)` (ACRA_REPORT tag, no DEBUG throw), because a
+   `silentError` DEBUG throw there would recurse into the very path it guards. A plain init
+   step whose DEBUG throw *cannot* recurse may still use `silentError` (e.g.
+   `registerPackageUpdateReceiver` — a failed receiver registration is a real bug worth the
+   DEBUG throw). Inside the global crash handler itself (`UncaughtCrashHandler`),
+   `android.util.Log.e` is used — not Timber, to avoid re-entering the planted `AcraTree`
+   and double-sending — see Rule 9 for why.
 
 8. **ACRA is opt-in (privacy-by-default).** Crash reporting is disabled
    immediately after init (`ACRA.errorReporter.setEnabled(false)`) and is
