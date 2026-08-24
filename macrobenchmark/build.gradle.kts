@@ -143,3 +143,83 @@ tasks.register("verifyLaunchBenchmark") {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// Startup gate — parse the Macrobenchmark JSON and fail if the baseline-profile
+// cold-start TTID MEDIAN regresses past the headroom threshold. Sibling of
+// verifyLaunchBenchmark; same dependency-free scan, same "measured value + a
+// generous, non-flaky buffer that catches a STRUCTURAL regress, not noise" logic.
+// -----------------------------------------------------------------------------
+tasks.register("verifyStartupBenchmark") {
+    group = "verification"
+    description = "Fail if StartupBenchmark.startupBaselineProfile timeToInitialDisplayMs " +
+        "median exceeds the threshold (run the StartupBenchmark first)."
+
+    // Threshold in MILLISECONDS, gated on the MEDIAN of the ship-equivalent
+    // (CompilationMode.Partial = baseline profile installed) COLD-start TTID.
+    //
+    // Measured on an A17 5G (SM-A176B, 20 iterations): Partial median 378 ms, p95
+    // 404 ms, max 408 ms, CoV 3.6%; the profile-LESS run (CompilationMode.None)
+    // sits at median 450 ms / min 435 ms with ZERO distribution overlap — the worst
+    // profiled cold start (408 ms) still beats the best unprofiled one (435 ms).
+    // 420 ms is ~11% over the healthy median AND above its max, so per-run noise
+    // never trips it; yet it sits below the profile-less median (450 ms), so it
+    // FAILS exactly when the profile silently stops applying (empty/absent baseline
+    // profile → Partial degrades toward None → TTID climbs to ~450 ms) or a heavy
+    // init lands on the startup path. Median (not max): startup is a whole-render
+    // measurement, so a single slow cold start is noise — a shifted median is the
+    // structural signal. Device-calibrated — re-tune if the reference device changes.
+    //
+    // OPERATIONAL: cold-start TTID is UNMEASURABLE while Kolibri is the default home
+    // (its process never dies — "must not be running prior to cold start"), so the
+    // data this gate reads is produced with ANOTHER launcher set as default. Local
+    // device only; not wired into the device-free CI.
+    val thresholdMs = 420.0
+    val benchmarkName = "startupBaselineProfile"
+    val metricName = "timeToInitialDisplayMs"
+
+    doLast {
+        val outDir = layout.buildDirectory.get().asFile
+        val jsons = outDir.walkTopDown()
+            .filter { it.isFile && it.name.endsWith("-benchmarkData.json") }
+            .toList()
+        if (jsons.isEmpty()) {
+            throw GradleException(
+                "No *-benchmarkData.json under ${outDir.path}. Run " +
+                    ":macrobenchmark:connectedBenchmarkAndroidTest (StartupBenchmark) first.",
+            )
+        }
+        // Dependency-free scan (no JSON lib on the test-module classpath). Two benchmarks
+        // emit `timeToInitialDisplayMs`, so anchor on the ship-equivalent one by name first,
+        // THEN read that block's `median` (a flat field, before the `runs` array).
+        var worstMedian = -1.0
+        var found = false
+        jsons.forEach { f ->
+            val text = f.readText()
+            val nameIdx = text.indexOf("\"$benchmarkName\"")
+            if (nameIdx >= 0) {
+                val block = text.substring(nameIdx)
+                val median = Regex(
+                    "\"${Regex.escape(metricName)}\"\\s*:\\s*\\{[^}]*?\"median\"\\s*:\\s*([0-9.eE+-]+)",
+                ).find(block)?.groupValues?.get(1)?.toDoubleOrNull()
+                if (median != null) { found = true; if (median > worstMedian) worstMedian = median }
+            }
+        }
+        if (!found) {
+            throw GradleException(
+                "Metric '$metricName' for '$benchmarkName' not found in benchmark JSON. Did the " +
+                    "StartupBenchmark run (with a non-Kolibri default home) and emit it?",
+            )
+        }
+        logger.lifecycle(
+            "Cold-start TTID (baseline profile), median: %.1f ms (threshold %.1f ms)".format(worstMedian, thresholdMs),
+        )
+        if (worstMedian > thresholdMs) {
+            throw GradleException(
+                "Cold-start TTID REGRESSED: baseline-profile median %.1f ms > %.1f ms threshold. ".format(worstMedian, thresholdMs) +
+                    "The profile is no longer paying off (empty/absent baseline profile, or a heavy " +
+                    "init on the startup path) — investigate before merging.",
+            )
+        }
+    }
+}
