@@ -14,8 +14,12 @@ import android.provider.CalendarContract
 import android.text.format.DateFormat
 import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
+import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.graphics.drawable.toDrawable
@@ -978,10 +982,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
     /**
      * Upcoming time-based events (alarms + calendar) dialog for the home
      * double-tap (the events indicator is a passive symbol, not a trigger). Same top-anchored, wallpaper-aware,
-     * blur-behind presentation as [showRecentAppsDialog]. Rows are glyph-prefixed
-     * by type via [TimeEventFormatter.formatEventRow] and actionable: an alarm row
-     * opens the clock app, a calendar row opens the calendar. An empty list is a
-     * no-op (the caller only fires this for a non-empty list).
+     * blur-behind presentation as [showRecentAppsDialog]. Row text comes from
+     * [TimeEventFormatter.formatEventRow]; the type is shown by a leading vector
+     * icon (alarm / calendar) tinted to the row text colour, set by the adapter
+     * below. Rows are actionable: an alarm row opens the clock app, a calendar
+     * row opens the calendar. An empty list is a no-op (the caller only fires
+     * this for a non-empty list).
      */
     private fun showTimeBasedEventsDialog(events: List<TimeBasedEvent>) {
         if (isFinishing || isDestroyed) return
@@ -1011,7 +1017,32 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // not the Activity theme, or text can vanish when wallpaper luminance and
         // system night mode diverge.
         val rowContext = ContextThemeWrapper(this, wallpaperAwareDialogStyle())
-        val adapter = ArrayAdapter(rowContext, R.layout.item_recent_app, R.id.recent_app_name, labels)
+        // Each row carries a leading monochrome vector icon (alarm / calendar)
+        // instead of the old inline emoji glyph. labels[] and events[] are
+        // parallel, so position maps straight to the event type; the icon is
+        // tinted to the row's already-resolved wallpaper-aware text colour so it
+        // tracks the same adaptive contrast as the label.
+        val iconSize = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_size)
+        val iconPadding = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_padding)
+        val adapter = object : ArrayAdapter<String>(
+            rowContext, R.layout.item_recent_app, R.id.recent_app_name, labels
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                val row = view.findViewById<TextView>(R.id.recent_app_name)
+                val iconRes = when (events[position].type) {
+                    TimeBasedEventType.ALARM -> R.drawable.ic_alarm
+                    TimeBasedEventType.CALENDAR -> R.drawable.ic_calendar
+                }
+                val icon = ContextCompat.getDrawable(rowContext, iconRes)?.mutate()?.apply {
+                    setBounds(0, 0, iconSize, iconSize)
+                    setTint(row.currentTextColor)
+                }
+                row.setCompoundDrawablesRelative(icon, null, null, null)
+                row.compoundDrawablePadding = iconPadding
+                return view
+            }
+        }
         val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.events_dialog_title))
             .setAdapter(adapter) { _, which ->

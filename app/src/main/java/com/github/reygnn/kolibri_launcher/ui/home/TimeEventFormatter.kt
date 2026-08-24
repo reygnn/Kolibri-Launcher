@@ -54,22 +54,21 @@ class TimeEventFormatter {
     }
 
     /**
-     * Builds a single glyph-prefixed row label for the time-based-events dialog,
-     * e.g. "⏰  07:00  Alarm" or "📅  14:30  Standup". The leading glyph makes the
-     * event type visually distinguishable in the flat, time-sorted list, and the
-     * time is formatted with the type-appropriate rule (alarms round up seconds,
-     * calendar times do not). Pure JVM logic — no Android dependencies.
+     * Builds a single row label for the time-based-events dialog, e.g.
+     * "07:00  Alarm" or "14:30  Standup". The event type is conveyed by a
+     * leading monochrome vector icon set on the row by the dialog adapter
+     * (see MainActivity.showTimeBasedEventsDialog) — it replaced the old
+     * inline emoji glyph, which did not tint with the wallpaper-aware text
+     * colour. The time is formatted with the type-appropriate rule (alarms
+     * round up seconds, calendar times do not). Pure JVM logic — no Android
+     * dependencies.
      */
     fun formatEventRow(event: TimeBasedEvent, is24Hour: Boolean, locale: Locale = Locale.getDefault()): String {
         val time = when (event.type) {
             TimeBasedEventType.ALARM -> formatAlarmTime(event.triggerTimeMillis, is24Hour, locale)
             TimeBasedEventType.CALENDAR -> formatCalendarTime(event.triggerTimeMillis, is24Hour, locale)
         }
-        val glyph = when (event.type) {
-            TimeBasedEventType.ALARM -> "⏰"
-            TimeBasedEventType.CALENDAR -> "📅"
-        }
-        return "$glyph  $time  ${event.title}"
+        return "$time  ${event.title}"
     }
 
     private fun formatTimeInternal(timeMillis: Long, is24Hour: Boolean, locale: Locale): String {

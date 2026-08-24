@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -85,28 +86,30 @@ class TimeEventFormatterTest {
     }
 
     @Test
-    fun `formatEventRow - alarm uses bell glyph and alarm rounding`() {
+    fun `formatEventRow - alarm applies alarm rounding and carries no emoji glyph`() {
         // 07:00:30 → alarm rounding bumps to 07:01
         val time = createTime(7, 0, 30, 0)
         val event = TimeBasedEvent(time, "Alarm", TimeBasedEventType.ALARM)
 
         val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
 
-        assertTrue("expected bell glyph, was: $row", row.startsWith("⏰"))
-        assertTrue("expected rounded alarm time, was: $row", row.contains("07:01"))
+        // The type is now conveyed by a leading vector icon in the dialog adapter,
+        // not by an inline glyph — the row text must start with the time.
+        assertTrue("expected no leading glyph, was: $row", row.startsWith("07:01"))
+        assertFalse("expected no bell glyph, was: $row", row.contains("⏰"))
         assertTrue("expected title, was: $row", row.contains("Alarm"))
     }
 
     @Test
-    fun `formatEventRow - calendar uses calendar glyph and does not round`() {
+    fun `formatEventRow - calendar does not round and carries no emoji glyph`() {
         // 14:30:30 → calendar keeps 14:30 (no rounding)
         val time = createTime(14, 30, 30, 0)
         val event = TimeBasedEvent(time, "Standup", TimeBasedEventType.CALENDAR)
 
         val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
 
-        assertTrue("expected calendar glyph, was: $row", row.startsWith("📅"))
-        assertTrue("expected unrounded time, was: $row", row.contains("14:30"))
+        assertTrue("expected no leading glyph, was: $row", row.startsWith("14:30"))
+        assertFalse("expected no calendar glyph, was: $row", row.contains("📅"))
         assertTrue("expected title, was: $row", row.contains("Standup"))
     }
 

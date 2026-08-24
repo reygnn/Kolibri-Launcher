@@ -17,6 +17,13 @@
     <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
     <dimen name="touch_target_padding">6dp</dimen>
 
+    <!-- Leading type icon (alarm / calendar vector) in the double-tap
+         time-based-events dialog rows. Tinted at runtime to the row's
+         wallpaper-aware text colour, replacing the old inline emoji glyph.
+         Sized to the row text (app_row_text_size = 18sp) with a small gap. -->
+    <dimen name="events_dialog_icon_size">24dp</dimen>
+    <dimen name="events_dialog_icon_padding">12dp</dimen>
+
     <!-- =============================================================== -->
     <!-- == HOME FRAGMENT                                             == -->
     <!-- =============================================================== -->
