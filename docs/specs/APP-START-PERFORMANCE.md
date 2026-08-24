@@ -130,6 +130,110 @@ process/activity start was **~11 ms (home) / ~19 ms (drawer)** — the only real
 cost on a launch, and **not the launcher's to optimise**. The launcher's own
 tap→binder share is ~1–2 ms, entirely within one frame.
 
+## 5. Kolibri's own cold start (TTID) + Baseline Profile
+
+Everything above measures **the hop** — the launcher's own share of launching a
+*foreign* app (tap → `startMainActivity` binder), which is sub-frame and not
+worth optimising. This section measures a **different** thing: Kolibri's **own**
+process cold start — `timeToInitialDisplayMs` from process fork to the home
+screen's first frame. That *is* the launcher's to optimise, because it is the
+user's every-unlock experience, and it was the one hot path still running
+interpreted on first use.
+
+**TL;DR:** shipping a Baseline Profile (`androidx.baselineprofile` producer in
+`:baselineprofile`, applied via `profileinstaller` in `:app`) cuts cold-start
+TTID on a low-end device by **~16 % (450.1 → 378.2 ms median, −71.9 ms)**. The
+gain is **structural, not a median fluke**: the profiled and unprofiled
+distributions **do not overlap** — the slowest profiled cold start (407.6 ms) is
+faster than the fastest unprofiled one (434.6 ms). A `verifyStartupBenchmark`
+gate (sibling to `verifyLaunchBenchmark`) locks it against silent regression.
+
+> Companion agent memory: `project-cold-start-ttid-baseline-profile`. If "is the
+> Baseline Profile worth keeping / does it still fire" is raised again, it is
+> closed on measured data. Re-open only if the startup hot path changes, on a
+> very different device, or if the gate below starts firing (profile likely gone
+> silent after a dependency bump — see gate rationale).
+
+### Test setup
+
+| | |
+|---|---|
+| Device | Galaxy A17 5G (`SM-A176B`) — real low-end hardware, not an emulator |
+| Build | `0.99.198`, release, `<profileable shell="true">`, R8 minify on |
+| Tool | Macrobenchmark (`benchmark-macro` 1.5.0-rc01 — the `androidx.baselineprofile` plugin needs the 1.5.0 line under AGP 9; 1.4.1 rejects `:app`), `StartupMode.COLD`, 20 iterations |
+| A/B | `CompilationMode.None()` vs `CompilationMode.Partial()` (= baseline profile installed) |
+| Metric | `timeToInitialDisplayMs`, per-iteration |
+| Caveat | measured with a **different** default launcher (see operational note) |
+
+Low-end is deliberate: the interpreter-vs-AOT gap the profile closes is felt on
+a weak CPU and would vanish into noise on a flagship. The A17 5G is where the
+number is meaningful.
+
+### Distribution — None vs Partial
+
+20 cold starts per arm, isolated run, all values **ms**.
+
+| Arm | min | median | p95 | max | CoV |
+|---|---|---|---|---|---|
+| None (no profile) | 434.6 | 450.1 | 465.8 | 468.8 | 2.2 % |
+| Partial (profiled) | 358.6 | **378.2** | 404.3 | 407.6 | 3.6 % |
+
+The headline is **not** the 16 % — it is the **zero overlap**. Partial-max
+(407.6) sits 27 ms below None-min (434.6); the two ranges are disjoint. With
+CoV 2–3 % this is a clean structural separation, so no significance test is
+needed (the distributions do not touch; Mann-Whitney would be ~10⁻⁶,
+academic here). p95 profiled (404.3) is barely above its own median (378.2) —
+the tail did not blow out, so the gain is robust, not an average over lucky runs.
+
+### Gate — `verifyStartupBenchmark`
+
+Same dependency-free JSON scan as `verifyLaunchBenchmark`, but the threshold and
+the percentile are chosen from *this* metric's failure mode, not copied.
+
+**Failure mode:** the profile going **silent** (a dependency bump drops the
+generated rules, or a heavy init sneaks onto the startup path). When that
+happens, Partial degrades to None behaviour and the median drifts back toward
+**~450 ms**. So the gate must sit in the corridor **between** the two
+distributions — not above both. A naive "just above the unprofiled value"
+threshold (~460–480 ms) would miss the target case entirely: a dead profile
+lands at ~450 ms, under 460, and passes green while broken.
+
+**Threshold: median 420 ms.**
+
+- 42 ms / 11 % over the healthy median (378.2) **and** over its max (407.6) →
+  noise never trips it.
+- **Below** the profile-loss median (~450) → catches exactly "profile gone" +
+  "heavy init on the startup path".
+- **Median, not maximum** (unlike `verifyLaunchBenchmark`, which gates on
+  `maximum`): the dispatch gate catches a *structural sub-frame spike* where one
+  extra frame in the hop is the signal. TTID is the opposite — an aggregate
+  render measurement where a single slow cold start (Doze, background I/O) is
+  noise and the **shifted median** is the signal.
+
+Live-validated: reads 378.2 (profiled) correctly — name-anchored past the None
+value (450.1) so it never picks up the wrong block — and passes with headroom.
+
+### Operational note — why this is local-device-only
+
+Cold-start TTID is **unmeasurable while Kolibri is the default home**: the home
+process never dies, so Macrobenchmark's "target must not be running prior to a
+cold start" precondition can never hold. The gate data is therefore produced
+with a **different launcher set as default** (switch temporarily, switch back
+after). This — like the benchmark itself — is why it is **local-device-only**
+and deliberately **not** wired into the device-free CI job (CLAUDE.md Rule 10;
+perf numbers on a hosted emulator are noise, and here they are also structurally
+impossible).
+
+### Methodology note — why the first run did not count
+
+The **first** A17 attempt showed a much wider spread (min ~359 / max ~500 ms)
+and was **discarded**. Cause: measurement interference — parallel `uiautomator`
+dumps churning the device plus Doze on the earlier emulator-adjacent setup,
+inflating the tail. The isolated A17 5G run (CoV 2–3 %, table above) is the
+load-bearing number. Recorded here on purpose: the discarded run is *not* a
+valid baseline, and a future reader must not mistake a disturbed measurement for
+signal — nor distrust the gate when it correctly fires against a real regression.
+
 ---
 
 ## Verdict
@@ -231,6 +335,7 @@ user-specific favorite is needed).
 
 ---
 
-*Measurements: 2026-08-15 (medians) and 2026-08-16 (p99 / contention / A/B).
-Build 0.99.174, Pixel 9a + Galaxy A36. Numbers are device- and build-specific;
-re-measure after a hot-path change or on different hardware.*
+*Measurements: 2026-08-15 (medians) and 2026-08-16 (p99 / contention / A/B),
+build 0.99.174, Pixel 9a + Galaxy A36; §5 cold-start TTID + Baseline Profile
+2026-08-24, build 0.99.198, Galaxy A17 5G. Numbers are device- and
+build-specific; re-measure after a hot-path change or on different hardware.*
