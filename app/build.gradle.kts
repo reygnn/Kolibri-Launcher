@@ -23,6 +23,10 @@ plugins {
     alias(libs.plugins.hilt.android)
     id("jacoco")
     alias(libs.plugins.kotlin.serialization)
+    // Consumes the :baselineprofile producer and bakes its generated profile
+    // into the release build. Adds internal nonMinifiedRelease/benchmarkRelease
+    // generation variants (used only by :app:generateBaselineProfile).
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // Loads the sensitive data from the keystore.properties file.
@@ -261,6 +265,12 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.kotlinx.serialization.json)  // 1.10.0 requires Kotlin 2.3.0.
     testImplementation(libs.robolectric)
+
+    // Baseline Profile: installs the baked profile at first run (dexopt).
+    // REQUIRED for the shipped profile to have any runtime effect.
+    implementation(libs.androidx.profileinstaller)
+    // Wires :baselineprofile as the producer of :app's release baseline profile.
+    baselineProfile(project(":baselineprofile"))
 
     // Hilt
     implementation(libs.hilt.android)

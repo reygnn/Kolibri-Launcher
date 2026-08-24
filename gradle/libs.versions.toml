@@ -125,8 +125,16 @@ jmh = "1.37"  # JMH core/generator version, pinned via the jmh { } block in :dom
 jmh-gradle-plugin = "0.7.3"  # me.champeau.jmh Gradle plugin (owns the src/jmh/ source set + jmh task). Latest stable.
 
 # Macrobenchmark (:macrobenchmark — on-device launch-latency gate, local device only)
-benchmark-macro = "1.4.1"  # androidx.benchmark macro-junit4. Recheck 2026-Q3: current latest stable (1.5.0 still alpha/beta/rc).
+benchmark-macro = "1.5.0-rc01"  # androidx.benchmark macro-junit4 + drives the androidx.baselineprofile plugin (same release; see [plugins]). PRE-RELEASE ON PURPOSE: the baselineprofile Gradle plugin at the last stable (1.4.1) rejects :app under AGP 9.3.1 ("not a supported android module" — AgpPlugin AGP-version gate); AGP-9 support lands only in the 1.5.0 line. rc01 verified: applies on :app, both benchmark modules compile clean. DOWNGRADE to 1.4.1 breaks :app:generateBaselineProfile. Recheck 2026-Q4: move to 1.5.0 stable once it ships.
 uiautomator = "2.4.0"  # androidx.test.uiautomator, used only by :macrobenchmark to drive taps. Latest stable.
+
+# Baseline Profile (:baselineprofile — release-profile producer, local device only)
+# NOTE: the androidx.baselineprofile PLUGIN version is NOT pinned here — it is
+# published from the same androidx.benchmark release as `benchmark-macro`, so
+# the [plugins] alias reuses that version.ref to keep the two in lockstep
+# mechanically (one source of truth, cannot drift). Only the runtime
+# profileinstaller artifact needs its own line.
+profileinstaller = "1.4.1"  # androidx.profileinstaller — installs the baked baseline profile at first run (dexopt). Recheck 2026-Q3 together with benchmark-macro.
 
 
 [libraries]
@@ -199,6 +207,9 @@ androidx-test-espresso-idling-resource = { module = "androidx.test.espresso:espr
 benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "benchmark-macro" }
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
 
+# Baseline Profile (:app runtime installer)
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -208,3 +219,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 jmh = { id = "me.champeau.jmh", version.ref = "jmh-gradle-plugin" }
+# Reuses the benchmark-macro version.ref on purpose: the androidx.baselineprofile
+# plugin ships from the same androidx.benchmark release, so pinning them together
+# is mechanical, not a coincidence to keep in sync by hand.
+androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark-macro" }

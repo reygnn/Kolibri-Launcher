@@ -90,6 +90,14 @@ jobs:
       - name: Compile macrobenchmark module
         run: ./gradlew :macrobenchmark:compileBenchmarkSources --stacktrace
 
+      # Same rot-guard for the on-device :baselineprofile producer module (the
+      # BaselineProfileRule generator). Compile-only: the actual profile is
+      # generated locally on a real device via `./gradlew :app:generateBaselineProfile`
+      # (needs an unlocked, past-onboarding device — perf/instrumentation on a
+      # hosted emulator is noise). No app build, no signing, no device here.
+      - name: Compile baselineprofile module
+        run: ./gradlew :baselineprofile:compileNonMinifiedReleaseSources --stacktrace
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
