@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
@@ -76,6 +77,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
         every { alarmInfo.triggerTime } returns triggerTime
+        every { alarmInfo.showIntent } returns null
         every { alarmManager.nextAlarmClock } returns alarmInfo
 
         val result = manager.getUpcomingTimeBasedEvents(5)
@@ -83,6 +85,72 @@ class TimeBasedEventsRepositoryImplTest {
         Assert.assertEquals(1, result.size)
         Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
         Assert.assertEquals(TimeBasedEventType.ALARM, result[0].type)
+    }
+
+    @Test
+    fun `getUpcomingTimeBasedEvents - alarm from non-alarm OEM package (Samsung Calendar) - filtered out`() = runTest {
+        // Samsung Calendar registers its midnight rollover via setAlarmClock(),
+        // so getNextAlarmClock() returns a phantom "alarm" whose showIntent is
+        // owned by com.samsung.android.calendar. It must not surface as an event.
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val showIntent = mockk<PendingIntent>()
+        every { showIntent.creatorPackage } returns "com.samsung.android.calendar"
+
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns System.currentTimeMillis() + 10000
+        every { alarmInfo.showIntent } returns showIntent
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `getUpcomingTimeBasedEvents - alarm from real clock app - kept`() = runTest {
+        // A genuine alarm-clock app's PendingIntent is not on the blocklist and
+        // must still show.
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val triggerTime = System.currentTimeMillis() + 10000
+        val showIntent = mockk<PendingIntent>()
+        every { showIntent.creatorPackage } returns "com.google.android.deskclock"
+
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns triggerTime
+        every { alarmInfo.showIntent } returns showIntent
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertEquals(1, result.size)
+        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
+        Assert.assertEquals(TimeBasedEventType.ALARM, result[0].type)
+    }
+
+    @Test
+    fun `getUpcomingTimeBasedEvents - alarm with null showIntent creatorPackage - kept (fail-open)`() = runTest {
+        // An unidentifiable source (null showIntent or null creatorPackage) is
+        // treated as a real alarm so a genuine alarm is never hidden.
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val triggerTime = System.currentTimeMillis() + 10000
+        val showIntent = mockk<PendingIntent>()
+        every { showIntent.creatorPackage } returns null
+
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns triggerTime
+        every { alarmInfo.showIntent } returns showIntent
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertEquals(1, result.size)
+        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
     }
 
     @Test
@@ -155,6 +223,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
         every { alarmInfo.triggerTime } returns later
+        every { alarmInfo.showIntent } returns null
         every { alarmManager.nextAlarmClock } returns alarmInfo
 
         val result = manager.getUpcomingTimeBasedEvents(5)

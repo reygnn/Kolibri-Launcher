@@ -827,6 +827,19 @@ carries the rationale and a re-evaluation trigger. Before "fixing" a
 perceived UX bug that touches accessibility, wallpaper classification, or
 the home/keyguard boundary, cross-check `ACCEPTED_LIMITATIONS.md`.
 
+## OEM / framework quirks worked around
+
+`KNOWN_QUIRKS.md` is the third sibling of the two docs above (StrictMode /
+accepted-limitations): it documents OEM- or framework-specific behaviours
+that Kolibri *actively works around in code* — the distinction is the verb,
+a quirk here has a live workaround whose logic must not be reverted by
+someone who only sees odd-looking filter code. First entry: Samsung
+Calendar's midnight-rollover phantom "alarm" at 00:00 (it misuses
+`setAlarmClock()`, so `getNextAlarmClock()` returns it on Samsung devices),
+filtered in `TimeBasedEventsRepositoryImpl` by the `showIntent` creator
+package. Before "simplifying" a package-blocklist or a source-filter that
+looks arbitrary, cross-check `KNOWN_QUIRKS.md`.
+
 ---
 
 ## Test conventions (short version)
@@ -935,8 +948,9 @@ into `main` once the maintainer signs off (memory `feedback-git-workflow`).
 - Not a TODO list (see `TODO.md`).
 - Not the full testing reference (see `app/src/test/CLAUDE.md` and
   `TESTING_CONVENTIONS.kt`).
-- Not the place for known StrictMode issues (see `KNOWN_ISSUES.md`)
-  or intentional UX limitations (see `ACCEPTED_LIMITATIONS.md`).
+- Not the place for known StrictMode issues (see `KNOWN_ISSUES.md`),
+  intentional UX limitations (see `ACCEPTED_LIMITATIONS.md`), or
+  OEM/framework quirks worked around in code (see `KNOWN_QUIRKS.md`).
 - Not a holding pen for transient refactor notes — those belong in commit
   messages on short-lived feature branches.
 

@@ -38,6 +38,32 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
     companion object {
         private val QUERY_DURATION = DateUtils.HOUR_IN_MILLIS * 12
         private const val MAX_EVENTS_DEFAULT = 5
+
+        /**
+         * Packages whose [AlarmManager.getNextAlarmClock] entries are NOT
+         * user-facing alarms and must not light the alarm indicator.
+         *
+         * Some OEM system apps misuse [AlarmManager.setAlarmClock] — the API
+         * reserved for user-visible alarms — for internal scheduling. Samsung
+         * Calendar registers its daily midnight rollover
+         * (`ACTION_MIDNIGHT_DATE_CHANGED_FOR_NOTIFICATION`) this way, so it
+         * surfaces through `getNextAlarmClock()` as a phantom "alarm" at 00:00
+         * even when the user has set none. Samsung's own SystemUI suppresses the
+         * status-bar icon for it; a third-party launcher only has the
+         * [android.app.PendingIntent.getCreatorPackage] of the alarm's
+         * `showIntent` to tell them apart. Match by that package and drop it.
+         *
+         * Blocklist (fail-open) is deliberate: an unrecognised source is treated
+         * as a real alarm, so a genuine user alarm is never hidden — a phantom is
+         * a nuisance, a missed alarm is not. Add further known offenders here as
+         * they surface; the discriminator is the PendingIntent creator package,
+         * the only cross-OEM signal that separates a calendar-rollover alarm from
+         * a user-set one. Full rationale + how to confirm a candidate:
+         * KNOWN_QUIRKS.md §1.
+         */
+        private val NON_ALARM_CLOCK_PACKAGES = setOf(
+            "com.samsung.android.calendar"
+        )
     }
 
     override suspend fun getUpcomingTimeBasedEvents(maxCount: Int): List<TimeBasedEvent> {
@@ -110,6 +136,15 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
             }
 
             val nextAlarm = alarmManager.nextAlarmClock ?: return null
+
+            // Drop phantom "alarms" that OEM system apps schedule via
+            // setAlarmClock() for internal purposes (see NON_ALARM_CLOCK_PACKAGES).
+            // showIntent/creatorPackage may be null for legitimate alarms too, so a
+            // null here means "unknown source" and is kept (fail-open).
+            val creatorPackage = nextAlarm.showIntent?.creatorPackage
+            if (creatorPackage != null && creatorPackage in NON_ALARM_CLOCK_PACKAGES) {
+                return null
+            }
 
             TimeBasedEvent(
                 // Empty = "no title". The UI layer resolves a localized fallback by

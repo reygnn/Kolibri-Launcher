@@ -14,6 +14,9 @@ This document tracks known `StrictMode` violations seen in DEBUG. Two categories
 > *intentional UX or behavioural* limitations (rather than StrictMode
 > ones) that are direct consequences of an architectural decision —
 > same "deliberately not fixed" shape, different category.
+> `KNOWN_QUIRKS.md` is the third sibling: OEM/framework behaviours we
+> *do work around* in code (different verb — those have a live fix whose
+> rationale must not be reverted).
 
 ---
 

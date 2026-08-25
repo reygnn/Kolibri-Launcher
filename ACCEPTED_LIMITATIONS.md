@@ -6,6 +6,11 @@ bugs to be fixed; they are costs we have priced in. The purpose of
 this file is to remind future-us why we accepted them, so we don't
 re-litigate the decision every time the limitation is noticed.
 
+> **See also:** `KNOWN_ISSUES.md` (StrictMode violations) and
+> `KNOWN_QUIRKS.md` (OEM/framework behaviours we *do* work around in
+> code). This file is the "priced-in, left alone" axis; `KNOWN_QUIRKS.md`
+> is the "actively worked around" one.
+
 ---
 
 ## 1. AppDrawer AUTO-mode classifier ignores layer composition
