@@ -156,11 +156,18 @@ Run one class at a time to keep the JSON focused:
   -Pandroid.testInstrumentationRunnerArguments.class=\
 com.github.reygnn.kolibri_launcher.macrobenchmark.LaunchDispatchBenchmark
 
-# Cold start only (see the default-home caveat below):
+# Cold start only — the two startup* METHODS in isolation (see the default-home
+# caveat below, and "Methodology" for why the jank siblings are excluded):
 ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=\
-com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark
+com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark#startupNoCompilation,\
+com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark#startupBaselineProfile
 ```
+
+`StartupBenchmark` also contains two `drawerScrollJank*` methods. Run the cold
+start **filtered to the two `startup*` methods** (above), not the whole class —
+the jank methods add device contention that inflates the cold-start tail
+(see Methodology).
 
 Read the per-device JSON at:
 
@@ -178,6 +185,45 @@ therefore produced with a **different launcher set as default** (switch
 temporarily, switch back after). This is another reason the whole measurement is
 local-device-only. The **hop** benchmark has no such constraint — it launches
 Kolibri to the foreground itself and taps a drawer app.
+
+### Methodology — cold-start noise is contention, not thermal
+
+Cold-start TTID is noise-sensitive, and it is tempting to blame heat. On the A17
+that is **wrong** — verified by live-logging the SoC (`dumpsys thermalservice`,
+3 s poll) across a full isolated run (2026-08-25):
+
+| | value during a measured run |
+|---|---|
+| AP (SoC) temp | 31 °C at rest → **peak 44.5 °C** under load |
+| `Thermal Status` | **0 (NONE) the entire run** — never throttled |
+| Battery / skin | flat ~29 °C / peak ~36 °C |
+
+The A17 does **not** thermally throttle at benchmark load, so a cooldown wait is
+**not** needed for thermal reasons. The real noise source is **device
+contention**:
+
+- Running the whole `StartupBenchmark` class lets the `drawerScrollJank*` methods
+  churn the device alongside the cold-start methods.
+- Background work right after a **reboot / fresh install / onboarding**
+  (media scan, ART optimisation, first-run settling).
+
+Both inflate the cold-start **tail** (outlier iterations toward ~550 ms) and lift
+the median, while `Thermal Status` stays 0 throughout — the signature of
+contention, not heat (throttling would raise the *whole* distribution, not
+scatter individual iterations). A disturbed run of this kind is **discarded**,
+not treated as signal.
+
+**Recipe for a clean cold-start number:** run the two `startup*` methods in
+isolation (command above), on a device that has been idle a few minutes after
+any reboot/onboarding. Confirmed reproducible: an isolated, settled run landed
+the profiled median at **376.3 ms** — within ~2 ms of the reference **378.2 ms**
+(see [`PERF-RESULTS`](PERF-RESULTS.md)), with `Thermal Status` 0 throughout.
+
+To watch it live during a run, poll in a shell loop:
+
+```bash
+adb shell dumpsys thermalservice | grep -E 'Thermal Status:|mName=AP,'
+```
 
 ---
 
