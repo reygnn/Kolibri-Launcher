@@ -904,6 +904,16 @@ any doc. The GitHub release tags mirror `versionName` exactly. The
 `uploadProguardMapping` task fires automatically after `assembleRelease`
 or `bundleRelease` and pushes the mapping to ACRA.
 
+**Regenerate the baseline profile before a release build.** The release baseline
+profile is a local, **gitignored** build artifact: nothing auto-generates it
+during the build (no `automaticGenerationDuringBuild`) and it is not committed.
+So `bundleRelease` on a fresh checkout (or after a `build/` clean) bakes only the
+library-default ART rules (~2.7k lines vs the ~15k captured profile) — a
+silently degraded cold-start in the shipped AAB. Run
+`./gradlew :app:generateBaselineProfile` (connected device) first, then
+`bundleRelease`. Same trap surfaces the cold-start perf gate as a false
+"REGRESS" — see `docs/specs/PERF-BENCHMARK-SETUP.md`.
+
 ---
 
 ## Git workflow

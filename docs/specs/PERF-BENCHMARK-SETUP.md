@@ -155,7 +155,20 @@ because `connectedBenchmarkAndroidTest` reinstalls the target fresh each run, so
 a hand-done first-run would be wiped. No seam ships in the app — the benchmarks
 measure the literal `release` build (full baseline profile). The cold-start
 class additionally needs **another launcher set as default home** (see the
-default-home caveat below). Keep the screen alive:
+default-home caveat below).
+
+> **Regenerate the baseline profile first.** The release baseline profile is a
+> local, **gitignored** build artifact — nothing generates it during a normal
+> build (no `automaticGenerationDuringBuild`), and it is not committed. On a
+> fresh checkout (or after `build/` is cleaned) the release build bakes only the
+> library-default rules (~2.7k lines instead of ~15k), so the cold-start
+> `startupBaselineProfile` TTID silently measures a near-profile-less build and
+> `verifyStartupBenchmark` "REGRESSES" for no real reason. Run
+> `./gradlew :app:generateBaselineProfile` (on the connected device) before
+> trusting the cold-start gate. Same trap applies to `bundleRelease` — see
+> CLAUDE.md § Versioning.
+
+Keep the screen alive:
 
 ```bash
 adb shell svc power stayon usb
