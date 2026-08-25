@@ -147,9 +147,15 @@ copied from the other.
 
 ## Running the benchmarks
 
-Preconditions on the A17: connected over USB, **unlocked**, launcher **past
-onboarding** (the hop benchmark taps a drawer app; no user-specific favorite
-needed). Keep the screen alive:
+Preconditions on the A17: connected over USB, **unlocked**. Onboarding needs
+**no** manual setup: each class clears the first-run gates itself in its
+`setupBlock` (shared `dismissFirstRunGatesIfPresent()` — taps Onboarding's Done,
+declines the ACRA consent dialog; a no-op once past onboarding). This is needed
+because `connectedBenchmarkAndroidTest` reinstalls the target fresh each run, so
+a hand-done first-run would be wiped. No seam ships in the app — the benchmarks
+measure the literal `release` build (full baseline profile). The cold-start
+class additionally needs **another launcher set as default home** (see the
+default-home caveat below). Keep the screen alive:
 
 ```bash
 adb shell svc power stayon usb

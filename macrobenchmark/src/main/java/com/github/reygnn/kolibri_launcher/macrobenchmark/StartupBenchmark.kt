@@ -55,10 +55,29 @@ class StartupBenchmark {
         iterations = ITERATIONS,
         startupMode = StartupMode.COLD,
         compilationMode = mode,
-        setupBlock = { pressHome() },
+        setupBlock = {
+            if (!pastOnboarding) {
+                // First iteration only: launch once to clear the first-run gates.
+                // The tap writes onboarding-complete + consent to DataStore, which
+                // persist across iterations; the COLD measure below kills this
+                // process, so every measured cold start still starts from scratch
+                // — and now renders Home instead of the onboarding gate.
+                startActivityAndWait()
+                dismissFirstRunGatesIfPresent(TARGET_PACKAGE)
+                pastOnboarding = true
+            }
+            pressHome()
+        },
     ) {
         startActivityAndWait()
     }
+
+    // Onboarding cleared once (first setupBlock iteration); see
+    // dismissFirstRunGatesIfPresent() in OnboardingSetup.kt. NOTE: cold start is
+    // only measurable with ANOTHER launcher set as default home — a default-home
+    // Kolibri is restarted by the system after kill ("must not be running prior
+    // to cold start").
+    private var pastOnboarding = false
 
     private companion object {
         const val TARGET_PACKAGE = "com.github.reygnn.kolibri_launcher"

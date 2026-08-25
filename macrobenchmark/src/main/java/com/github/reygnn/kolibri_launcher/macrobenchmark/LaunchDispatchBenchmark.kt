@@ -50,6 +50,9 @@ class LaunchDispatchBenchmark {
             // top, with the drawer closed).
             pressHome()
             startActivityAndWait()
+            // First iteration: clear onboarding + consent so the drawer has app
+            // rows to tap. Flags persist across iterations (no app-data clear).
+            if (!pastOnboarding) { dismissFirstRunGatesIfPresent(TARGET_PACKAGE); pastOnboarding = true }
         },
     ) {
         // One launch per iteration: open the drawer, tap the first app row. The
@@ -74,6 +77,10 @@ class LaunchDispatchBenchmark {
         firstApp.click()
         device.waitForIdle()
     }
+
+    // Onboarding cleared once per test method (first setupBlock iteration); see
+    // dismissFirstRunGatesIfPresent() in OnboardingSetup.kt.
+    private var pastOnboarding = false
 
     private companion object {
         const val TARGET_PACKAGE = "com.github.reygnn.kolibri_launcher"

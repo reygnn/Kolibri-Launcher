@@ -52,6 +52,9 @@ class DrawerScrollJankBenchmark {
         setupBlock = {
             pressHome()
             startActivityAndWait()
+            // First iteration: clear onboarding + consent so the drawer opens on
+            // Home. The flags persist across iterations (no app-data clear).
+            if (!pastOnboarding) { dismissFirstRunGatesIfPresent(TARGET_PACKAGE); pastOnboarding = true }
         },
     ) {
         // Open the drawer with the same gesture the latency benchmark uses.
@@ -77,6 +80,10 @@ class DrawerScrollJankBenchmark {
         }
         device.waitForIdle()
     }
+
+    // Onboarding cleared once per test method (first setupBlock iteration); see
+    // dismissFirstRunGatesIfPresent() in OnboardingSetup.kt.
+    private var pastOnboarding = false
 
     /** Fling the drawer list, re-locating it each call to dodge StaleObjectException. */
     private fun MacrobenchmarkScope.flingDrawer(direction: Direction) {
