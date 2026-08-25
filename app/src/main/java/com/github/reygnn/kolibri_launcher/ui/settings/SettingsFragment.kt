@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.settings
 
 import android.Manifest
-import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateUtils
@@ -45,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHe
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
+import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
@@ -75,8 +75,8 @@ import javax.inject.Inject
  *
  * 2026-05-02 follow-up sweep: listener bodies that only call a sub-method
  * with its own try/catch (`openSystemWallpaperPicker`,
- * `showFactoryResetDialog`, `openDefaultLauncherSettings`) need no
- * additional outer catch.
+ * `showFactoryResetDialog`) or a helper that catches internally
+ * (`DefaultLauncherHelper.requestDefault`) need no additional outer catch.
  * Listeners with `viewLifecycleOwner` access or direct system-API calls
  * (`startActivity`, `parentFragmentManager`) keep their inner catch
  * (lifecycle-race protection).
@@ -113,6 +113,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
     companion object {
         private const val CALENDAR_PERMISSION = Manifest.permission.READ_CALENDAR
     }
+
+    // ActivityResultLauncher for the in-place ROLE_HOME dialog. Result ignored
+    // beyond re-reading state: granted or not, we refresh the preference summary
+    // so it reflects reality without the user leaving the screen.
+    private val roleRequestLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            updateDefaultLauncherStatus()
+        }
 
     // 3. ActivityResultLauncher für die Berechtigungsanfrage
     private val requestPermissionLauncher =
@@ -249,8 +257,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onResume() {
         super.onResume()
-        // updateDefaultLauncherStatus hat eigene Catches für die echten
-        // System-API-Calls (RoleManager). Ein Outer-Catch hier wäre tot.
+        // updateDefaultLauncherStatus delegates the system-API read to
+        // DefaultLauncherHelper (fail-closed, catches internally); the
+        // Preference writes here can't throw. An outer catch would be dead.
         updateDefaultLauncherStatus()
     }
 
@@ -409,9 +418,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // Default Launcher — openDefaultLauncherSettings has its own try/catch.
+        // Default Launcher — helper prefers the in-place role dialog and falls
+        // back to Home settings; onError surfaces a toast via the ViewModel.
         findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
-            openDefaultLauncherSettings()
+            DefaultLauncherHelper.requestDefault(
+                activity = requireActivity(),
+                roleLauncher = roleRequestLauncher,
+                onError = { viewModel.onErrorOpeningDefaultLauncherSettings(it) }
+            )
             true
         }
 
@@ -846,7 +860,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun updateDefaultLauncherStatus() {
-        // Inner-Catches schützen die echten System-API-Calls (RoleManager).
+        // System-API reads are encapsulated in DefaultLauncherHelper (fail-closed).
         // Property-Writes danach werfen nicht; ein Outer-Catch wäre tot.
         val setDefaultLauncherPref =
             findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
@@ -855,28 +869,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             return
         }
 
-        val roleManager = try {
-            requireContext().getSystemService(RoleManager::class.java)
-        } catch (e: Throwable) {
-            // no suspension point — non-suspend RoleManager fetch, cannot see CancellationException
-            TimberWrapper.silentError(e, "Error getting RoleManager")
-            return
-        }
-
-        if (roleManager == null) {
-            Timber.w("RoleManager is null")
-            return
-        }
-
-        val isDefault = try {
-            roleManager.isRoleHeld(RoleManager.ROLE_HOME)
-        } catch (e: Throwable) {
-            // no suspension point — non-suspend role-held check, cannot see CancellationException
-            TimberWrapper.silentError(e, "Error checking role")
-            false
-        }
-
-        if (isDefault) {
+        if (DefaultLauncherHelper.isDefault(requireContext())) {
             setDefaultLauncherPref.summary = getString(R.string.default_launcher_is_set)
             setDefaultLauncherPref.isEnabled = false
         } else {
@@ -922,15 +915,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         } catch (e: Throwable) {
             // no suspension point — non-suspend permission request, cannot see CancellationException
             TimberWrapper.silentError(e, "Error handling calendar permission request")
-        }
-    }
-
-    private fun openDefaultLauncherSettings() {
-        try {
-            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-        } catch (e: Throwable) {
-            // no suspension point — non-suspend launcher-settings launch, cannot see CancellationException
-            viewModel.onErrorOpeningDefaultLauncherSettings(e)
         }
     }
 

@@ -1,11 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.onboarding
 
-import android.app.role.RoleManager
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -26,6 +23,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
+import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
@@ -225,7 +223,12 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
 
     private fun setupClickListeners() {
         binding.setDefaultLauncherButton.setOnClickListener {
-            launchSetDefaultLauncher()
+            // Result ignored via roleRequestLauncher's no-op callback: onboarding
+            // continues whether or not the HOME role is granted.
+            DefaultLauncherHelper.requestDefault(
+                activity = this,
+                roleLauncher = roleRequestLauncher
+            )
         }
 
         binding.restoreBackupButton.setOnClickListener {
@@ -255,41 +258,6 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 } else {
                     finish()
                 }
-            }
-        }
-    }
-
-    /**
-     * Prefer the API 29+ in-place system dialog (RoleManager.ROLE_HOME) so the
-     * user can make Kolibri the default launcher without leaving onboarding.
-     * Falls back to the Home settings screen on older devices or if the role
-     * request can't be built. Mirrors the RoleManager usage already in
-     * SettingsFragment.
-     */
-    private fun launchSetDefaultLauncher() {
-        // Inner catch: RoleManager fetch / intent build / startActivity are all
-        // synchronous Android calls that can throw on some OEMs.
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val roleManager = getSystemService(RoleManager::class.java)
-                if (roleManager != null &&
-                    roleManager.isRoleAvailable(RoleManager.ROLE_HOME) &&
-                    !roleManager.isRoleHeld(RoleManager.ROLE_HOME)
-                ) {
-                    roleRequestLauncher.launch(
-                        roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME)
-                    )
-                    return
-                }
-            }
-            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error requesting default launcher role")
-            // Last resort: try the settings screen directly.
-            try {
-                startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-            } catch (inner: Throwable) {
-                TimberWrapper.silentError(inner, "Error opening home settings")
             }
         }
     }
