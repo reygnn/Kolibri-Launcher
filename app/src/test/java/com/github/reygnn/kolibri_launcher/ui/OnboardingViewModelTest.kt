@@ -431,6 +431,102 @@ class OnboardingViewModelTest {
             coVerify { markOnboardingCompletedUseCase() }
         }
 
+    @Test
+    fun `restoreBackupAndFinish - success with dropped wallpaper layers - toasts then navigates`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns ImportResult.Success(
+                importedCount = 1,
+                skippedCount = 0,
+                missingApps = emptySet(),
+                droppedWallpaperLayers = 2
+            )
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+                val toast = awaitItem()
+                assertTrue(toast is OnboardingEvent.ShowDroppedLayersToast)
+                assertEquals(2, (toast as OnboardingEvent.ShowDroppedLayersToast).count)
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            coVerify { markOnboardingCompletedUseCase() }
+        }
+
+    @Test
+    fun `restoreBackupAndFinish - success but favorites read Unavailable - still marks and navigates`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns
+                ImportResult.Success(importedCount = 1, skippedCount = 0, missingApps = emptySet())
+            // Mirror read fails: the Unavailable branch must be a no-op (favorites are
+            // already on disk), not a crash — restore still marks + navigates.
+            coEvery { getFavoriteComponentsUseCase() } returns
+                FavoritesEditRead.Unavailable(IOException("read failed"))
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            coVerify { markOnboardingCompletedUseCase() }
+        }
+
+    @Test
+    fun `restoreBackupAndFinish - missing apps in EDIT_FAVORITES - still toasts but does not mark`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns
+                ImportResult.Success(importedCount = 1, skippedCount = 0, missingApps = setOf("pkgA/clsA"))
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+                val toast = awaitItem()
+                assertTrue(toast is OnboardingEvent.ShowMissingAppsToast)
+                assertEquals(1, (toast as OnboardingEvent.ShowMissingAppsToast).count)
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            // The missing-apps toast is mode-independent, but the completed flag stays
+            // INITIAL_SETUP-only.
+            coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+        }
+
+    @Test
+    fun `onDoneClicked - while isRestoring is latched - is ignored (no wipe)`() = runTest {
+        // The success path leaves isRestoring = true (the activity navigates away on
+        // the UI side). This pins BOTH halves of the wipe-guard: deleting the
+        // `isRestoring = true` set OR the onDoneClicked guard makes this go red.
+        coEvery { importBackupUseCase(any(), any()) } returns
+            ImportResult.Success(importedCount = 1, skippedCount = 0, missingApps = emptySet())
+        coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        viewModel.restoreBackupAndFinish("content://backup.zip")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isRestoring)
+
+        // A Done that fires while isRestoring is latched must be dropped by the
+        // guard — it must NOT run completeOnboardingUseCase (which would save the
+        // empty selection over the restored favorites).
+        viewModel.onDoneClicked()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
+    }
+
     // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
@@ -440,26 +536,21 @@ class OnboardingViewModelTest {
             throw IOException("Cannot load apps")
         }
 
-        // 3. ViewModel initialisieren
+        // 3. Initialize the ViewModel.
         //
-        // ⚠️ AUSNAHME zur Dispatcher-Konvention:
-        // Hier braucht der mainDispatcher StandardTestDispatcher-Semantik (queued),
-        // NICHT UnconfinedTestDispatcher (eager) wie sonst aus mainDispatcherRule.
+        // ⚠️ Dispatcher-convention exception: this one case needs
+        // StandardTestDispatcher (queued), not the rule's default
+        // UnconfinedTestDispatcher (eager).
         //
-        // Grund: Der init-Block des ViewModels macht launch(mainDispatcher) { collectFlow() }.
-        // Mit UnconfinedTestDispatcher läuft das launch SOFORT im Konstruktor durch,
-        // wirft die IOException, das ViewModel emittet ShowError auf _event —
-        // aber unser Turbine-Subscriber existiert zu diesem Zeitpunkt noch nicht
-        // (event.test {} kommt erst nach dem Konstruktor). _event ist eine
-        // MutableSharedFlow ohne Replay → Event ist weg, Test timed out.
-        //
-        // Mit StandardTestDispatcher(testScheduler) wird das launch nur queued.
-        // Wir subscriben erst per event.test {} und dispatchen dann mit
-        // advanceUntilIdle(). Der Subscriber ist da, das Event kommt an.
-        //
-        // testScheduler kommt aus runTest und ist derselbe wie mainDispatcherRule —
-        // also EIN Scheduler, zwei Dispatcher-Strategien. Das ist die Variante
-        // aus dem "EXCEPTION"-Block in TESTING_CONVENTIONS.kt.
+        // The init block does launch(mainDispatcher) { collectFlow() }. With an
+        // eager dispatcher that runs inside the constructor and emits ShowError
+        // before this test's collector attaches (event.test {} comes after the
+        // constructor). _event is a buffered Channel (BaseViewModel), so the event
+        // is NOT lost — but a queued dispatcher keeps the emit/collect ordering
+        // explicit: we subscribe via event.test {} first, then drive the init with
+        // advanceUntilIdle(). One testScheduler (from runTest, same as
+        // mainDispatcherRule), two dispatcher strategies — the "EXCEPTION" variant
+        // from TESTING_CONVENTIONS.kt.
         val testDispatcher = StandardTestDispatcher(testScheduler)
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,

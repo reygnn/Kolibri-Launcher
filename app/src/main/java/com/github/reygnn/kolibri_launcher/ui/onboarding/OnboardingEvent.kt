@@ -11,4 +11,9 @@ sealed class OnboardingEvent {
     // Restore succeeded but the backup referenced [count] apps that aren't
     // installed on this device (they were skipped). Surfaced as a short toast.
     data class ShowMissingAppsToast(val count: Int) : OnboardingEvent()
+    // Restore succeeded but [count] wallpaper layers couldn't be restored (their
+    // source was no longer accessible). Surfaced so a partial wallpaper restore is
+    // never silent (BackupData.ImportResult.Success KDoc), mirroring the Settings
+    // restore flow. Short toast.
+    data class ShowDroppedLayersToast(val count: Int) : OnboardingEvent()
 }

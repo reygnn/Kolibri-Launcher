@@ -227,12 +227,19 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
 
     private fun setupClickListeners() {
         binding.setDefaultLauncherButton.setOnClickListener {
-            // Result ignored via roleRequestLauncher's no-op callback: onboarding
-            // continues whether or not the HOME role is granted.
-            DefaultLauncherHelper.requestDefault(
-                activity = this,
-                roleLauncher = roleRequestLauncher
-            )
+            if (DefaultLauncherHelper.isDefault(this)) {
+                // Already default (e.g. a re-tap). requestDefault would fall back to
+                // the Home-settings screen with no result callback, so confirm here.
+                showToastSafe(R.string.onboarding_default_launcher_set, Toast.LENGTH_SHORT)
+            } else {
+                // Normal case: the in-place role dialog reports via roleRequestLauncher;
+                // onError covers the rare Home-settings-fallback launch failure.
+                DefaultLauncherHelper.requestDefault(
+                    activity = this,
+                    roleLauncher = roleRequestLauncher,
+                    onError = { showToastSafe(R.string.onboarding_default_launcher_not_set, Toast.LENGTH_SHORT) }
+                )
+            }
         }
 
         binding.restoreBackupButton.setOnClickListener {
@@ -322,6 +329,14 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 showToastSafe(
                     resources.getQuantityString(
                         R.plurals.onboarding_restore_missing_apps, event.count, event.count
+                    ),
+                    Toast.LENGTH_SHORT
+                )
+            }
+            is OnboardingEvent.ShowDroppedLayersToast -> {
+                showToastSafe(
+                    resources.getQuantityString(
+                        R.plurals.backup_import_wallpaper_layers_dropped, event.count, event.count
                     ),
                     Toast.LENGTH_SHORT
                 )

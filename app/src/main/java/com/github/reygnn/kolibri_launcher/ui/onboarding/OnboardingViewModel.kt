@@ -275,6 +275,14 @@ class OnboardingViewModel @Inject constructor(
                                 OnboardingEvent.ShowMissingAppsToast(result.missingApps.size)
                             )
                         }
+                        // Same for wallpaper layers that couldn't be restored — a
+                        // partial wallpaper restore must never be silent (mirrors the
+                        // Settings restore flow / the Success model contract).
+                        if (result.droppedWallpaperLayers > 0) {
+                            sendOnboardingEvent(
+                                OnboardingEvent.ShowDroppedLayersToast(result.droppedWallpaperLayers)
+                            )
+                        }
                         if (launchMode == LaunchMode.INITIAL_SETUP) {
                             markOnboardingCompletedUseCase()
                         }
