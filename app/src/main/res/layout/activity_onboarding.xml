@@ -35,6 +35,40 @@
         app:layout_constraintEnd_toEndOf="@id/title_text"
         tools:text="Select your favorite apps..." />
 
+    <!--
+        First-run-only extras. INITIAL_SETUP shows this via OnboardingUiState
+        .showSetupExtras; EDIT_FAVORITES keeps it gone, and HiddenAppsActivity
+        (which reuses this layout) never toggles it, so this `gone` default keeps
+        it hidden there. Keep the default visibility `gone`.
+    -->
+    <LinearLayout
+        android:id="@+id/setup_extras_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/subtitle_text"
+        app:layout_constraintStart_toStartOf="@id/title_text"
+        app:layout_constraintEnd_toEndOf="@id/title_text"
+        tools:visibility="visible">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/set_default_launcher_button"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/onboarding_set_default_launcher" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/restore_backup_button"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/onboarding_restore_backup" />
+    </LinearLayout>
+
     <HorizontalScrollView
         android:id="@+id/chips_scroll_view"
         android:layout_width="0dp"
@@ -43,7 +77,7 @@
         android:scrollbars="none"
         android:minHeight="48dp"
         android:visibility="invisible"
-        app:layout_constraintTop_toBottomOf="@id/subtitle_text"
+        app:layout_constraintTop_toBottomOf="@id/setup_extras_container"
         app:layout_constraintStart_toStartOf="@id/title_text"
         app:layout_constraintEnd_toEndOf="@id/title_text"
         tools:visibility="visible">

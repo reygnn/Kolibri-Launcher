@@ -8,5 +8,11 @@ data class OnboardingUiState(
     val titleResId: Int = R.string.onboarding_title_welcome,
     val subtitleResId: Int = R.string.onboarding_subtitle_welcome,
     val selectableApps: List<SelectableAppInfo> = emptyList(),
-    val selectedApps: List<AppInfo> = emptyList()
+    val selectedApps: List<AppInfo> = emptyList(),
+    // First-run-only extras (set default launcher / restore backup). Gated to
+    // INITIAL_SETUP in setLaunchMode so they never appear in the EDIT_FAVORITES
+    // flow — nor in HiddenAppsActivity, which reuses this layout but never sets
+    // this flag (the container's XML default is `gone`). Default false keeps
+    // both reuse paths hidden without any extra wiring.
+    val showSetupExtras: Boolean = false
 )

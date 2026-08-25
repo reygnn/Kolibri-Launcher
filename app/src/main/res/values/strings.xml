@@ -123,6 +123,14 @@
 
     <string name="onboarding_title_welcome">Welcome!</string>
     <string name="onboarding_subtitle_welcome">Select your favorite apps for the home screen.</string>
+
+    <!-- First-run-only onboarding extras -->
+    <string name="onboarding_set_default_launcher">Set Kolibri as default launcher</string>
+    <string name="onboarding_restore_backup">Restore from backup</string>
+    <string name="onboarding_restore_failed">Restore failed. Please try again.</string>
+    <string name="onboarding_restore_limit_exceeded">This backup has too many favorites to restore.</string>
+    <string name="onboarding_restore_unsupported_version">This backup version isn\'t supported.</string>
+    <string name="onboarding_restore_invalid_format">This file isn\'t a valid backup.</string>
     <string name="onboarding_title_edit_favorites">Edit Favorites</string>
     <string name="onboarding_subtitle_edit_favorites">Select the apps you want on your home screen.</string>
 

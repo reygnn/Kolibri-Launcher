@@ -118,6 +118,14 @@
 
     <string name="onboarding_title_welcome">Willkommen!</string>
     <string name="onboarding_subtitle_welcome">Wähle deine Lieblings-Apps für den Startbildschirm aus.</string>
+
+    <!-- First-run-only onboarding extras -->
+    <string name="onboarding_set_default_launcher">Kolibri als Standard-Launcher festlegen</string>
+    <string name="onboarding_restore_backup">Aus Backup wiederherstellen</string>
+    <string name="onboarding_restore_failed">Wiederherstellung fehlgeschlagen. Bitte erneut versuchen.</string>
+    <string name="onboarding_restore_limit_exceeded">Dieses Backup hat zu viele Favoriten zum Wiederherstellen.</string>
+    <string name="onboarding_restore_unsupported_version">Diese Backup-Version wird nicht unterstützt.</string>
+    <string name="onboarding_restore_invalid_format">Diese Datei ist kein gültiges Backup.</string>
     <string name="onboarding_title_edit_favorites">Favoriten bearbeiten</string>
     <string name="onboarding_subtitle_edit_favorites">Wähle die Apps aus, die du auf dem Startbildschirm haben möchtest.</string>
 

@@ -7,9 +7,13 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
+import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.MarkOnboardingCompletedUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingEvent
@@ -47,6 +51,8 @@ class OnboardingViewModelTest {
     private val onboardingAppsUseCase: GetOnboardingAppsUseCase = mockk(relaxed = true)
     private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase = mockk(relaxed = true)
     private val completeOnboardingUseCase: CompleteOnboardingUseCase = mockk(relaxed = true)
+    private val importBackupUseCase: ImportBackupUseCase = mockk(relaxed = true)
+    private val markOnboardingCompletedUseCase: MarkOnboardingCompletedUseCase = mockk(relaxed = true)
 
     private lateinit var viewModel: OnboardingViewModel
 
@@ -66,6 +72,8 @@ class OnboardingViewModelTest {
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
             completeOnboardingUseCase,
+            importBackupUseCase,
+            markOnboardingCompletedUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
     }
@@ -206,6 +214,102 @@ class OnboardingViewModelTest {
         }
     }
 
+    // ========== SETUP-EXTRAS VISIBILITY ==========
+
+    @Test
+    fun `setLaunchMode - INITIAL_SETUP - shows setup extras`() = runTest {
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showSetupExtras)
+    }
+
+    @Test
+    fun `setLaunchMode - EDIT_FAVORITES - hides setup extras`() = runTest {
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.showSetupExtras)
+    }
+
+    // ========== RESTORE-BACKUP PATH ==========
+
+    @Test
+    fun `restoreBackupAndFinish - success in INITIAL_SETUP - marks completed and navigates`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns ImportResult.Success(
+                importedCount = 3,
+                skippedCount = 0,
+                missingApps = emptySet()
+            )
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            // Full restore uses the all-true default options.
+            coVerify { importBackupUseCase("content://backup.zip", ImportOptions()) }
+            coVerify { markOnboardingCompletedUseCase() }
+            // CRITICAL: the normal done-path must NOT run — it would overwrite the
+            // just-restored favorites with the still-empty selection.
+            coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
+        }
+
+    @Test
+    fun `restoreBackupAndFinish - LimitExceeded - emits error and does not complete`() = runTest {
+        coEvery { importBackupUseCase(any(), any()) } returns ImportResult.LimitExceeded(
+            packageCount = 600,
+            limit = AppConstants.MAX_FAVORITES_ON_HOME
+        )
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.restoreBackupAndFinish("content://backup.zip")
+
+            val event = awaitItem()
+            assertTrue(event is OnboardingEvent.ShowError)
+            assertEquals(
+                R.string.onboarding_restore_limit_exceeded,
+                (event as OnboardingEvent.ShowError).messageResId
+            )
+        }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+    }
+
+    @Test
+    fun `restoreBackupAndFinish - Error - emits generic restore-failed error`() = runTest {
+        coEvery { importBackupUseCase(any(), any()) } returns ImportResult.Error("boom")
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.restoreBackupAndFinish("content://backup.zip")
+
+            val event = awaitItem()
+            assertTrue(event is OnboardingEvent.ShowError)
+            assertEquals(
+                R.string.onboarding_restore_failed,
+                (event as OnboardingEvent.ShowError).messageResId
+            )
+        }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+    }
+
     // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test
@@ -240,6 +344,8 @@ class OnboardingViewModelTest {
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
             completeOnboardingUseCase,
+            importBackupUseCase,
+            markOnboardingCompletedUseCase,
             mainDispatcher = testDispatcher
         )
 

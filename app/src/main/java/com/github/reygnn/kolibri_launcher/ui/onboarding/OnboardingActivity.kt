@@ -1,17 +1,25 @@
 package com.github.reygnn.kolibri_launcher.ui.onboarding
 
+import android.app.role.RoleManager
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
+import androidx.core.view.isVisible
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.core.widget.doOnTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.ActivityOnboardingBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
@@ -74,6 +82,28 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
 
     // Search Debouncing
     private val searchQueryFlow = MutableStateFlow("")
+
+    // ActivityResult launchers must be registered before the Activity reaches
+    // STARTED, so they live as field initializers (same pattern as BackupFragment).
+
+    // Result ignored: whether the user grants the HOME role or not, onboarding
+    // simply continues. Registered only for the API 29+ in-place role dialog.
+    private val roleRequestLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { /* no-op */ }
+
+    // OpenDocument returns the picked file's Uri (or null if cancelled). On a
+    // pick we hand the Uri straight to the ViewModel for a full restore.
+    private val restoreDocumentLauncher: ActivityResultLauncher<Array<String>> =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            // Inner catch: the callback runs outside the ViewModel's launchSafe,
+            // so the toString()/dispatch is guarded here; the actual restore work
+            // is caught inside the ViewModel.
+            try {
+                uri?.let { viewModel.restoreBackupAndFinish(it.toString()) }
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error dispatching backup restore")
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -194,6 +224,23 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     }
 
     private fun setupClickListeners() {
+        binding.setDefaultLauncherButton.setOnClickListener {
+            launchSetDefaultLauncher()
+        }
+
+        binding.restoreBackupButton.setOnClickListener {
+            // Inner catch: launching the system document picker is a synchronous
+            // Android call that can throw on some OEMs (no matching activity).
+            try {
+                restoreDocumentLauncher.launch(
+                    arrayOf(AppConstants.MIME_TYPE_JSON, AppConstants.MIME_TYPE_ZIP)
+                )
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error launching backup picker")
+                showToastSafe(getString(R.string.onboarding_restore_failed), Toast.LENGTH_LONG)
+            }
+        }
+
         binding.doneButton.setOnClickListener {
             // Inner catch kept: viewModel.onDoneClicked is the user-facing
             // path that completes onboarding; if the underlying use case
@@ -208,6 +255,41 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
                 } else {
                     finish()
                 }
+            }
+        }
+    }
+
+    /**
+     * Prefer the API 29+ in-place system dialog (RoleManager.ROLE_HOME) so the
+     * user can make Kolibri the default launcher without leaving onboarding.
+     * Falls back to the Home settings screen on older devices or if the role
+     * request can't be built. Mirrors the RoleManager usage already in
+     * SettingsFragment.
+     */
+    private fun launchSetDefaultLauncher() {
+        // Inner catch: RoleManager fetch / intent build / startActivity are all
+        // synchronous Android calls that can throw on some OEMs.
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val roleManager = getSystemService(RoleManager::class.java)
+                if (roleManager != null &&
+                    roleManager.isRoleAvailable(RoleManager.ROLE_HOME) &&
+                    !roleManager.isRoleHeld(RoleManager.ROLE_HOME)
+                ) {
+                    roleRequestLauncher.launch(
+                        roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME)
+                    )
+                    return
+                }
+            }
+            startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Error requesting default launcher role")
+            // Last resort: try the settings screen directly.
+            try {
+                startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            } catch (inner: Throwable) {
+                TimberWrapper.silentError(inner, "Error opening home settings")
             }
         }
     }
@@ -230,6 +312,10 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
         }
         binding.titleText.setText(state.titleResId)
         binding.subtitleText.setText(state.subtitleResId)
+        // First-run-only extras (set default launcher / restore backup). Gone in
+        // EDIT_FAVORITES; HiddenAppsActivity reuses this layout but never sets the
+        // flag, so the container stays at its XML `gone` default there.
+        binding.setupExtrasContainer.isVisible = state.showSetupExtras
         allAppsAdapter?.submitList(state.selectableApps) ?: run {
             Timber.w("Adapter is null, cannot submit list")
         }

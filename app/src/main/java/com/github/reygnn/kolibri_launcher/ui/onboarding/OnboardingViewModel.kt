@@ -16,11 +16,15 @@ import com.github.reygnn.kolibri_launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
+import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.MarkOnboardingCompletedUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -37,6 +41,8 @@ class OnboardingViewModel @Inject constructor(
     private val onboardingAppsUseCase: GetOnboardingAppsUseCase,
     private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
+    private val importBackupUseCase: ImportBackupUseCase,
+    private val markOnboardingCompletedUseCase: MarkOnboardingCompletedUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<OnboardingEvent>(mainDispatcher) {
 
@@ -115,7 +121,12 @@ class OnboardingViewModel @Inject constructor(
             if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_title_edit_favorites else R.string.onboarding_title_welcome
         val subtitleRes =
             if (mode == LaunchMode.EDIT_FAVORITES) R.string.onboarding_subtitle_edit_favorites else R.string.onboarding_subtitle_welcome
-        _uiState.update { it.copy(titleResId = titleRes, subtitleResId = subtitleRes) }
+        // First-run extras only in INITIAL_SETUP. EDIT_FAVORITES (and, via the
+        // false default, HiddenAppsActivity) never show them.
+        val showExtras = mode == LaunchMode.INITIAL_SETUP
+        _uiState.update {
+            it.copy(titleResId = titleRes, subtitleResId = subtitleRes, showSetupExtras = showExtras)
+        }
     }
 
     fun loadInitialData() {
@@ -211,6 +222,42 @@ class OnboardingViewModel @Inject constructor(
                     "CRITICAL: Failed to save favorites or complete onboarding."
                 )
                 sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_error_save_failed))
+            }
+        }
+    }
+
+    /**
+     * First-run "restore a full backup right now" path. Loads the picked file and
+     * restores EVERYTHING (default [ImportOptions] = all flags true).
+     *
+     * CRITICAL — do NOT reuse the onDoneClicked path afterwards: on success the
+     * favorites have already been persisted by the import. In INITIAL_SETUP the
+     * in-memory `selectedComponents` is still empty, so calling
+     * CompleteOnboardingUseCase would immediately overwrite the restored
+     * favorites with an empty list (the same wipe the DSR save-gate guards
+     * against). We therefore only flip the onboarding-completed flag via
+     * [markOnboardingCompletedUseCase] — the backup carries no such flag, so
+     * without this the user would be dropped back into onboarding on next start
+     * — and then navigate. The flag is INITIAL_SETUP-only; in EDIT_FAVORITES the
+     * button isn't shown, and the guard keeps that invariant explicit.
+     */
+    fun restoreBackupAndFinish(uriString: String) {
+        launchSafe {
+            when (val result = importBackupUseCase(uriString, ImportOptions())) {
+                is ImportResult.Success -> {
+                    if (launchMode == LaunchMode.INITIAL_SETUP) {
+                        markOnboardingCompletedUseCase()
+                    }
+                    sendOnboardingEvent(OnboardingEvent.NavigateToMain)
+                }
+                is ImportResult.LimitExceeded ->
+                    sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_restore_limit_exceeded))
+                is ImportResult.UnsupportedVersion ->
+                    sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_restore_unsupported_version))
+                is ImportResult.InvalidFormat ->
+                    sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_restore_invalid_format))
+                is ImportResult.Error ->
+                    sendOnboardingEvent(OnboardingEvent.ShowError(R.string.onboarding_restore_failed))
             }
         }
     }
