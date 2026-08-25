@@ -14,5 +14,10 @@ data class OnboardingUiState(
     // flow — nor in HiddenAppsActivity, which reuses this layout but never sets
     // this flag (the container's XML default is `gone`). Default false keeps
     // both reuse paths hidden without any extra wiring.
-    val showSetupExtras: Boolean = false
+    val showSetupExtras: Boolean = false,
+    // True while a backup restore is in flight (the async import runs for seconds
+    // on a large ZIP). The Done + setup-extra buttons are disabled for this window
+    // so a concurrent Done tap cannot run onDoneClicked and overwrite the
+    // just-restored favorites with the empty in-memory selection.
+    val isRestoring: Boolean = false
 )

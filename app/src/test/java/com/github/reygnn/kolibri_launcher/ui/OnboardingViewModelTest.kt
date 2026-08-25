@@ -244,6 +244,8 @@ class OnboardingViewModelTest {
                 skippedCount = 0,
                 missingApps = emptySet()
             )
+            // The restore mirrors the restored favorites into the in-memory selection.
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
             setupViewModel()
             viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
             advanceUntilIdle()
@@ -309,6 +311,98 @@ class OnboardingViewModelTest {
 
         coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
     }
+
+    @Test
+    fun `restoreBackupAndFinish - UnsupportedVersion - emits error, no mark, re-enables UI`() = runTest {
+        coEvery { importBackupUseCase(any(), any()) } returns ImportResult.UnsupportedVersion("99")
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.restoreBackupAndFinish("content://backup.zip")
+            val event = awaitItem()
+            assertTrue(event is OnboardingEvent.ShowError)
+            assertEquals(
+                R.string.onboarding_restore_unsupported_version,
+                (event as OnboardingEvent.ShowError).messageResId
+            )
+        }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+        assertFalse(viewModel.uiState.value.isRestoring)
+    }
+
+    @Test
+    fun `restoreBackupAndFinish - InvalidFormat - emits error, no mark, re-enables UI`() = runTest {
+        coEvery { importBackupUseCase(any(), any()) } returns ImportResult.InvalidFormat
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        advanceUntilIdle()
+
+        viewModel.event.test {
+            viewModel.restoreBackupAndFinish("content://backup.zip")
+            val event = awaitItem()
+            assertTrue(event is OnboardingEvent.ShowError)
+            assertEquals(
+                R.string.onboarding_restore_invalid_format,
+                (event as OnboardingEvent.ShowError).messageResId
+            )
+        }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+        assertFalse(viewModel.uiState.value.isRestoring)
+    }
+
+    @Test
+    fun `restoreBackupAndFinish - success in EDIT_FAVORITES - navigates but does NOT mark completed`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns
+                ImportResult.Success(importedCount = 1, skippedCount = 0, missingApps = emptySet())
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            // The onboarding-completed flag is INITIAL_SETUP-only; EDIT mode must not flip it.
+            coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
+        }
+
+    @Test
+    fun `restoreBackupAndFinish - mark fails after import - re-enables UI and a later Done saves the RESTORED favorites`() =
+        runTest {
+            val restored = setOf("pkg1/class1")
+            coEvery { importBackupUseCase(any(), any()) } returns
+                ImportResult.Success(importedCount = 1, skippedCount = 0, missingApps = emptySet())
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(restored)
+            coEvery { markOnboardingCompletedUseCase() } throws IOException("settings write failed")
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+                // mark threw: UI re-enabled + error shown (not silent, not stuck).
+                assertTrue(awaitItem() is OnboardingEvent.ShowError)
+                assertFalse(viewModel.uiState.value.isRestoring)
+
+                // A later Done must NOT wipe: the restored favorites were mirrored into
+                // the selection, so completeOnboardingUseCase saves THEM, not emptyList.
+                viewModel.onDoneClicked()
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            coVerify { completeOnboardingUseCase(restored.toList(), true) }
+        }
 
     // ========== CRASH-RESISTANCE TESTS ==========
 

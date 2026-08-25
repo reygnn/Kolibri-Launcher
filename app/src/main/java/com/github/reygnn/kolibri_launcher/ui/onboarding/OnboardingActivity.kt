@@ -93,14 +93,10 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     // pick we hand the Uri straight to the ViewModel for a full restore.
     private val restoreDocumentLauncher: ActivityResultLauncher<Array<String>> =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-            // Inner catch: the callback runs outside the ViewModel's launchSafe,
-            // so the toString()/dispatch is guarded here; the actual restore work
-            // is caught inside the ViewModel.
-            try {
-                uri?.let { viewModel.restoreBackupAndFinish(it.toString()) }
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error dispatching backup restore")
-            }
+            // A null Uri means the user cancelled the picker. Handing the Uri to the
+            // ViewModel is a plain call whose work runs inside launchSafe — nothing
+            // here can throw, so no catch (Rule 11).
+            uri?.let { viewModel.restoreBackupAndFinish(it.toString()) }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -284,6 +280,12 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
         // EDIT_FAVORITES; HiddenAppsActivity reuses this layout but never sets the
         // flag, so the container stays at its XML `gone` default there.
         binding.setupExtrasContainer.isVisible = state.showSetupExtras
+        // While a restore is in flight, disable Done + the setup-extra buttons so a
+        // concurrent Done tap can't overwrite the just-restored favorites (the VM
+        // guards this too; this is the immediate UI feedback).
+        binding.doneButton.isEnabled = !state.isRestoring
+        binding.setDefaultLauncherButton.isEnabled = !state.isRestoring
+        binding.restoreBackupButton.isEnabled = !state.isRestoring
         allAppsAdapter?.submitList(state.selectableApps) ?: run {
             Timber.w("Adapter is null, cannot submit list")
         }

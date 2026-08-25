@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
@@ -23,7 +22,6 @@ object DefaultLauncherHelper {
 
     /** True iff this app currently holds ROLE_HOME. Fail-closed to false. */
     fun isDefault(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         return try {
             context.getSystemService(RoleManager::class.java)
                 ?.isRoleHeld(RoleManager.ROLE_HOME) == true
@@ -35,11 +33,11 @@ object DefaultLauncherHelper {
     }
 
     /**
-     * Prefer the API 29+ in-place role dialog so the user can set Kolibri as the
+     * Prefer the in-place ROLE_HOME dialog so the user can set Kolibri as the
      * default launcher without leaving the current screen. Falls back to the Home
-     * settings screen on older devices, when the role isn't available / already
-     * held, or if building the request throws. [onError] fires only if even the
-     * settings fallback fails, so the caller can surface a toast.
+     * settings screen when the role isn't available / already held, or if building
+     * the request throws. [onError] fires only if even the settings fallback fails,
+     * so the caller can surface a toast.
      */
     fun requestDefault(
         activity: Activity,
@@ -70,7 +68,6 @@ object DefaultLauncherHelper {
         activity: Activity,
         roleLauncher: ActivityResultLauncher<Intent>
     ): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         val roleManager = activity.getSystemService(RoleManager::class.java) ?: return false
         if (!roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) return false
         if (roleManager.isRoleHeld(RoleManager.ROLE_HOME)) return false
