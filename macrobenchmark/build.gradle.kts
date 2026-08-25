@@ -4,7 +4,7 @@
 //
 // A `com.android.test` module (NOT shipped) that measures Kolibri's app-launch
 // hot path on a REAL device via Macrobenchmark + Perfetto trace sections. It
-// exists to LOCK the sub-frame property established by the APP-START-PERFORMANCE
+// exists to LOCK the sub-frame property established by the PERF-RESULTS
 // measurements: the ViewModel+Channel launch hop is sub-millisecond and must
 // stay far under one frame. A regression that pushes it toward a full frame
 // (e.g. a suspend call sneaking into the dispatch) trips the threshold gate.
@@ -91,10 +91,11 @@ tasks.register("verifyLaunchBenchmark") {
         "(run :macrobenchmark:connectedBenchmarkAndroidTest first)."
 
     // Worst-case threshold in MILLISECONDS, gated on the `maximum` of the
-    // per-iteration TAP->DISPATCH gap. Measured p99 on a Pixel 9a is ~0.85 ms
-    // (APP-START-PERFORMANCE.md); 4.0 ms is generous, non-flaky headroom that
-    // is still under half a 120 Hz frame (8.33 ms). A structural regression
-    // (a frame added to the hop) lands well past this. Device-calibrated —
+    // per-iteration TAP->DISPATCH gap. Measured max on the A17 5G is ~1.3 ms
+    // (PERF-RESULTS.md; the Pixel 9a calibration p99 was ~0.85 ms); 4.0 ms is
+    // generous, non-flaky headroom, still under half a 120 Hz frame (8.33 ms).
+    // A structural regression (a frame added to the hop) lands well past this.
+    // Device-calibrated —
     // re-tune if the reference device changes.
     val thresholdMs = 4.0
     val metricName = "launchDispatchGapMs" // emitted by LaunchDispatchGapMetric

@@ -14,7 +14,8 @@ import androidx.benchmark.traceprocessor.TraceProcessor
  * path would add a frame here with no catch-clause or signature change to
  * review. `TraceSectionMetric` cannot see it — it measures a single slice's
  * duration, not the gap *between* two slices — so this queries the trace directly
- * via Perfetto SQL, exactly as the manual analysis in APP-START-PERFORMANCE.md did.
+ * via Perfetto SQL (metric described in PERF-BENCHMARK-SETUP.md), exactly as the
+ * original manual analysis did.
  *
  * Emitted per iteration; the framework aggregates to min/median/max + per-run
  * data, and `verifyLaunchBenchmark` gates on the worst-case (max).

@@ -1,5 +1,16 @@
 # App-Start Performance — On-Device Measurements
 
+> **ARCHIVED (2026-08-25).** Superseded by the A17-only rewrite split into two
+> living docs in [`../specs/`](../specs/):
+> [`PERF-BENCHMARK-SETUP`](../specs/PERF-BENCHMARK-SETUP.md) (device, tooling,
+> metrics, gates, re-run recipe) and [`PERF-RESULTS`](../specs/PERF-RESULTS.md)
+> (the numbers + verdict). This file is kept for provenance only — it carries the
+> historical **Pixel 9a** hop distributions (§1–3, incl. the manual Perfetto
+> contention run and the `experiment/direct-launch-latency` A/B) and the
+> **Galaxy A36** cross-check, none of which the A17 rewrite reproduces. The A17
+> §5 cold-start data was migrated forward verbatim. Do not treat anything below
+> as the live reference.
+
 On-device measurements of Kolibri's **app-launch hot path** — the latency from
 tapping an app entry to the target app's `startMainActivity` binder call. This
 is the launcher's *own* share of a launch; everything after the binder call

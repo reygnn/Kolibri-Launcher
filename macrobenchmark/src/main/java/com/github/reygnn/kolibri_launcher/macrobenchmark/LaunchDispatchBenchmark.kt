@@ -11,7 +11,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * On-device gate for the app-launch hot path (APP-START-PERFORMANCE.md).
+ * On-device gate for the app-launch hot path (PERF-BENCHMARK-SETUP.md +
+ * PERF-RESULTS.md).
  *
  * Measures an app-drawer launch on the `release` build and pins the launcher's
  * own three synchronous chunks plus the TAP->DISPATCH gap (the ViewModel+Channel

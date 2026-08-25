@@ -15,11 +15,12 @@ not here.
 
 - [`ACRA_FLOW`](ACRA_FLOW.md) — Ziel-Architektur des Crash-Reporting-Subsystems — konvergiert; alle vier Gabelungen entschieden.
 - [`ACRA_SPEC`](ACRA_SPEC.md) — Implementierungs-Spec zum ACRA-Rewrite — die Signatur-/Test-/Konfig-Schicht unter ACRAFLOW.md.
-- [`APP-START-PERFORMANCE`](APP-START-PERFORMANCE.md) — App-Start Performance — On-Device Measurements
 - [`APPLIST_SORT_SPLIT_SPEC`](APPLIST_SORT_SPLIT_SPEC.md) — Sortierung dem Consumer geben, nicht dem Namens-Helfer (RAL-4)
 - [`DATASTORE_READ_SPEC`](DATASTORE_READ_SPEC.md) — Ein autoritativer Lesepfad pro DataStore-State (Plan + Sigs)
 - [`DEBOUNCE_SPEC`](DEBOUNCE_SPEC.md) — Status: ENTWURF (2026-08-09), Spec-Review-Runde 1 eingearbeitet — Verdikt SOUND
 - [`INSTALLED_APPS_LOAD_SPEC`](INSTALLED_APPS_LOAD_SPEC.md) — Der App-Loader kollabiert Fehler zu leer (Plan + Sigs)
+- [`PERF-BENCHMARK-SETUP`](PERF-BENCHMARK-SETUP.md) — App-start performance: benchmark & setup (A17-only, tooling, gates).
+- [`PERF-RESULTS`](PERF-RESULTS.md) — App-start performance: on-device results (A17) — hop + cold-start TTID.
 - [`REACTIVE_APPLIST_SPEC`](REACTIVE_APPLIST_SPEC.md) — Anzeige rein reaktiv, Enumeration nur bei echter Änderung
 - [`RECONCILE_FIX_SPEC`](RECONCILE_FIX_SPEC.md) — Fix-Spec für das R-INV-Loch im Verifikations-Veto (RECONCILESPEC.md §3, as-built).
 - [`RECONCILE_SPEC`](RECONCILE_SPEC.md) — Implementierungs-Spec für den App-Listen-Reconcile-Rewrite — grüne Wiese, noch kein Code.

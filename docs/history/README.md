@@ -6,6 +6,12 @@ One-off historical documents kept for provenance, not as live reference:
   `HISTORY.md`).
 - [`TODO-completed.md`](TODO-completed.md) — completed roadmap sections moved out
   of the active `TODO.md`.
+- [`APP-START-PERFORMANCE.md`](APP-START-PERFORMANCE.md) — the original combined
+  app-start performance report (Pixel 9a + Galaxy A36 hop distributions, manual
+  Perfetto runs). Superseded 2026-08-25 by the A17-only split into
+  [`../specs/PERF-BENCHMARK-SETUP.md`](../specs/PERF-BENCHMARK-SETUP.md) +
+  [`../specs/PERF-RESULTS.md`](../specs/PERF-RESULTS.md); kept for the historical
+  Pixel/A36 numbers the rewrite does not reproduce.
 
 **Rejected / superseded design proposals** (kept as the "why we did NOT do X"
 record; still cited by bare name from the living specs in [`../specs/`](../specs/)):
