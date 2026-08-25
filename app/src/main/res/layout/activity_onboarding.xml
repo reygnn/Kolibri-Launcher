@@ -55,14 +55,14 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/set_default_launcher_button"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/onboarding_set_default_launcher" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/restore_backup_button"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
