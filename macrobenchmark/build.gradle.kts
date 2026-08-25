@@ -179,6 +179,19 @@ tasks.register("verifyStartupBenchmark") {
     val benchmarkName = "startupBaselineProfile"
     val metricName = "timeToInitialDisplayMs"
 
+    // Baseline-profile sanity floor. The release baseline profile is a gitignored
+    // local artifact with no automatic generation (CLAUDE.md § Versioning), so a
+    // fresh checkout / cleaned build/ bakes only the library-default ART rules
+    // (~2.7k lines) instead of the ~15k captured profile — which silently
+    // inflates the very TTID this gate reads. 6k cleanly separates the two
+    // (2.7k defaults « 6k « ~15k captured) with room for the app to shrink; used
+    // ONLY to turn a degraded-profile failure into an actionable "regenerate"
+    // message instead of a misleading "REGRESSED". Captured at configuration time
+    // to avoid cross-project access in doLast.
+    val minHealthyProfileLines = 6_000
+    val appReleaseArtProfileDir =
+        project(":app").layout.buildDirectory.dir("intermediates/merged_art_profile/release")
+
     doLast {
         val outDir = layout.buildDirectory.get().asFile
         val jsons = outDir.walkTopDown()
@@ -216,10 +229,27 @@ tasks.register("verifyStartupBenchmark") {
             "Cold-start TTID (baseline profile), median: %.1f ms (threshold %.1f ms)".format(worstMedian, thresholdMs),
         )
         if (worstMedian > thresholdMs) {
+            // Before crying regression, check whether the baked release baseline
+            // profile is actually there. A degraded/absent profile (the gitignored
+            // local artifact was never generated) inflates this metric for a benign
+            // reason — surface that as an actionable regenerate, not a false alarm.
+            val profileFile = appReleaseArtProfileDir.get().asFile
+                .walkTopDown().firstOrNull { it.name == "baseline-prof.txt" }
+            val profileLines = profileFile?.readLines()?.size ?: 0
+            if (profileLines < minHealthyProfileLines) {
+                throw GradleException(
+                    "Cold-start TTID %.1f ms > %.1f ms, BUT the baked release baseline profile looks ".format(worstMedian, thresholdMs) +
+                        "degraded/absent ($profileLines lines; healthy ~15k, ~2.7k = library defaults only). " +
+                        "This is almost certainly NOT a real regression: the profile is a gitignored local " +
+                        "artifact that nothing auto-generates. Run `./gradlew :app:generateBaselineProfile` " +
+                        "(connected device), then re-run StartupBenchmark. If it STILL reads ~2.7k after " +
+                        "regenerating, the profile generation itself is broken. See PERF-BENCHMARK-SETUP.md.",
+                )
+            }
             throw GradleException(
-                "Cold-start TTID REGRESSED: baseline-profile median %.1f ms > %.1f ms threshold. ".format(worstMedian, thresholdMs) +
-                    "The profile is no longer paying off (empty/absent baseline profile, or a heavy " +
-                    "init on the startup path) — investigate before merging.",
+                "Cold-start TTID REGRESSED: baseline-profile median %.1f ms > %.1f ms threshold ".format(worstMedian, thresholdMs) +
+                    "(profile healthy, $profileLines lines). A heavy init likely landed on the startup " +
+                    "path — investigate before merging.",
             )
         }
     }
