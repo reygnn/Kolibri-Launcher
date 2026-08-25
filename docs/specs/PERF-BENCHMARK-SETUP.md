@@ -58,7 +58,14 @@ The `:macrobenchmark` module (`com.android.test`) drives everything on the
 |---|---|---|
 | `LaunchDispatchBenchmark` | the hop (drawer launch) | `LaunchDispatchGapMetric` + three `LaunchTrace` sections |
 | `StartupBenchmark` | Kolibri's own cold start | `timeToInitialDisplayMs`, None vs Partial |
+| `DrawerScrollJankBenchmark` | drawer-fling jank | `FrameTimingMetric`, None vs Partial |
 | `WallpaperCompositeBenchmark` | wallpaper composite cache A/B | (out of scope here) |
+
+`StartupBenchmark` and `DrawerScrollJankBenchmark` are the two surfaces of the
+same baseline-profile question, deliberately in **separate classes** (split
+2026-08-25): their run constraints differ, and run together the jank fling churns
+the device and inflates the cold-start tail (see Methodology). Each is run on its
+own.
 
 Macrobenchmark version: `benchmark-macro 1.5.0-rc01` — the `androidx.baselineprofile`
 plugin needs the 1.5.0 line under AGP 9; 1.4.1 rejects `:app`.
@@ -156,18 +163,20 @@ Run one class at a time to keep the JSON focused:
   -Pandroid.testInstrumentationRunnerArguments.class=\
 com.github.reygnn.kolibri_launcher.macrobenchmark.LaunchDispatchBenchmark
 
-# Cold start only — the two startup* METHODS in isolation (see the default-home
-# caveat below, and "Methodology" for why the jank siblings are excluded):
+# Cold start only (see the default-home caveat below):
 ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=\
-com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark#startupNoCompilation,\
-com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark#startupBaselineProfile
+com.github.reygnn.kolibri_launcher.macrobenchmark.StartupBenchmark
+
+# Drawer-scroll jank only (runs with Kolibri as default home):
+./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=\
+com.github.reygnn.kolibri_launcher.macrobenchmark.DrawerScrollJankBenchmark
 ```
 
-`StartupBenchmark` also contains two `drawerScrollJank*` methods. Run the cold
-start **filtered to the two `startup*` methods** (above), not the whole class —
-the jank methods add device contention that inflates the cold-start tail
-(see Methodology).
+Cold start and jank are **separate classes**, so a class-level `StartupBenchmark`
+run measures cold start with no contention from the jank fling — no method-level
+filtering needed (see Methodology).
 
 Read the per-device JSON at:
 
@@ -202,10 +211,13 @@ The A17 does **not** thermally throttle at benchmark load, so a cooldown wait is
 **not** needed for thermal reasons. The real noise source is **device
 contention**:
 
-- Running the whole `StartupBenchmark` class lets the `drawerScrollJank*` methods
-  churn the device alongside the cold-start methods.
-- Background work right after a **reboot / fresh install / onboarding**
-  (media scan, ART optimisation, first-run settling).
+- **Historically:** cold start and drawer-jank shared one `StartupBenchmark`
+  class, so a class-level run let the jank fling churn the device alongside the
+  cold-start iterations. That is why `DrawerScrollJankBenchmark` was **split into
+  its own class** (2026-08-25) — the contention is now structurally gone: a
+  `StartupBenchmark` run no longer touches the jank path.
+- **Remaining:** background work right after a **reboot / fresh install /
+  onboarding** (media scan, ART optimisation, first-run settling).
 
 Both inflate the cold-start **tail** (outlier iterations toward ~550 ms) and lift
 the median, while `Thermal Status` stays 0 throughout — the signature of
@@ -213,10 +225,10 @@ contention, not heat (throttling would raise the *whole* distribution, not
 scatter individual iterations). A disturbed run of this kind is **discarded**,
 not treated as signal.
 
-**Recipe for a clean cold-start number:** run the two `startup*` methods in
-isolation (command above), on a device that has been idle a few minutes after
-any reboot/onboarding. Confirmed reproducible: an isolated, settled run landed
-the profiled median at **376.3 ms** — within ~2 ms of the reference **378.2 ms**
+**Recipe for a clean cold-start number:** run `StartupBenchmark` on its own
+(command above), on a device that has been idle a few minutes after any
+reboot/onboarding. Confirmed reproducible: an isolated, settled run landed the
+profiled median at **376.3 ms** — within ~2 ms of the reference **378.2 ms**
 (see [`PERF-RESULTS`](PERF-RESULTS.md)), with `Thermal Status` 0 throughout.
 
 To watch it live during a run, poll in a shell loop:
