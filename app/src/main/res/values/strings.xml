@@ -131,6 +131,12 @@
     <string name="onboarding_restore_limit_exceeded">This backup has too many favorites to restore.</string>
     <string name="onboarding_restore_unsupported_version">This backup version isn\'t supported.</string>
     <string name="onboarding_restore_invalid_format">This file isn\'t a valid backup.</string>
+    <string name="onboarding_default_launcher_set">Kolibri is now your default launcher</string>
+    <string name="onboarding_default_launcher_not_set">Kolibri was not set as default launcher</string>
+    <plurals name="onboarding_restore_missing_apps">
+        <item quantity="one">%d app from the backup isn\'t installed</item>
+        <item quantity="other">%d apps from the backup aren\'t installed</item>
+    </plurals>
     <string name="onboarding_title_edit_favorites">Edit Favorites</string>
     <string name="onboarding_subtitle_edit_favorites">Select the apps you want on your home screen.</string>
 

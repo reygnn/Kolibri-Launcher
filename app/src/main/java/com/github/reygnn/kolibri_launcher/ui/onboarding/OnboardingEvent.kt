@@ -8,4 +8,7 @@ sealed class OnboardingEvent {
     data class ShowError(@param:StringRes val messageResId: Int) : OnboardingEvent()
     object NavigateToMain : OnboardingEvent()
     data class ShowLimitReachedToast(val limit: Int) : OnboardingEvent()
+    // Restore succeeded but the backup referenced [count] apps that aren't
+    // installed on this device (they were skipped). Surfaced as a short toast.
+    data class ShowMissingAppsToast(val count: Int) : OnboardingEvent()
 }

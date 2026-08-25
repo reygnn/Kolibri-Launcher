@@ -404,6 +404,33 @@ class OnboardingViewModelTest {
             coVerify { completeOnboardingUseCase(restored.toList(), true) }
         }
 
+    @Test
+    fun `restoreBackupAndFinish - success with missing apps - emits missing-apps toast then navigates`() =
+        runTest {
+            coEvery { importBackupUseCase(any(), any()) } returns ImportResult.Success(
+                importedCount = 2,
+                skippedCount = 3,
+                missingApps = setOf("pkgA/clsA", "pkgB/clsB", "pkgC/clsC")
+            )
+            coEvery { getFavoriteComponentsUseCase() } returns FavoritesEditRead.Loaded(emptySet())
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            advanceUntilIdle()
+
+            viewModel.event.test {
+                viewModel.restoreBackupAndFinish("content://backup.zip")
+
+                val toast = awaitItem()
+                assertTrue(toast is OnboardingEvent.ShowMissingAppsToast)
+                assertEquals(3, (toast as OnboardingEvent.ShowMissingAppsToast).count)
+
+                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+            }
+            advanceUntilIdle()
+
+            coVerify { markOnboardingCompletedUseCase() }
+        }
+
     // ========== CRASH-RESISTANCE TESTS ==========
 
     @Test

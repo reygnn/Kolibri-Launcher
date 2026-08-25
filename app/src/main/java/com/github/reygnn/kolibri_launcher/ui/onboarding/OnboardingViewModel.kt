@@ -259,7 +259,7 @@ class OnboardingViewModel @Inject constructor(
         launchSafe {
             _uiState.update { it.copy(isRestoring = true) }
             try {
-                when (importBackupUseCase(uriString, ImportOptions())) {
+                when (val result = importBackupUseCase(uriString, ImportOptions())) {
                     is ImportResult.Success -> {
                         // The import already persisted the favorites. Mirror them into
                         // the in-memory selection (best-effort; they are on disk
@@ -267,6 +267,13 @@ class OnboardingViewModel @Inject constructor(
                         when (val read = getFavoriteComponentsUseCase()) {
                             is FavoritesEditRead.Loaded -> selectedComponents.value = read.components
                             is FavoritesEditRead.Unavailable -> Unit
+                        }
+                        // Tell the user if the backup referenced apps that aren't
+                        // installed here (they were skipped) — before navigating away.
+                        if (result.missingApps.isNotEmpty()) {
+                            sendOnboardingEvent(
+                                OnboardingEvent.ShowMissingAppsToast(result.missingApps.size)
+                            )
                         }
                         if (launchMode == LaunchMode.INITIAL_SETUP) {
                             markOnboardingCompletedUseCase()

@@ -84,10 +84,18 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
     // ActivityResult launchers must be registered before the Activity reaches
     // STARTED, so they live as field initializers (same pattern as BackupFragment).
 
-    // Result ignored: whether the user grants the HOME role or not, onboarding
-    // simply continues. Registered only for the API 29+ in-place role dialog.
+    // Reports the outcome of the in-place ROLE_HOME dialog as a short toast.
+    // Ground truth is the role state, not the result code (OEM-inconsistent), so we
+    // re-read isDefault(). Onboarding continues either way.
     private val roleRequestLauncher: ActivityResultLauncher<Intent> =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { /* no-op */ }
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            val messageRes = if (DefaultLauncherHelper.isDefault(this)) {
+                R.string.onboarding_default_launcher_set
+            } else {
+                R.string.onboarding_default_launcher_not_set
+            }
+            showToastSafe(messageRes, Toast.LENGTH_SHORT)
+        }
 
     // OpenDocument returns the picked file's Uri (or null if cancelled). On a
     // pick we hand the Uri straight to the ViewModel for a full restore.
@@ -309,6 +317,14 @@ class OnboardingActivity : BaseActivity<OnboardingEvent, OnboardingViewModel>() 
             }
             is OnboardingEvent.ShowLimitReachedToast -> {
                 showToastSafe(getString(R.string.favorites_limit_reached, event.limit))
+            }
+            is OnboardingEvent.ShowMissingAppsToast -> {
+                showToastSafe(
+                    resources.getQuantityString(
+                        R.plurals.onboarding_restore_missing_apps, event.count, event.count
+                    ),
+                    Toast.LENGTH_SHORT
+                )
             }
         }
     }
