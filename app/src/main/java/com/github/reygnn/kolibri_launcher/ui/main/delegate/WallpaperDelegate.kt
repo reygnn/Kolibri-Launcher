@@ -166,6 +166,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * Delegate responsible for wallpaper management:
@@ -279,25 +280,43 @@ class WallpaperDelegate(
         }
 
     /**
-     * The persisted backdrop that sits behind the wallpaper collage.
-     * Read by the wallpaper-edit CommandsPanel toggle to show the current
-     * state and to compute the flipped target; the actual on-screen backdrop
-     * colour is driven independently by MainActivity's own observer of the
-     * same DataStore flow (single source of truth).
+     * The backdrop that sits behind the wallpaper collage, read by the
+     * wallpaper-edit CommandsPanel toggle to show the current state and to
+     * compute the flipped target. The actual on-screen backdrop colour is
+     * driven independently by MainActivity's own observer of the same DataStore
+     * flow — DataStore stays the single source of truth.
+     *
+     * This is an *optimistic* mirror rather than a raw `stateIn` of the store:
+     * [onToggleWallpaperBackdrop] updates it synchronously so a rapid double-tap
+     * flips from the intended next value instead of the write→read-lagged store
+     * value (which only changes after the DataStore round-trip). The collector
+     * below keeps it resynced with the persisted value, so an external change
+     * (e.g. the Settings screen) still propagates here.
      */
-    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = observeWallpaperBackdropUseCase()
-        .stateIn(
-            scope = scope.coroutineScope,
-            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-            initialValue = AppConstants.DEFAULT_WALLPAPER_BACKDROP,
-        )
+    private val _wallpaperBackdrop =
+        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_BACKDROP)
+    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = _wallpaperBackdrop.asStateFlow()
 
-    /** Flips the backdrop between system-wallpaper and black and persists it. */
+    init {
+        scope.launchSafe("Error observing wallpaper backdrop") {
+            observeWallpaperBackdropUseCase().collect { _wallpaperBackdrop.value = it }
+        }
+    }
+
+    /**
+     * Flips the backdrop between system-wallpaper and black and persists it.
+     * The flip is computed via [updateAndGet] on the optimistic mirror so two
+     * taps always net to a no-op even if the DataStore write of the first has
+     * not yet round-tripped (the conflated-value lost-update the raw `.value`
+     * read was prone to).
+     */
     fun onToggleWallpaperBackdrop() =
         scope.launchSafe("Error toggling wallpaper backdrop") {
-            val next = when (wallpaperBackdrop.value) {
-                WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
-                WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
+            val next = _wallpaperBackdrop.updateAndGet {
+                when (it) {
+                    WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
+                    WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
+                }
             }
             setWallpaperBackdropUseCase(next)
         }

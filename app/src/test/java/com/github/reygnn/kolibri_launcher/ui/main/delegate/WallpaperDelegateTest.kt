@@ -25,6 +25,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -2031,5 +2032,24 @@ class WallpaperDelegateTest {
         delegate.onToggleWallpaperBackdrop()
         advanceUntilIdle()
         coVerify { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
+    }
+
+    @Test
+    fun `onToggleWallpaperBackdrop double-tap nets to a no-op`() = runTest {
+        // Default is SYSTEM_WALLPAPER and the store never emits between taps —
+        // the exact lost-update scenario: a stale `.value` read would flip both
+        // taps to BLACK. The optimistic mirror must flip the second tap from the
+        // first tap's target (BLACK) back to SYSTEM_WALLPAPER.
+        val delegate = createDelegate()
+
+        delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK
+        delegate.onToggleWallpaperBackdrop() // BLACK -> SYSTEM_WALLPAPER
+        advanceUntilIdle()
+
+        coVerifyOrder {
+            setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK)
+            setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER)
+        }
+        assertEquals(WallpaperBackdrop.SYSTEM_WALLPAPER, delegate.wallpaperBackdrop.value)
     }
 }

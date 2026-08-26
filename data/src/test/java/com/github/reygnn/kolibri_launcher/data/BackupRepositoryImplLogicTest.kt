@@ -7,6 +7,7 @@ import android.content.ContentResolver
 import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -564,6 +565,124 @@ class BackupRepositoryImplLogicTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(fakeSettingsRepo.wallpaperSurfaceModeFlow.first())
             .isEqualTo(WallpaperSurfaceMode.DARK)
+    }
+
+    // ========================================================================
+    // WALLPAPER BACKDROP (mirror of favoritesAlignment / wallpaperSurfaceMode suites)
+    // ========================================================================
+
+    @Test
+    fun `exportToJson - includes wallpaperBackdrop as enum name`() = runTest {
+        fakeSettingsRepo.wallpaperBackdrop = WallpaperBackdrop.BLACK
+
+        val jsonString = backupManager.exportToJson()
+
+        assertThat(jsonString).contains("\"wallpaperBackdrop\": \"BLACK\"")
+    }
+
+    @Test
+    fun `importFromJson - applies wallpaperBackdrop when present`() = runTest {
+        fakeSettingsRepo.wallpaperBackdrop = WallpaperBackdrop.SYSTEM_WALLPAPER
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperBackdrop": "BLACK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperBackdropFlow.first())
+            .isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun `importFromJson - legacy backup without wallpaperBackdrop leaves current value`() = runTest {
+        // Simulates any backup produced before this field existed — the field
+        // is simply absent. The `?.let` in BackupDataAssembler Phase 7 must skip
+        // the setter so the user's current backdrop survives the restore.
+        fakeSettingsRepo.wallpaperBackdrop = WallpaperBackdrop.BLACK
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperBackdropFlow.first())
+            .isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun `importFromJson - unknown wallpaperBackdrop is skipped, current value kept`() = runTest {
+        // Hand-edited or future-version backup carries a name the importer
+        // doesn't recognise. Skip-on-invalid: the current value survives, no
+        // crash, no Success-degradation.
+        fakeSettingsRepo.wallpaperBackdrop = WallpaperBackdrop.BLACK
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperBackdrop": "NEON_PINK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = true)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperBackdropFlow.first())
+            .isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun `importFromJson - wallpaperBackdrop ignored when importThemeSettings is false`() = runTest {
+        fakeSettingsRepo.wallpaperBackdrop = WallpaperBackdrop.SYSTEM_WALLPAPER
+        val json = """
+            {
+                "version": "1.0.0",
+                "settings": {
+                    "wallpaperBackdrop": "BLACK",
+                    "favoriteComponents": [],
+                    "favoritesOrder": [],
+                    "hiddenComponents": []
+                }
+            }
+        """.trimIndent()
+
+        val result = backupManager.importFromJson(
+            json,
+            ImportOptions(importThemeSettings = false)
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(fakeSettingsRepo.wallpaperBackdropFlow.first())
+            .isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
     }
 
     // ========================================================================

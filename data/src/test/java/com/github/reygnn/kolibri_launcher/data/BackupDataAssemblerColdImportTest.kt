@@ -6,7 +6,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -193,45 +192,5 @@ class BackupDataAssemblerColdImportTest {
         // ── ASSERT: no partial writes happened — the gate blocks before
         // any phase runs.
         coVerify(exactly = 0) { favoritesRepository.saveFavoriteComponents(any()) }
-    }
-
-    // ── Wallpaper backdrop (Phase 7 theme settings) ──
-    // These reuse the warm-subscriber harness (installed apps non-empty from
-    // the start) so the Phase-1 gate passes synchronously and we can assert on
-    // the settings-apply phase in isolation.
-
-    private fun backupWithBackdrop(name: String) = BackupData(
-        version = "1.0.0",
-        timestamp = 0L,
-        appVersion = "test",
-        settings = LauncherSettings(wallpaperBackdrop = name),
-    )
-
-    @Test
-    fun `performImport applies a valid wallpaperBackdrop`() = runTest {
-        val installedAppsFlow = MutableStateFlow(listOf(installedApp))
-        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
-        stubFavoritesFlowForPhase2(emptySet())
-
-        val result = makeAssembler()
-            .performImport(backupWithBackdrop("BLACK"), ImportOptions(), wallpaperRestorer)
-
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        coVerify(exactly = 1) { settingsRepository.setWallpaperBackdrop(WallpaperBackdrop.BLACK) }
-    }
-
-    @Test
-    fun `performImport skips an unknown wallpaperBackdrop and keeps the current value`() = runTest {
-        val installedAppsFlow = MutableStateFlow(listOf(installedApp))
-        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
-        stubFavoritesFlowForPhase2(emptySet())
-
-        val result = makeAssembler()
-            .performImport(backupWithBackdrop("NOT_A_REAL_VALUE"), ImportOptions(), wallpaperRestorer)
-
-        // Import still succeeds; the unknown enum name is skipped (skip-on-unknown),
-        // never persisted — so the user's current backdrop is left untouched.
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        coVerify(exactly = 0) { settingsRepository.setWallpaperBackdrop(any()) }
     }
 }
