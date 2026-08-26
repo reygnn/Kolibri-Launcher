@@ -949,14 +949,14 @@ op), a personal build re-enables them with `-PcacheToasts` (bare, or `=true`),
 and debug always shows them. In a public release the field is a compile-time
 `false` constant, so R8 strips the toast blocks entirely.
 
-**The `dailydriver` über-flag.** `-Pdailydriver` is the personal-build master
+**The `dailyDriver` über-flag.** `-PdailyDriver` is the personal-build master
 switch: it turns on **every** personal-only release toggle at once (currently
 `SHOW_DEV_COMMANDS` + `SHOW_CACHE_TOASTS`) — each toggle is the OR of its own
-property and `dailydriver`, so the individual flags still work standalone. Build
-the daily-driver AAB with `./gradlew bundleRelease -Pdailydriver`; a plain
+property and `dailyDriver`, so the individual flags still work standalone. Build
+the daily-driver AAB with `./gradlew bundleRelease -PdailyDriver`; a plain
 `bundleRelease` stays public-safe. When adding a new personal-only release
 surface, define it via the `personalProperty(...)` helper and OR in
-`dailydriverRelease` so `-Pdailydriver` keeps covering everything.
+`dailyDriverRelease` so `-PdailyDriver` keeps covering everything.
 
 ---
 
