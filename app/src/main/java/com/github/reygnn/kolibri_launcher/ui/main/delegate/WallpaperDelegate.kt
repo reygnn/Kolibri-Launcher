@@ -127,6 +127,7 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
@@ -771,11 +772,13 @@ class WallpaperDelegate(
         // an empty cache, so the live current-key entry is never touched.
         compositeCache.invalidateIfNotKey(key)
         if (compositeCache.get(key) != null) {
-            // TEMP (remove later): a single-layer cache HIT means the raw bitmap is
-            // still valid — e.g. a transform-only edit changed scale/position but not
-            // the image, so nothing is re-decoded. Signals that "no fill toast" is NOT
-            // "not cached". Removed together with the fill toasts once verified (F10).
-            if (state.layerCount == 1) {
+            // Cache-diagnostic toast (F10), gated by BuildConfig.SHOW_CACHE_TOASTS —
+            // debug + personal/daily-driver builds only, compiled out of a public
+            // release. A single-layer cache HIT means the raw bitmap is still valid
+            // (e.g. a transform-only edit changed scale/position but not the image,
+            // so nothing is re-decoded), signalling that "no fill toast" is NOT
+            // "not cached".
+            if (state.layerCount == 1 && BuildConfig.SHOW_CACHE_TOASTS) {
                 scope.launchSafe("Error signalling single-layer cache hit") {
                     scope.sendEvent(
                         UiEvent.ShowToastFromString("Single-layer cache still valid", Toast.LENGTH_SHORT)
@@ -828,15 +831,19 @@ class WallpaperDelegate(
         val current = _wallpaperState.value
         if (current.layerCount == 1 && current.layers[0].imageUri == key) {
             compositeCache.put(key, decoded)
-            // TEMP (remove later): visual signal on each single-layer cache fill — kept until the
-            // unified refill is verified 100% on-device. Symmetric with the composite warm's toast.
-            val m = context.resources.displayMetrics
-            scope.sendEvent(
-                UiEvent.ShowToastFromString(
-                    "Single-layer cache filled (${m.widthPixels}x${m.heightPixels})",
-                    Toast.LENGTH_SHORT,
+            // Cache-diagnostic toast (F10), gated by BuildConfig.SHOW_CACHE_TOASTS —
+            // debug + personal/daily-driver builds only, compiled out of a public
+            // release. Visual signal on each single-layer cache fill; symmetric with
+            // the composite warm's toast below.
+            if (BuildConfig.SHOW_CACHE_TOASTS) {
+                val m = context.resources.displayMetrics
+                scope.sendEvent(
+                    UiEvent.ShowToastFromString(
+                        "Single-layer cache filled (${m.widthPixels}x${m.heightPixels})",
+                        Toast.LENGTH_SHORT,
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -922,17 +929,21 @@ class WallpaperDelegate(
             )
             // Publish the composite luminance for the AUTO classifier (v4.3, ACCEPTED_LIMITATIONS #1).
             compositeLuminanceSignal.emit(luminance)
-            // TEMP (remove later): visual signal on each composite cache (re)fill — to gauge how
-            // often a re-flatten is actually needed (cold start / edit-commit / rotate). The
-            // resolution in the text distinguishes a rotate-triggered refill from the rest.
-            // Only a genuine composite (layerCount >= 2) reaches this path now; a lone image
-            // fills via warmSingleLayer under its file:// key.
-            scope.sendEvent(
-                UiEvent.ShowToastFromString(
-                    "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})",
-                    Toast.LENGTH_SHORT,
+            // Cache-diagnostic toast (F10), gated by BuildConfig.SHOW_CACHE_TOASTS —
+            // debug + personal/daily-driver builds only, compiled out of a public
+            // release. Visual signal on each composite cache (re)fill, to gauge how
+            // often a re-flatten is actually needed (cold start / edit-commit / rotate);
+            // the resolution in the text distinguishes a rotate-triggered refill. Only a
+            // genuine composite (layerCount >= 2) reaches this path; a lone image fills
+            // via warmSingleLayer under its file:// key.
+            if (BuildConfig.SHOW_CACHE_TOASTS) {
+                scope.sendEvent(
+                    UiEvent.ShowToastFromString(
+                        "Composite cache filled (${metrics.widthPixels}x${metrics.heightPixels})",
+                        Toast.LENGTH_SHORT,
+                    )
                 )
-            )
+            }
         }
         } finally {
             LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_WARM, WARM_TRACE_COOKIE)

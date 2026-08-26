@@ -941,6 +941,23 @@ can only ever produce a public-safe build, never leak. The read-only
 always show all four. Details in `app/build.gradle.kts` (the `devCommandsInRelease`
 val) and `SettingsFragment` (the `SHOW_DEV_COMMANDS` branch).
 
+**The `cacheToasts` flag.** The three wallpaper cache-diagnostic toasts in
+`WallpaperDelegate` (single-layer hit / single-layer fill / composite fill, F10)
+follow the exact same public-safe model via `BuildConfig.SHOW_CACHE_TOASTS`: a
+plain release compiles them out (so the public AAB never toasts on every cache
+op), a personal build re-enables them with `-PcacheToasts` (bare, or `=true`),
+and debug always shows them. In a public release the field is a compile-time
+`false` constant, so R8 strips the toast blocks entirely.
+
+**The `dailydriver` über-flag.** `-Pdailydriver` is the personal-build master
+switch: it turns on **every** personal-only release toggle at once (currently
+`SHOW_DEV_COMMANDS` + `SHOW_CACHE_TOASTS`) — each toggle is the OR of its own
+property and `dailydriver`, so the individual flags still work standalone. Build
+the daily-driver AAB with `./gradlew bundleRelease -Pdailydriver`; a plain
+`bundleRelease` stays public-safe. When adding a new personal-only release
+surface, define it via the `personalProperty(...)` helper and OR in
+`dailydriverRelease` so `-Pdailydriver` keeps covering everything.
+
 ---
 
 ## Git workflow

@@ -100,25 +100,42 @@ android {
         }
     }
 
+    // A personal-build release toggle: true if its own `-P<name>` (bare or
+    // `=true`) OR the `-Pdailydriver` master flag is passed. Absence = off, so a
+    // plain `bundleRelease` / `assembleRelease` can only ever produce a
+    // public-safe build, never leak a personal-only surface.
+    fun personalProperty(name: String): Boolean =
+        providers.gradleProperty(name).map { it.isBlank() || it.toBoolean() }.getOrElse(false)
+
+    // `-Pdailydriver` is the personal-build master flag: it turns on every
+    // personal-only release toggle at once (currently SHOW_DEV_COMMANDS +
+    // SHOW_CACHE_TOASTS). The individual flags below still work standalone —
+    // each is the OR of its own property and dailydriver.
+    val dailydriverRelease = personalProperty("dailydriver")
+
     // Public-safe default: the three ACRA test-trigger dev commands
     // (throw / silent-error / warn) are compiled out of a plain
     // `bundleRelease` / `assembleRelease` so the GitHub-shipped AAB never
-    // exposes them. A personal build re-enables them with
-    // `-PdevCommands` (bare, or `=true`); absence = off, so forgetting the
-    // flag can only ever produce a public-safe build, never leak. Read via
-    // BuildConfig.SHOW_DEV_COMMANDS in SettingsFragment. pipeline_status is
-    // NOT gated (read-only probe, harmless in public).
-    val devCommandsInRelease = providers.gradleProperty("devCommands")
-        .map { it.isBlank() || it.toBoolean() }
-        .getOrElse(false)
+    // exposes them. A personal build re-enables them with `-PdevCommands`
+    // (bare, or `=true`) or `-Pdailydriver`. Read via BuildConfig.SHOW_DEV_COMMANDS
+    // in SettingsFragment. pipeline_status is NOT gated (read-only probe).
+    val devCommandsInRelease = dailydriverRelease || personalProperty("devCommands")
+
+    // Public-safe default: the three wallpaper cache-diagnostic toasts
+    // (single-layer hit / single-layer fill / composite fill in WallpaperDelegate)
+    // are compiled out of a plain release so the GitHub AAB never toasts on every
+    // cache operation. A personal build re-enables them with `-PcacheToasts`
+    // (bare, or `=true`) or `-Pdailydriver`. Read via BuildConfig.SHOW_CACHE_TOASTS.
+    val cacheToastsInRelease = dailydriverRelease || personalProperty("cacheToasts")
 
     buildTypes {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
             isDebuggable = true
-            // Dev commands always present in a debug build.
+            // Dev commands + cache-diagnostic toasts always present in a debug build.
             buildConfigField("boolean", "SHOW_DEV_COMMANDS", "true")
+            buildConfigField("boolean", "SHOW_CACHE_TOASTS", "true")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -129,6 +146,7 @@ android {
             isShrinkResources = true
             isDebuggable = false
             buildConfigField("boolean", "SHOW_DEV_COMMANDS", devCommandsInRelease.toString())
+            buildConfigField("boolean", "SHOW_CACHE_TOASTS", cacheToastsInRelease.toString())
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
