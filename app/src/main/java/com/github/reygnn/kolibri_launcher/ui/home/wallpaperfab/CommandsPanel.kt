@@ -51,6 +51,7 @@ class CommandsPanel @JvmOverloads constructor(
     private val btnLayerUp: MaterialButton
     private val btnLayerDown: MaterialButton
     private val btnMemInfo: MaterialButton
+    private val btnBackdropToggle: MaterialButton
     private val btnClose: MaterialButton
     private val txtLayerIndicator: TextView
 
@@ -72,6 +73,7 @@ class CommandsPanel @JvmOverloads constructor(
         btnLayerUp = findViewById(R.id.btnLayerUp)
         btnLayerDown = findViewById(R.id.btnLayerDown)
         btnMemInfo = findViewById(R.id.btnLayerMemInfo)
+        btnBackdropToggle = findViewById(R.id.btnBackdropToggle)
         btnClose = findViewById(R.id.btnCloseCommands)
         txtLayerIndicator = findViewById(R.id.txtLayerIndicator)
     }
@@ -176,6 +178,9 @@ class CommandsPanel @JvmOverloads constructor(
     fun setOnMemInfoClicked(listener: () -> Unit) =
         btnMemInfo.setOnClickListener { listener() }
 
+    fun setOnBackdropToggleClicked(listener: () -> Unit) =
+        btnBackdropToggle.setOnClickListener { listener() }
+
     fun setOnCloseClicked(listener: () -> Unit) =
         btnClose.setOnClickListener { listener() }
 
@@ -187,6 +192,8 @@ class CommandsPanel @JvmOverloads constructor(
     fun setSnapModeIcon(resId: Int) = btnSnapMode.setIconResource(resId)
     fun setHorizontalSnapIcon(resId: Int) = btnHSnap.setIconResource(resId)
     fun setVerticalSnapIcon(resId: Int) = btnVSnap.setIconResource(resId)
+
+    fun setBackdropToggleIcon(resId: Int) = btnBackdropToggle.setIconResource(resId)
 
     fun setLayerIndicator(text: CharSequence?, visible: Boolean) {
         txtLayerIndicator.text = text

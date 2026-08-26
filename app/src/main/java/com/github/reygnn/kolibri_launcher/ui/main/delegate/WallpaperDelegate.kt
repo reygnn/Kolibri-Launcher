@@ -131,13 +131,16 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
@@ -190,6 +193,8 @@ class WallpaperDelegate(
     private val clearWallpaperUseCase: ClearWallpaperUseCase,
     private val getFabPositionUseCase: GetFabPositionUseCase,
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
+    private val observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
+    private val setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     private val wallpaperFileManager: WallpaperFileManager,
     private val wallpaperFlattener: WallpaperFlattener,
     private val compositeCache: WallpaperCompositeCache,
@@ -271,6 +276,30 @@ class WallpaperDelegate(
     fun onFabPositionChanged(xFraction: Float, yFraction: Float) =
         scope.launchSafe("Error saving FAB position") {
             saveFabPositionUseCase(FabPosition(xFraction = xFraction, yFraction = yFraction))
+        }
+
+    /**
+     * The persisted backdrop that sits behind the wallpaper collage.
+     * Read by the wallpaper-edit CommandsPanel toggle to show the current
+     * state and to compute the flipped target; the actual on-screen backdrop
+     * colour is driven independently by MainActivity's own observer of the
+     * same DataStore flow (single source of truth).
+     */
+    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = observeWallpaperBackdropUseCase()
+        .stateIn(
+            scope = scope.coroutineScope,
+            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            initialValue = AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+        )
+
+    /** Flips the backdrop between system-wallpaper and black and persists it. */
+    fun onToggleWallpaperBackdrop() =
+        scope.launchSafe("Error toggling wallpaper backdrop") {
+            val next = when (wallpaperBackdrop.value) {
+                WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
+                WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
+            }
+            setWallpaperBackdropUseCase(next)
         }
 
     // --- Edit Session State ---

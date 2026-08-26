@@ -133,6 +133,8 @@ class WallpaperDelegateTest {
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
+        observeWallpaperBackdropUseCase = mockk(relaxed = true),
+        setWallpaperBackdropUseCase = mockk(relaxed = true),
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = compositeCache,

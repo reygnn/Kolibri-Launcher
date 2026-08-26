@@ -97,6 +97,16 @@
         <item>DARK</item>
     </string-array>
 
+    <string name="wallpaper_backdrop_title">Behind the wallpaper</string>
+    <string-array name="wallpaper_backdrop_entries">
+        <item>System wallpaper</item>
+        <item>Black</item>
+    </string-array>
+    <string-array name="wallpaper_backdrop_values">
+        <item>SYSTEM_WALLPAPER</item>
+        <item>BLACK</item>
+    </string-array>
+
 
     <!-- NEW -->
     <string name="category_gestures_title">Gestures</string>
@@ -380,6 +390,7 @@
 <string name="cd_open_commands">More wallpaper-edit controls</string>
 <string name="cd_close_commands">Close controls</string>
 <string name="cd_wallpaper_memory_info">Show memory usage</string>
+<string name="cd_wallpaper_backdrop_toggle">Toggle backdrop: system wallpaper or black</string>
 
 <!-- Wallpaper memory info dialog (opt-in via the ⓘ button in the edit overflow). -->
 <string name="wallpaper_memory_title">Wallpaper memory</string>

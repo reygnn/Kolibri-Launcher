@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -37,6 +38,9 @@ interface SettingsRepository : Purgeable {
 
     val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode>
     suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode)
+
+    val wallpaperBackdropFlow: Flow<WallpaperBackdrop>
+    suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop)
 
 
     val showCalendarEventFlow: Flow<Boolean>

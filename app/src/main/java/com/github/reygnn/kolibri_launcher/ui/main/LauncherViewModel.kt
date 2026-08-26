@@ -33,6 +33,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
@@ -53,6 +54,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseC
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
@@ -68,6 +70,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaU
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
@@ -141,6 +144,8 @@ class LauncherViewModel @Inject constructor(
     clearWallpaperUseCase: ClearWallpaperUseCase,
     getFabPositionUseCase: GetFabPositionUseCase,
     saveFabPositionUseCase: SaveFabPositionUseCase,
+    observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
+    setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     wallpaperFileManager: WallpaperFileManager,
     wallpaperFlattener: WallpaperFlattener,
     wallpaperCompositeCache: WallpaperCompositeCache,
@@ -239,6 +244,8 @@ class LauncherViewModel @Inject constructor(
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
+        observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
+        setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = wallpaperCompositeCache,
@@ -306,7 +313,7 @@ class LauncherViewModel @Inject constructor(
         }
     val pendingFocusLayerId: StateFlow<String?> get() = wallpaperDelegate.pendingFocusLayerId
     val fabPosition: StateFlow<FabPosition> get() = wallpaperDelegate.fabPosition
-
+    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> get() = wallpaperDelegate.wallpaperBackdrop
     fun consumePendingFocusLayerId() = wallpaperDelegate.consumePendingFocusLayerId()
 
     // ===========================================
@@ -434,6 +441,7 @@ class LauncherViewModel @Inject constructor(
         wallpaperDelegate.onSaveAllLayerTransforms(transforms)
     fun onFabPositionChanged(xFraction: Float, yFraction: Float) =
         wallpaperDelegate.onFabPositionChanged(xFraction, yFraction)
+    fun onToggleWallpaperBackdrop() = wallpaperDelegate.onToggleWallpaperBackdrop()
 
     // ===========================================
     // COMPOSITE REFRESH (orchestration)

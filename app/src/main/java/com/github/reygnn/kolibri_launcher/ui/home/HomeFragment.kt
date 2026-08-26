@@ -645,6 +645,19 @@ class HomeFragment : Fragment() {
             wallpaperEditController?.applyFabPosition(position)
         }
 
+        // Observer: wallpaper backdrop (system wallpaper / black). Keeps the
+        // edit-panel toggle icon in sync with the persisted choice. The actual
+        // on-screen backdrop is driven by MainActivity's own observer; this one
+        // only reflects state into the edit UI.
+        collectOnStarted(
+            flow = viewModel.wallpaperBackdrop,
+            errorTag = "wallpaper-edit backdrop",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { backdrop ->
+            if (_binding == null) return@collectOnStarted
+            wallpaperEditController?.applyBackdrop(backdrop)
+        }
+
         // Observer: user-controlled wallpaper scrim. Its own collector (drives a
         // View alpha, not the layout cache) — edit-mode gating is handled in
         // applyScrim, re-triggered by Observer 8 above.

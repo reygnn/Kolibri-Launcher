@@ -166,6 +166,8 @@ class LauncherViewModelDoomsdayTest {
         clearWallpaperUseCase = mockk(relaxed = true),
         getFabPositionUseCase = mockk<GetFabPositionUseCase>(relaxed = true).also { every { it.invoke() } returns emptyFlow() },
         saveFabPositionUseCase = mockk(relaxed = true),
+        observeWallpaperBackdropUseCase = mockk(relaxed = true),
+        setWallpaperBackdropUseCase = mockk(relaxed = true),
         wallpaperFileManager = mockk(relaxed = true),
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeCache = mockk(relaxed = true),

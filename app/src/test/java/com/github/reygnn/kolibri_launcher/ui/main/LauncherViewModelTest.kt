@@ -250,6 +250,8 @@ class LauncherViewModelTest {
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
+        observeWallpaperBackdropUseCase = mockk(relaxed = true),
+        setWallpaperBackdropUseCase = mockk(relaxed = true),
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeCache = mockk(relaxed = true),

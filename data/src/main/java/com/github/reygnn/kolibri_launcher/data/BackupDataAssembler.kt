@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -103,6 +104,7 @@ class BackupDataAssembler @Inject constructor(
         val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
         val favoritesAlignment = settingsRepository.favoritesAlignmentFlow.first()
         val wallpaperSurfaceMode = settingsRepository.wallpaperSurfaceModeFlow.first()
+        val wallpaperBackdrop = settingsRepository.wallpaperBackdropFlow.first()
 
         val wallpaperState = wallpaperRepository.getWallpaperStateSync()
 
@@ -141,6 +143,7 @@ class BackupDataAssembler @Inject constructor(
             contentTopMarginScale = contentTopMarginScale,
             favoritesAlignment = favoritesAlignment.name,
             wallpaperSurfaceMode = wallpaperSurfaceMode.name,
+            wallpaperBackdrop = wallpaperBackdrop.name,
             textShadowEnabled = textShadowEnabled,
             wallpaperUri = wallpaperUri,
             wallpaperScale = wallpaperScale,
@@ -344,6 +347,15 @@ class BackupDataAssembler @Inject constructor(
                 } catch (e: IllegalArgumentException) {
                     // Same skip-on-unknown semantics as favoritesAlignment above.
                     Timber.w(e, "Unknown wallpaperSurfaceMode in backup: $name — keeping current value")
+                }
+            }
+
+            backup.settings.wallpaperBackdrop?.let { name ->
+                try {
+                    settingsRepository.setWallpaperBackdrop(WallpaperBackdrop.valueOf(name))
+                } catch (e: IllegalArgumentException) {
+                    // Same skip-on-unknown semantics as favoritesAlignment above.
+                    Timber.w(e, "Unknown wallpaperBackdrop in backup: $name — keeping current value")
                 }
             }
 

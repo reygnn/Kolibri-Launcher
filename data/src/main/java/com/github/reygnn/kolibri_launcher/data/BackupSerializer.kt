@@ -170,7 +170,8 @@ class BackupSerializer @Inject constructor() {
                 backup.settings.isFontBold != null ||
                 backup.settings.contentTopMarginScale != null ||
                 backup.settings.favoritesAlignment != null ||
-                backup.settings.wallpaperSurfaceMode != null,
+                backup.settings.wallpaperSurfaceMode != null ||
+                backup.settings.wallpaperBackdrop != null,
             hasWallpaper = if (hasMultiLayer) {
                 backup.settings.wallpaperLayers.any { it.imageUri != null || it.imageFileName != null }
             } else {
@@ -340,6 +341,7 @@ class BackupSerializer @Inject constructor() {
             isFontBold = settings.getStrictBool("isFontBold", "is_font_bold") ?: base.isFontBold,
             favoritesAlignment = settings.getStrictString("favoritesAlignment", "favorites_alignment") ?: base.favoritesAlignment,
             wallpaperSurfaceMode = settings.getStrictString("wallpaperSurfaceMode", "wallpaper_surface_mode") ?: base.wallpaperSurfaceMode,
+            wallpaperBackdrop = settings.getStrictString("wallpaperBackdrop", "wallpaper_backdrop") ?: base.wallpaperBackdrop,
             sortOrder = settings.getStrictString("sortOrder", "sort_order") ?: base.sortOrder,
             textShadowEnabled = settings.getStrictBool("textShadowEnabled", "text_shadow_enabled") ?: base.textShadowEnabled,
             showCalendarEvent = settings.getStrictBool("showCalendarEvent", "show_calendar_event") ?: base.showCalendarEvent,
@@ -432,6 +434,7 @@ class BackupSerializer @Inject constructor() {
                 "swipe_left_app", "swipe_right_app", "wallpaper_uri",
                 "favoritesAlignment", "favorites_alignment",
                 "wallpaperSurfaceMode", "wallpaper_surface_mode",
+                "wallpaperBackdrop", "wallpaper_backdrop",
                 "sortOrder", "sort_order",
             )
             for (field in stringFields) {

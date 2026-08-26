@@ -123,6 +123,16 @@ data class LauncherSettings(
     @JsonNames("wallpaper_surface_mode")
     val wallpaperSurfaceMode: String? = null,
 
+    /**
+     * Persisted as the [WallpaperBackdrop] enum's `name` string
+     * (`"SYSTEM_WALLPAPER"` / `"BLACK"`). Optional — legacy backups
+     * created before this field existed deserialize as `null` and the
+     * import path leaves the user's current value untouched. Same
+     * skip-on-unknown semantics as [favoritesAlignment].
+     */
+    @JsonNames("wallpaper_backdrop")
+    val wallpaperBackdrop: String? = null,
+
     // --- Wallpaper Single-Layer (Backward Compat) ---
 
     @JsonNames("wallpaper_uri")

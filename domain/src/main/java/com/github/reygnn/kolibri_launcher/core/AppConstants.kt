@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -65,6 +66,12 @@ object AppConstants {
     val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
     val DEFAULT_FAVORITES_ALIGNMENT = FavoritesAlignment.START
     val DEFAULT_WALLPAPER_SURFACE_MODE = WallpaperSurfaceMode.AUTO
+
+    // Preserve historical behaviour: the launcher window has always been
+    // transparent + FLAG_SHOW_WALLPAPER, so existing users (and legacy backups
+    // with no stored value) keep seeing the system wallpaper behind the collage.
+    // Product may flip this to BLACK for fresh multi-layer installs.
+    val DEFAULT_WALLPAPER_BACKDROP = WallpaperBackdrop.SYSTEM_WALLPAPER
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"
@@ -241,6 +248,7 @@ object AppConstants {
         const val FAVORITES_ALIGNMENT = "favorites_alignment"
         const val ROTATION_LOCKED = "rotation_locked"
         const val APP_DRAWER_MODE = "app_drawer_mode"
+        const val WALLPAPER_BACKDROP = "wallpaper_backdrop"
 
         // Home Screen Features
         const val SHOW_CALENDAR_EVENT = "show_calendar_event"

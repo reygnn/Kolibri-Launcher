@@ -13,6 +13,7 @@ import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.toEnumOrNull
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -39,6 +40,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
         val FAVORITES_ALIGNMENT = stringPreferencesKey(AppConstants.PrefKeys.FAVORITES_ALIGNMENT)
         val APP_DRAWER_MODE = stringPreferencesKey(AppConstants.PrefKeys.APP_DRAWER_MODE)
+        val WALLPAPER_BACKDROP = stringPreferencesKey(AppConstants.PrefKeys.WALLPAPER_BACKDROP)
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
@@ -73,6 +75,7 @@ class SettingsRepositoryImpl @Inject constructor(
         PreferenceKeys.SORT_ORDER_KEY.name,
         PreferenceKeys.FAVORITES_ALIGNMENT.name,
         PreferenceKeys.APP_DRAWER_MODE.name,
+        PreferenceKeys.WALLPAPER_BACKDROP.name,
         PreferenceKeys.ONBOARDING_COMPLETED.name,
         PreferenceKeys.TEXT_SHADOW_ENABLED.name,
         PreferenceKeys.IS_FONT_BOLD.name,
@@ -245,6 +248,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) =
         putValue(PreferenceKeys.APP_DRAWER_MODE, mode.name)
 
+    override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
+        enumFlow(PreferenceKeys.WALLPAPER_BACKDROP, AppConstants.DEFAULT_WALLPAPER_BACKDROP)
+
+    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) =
+        putValue(PreferenceKeys.WALLPAPER_BACKDROP, backdrop.name)
+
     override val contentTopMarginScaleFlow: Flow<Float> =
         valueFlow(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE, AppConstants.DEFAULT_TOP_MARGIN)
 
@@ -281,6 +290,7 @@ class SettingsRepositoryImpl @Inject constructor(
             // APP_DRAWER_MODE backs wallpaperSurfaceMode (legacy key name);
             // it is a user-facing setting and must reset like the rest.
             preferences.remove(PreferenceKeys.APP_DRAWER_MODE)
+            preferences.remove(PreferenceKeys.WALLPAPER_BACKDROP)
 
             // Legacy orphans: the double-tap-to-lock, swipe-down-to-notifications
             // and secure-window features were removed along with their

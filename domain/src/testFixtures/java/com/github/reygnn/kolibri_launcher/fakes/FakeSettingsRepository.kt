@@ -4,6 +4,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -218,6 +219,7 @@ class FakeSettingsRepository : SettingsRepository {
 
         favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
         wallpaperSurfaceModeState.value = AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
+        wallpaperBackdropState.value = AppConstants.DEFAULT_WALLPAPER_BACKDROP
 
         onboardingCompletedState.value = wasOnboardingCompleted
     }
@@ -271,5 +273,19 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) {
         wallpaperSurfaceMode = mode
+    }
+
+    // wallpaperBackdrop
+    private val wallpaperBackdropState =
+        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_BACKDROP)
+
+    var wallpaperBackdrop: WallpaperBackdrop
+        get() = wallpaperBackdropState.value
+        set(value) { wallpaperBackdropState.value = value }
+
+    override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> = wallpaperBackdropState
+
+    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) {
+        wallpaperBackdrop = backdrop
     }
 }

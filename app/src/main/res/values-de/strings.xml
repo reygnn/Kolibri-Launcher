@@ -94,6 +94,16 @@
         <item>DARK</item>
     </string-array>
 
+    <string name="wallpaper_backdrop_title">Hinter dem Wallpaper</string>
+    <string-array name="wallpaper_backdrop_entries">
+        <item>System-Wallpaper</item>
+        <item>Schwarz</item>
+    </string-array>
+    <string-array name="wallpaper_backdrop_values">
+        <item>SYSTEM_WALLPAPER</item>
+        <item>BLACK</item>
+    </string-array>
+
     <string name="category_gestures_title">Gesten</string>
     <string name="recent_apps_title">Zuletzt geöffnet</string>
     <string name="recent_apps_empty">Noch keine kürzlich geöffneten Apps</string>
@@ -372,6 +382,7 @@
 <string name="cd_open_commands">Weitere Hintergrund-Steuerungen</string>
 <string name="cd_close_commands">Steuerungen schließen</string>
 <string name="cd_wallpaper_memory_info">Speicherverbrauch anzeigen</string>
+<string name="cd_wallpaper_backdrop_toggle">Hintergrund umschalten: System-Wallpaper oder Schwarz</string>
 
 <!-- Info-Dialog Wallpaper-Speicher (opt-in über den ⓘ-Button im Edit-Overflow). -->
 <string name="wallpaper_memory_title">Wallpaper-Speicher</string>

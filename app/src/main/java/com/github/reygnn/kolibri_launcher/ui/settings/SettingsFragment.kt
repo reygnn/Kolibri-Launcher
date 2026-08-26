@@ -28,6 +28,7 @@ import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupFragment
@@ -453,6 +454,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
+        // Wallpaper Backdrop (System wallpaper / Black) — what sits behind the
+        // collage. Writes to DataStore (source of truth); MainActivity's
+        // wallpaperBackdropFlow observer drives the actual backdrop colour.
+        val wallpaperBackdropPreference =
+            findPreference<ListPreference>(AppConstants.PrefKeys.WALLPAPER_BACKDROP)
+        wallpaperBackdropPreference?.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue is String) {
+                val backdrop = try {
+                    WallpaperBackdrop.valueOf(newValue)
+                } catch (e: IllegalArgumentException) {
+                    TimberWrapper.silentError(e, "Unknown WallpaperBackdrop value: $newValue")
+                    return@setOnPreferenceChangeListener false
+                }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        settingsRepository.setWallpaperBackdrop(backdrop)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error setting WallpaperBackdrop")
+                    }
+                }
+            }
+            true
+        }
+
         // Swipe Actions
         findPreference<Preference>(AppConstants.PrefKeys.SWIPE_ACTIONS)?.setOnPreferenceClickListener {
             try {
@@ -756,6 +783,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         throw e
                     } catch (e: Throwable) {
                         TimberWrapper.silentError(e, "Error in wallpaperSurfaceMode flow collection")
+                    }
+                }
+
+                // Observer for Wallpaper Backdrop Setting
+                launch {
+                    try {
+                        settingsRepository.wallpaperBackdropFlow.collect { backdrop ->
+                            if (!isAdded || isDetached) return@collect
+                            findPreference<ListPreference>(AppConstants.PrefKeys.WALLPAPER_BACKDROP)?.value =
+                                backdrop.name
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in wallpaperBackdrop flow collection")
                     }
                 }
 

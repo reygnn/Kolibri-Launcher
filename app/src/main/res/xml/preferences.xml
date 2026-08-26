@@ -78,6 +78,15 @@
             app:iconSpaceReserved="false"
             app:useSimpleSummaryProvider="true" />
 
+        <ListPreference
+            android:key="wallpaper_backdrop"
+            android:title="@string/wallpaper_backdrop_title"
+            android:entries="@array/wallpaper_backdrop_entries"
+            android:entryValues="@array/wallpaper_backdrop_values"
+            android:defaultValue="SYSTEM_WALLPAPER"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+
         <SwitchPreferenceCompat
             android:key="show_calendar_event"
             android:title="@string/show_calendar_event_title"

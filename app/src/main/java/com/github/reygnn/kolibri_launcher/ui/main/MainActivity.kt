@@ -36,11 +36,13 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
+import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.home.TimeEventFormatter
 import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
@@ -393,6 +395,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             return
         }
 
+        observeWallpaperBackdrop()
+
         // Keep the cached wallpaper-surface classification fresh across
         // wallpaper / surface-mode changes for the lifetime of the
         // Activity. Read at click-time by [wallpaperAwareDialogStyle]
@@ -431,6 +435,34 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             isInitialized = true
             onboardingCheckCompleted = true
             Timber.d("Activity recreated, skipping initialization")
+        }
+    }
+
+    /**
+     * Drives the Activity-owned backdrop ([R.id.wallpaper_backdrop]) from the
+     * persisted [SettingsRepository.wallpaperBackdropFlow]. The backdrop sits
+     * behind the NavHost and outlives HomeFragment's view, so painting it opaque
+     * black here (rather than as a bottom collage layer) is what stops the system
+     * wallpaper from flashing on every drawer→home return
+     * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC). [WallpaperBackdrop.SYSTEM_WALLPAPER]
+     * keeps it transparent so the device wallpaper shows through the window's
+     * FLAG_SHOW_WALLPAPER (set in [setupWindow]); no window flag is toggled at
+     * runtime — opaque black simply makes the flag a visual no-op.
+     *
+     * Must be called after [setupMainContent] has inflated the content view.
+     */
+    private fun observeWallpaperBackdrop() {
+        val backdrop = findViewById<View>(R.id.wallpaper_backdrop)
+        collectOnStarted(
+            flow = settingsRepository.wallpaperBackdropFlow,
+            errorTag = "wallpaper backdrop",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { mode ->
+            val color = when (mode) {
+                WallpaperBackdrop.SYSTEM_WALLPAPER -> Color.TRANSPARENT
+                WallpaperBackdrop.BLACK -> Color.BLACK
+            }
+            backdrop.setBackgroundColor(color)
         }
     }
 

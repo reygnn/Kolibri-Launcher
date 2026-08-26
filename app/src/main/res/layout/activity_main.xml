@@ -5,6 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- Opaque base for the wallpaper collage, owned by the Activity (NOT by
+         HomeFragment's view). Because it lives above the fragment lifecycle it
+         stays drawn during the drawer→home view teardown/rebuild, so the system
+         wallpaper can't flash through the transparent window in that gap
+         (WALLPAPER_DRAWER_HOME_REBUILD_SPEC). Colour is driven by
+         SettingsRepository.wallpaperBackdropFlow in MainActivity: TRANSPARENT
+         (system wallpaper shows via FLAG_SHOW_WALLPAPER) or BLACK. Default
+         transparent here preserves the historical look until the flow emits. -->
+    <View
+        android:id="@+id/wallpaper_backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
+
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/nav_host_fragment"
         android:name="androidx.navigation.fragment.NavHostFragment"

@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryReport
@@ -54,6 +55,7 @@ internal class WallpaperEditController(
     // A FAB position emitted by the ViewModel before the overlay exists is
     // stashed here and applied at inflation time (see [applyFabPosition]).
     private var pendingFabPosition: FabPosition? = null
+    private var pendingBackdrop: WallpaperBackdrop? = null
 
     private val fabCluster: SpeedDialFabCluster get() = requireNotNull(overlay).wallpaperFabCluster
     private val commandsPanel: CommandsPanel get() = requireNotNull(overlay).wallpaperCommandsPanel
@@ -83,6 +85,16 @@ internal class WallpaperEditController(
         pendingFabPosition?.let {
             bound.wallpaperFabCluster.applyPosition(it.xFraction, it.yFraction)
             pendingFabPosition = null
+        }
+
+        // Apply a backdrop choice that arrived before the panel existed.
+        pendingBackdrop?.let {
+            val iconRes = when (it) {
+                WallpaperBackdrop.SYSTEM_WALLPAPER -> R.drawable.ic_backdrop_system
+                WallpaperBackdrop.BLACK -> R.drawable.ic_backdrop_black
+            }
+            bound.wallpaperCommandsPanel.setBackdropToggleIcon(iconRes)
+            pendingBackdrop = null
         }
 
         return bound
@@ -121,6 +133,30 @@ internal class WallpaperEditController(
             // fabPosition flow emits its initial value at startup. Stash it;
             // [ensureOverlayInflated] applies it when the overlay is built.
             pendingFabPosition = position
+        }
+    }
+
+    /**
+     * Updates the CommandsPanel backdrop-toggle icon to reflect the current
+     * [WallpaperBackdrop]. Driven by the Fragment's observer of
+     * [LauncherViewModel.wallpaperBackdrop]. No-op until the overlay (and thus
+     * the panel) has been inflated — the icon is re-applied on the next emit
+     * once the user enters edit mode, and the flow is a StateFlow so a current
+     * value is always available.
+     */
+    fun applyBackdrop(backdrop: WallpaperBackdrop) {
+        val iconRes = when (backdrop) {
+            WallpaperBackdrop.SYSTEM_WALLPAPER -> R.drawable.ic_backdrop_system
+            WallpaperBackdrop.BLACK -> R.drawable.ic_backdrop_black
+        }
+        if (overlay != null) {
+            commandsPanel.setBackdropToggleIcon(iconRes)
+        } else {
+            // Overlay not built yet — stash and apply on inflation, like
+            // pendingFabPosition. wallpaperBackdrop is a StateFlow, so the
+            // Fragment's collector re-emits the current value on STARTED after a
+            // view rebuild, keeping this fresh.
+            pendingBackdrop = backdrop
         }
     }
 
@@ -223,6 +259,7 @@ internal class WallpaperEditController(
         fabCluster.setOnOpenCommandsClicked { commandsPanel.togglePanel() }
         commandsPanel.setOnCloseClicked { commandsPanel.hidePanel() }
         commandsPanel.setOnMemInfoClicked { showWallpaperMemoryDialog() }
+        commandsPanel.setOnBackdropToggleClicked { viewModel.onToggleWallpaperBackdrop() }
 
         // ── SNAP CONTROLS — wired on the panel ──
         updateSnapButtonIcon(wallpaperView.isSnapEnabled)
@@ -314,6 +351,7 @@ internal class WallpaperEditController(
         commandsPanel.setOnLayerUpClicked { /* no-op */ }
         commandsPanel.setOnLayerDownClicked { /* no-op */ }
         commandsPanel.setOnMemInfoClicked { /* no-op */ }
+        commandsPanel.setOnBackdropToggleClicked { /* no-op */ }
         commandsPanel.setOnCloseClicked { /* no-op */ }
 
         binding.wallpaperView.onLayerTapped = null
