@@ -10,10 +10,14 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitm
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -65,6 +69,8 @@ class WallpaperDelegateTest {
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
     private lateinit var getFabPositionUseCase: GetFabPositionUseCase
     private lateinit var saveFabPositionUseCase: SaveFabPositionUseCase
+    private lateinit var observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase
+    private lateinit var setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase
     private lateinit var wallpaperFileManager: WallpaperFileManager
 
     private val testUri: Uri = mockk()
@@ -88,6 +94,10 @@ class WallpaperDelegateTest {
         getFabPositionUseCase = mockk(relaxed = true)
         every { getFabPositionUseCase.invoke() } returns emptyFlow()
         saveFabPositionUseCase = mockk(relaxed = true)
+
+        observeWallpaperBackdropUseCase = mockk(relaxed = true)
+        every { observeWallpaperBackdropUseCase.invoke() } returns emptyFlow()
+        setWallpaperBackdropUseCase = mockk(relaxed = true)
 
         wallpaperFileManager = mockk(relaxed = true)
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
@@ -133,8 +143,8 @@ class WallpaperDelegateTest {
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
-        observeWallpaperBackdropUseCase = mockk(relaxed = true),
-        setWallpaperBackdropUseCase = mockk(relaxed = true),
+        observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
+        setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         wallpaperFileManager = wallpaperFileManager,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = compositeCache,
@@ -1970,5 +1980,56 @@ class WallpaperDelegateTest {
                 com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.42f, yFraction = 0.58f)
             )
         }
+    }
+
+    // ===========================================
+    // WALLPAPER BACKDROP
+    // ===========================================
+
+    @Test
+    fun `wallpaperBackdrop starts at DEFAULT when the use case has not emitted`() {
+        // observe returns emptyFlow() (setUp) — stateIn holds its initialValue.
+        val delegate = createDelegate()
+        assertEquals(AppConstants.DEFAULT_WALLPAPER_BACKDROP, delegate.wallpaperBackdrop.value)
+    }
+
+    @Test
+    fun `wallpaperBackdrop reflects use-case flow emissions`() = runTest {
+        val flow = MutableStateFlow(WallpaperBackdrop.BLACK)
+        every { observeWallpaperBackdropUseCase.invoke() } returns flow
+
+        val delegate = createDelegate()
+        // StateIn(WhileSubscribed) needs a collector before it leaves initialValue.
+        backgroundScope.launch { delegate.wallpaperBackdrop.collect { } }
+        advanceUntilIdle()
+        assertEquals(WallpaperBackdrop.BLACK, delegate.wallpaperBackdrop.value)
+
+        flow.value = WallpaperBackdrop.SYSTEM_WALLPAPER
+        advanceUntilIdle()
+        assertEquals(WallpaperBackdrop.SYSTEM_WALLPAPER, delegate.wallpaperBackdrop.value)
+    }
+
+    @Test
+    fun `onToggleWallpaperBackdrop flips SYSTEM_WALLPAPER to BLACK`() = runTest {
+        // Current value is the SYSTEM_WALLPAPER default (no emission, no collector).
+        val delegate = createDelegate()
+        delegate.onToggleWallpaperBackdrop()
+        advanceUntilIdle()
+        coVerify { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
+    }
+
+    @Test
+    fun `onToggleWallpaperBackdrop flips BLACK to SYSTEM_WALLPAPER`() = runTest {
+        every { observeWallpaperBackdropUseCase.invoke() } returns
+            MutableStateFlow(WallpaperBackdrop.BLACK)
+
+        val delegate = createDelegate()
+        // Drive the StateFlow past its initialValue so the toggle reads BLACK.
+        backgroundScope.launch { delegate.wallpaperBackdrop.collect { } }
+        advanceUntilIdle()
+
+        delegate.onToggleWallpaperBackdrop()
+        advanceUntilIdle()
+        coVerify { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
     }
 }

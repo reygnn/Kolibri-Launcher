@@ -59,6 +59,7 @@ class BackupSerializerRoundTripTest {
             contentTopMarginScale = 1.11f,
             favoritesAlignment = "END",
             wallpaperSurfaceMode = "LIGHT",
+            wallpaperBackdrop = "BLACK",
             wallpaperUri = "file:///wp/single.img",
             wallpaperScale = 2.5f,
             wallpaperTranslateX = 9.0f,
