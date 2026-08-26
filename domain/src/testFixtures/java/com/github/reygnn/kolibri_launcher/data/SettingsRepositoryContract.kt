@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -123,6 +124,15 @@ abstract class SettingsRepositoryContract {
         )
     }
 
+    @Test
+    fun `fresh repository emits default wallpaperBackdrop`() = runTest {
+        val repo = createRepository()
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+            repo.wallpaperBackdropFlow.first(),
+        )
+    }
+
     // ---------- Roundtrip: Set -> Flow reflects change ----------
 
     @Test
@@ -183,6 +193,15 @@ abstract class SettingsRepositoryContract {
             .first { it != AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE }
         repo.setWallpaperSurfaceMode(newValue)
         assertEquals(newValue, repo.wallpaperSurfaceModeFlow.first())
+    }
+
+    @Test
+    fun `setWallpaperBackdrop reflects in flow`() = runTest {
+        val repo = createRepository()
+        val newValue = WallpaperBackdrop.entries
+            .first { it != AppConstants.DEFAULT_WALLPAPER_BACKDROP }
+        repo.setWallpaperBackdrop(newValue)
+        assertEquals(newValue, repo.wallpaperBackdropFlow.first())
     }
 
     @Test
@@ -273,6 +292,21 @@ abstract class SettingsRepositoryContract {
         assertEquals(
             AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE,
             repo.wallpaperSurfaceModeFlow.first()
+        )
+    }
+
+    @Test
+    fun `purgeRepository resets wallpaperBackdrop to default`() = runTest {
+        val repo = createRepository()
+        val nonDefault = WallpaperBackdrop.entries
+            .first { it != AppConstants.DEFAULT_WALLPAPER_BACKDROP }
+        repo.setWallpaperBackdrop(nonDefault)
+
+        repo.purgeRepository()
+
+        assertEquals(
+            AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+            repo.wallpaperBackdropFlow.first()
         )
     }
 
