@@ -88,20 +88,11 @@
         <item>Hell</item>
         <item>Dunkel</item>
     </string-array>
-    <string-array name="app_drawer_mode_values">
-        <item>AUTO</item>
-        <item>LIGHT</item>
-        <item>DARK</item>
-    </string-array>
 
     <string name="wallpaper_backdrop_title">Hinter dem Wallpaper</string>
     <string-array name="wallpaper_backdrop_entries">
         <item>System-Wallpaper</item>
         <item>Schwarz</item>
-    </string-array>
-    <string-array name="wallpaper_backdrop_values">
-        <item>SYSTEM_WALLPAPER</item>
-        <item>BLACK</item>
     </string-array>
 
     <string name="category_gestures_title">Gesten</string>

@@ -91,7 +91,10 @@
         <item>Light</item>
         <item>Dark</item>
     </string-array>
-    <string-array name="app_drawer_mode_values">
+    <!-- Persisted enum identifiers (fed to WallpaperSurfaceMode.valueOf); NOT UI
+         prose. translatable="false" keeps them out of values-de/ so a translation
+         can't break persistence. Visible labels live in app_drawer_mode_entries. -->
+    <string-array name="app_drawer_mode_values" translatable="false">
         <item>AUTO</item>
         <item>LIGHT</item>
         <item>DARK</item>
@@ -102,7 +105,10 @@
         <item>System wallpaper</item>
         <item>Black</item>
     </string-array>
-    <string-array name="wallpaper_backdrop_values">
+    <!-- Persisted enum identifiers (fed to WallpaperBackdrop.valueOf); NOT UI
+         prose. translatable="false" keeps them out of values-de/ so a translation
+         can't break persistence. Visible labels live in wallpaper_backdrop_entries. -->
+    <string-array name="wallpaper_backdrop_values" translatable="false">
         <item>SYSTEM_WALLPAPER</item>
         <item>BLACK</item>
     </string-array>
