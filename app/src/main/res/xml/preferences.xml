@@ -168,9 +168,13 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
-    <!-- Entwickler-Befehle: ACRA-Verifikations-Shortcuts (Pipeline-Status,
-         Throw Test Exception). Auch im Release sichtbar — siehe TODO §14
-         und die Strings im values/strings.xml. -->
+    <!-- Developer commands: ACRA verification shortcuts. pipeline_status is a
+         harmless read-only probe and stays in every build. The three
+         test-triggers below (throw / silent-error / warn) are gated at runtime
+         by BuildConfig.SHOW_DEV_COMMANDS (see SettingsFragment + app/build.gradle.kts):
+         present in debug and in a personal `-PdevCommands` release, removed from
+         the public GitHub release (public-safe default). Declared statically here
+         and stripped in code when the flag is off. -->
     <PreferenceCategory
         android:key="category_developer_commands"
         android:title="@string/developer_commands_category_title"

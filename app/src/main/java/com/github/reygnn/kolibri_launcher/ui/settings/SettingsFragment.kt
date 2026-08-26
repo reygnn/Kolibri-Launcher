@@ -549,59 +549,79 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        // Developer command: the ACRA throw-test shortcut. A throw in a
-        // Preference click handler propagates straight to the global
-        // UncaughtExceptionHandler — which for the throw-test button is exactly
-        // what we WANT (it exercises the real uncaught path).
-        findPreference<Preference>(AppConstants.PrefKeys.THROW_TEST_EXCEPTION)?.setOnPreferenceClickListener {
-            // Toast first so the user sees the warning before the crash.
-            // The Thread + Thread.sleep(800) gives Android time to render
-            // the Toast (~300ms surface) before the throw lands. The throw
-            // runs on a non-Main thread with no CoroutineExceptionHandler
-            // attached, so it travels straight to ACRA's global
-            // UncaughtExceptionHandler — the exact path a real user crash
-            // takes.
-            showToastSafe(R.string.toast_throwing_test_exception, Toast.LENGTH_LONG)
-            Thread {
-                try {
-                    Thread.sleep(800)
-                } catch (_: InterruptedException) {
-                    // ignore — the throw below is the point
-                }
-                throw RuntimeException(
-                    "ACRA developer-test crash from Settings (version ${BuildConfig.VERSION_NAME})",
+        // The three ACRA test-trigger dev commands (throw / silent-error /
+        // warn) are gated behind SHOW_DEV_COMMANDS: present in a debug build
+        // and in a personal release built with `-PdevCommands`, but compiled
+        // out of the public GitHub release (public-safe default = off, see
+        // app/build.gradle.kts). When off, they are removed from the
+        // developer-commands category so the category shows only the harmless
+        // read-only pipeline_status probe wired above.
+        if (BuildConfig.SHOW_DEV_COMMANDS) {
+            // Developer command: the ACRA throw-test shortcut. A throw in a
+            // Preference click handler propagates straight to the global
+            // UncaughtExceptionHandler — which for the throw-test button is exactly
+            // what we WANT (it exercises the real uncaught path).
+            findPreference<Preference>(AppConstants.PrefKeys.THROW_TEST_EXCEPTION)?.setOnPreferenceClickListener {
+                // Toast first so the user sees the warning before the crash.
+                // The Thread + Thread.sleep(800) gives Android time to render
+                // the Toast (~300ms surface) before the throw lands. The throw
+                // runs on a non-Main thread with no CoroutineExceptionHandler
+                // attached, so it travels straight to ACRA's global
+                // UncaughtExceptionHandler — the exact path a real user crash
+                // takes.
+                showToastSafe(R.string.toast_throwing_test_exception, Toast.LENGTH_LONG)
+                Thread {
+                    try {
+                        Thread.sleep(800)
+                    } catch (_: InterruptedException) {
+                        // ignore — the throw below is the point
+                    }
+                    throw RuntimeException(
+                        "ACRA developer-test crash from Settings (version ${BuildConfig.VERSION_NAME})",
+                    )
+                }.start()
+                true
+            }
+
+            // Developer command (§23): fire a silentError → must reach ACRA via
+            // AcraTree with the SILENT_ERROR intent tag. Unlike the throw-test this
+            // does NOT crash (in a RELEASE build silentError only logs + reports —
+            // report by intent), so the tester can then check the ACRA backend for
+            // a `[E/SILENT_ERROR]` carrier while the app stays alive.
+            findPreference<Preference>(AppConstants.PrefKeys.SILENT_ERROR_TEST)?.setOnPreferenceClickListener {
+                showToastSafe(R.string.toast_silent_error_test, Toast.LENGTH_LONG)
+                TimberWrapper.silentError(
+                    RuntimeException("ACRA silent-error test from Settings (version ${BuildConfig.VERSION_NAME})"),
+                    "ACRA silent-error test",
                 )
-            }.start()
-            true
-        }
+                true
+            }
 
-        // Developer command (§23): fire a silentError → must reach ACRA via
-        // AcraTree with the SILENT_ERROR intent tag. Unlike the throw-test this
-        // does NOT crash (in a RELEASE build silentError only logs + reports —
-        // report by intent), so the tester can then check the ACRA backend for
-        // a `[E/SILENT_ERROR]` carrier while the app stays alive.
-        findPreference<Preference>(AppConstants.PrefKeys.SILENT_ERROR_TEST)?.setOnPreferenceClickListener {
-            showToastSafe(R.string.toast_silent_error_test, Toast.LENGTH_LONG)
-            TimberWrapper.silentError(
-                RuntimeException("ACRA silent-error test from Settings (version ${BuildConfig.VERSION_NAME})"),
-                "ACRA silent-error test",
-            )
-            true
-        }
-
-        // Developer command (§23): fire an untagged Timber.w → must NOT reach
-        // ACRA (the report-by-intent invariant). If a report shows up in the
-        // backend for this, the intent gate has regressed. Timber.w never throws,
-        // so the app stays alive.
-        findPreference<Preference>(AppConstants.PrefKeys.WARN_TEST)?.setOnPreferenceClickListener {
-            showToastSafe(R.string.toast_warn_test, Toast.LENGTH_LONG)
-            Timber.w(
-                RuntimeException(
-                    "ACRA warn test from Settings (version ${BuildConfig.VERSION_NAME}) — should NOT appear in ACRA",
-                ),
-                "ACRA warn test — should NOT be reported",
-            )
-            true
+            // Developer command (§23): fire an untagged Timber.w → must NOT reach
+            // ACRA (the report-by-intent invariant). If a report shows up in the
+            // backend for this, the intent gate has regressed. Timber.w never throws,
+            // so the app stays alive.
+            findPreference<Preference>(AppConstants.PrefKeys.WARN_TEST)?.setOnPreferenceClickListener {
+                showToastSafe(R.string.toast_warn_test, Toast.LENGTH_LONG)
+                Timber.w(
+                    RuntimeException(
+                        "ACRA warn test from Settings (version ${BuildConfig.VERSION_NAME}) — should NOT appear in ACRA",
+                    ),
+                    "ACRA warn test — should NOT be reported",
+                )
+                true
+            }
+        } else {
+            // Public GitHub release: strip the three test triggers so they
+            // never render. parent?.removePreference detaches them from the
+            // developer-commands category.
+            listOf(
+                AppConstants.PrefKeys.THROW_TEST_EXCEPTION,
+                AppConstants.PrefKeys.SILENT_ERROR_TEST,
+                AppConstants.PrefKeys.WARN_TEST,
+            ).forEach { key ->
+                findPreference<Preference>(key)?.let { it.parent?.removePreference(it) }
+            }
         }
     }
 

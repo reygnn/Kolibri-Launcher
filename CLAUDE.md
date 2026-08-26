@@ -927,6 +927,20 @@ silently degraded cold-start in the shipped AAB. Run
 `bundleRelease`. Same trap surfaces the cold-start perf gate as a false
 "REGRESS" — see `docs/specs/PERF-BENCHMARK-SETUP.md`.
 
+**Public vs. personal release — the `devCommands` flag.** Settings carries three
+ACRA test-trigger dev commands (throw / silent-error / warn). They are gated by
+`BuildConfig.SHOW_DEV_COMMANDS`, whose release value is **public-safe by
+default**: a plain `./gradlew bundleRelease` compiles them out, so the AAB
+uploaded to GitHub never exposes them. To build your **personal** AAB with the
+dev commands present, pass `-PdevCommands` (bare, or `=true`):
+`./gradlew bundleRelease -PdevCommands` — or set `devCommands=true` in your
+**global** `~/.gradle/gradle.properties` (outside the repo) so every local
+release keeps them without typing. Absence of the flag = off, so forgetting it
+can only ever produce a public-safe build, never leak. The read-only
+`pipeline_status` probe is **not** gated (harmless in public). Debug builds
+always show all four. Details in `app/build.gradle.kts` (the `devCommandsInRelease`
+val) and `SettingsFragment` (the `SHOW_DEV_COMMANDS` branch).
+
 ---
 
 ## Git workflow

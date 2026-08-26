@@ -100,11 +100,25 @@ android {
         }
     }
 
+    // Public-safe default: the three ACRA test-trigger dev commands
+    // (throw / silent-error / warn) are compiled out of a plain
+    // `bundleRelease` / `assembleRelease` so the GitHub-shipped AAB never
+    // exposes them. A personal build re-enables them with
+    // `-PdevCommands` (bare, or `=true`); absence = off, so forgetting the
+    // flag can only ever produce a public-safe build, never leak. Read via
+    // BuildConfig.SHOW_DEV_COMMANDS in SettingsFragment. pipeline_status is
+    // NOT gated (read-only probe, harmless in public).
+    val devCommandsInRelease = providers.gradleProperty("devCommands")
+        .map { it.isBlank() || it.toBoolean() }
+        .getOrElse(false)
+
     buildTypes {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
             isDebuggable = true
+            // Dev commands always present in a debug build.
+            buildConfigField("boolean", "SHOW_DEV_COMMANDS", "true")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -114,6 +128,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false
+            buildConfigField("boolean", "SHOW_DEV_COMMANDS", devCommandsInRelease.toString())
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
