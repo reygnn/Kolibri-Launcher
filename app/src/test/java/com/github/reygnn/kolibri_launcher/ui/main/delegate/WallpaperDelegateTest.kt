@@ -2037,9 +2037,11 @@ class WallpaperDelegateTest {
     @Test
     fun `onToggleWallpaperBackdrop double-tap nets to a no-op`() = runTest {
         // Default is SYSTEM_WALLPAPER and the store never emits between taps —
-        // the exact lost-update scenario: a stale `.value` read would flip both
-        // taps to BLACK. The optimistic mirror must flip the second tap from the
-        // first tap's target (BLACK) back to SYSTEM_WALLPAPER.
+        // the exact lost-update scenario: a stale read of the write→read-lagged
+        // wallpaperBackdrop would flip BOTH taps to BLACK. The serialized toggle
+        // must flip the second tap from the first tap's last-written target
+        // (BLACK) back to SYSTEM_WALLPAPER, so the persisted writes are BLACK
+        // then SYSTEM_WALLPAPER (net no-op).
         val delegate = createDelegate()
 
         delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK
@@ -2050,6 +2052,5 @@ class WallpaperDelegateTest {
             setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK)
             setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER)
         }
-        assertEquals(WallpaperBackdrop.SYSTEM_WALLPAPER, delegate.wallpaperBackdrop.value)
     }
 }

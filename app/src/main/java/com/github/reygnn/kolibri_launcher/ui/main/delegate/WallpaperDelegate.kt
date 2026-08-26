@@ -166,7 +166,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * Delegate responsible for wallpaper management:
@@ -280,45 +279,47 @@ class WallpaperDelegate(
         }
 
     /**
-     * The backdrop that sits behind the wallpaper collage, read by the
-     * wallpaper-edit CommandsPanel toggle to show the current state and to
-     * compute the flipped target. The actual on-screen backdrop colour is
-     * driven independently by MainActivity's own observer of the same DataStore
-     * flow — DataStore stays the single source of truth.
+     * The persisted backdrop that sits behind the wallpaper collage, read by the
+     * wallpaper-edit CommandsPanel toggle to show the current state. A plain
+     * `stateIn` of the DataStore flow: it only ever mirrors what is persisted, so
+     * the edit-panel icon can never diverge from the actual on-screen backdrop
+     * (which MainActivity drives from the same flow) — in particular a failed
+     * write can never leave the icon showing a value that was never stored.
+     * DataStore stays the single source of truth.
      *
-     * This is an *optimistic* mirror rather than a raw `stateIn` of the store:
-     * [onToggleWallpaperBackdrop] updates it synchronously so a rapid double-tap
-     * flips from the intended next value instead of the write→read-lagged store
-     * value (which only changes after the DataStore round-trip). The collector
-     * below keeps it resynced with the persisted value, so an external change
-     * (e.g. the Settings screen) still propagates here.
+     * Double-tap correctness is handled on the WRITE side ([onToggleWallpaperBackdrop]),
+     * not by making this value optimistic — keeping display strictly = persisted.
      */
-    private val _wallpaperBackdrop =
-        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_BACKDROP)
-    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = _wallpaperBackdrop.asStateFlow()
-
-    init {
-        scope.launchSafe("Error observing wallpaper backdrop") {
-            observeWallpaperBackdropUseCase().collect { _wallpaperBackdrop.value = it }
-        }
-    }
+    val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = observeWallpaperBackdropUseCase()
+        .stateIn(
+            scope = scope.coroutineScope,
+            started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
+            initialValue = AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+        )
 
     /**
-     * Flips the backdrop between system-wallpaper and black and persists it.
-     * The flip is computed via [updateAndGet] on the optimistic mirror so two
-     * taps always net to a no-op even if the DataStore write of the first has
-     * not yet round-tripped (the conflated-value lost-update the raw `.value`
-     * read was prone to).
+     * Serializes backdrop toggles and remembers the value we last *successfully*
+     * persisted. A rapid double-tap thus flips from that intended value rather
+     * than the write→read-lagged [wallpaperBackdrop] (which only updates after
+     * the DataStore round-trip), so two taps net to a no-op instead of both
+     * reading the same stale value. Advanced ONLY after a successful write, so a
+     * failed persist leaves the next toggle computing from the last stored value.
      */
+    private val backdropToggleMutex = Mutex()
+    private var lastWrittenBackdrop: WallpaperBackdrop? = null
+
+    /** Flips the backdrop between system-wallpaper and black and persists it. */
     fun onToggleWallpaperBackdrop() =
         scope.launchSafe("Error toggling wallpaper backdrop") {
-            val next = _wallpaperBackdrop.updateAndGet {
-                when (it) {
+            backdropToggleMutex.withLock {
+                val current = lastWrittenBackdrop ?: wallpaperBackdrop.value
+                val next = when (current) {
                     WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
                     WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
                 }
+                setWallpaperBackdropUseCase(next)
+                lastWrittenBackdrop = next
             }
-            setWallpaperBackdropUseCase(next)
         }
 
     // --- Edit Session State ---
