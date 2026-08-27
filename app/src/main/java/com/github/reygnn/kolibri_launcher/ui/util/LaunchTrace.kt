@@ -44,6 +44,22 @@ object LaunchTrace {
         /** `NavController.navigate` into the app drawer (drawer-open path). */
         const val DRAWER_OPEN = "drawer_open_navigate"
 
+        // --- Home favorites first paint (the "favorites pop in late" lag) ---
+        // ASYNC section: spans the off-Main PackageManager enumeration wait and
+        // ends a frame later in a pre-draw callback, so the thread-local sync
+        // `section` (begin/end same thread) would mis-report. Measured on device
+        // via the `:macrobenchmark` TraceSectionMetric (FavoritesFirstPaintBenchmark).
+
+        /** From the cold-start Home view being created ([HomeFragment.onViewCreated])
+         * to the first favorites frame being drawn. Favorites are pure text buttons,
+         * but the list can only be built once the full PackageManager enumeration
+         * has produced every app's label (`drawer_apps_enumerate`), so on a cold
+         * start this span is enumeration-gated — it is the measurable form of the
+         * "favorites pop in late" lag documented in `FavoriteNameSnapshot`'s KDoc.
+         * Fires exactly once per process (cold start only); a warm Home return does
+         * not re-measure. */
+        const val FAVORITES_FIRST_PAINT = "favorites_first_paint"
+
         // --- Launcher process cold start (Application bootstrap) ---
         // These pin the synchronous Main-thread bootstrap chain that runs
         // before the first launcher frame. The `android_startups` trace metric

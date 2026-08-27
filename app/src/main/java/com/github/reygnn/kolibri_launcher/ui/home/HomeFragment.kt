@@ -18,6 +18,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.doOnPreDraw
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -432,6 +433,13 @@ class HomeFragment : Fragment() {
         // half-broken" states — exactly the failure mode the file-header
         // try/catch-audit calls out. Real init failures (inflate, OOM)
         // belong to silentDeath, not silentError.
+
+        // Anchor the cold-start favorites first-paint trace as early as the Home
+        // view exists (LaunchTrace.Names.FAVORITES_FIRST_PAINT). Ended a frame
+        // after the first non-empty favorites paint in renderFavorites; guarded
+        // to fire once per process (cold start only).
+        beginFavoritesFirstPaintTrace()
+
         recalculateLayoutCache(
             viewModel.layoutScaleState.value,
             viewModel.verticalPaddingState.value,
@@ -896,7 +904,15 @@ class HomeFragment : Fragment() {
         if (_binding == null) return
         Timber.d("Rendering ${apps.size} favorites")
         favoritesAdapter.setStyling(buildFavoritesStyling(colors))
-        favoritesAdapter.submitList(apps)
+        if (apps.isNotEmpty()) {
+            // First non-empty paint of this cold start: close the favorites
+            // first-paint trace one frame after the list commits (doOnPreDraw
+            // fires just before the frame that draws the new rows). No-op on
+            // every later submitList round via the once-per-process state guard.
+            favoritesAdapter.submitList(apps) { endFavoritesFirstPaintTraceOnNextDraw() }
+        } else {
+            favoritesAdapter.submitList(apps)
+        }
     }
 
     private fun clearAllViews() {
@@ -1549,4 +1565,67 @@ class HomeFragment : Fragment() {
 
         super.onDestroyView()
     }
+
+    // ============================================================================
+    // FAVORITES FIRST-PAINT TRACE (cold-start measurement point)
+    // ============================================================================
+
+    /**
+     * Opens the [LaunchTrace.Names.FAVORITES_FIRST_PAINT] async span exactly once
+     * per process, at the cold-start Home view creation. A warm Home return (view
+     * recreation within a live process) leaves the guard at [FavFirstPaint.DONE]
+     * and re-measures nothing. Trace calls are cheap no-ops when no tracer is
+     * attached, so this is free in normal use and present in release (that is what
+     * lets `:macrobenchmark` measure the ship build).
+     */
+    private fun beginFavoritesFirstPaintTrace() {
+        if (favFirstPaint != FavFirstPaint.NOT_STARTED) return
+        favFirstPaint = FavFirstPaint.STARTED
+        LaunchTrace.beginAsync(LaunchTrace.Names.FAVORITES_FIRST_PAINT, FAVORITES_FIRST_PAINT_COOKIE)
+    }
+
+    /**
+     * Closes the favorites first-paint span one frame after the first non-empty
+     * favorites list commits. [doOnPreDraw] fires just before the frame that
+     * actually draws the new rows, so the span ends at the true first paint, not
+     * at the (earlier) list commit. Called from [renderFavorites]; the state
+     * transition [FavFirstPaint.STARTED] -> [AWAITING_DRAW][FavFirstPaint.AWAITING_DRAW]
+     * -> [DONE][FavFirstPaint.DONE] guarantees exactly one `endAsync` even across
+     * the several `submitList` rounds a restore/reorder fires.
+     *
+     * If the view is torn down between commit and draw the span is left open on
+     * purpose: an unclosed async slice simply does not match in the benchmark,
+     * which is the correct signal for "favorites never painted".
+     */
+    private fun endFavoritesFirstPaintTraceOnNextDraw() {
+        if (favFirstPaint != FavFirstPaint.STARTED) return
+        favFirstPaint = FavFirstPaint.AWAITING_DRAW
+        val recyclerView = _binding?.favoritesRecyclerView ?: return
+        recyclerView.doOnPreDraw {
+            if (favFirstPaint == FavFirstPaint.AWAITING_DRAW) {
+                favFirstPaint = FavFirstPaint.DONE
+                LaunchTrace.endAsync(
+                    LaunchTrace.Names.FAVORITES_FIRST_PAINT,
+                    FAVORITES_FIRST_PAINT_COOKIE,
+                )
+            }
+        }
+    }
+
+    private companion object {
+        /** Async begin/end cookie for the favorites first-paint span (matched by
+         * [Trace][android.os.Trace]; arbitrary but stable per call site). */
+        const val FAVORITES_FIRST_PAINT_COOKIE = 0xF00D
+
+        /**
+         * Process-scoped one-shot for the cold-start favorites first-paint trace.
+         * Companion (static) so it survives fragment view recreation — the span is
+         * measured once per launcher process, not once per Home view. Touched only
+         * on the Main thread (onViewCreated, the Main favorites collector, the
+         * pre-draw callback), so no synchronization is needed.
+         */
+        private var favFirstPaint = FavFirstPaint.NOT_STARTED
+    }
+
+    private enum class FavFirstPaint { NOT_STARTED, STARTED, AWAITING_DRAW, DONE }
 }
