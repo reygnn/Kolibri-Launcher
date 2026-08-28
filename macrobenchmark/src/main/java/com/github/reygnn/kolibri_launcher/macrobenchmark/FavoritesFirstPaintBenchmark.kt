@@ -66,11 +66,15 @@ class FavoritesFirstPaintBenchmark {
         compilationMode = CompilationMode.Partial(), // ship-equivalent (baseline profile installed)
         setupBlock = {
             if (!pastOnboarding) {
-                // First iteration only: launch once to clear the first-run gates.
-                // The taps persist to DataStore and survive the COLD kill below, so
-                // every measured cold start renders Home instead of the onboarding gate.
+                // First iteration only: complete onboarding by SELECTING favorites in
+                // the onboarding app list (and declining the ACRA consent that follows).
+                // The selection persists to DataStore and survives the COLD kills below,
+                // so every measured cold start renders Home with real favorites instead
+                // of the empty-set fallback. Required because connectedBenchmarkAndroidTest
+                // reinstalls fresh and wipes the favorites store — see
+                // completeOnboardingWithFavorites.
                 startActivityAndWait()
-                dismissFirstRunGatesIfPresent(TARGET_PACKAGE)
+                completeOnboardingWithFavorites(TARGET_PACKAGE, SEED_FAVORITES_COUNT)
                 pastOnboarding = true
             }
             pressHome()
@@ -110,6 +114,10 @@ class FavoritesFirstPaintBenchmark {
     private companion object {
         const val TARGET_PACKAGE = "com.github.reygnn.kolibri_launcher"
         const val ITERATIONS = 20 // cold start is heavy; 20 keeps the run's wall-clock sane
+        // Enough favorites to exercise the favorites path (not the empty-set
+        // fallback); a small count keeps the one-off UI seeding robust. The provisional
+        // first-paint effect is visible with any non-empty favorite set.
+        const val SEED_FAVORITES_COUNT = 3
         const val PAINT_TIMEOUT_MS = 5_000L
         const val POLL_MS = 16L // ~one frame between "have favorites painted yet?" checks
         const val SECTION_FAVORITES_FIRST_PAINT = "favorites_first_paint" // LaunchTrace.Names.FAVORITES_FIRST_PAINT
