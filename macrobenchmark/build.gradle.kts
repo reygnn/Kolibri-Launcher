@@ -159,23 +159,26 @@ tasks.register("verifyStartupBenchmark") {
     // Threshold in MILLISECONDS, gated on the MEDIAN of the ship-equivalent
     // (CompilationMode.Partial = baseline profile installed) COLD-start TTID.
     //
-    // Measured on an A17 5G (SM-A176B, 20 iterations): Partial median 378 ms, p95
-    // 404 ms, max 408 ms, CoV 3.6%; the profile-LESS run (CompilationMode.None)
-    // sits at median 450 ms / min 435 ms with ZERO distribution overlap — the worst
-    // profiled cold start (408 ms) still beats the best unprofiled one (435 ms).
-    // 420 ms is ~11% over the healthy median AND above its max, so per-run noise
-    // never trips it; yet it sits below the profile-less median (450 ms), so it
-    // FAILS exactly when the profile silently stops applying (empty/absent baseline
-    // profile → Partial degrades toward None → TTID climbs to ~450 ms) or a heavy
-    // init lands on the startup path. Median (not max): startup is a whole-render
-    // measurement, so a single slow cold start is noise — a shifted median is the
-    // structural signal. Device-calibrated — re-tune if the reference device changes.
+    // Measured on an A17 5G (SM-A176B, 3×20 iterations pooled): Partial median
+    // 547 ms, p95 569 ms, CoV 3.1%; the profile-LESS run (CompilationMode.None)
+    // sits at median 613 ms / p5 587 ms. The 5–95% bands are DISJOINT — the
+    // profiled p95 (569 ms) still beats the unprofiled p5 (587 ms); only lone
+    // outlier iterations touch. 580 ms is ~6% over the healthy median AND above its
+    // p95, so per-run noise never trips it; yet it sits 33 ms below the profile-less
+    // median (613 ms), so it FAILS exactly when the profile silently stops applying
+    // (empty/absent baseline profile → Partial degrades toward None → TTID climbs to
+    // ~613 ms) or a heavy init lands on the startup path. Median (not max): startup
+    // is a whole-render measurement, so a single slow cold start is noise — a shifted
+    // median is the structural signal. The old, faster reference device (retired
+    // R5GL71YWEPH) had ZERO min/max overlap and the threshold cleared the Partial
+    // MAX; this slower unit's arm tails touch on outliers, so the buffer is now over
+    // p95, not max. Device-calibrated — re-tune if the reference device changes.
     //
     // OPERATIONAL: cold-start TTID is UNMEASURABLE while Kolibri is the default home
     // (its process never dies — "must not be running prior to cold start"), so the
     // data this gate reads is produced with ANOTHER launcher set as default. Local
     // device only; not wired into the device-free CI.
-    val thresholdMs = 420.0
+    val thresholdMs = 580.0
     val benchmarkName = "startupBaselineProfile"
     val metricName = "timeToInitialDisplayMs"
 

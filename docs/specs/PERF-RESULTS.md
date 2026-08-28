@@ -6,12 +6,13 @@ On-device start-up numbers for Kolibri, measured on the **Galaxy A17 5G**
 
 **TL;DR**
 
-- **The hop is free.** The launcher's own tap→dispatch latency is **0.65 ms
-  median / 1.30 ms max** — a tenth of one frame. Nothing to optimise.
-- **The foreign app's cold start dominates** a launch (~16 ms), and that is not
+- **The hop is free.** The launcher's own tap→dispatch latency is **0.57 ms
+  median / 1.43 ms max** — an eighth of one frame. Nothing to optimise.
+- **The foreign app's cold start dominates** a launch (~25 ms), and that is not
   Kolibri's to optimise.
 - **The Baseline Profile is worth keeping.** It cuts Kolibri's *own* cold start
-  by **~16 % (450 → 378 ms median)** with **zero distribution overlap**.
+  by **~11 % (613 → 547 ms median)**, with the profiled and unprofiled **5–95 %
+  bands disjoint**.
 - Both regression gates **PASS** with wide headroom.
 
 ---
@@ -23,73 +24,76 @@ rest. All values **ms**.
 
 | Slice | min | median | max | what it is |
 |---|---|---|---|---|
-| **`launchDispatchGapMs`** | 0.614 | **0.646** | **1.297** | the hop: TAP→DISPATCH (ViewModel + `Channel`) |
-| `app_launch_tap` | 0.123 | 0.155 | 0.269 | tap-handler duration |
-| `app_launch_dispatch` | 13.752 | 17.041 | 20.143 | dispatch section (contains the foreign binder) |
-| `app_launch_startMainActivity` | 12.777 | 16.152 | 19.131 | the `startMainActivity` binder call |
+| **`launchDispatchGapMs`** | 0.404 | **0.566** | **1.434** | the hop: TAP→DISPATCH (ViewModel + `Channel`) |
+| `app_launch_tap` | 0.072 | 0.096 | 0.368 | tap-handler duration |
+| `app_launch_dispatch` | 13.036 | 25.045 | 44.009 | dispatch section (contains the foreign binder) |
+| `app_launch_startMainActivity` | 12.761 | 24.702 | 43.658 | the `startMainActivity` binder call |
 
 **The hop (the only value that could regress invisibly) is sub-frame:**
 
 | | ms | ×90 Hz frame (11.11 ms) | ×60 Hz frame (16.67 ms) |
 |---|---|---|---|
-| hop median | 0.646 | 0.058 | 0.039 |
-| hop **max** | 1.297 | **0.117** | **0.078** |
+| hop median | 0.566 | 0.051 | 0.034 |
+| hop **max** | 1.434 | **0.129** | **0.086** |
 
-The worst single launch across 40 iterations is **~1/9 of one 90 Hz frame**.
+The worst single launch across 40 iterations is **~1/8 of one 90 Hz frame**.
 
 **Where a launch's time actually goes** (medians): the launcher's *own*
-synchronous share is `tap` (0.16) + the hop (0.65) + the dispatch work beyond the
-binder (`dispatch` − `startMainActivity` ≈ 17.04 − 16.15 ≈ **0.9**) ≈ **~1.7 ms
-total** — comfortably inside one frame. The remaining **~16 ms** is the
+synchronous share is `tap` (0.10) + the hop (0.57) + the dispatch work beyond the
+binder (`dispatch` − `startMainActivity` ≈ 25.05 − 24.70 ≈ **0.35**) ≈ **~1.0 ms
+total** — comfortably inside one frame. The remaining **~25 ms** is the
 `startMainActivity` binder forking the *foreign* app's process (§2).
 
 ## 2. The dominant cost is the foreign app's cold start
 
-The `startMainActivity` binder blocks ~**16 ms median** (up to ~19 ms) while the
+The `startMainActivity` binder blocks ~**25 ms median** (up to ~44 ms) while the
 target app's process is created — visible above as the near-equal
 `app_launch_dispatch` and `app_launch_startMainActivity` sections. That is the
 foreign app's cold start, **not the launcher's to optimise**. Any saving on the
-launcher's ~1.7 ms own share is dwarfed by it.
+launcher's ~1.0 ms own share is dwarfed by it.
 
 ## 3. Kolibri's own cold start (TTID) + Baseline Profile
 
-`StartupBenchmark`, **20 iterations per arm**, `StartupMode.COLD`,
+`StartupBenchmark`, **3×20 iterations per arm, pooled (60)**, `StartupMode.COLD`,
 `timeToInitialDisplayMs`. `None` = no profile; `Partial` = Baseline Profile
 installed (`:baselineprofile` producer, applied via `profileinstaller`). All
 values **ms**.
 
 | Arm | min | median | p95 | max | CoV |
 |---|---|---|---|---|---|
-| None (no profile) | 434.6 | 450.1 | 465.8 | 468.8 | 2.2 % |
-| Partial (profiled) | 358.6 | **378.2** | 404.3 | 407.6 | 3.6 % |
+| None (no profile) | 581.0 | 612.9 | 666.1 | 708.8 | 4.0 % |
+| Partial (profiled) | 521.0 | **547.4** | 569.4 | 642.0 | 3.1 % |
 
-**Median improvement: −71.9 ms (~16 %).** The headline is not the 16 % — it is
-the **zero overlap**: the slowest profiled cold start (407.6) is faster than the
-fastest unprofiled one (434.6). The two ranges are disjoint by 27 ms. With CoV
-2–3 %, that is a clean **structural** separation, not an average over lucky runs
-(p95 profiled, 404.3, barely exceeds its own median). No significance test is
-needed — the distributions do not touch.
+**Median improvement: −65.4 ms (~11 %).** The headline is the near-clean
+separation: the profiled **p95 (569.4)** still beats the unprofiled **p5 (587.0)**
+— the 5–95 % bands are disjoint by ~18 ms. The Partial median is rock-steady
+across the three runs (545.5 / 549.7 / 547.1), so this is a **structural**
+separation, not an average over lucky runs. Only lone outlier iterations touch:
+the raw min/max ranges overlap (Partial max 642.0 > None min 581.0) solely on a
+single Partial outlier — unlike the retired, faster reference unit whose ranges
+were fully disjoint (27 ms), this slower unit's tails just graze. No significance
+test is needed — the working distributions do not overlap.
 
 ## 4. Gate results
 
 | Gate | Metric | Threshold | A17 value | Result |
 |---|---|---|---|---|
-| `verifyLaunchBenchmark` | `launchDispatchGapMs` max | 4.0 ms | **1.297 ms** | **PASS** (« 4.0) |
-| `verifyStartupBenchmark` | `startupBaselineProfile` median | 420 ms | **378.2 ms** | **PASS** (« 420) |
+| `verifyLaunchBenchmark` | `launchDispatchGapMs` max | 4.0 ms | **1.434 ms** | **PASS** (« 4.0) |
+| `verifyStartupBenchmark` | `startupBaselineProfile` median | 580 ms | **547.4 ms** | **PASS** (« 580) |
 
 > When reading `verifyLaunchBenchmark`'s console line, note the stale-JSON
 > gotcha in [`PERF-BENCHMARK-SETUP`](PERF-BENCHMARK-SETUP.md#the-gates): it
 > aggregates the worst `maximum` across *all* JSONs under `build`, so a leftover
-> file from another device can inflate the reported worst. The 1.297 ms above is
+> file from another device can inflate the reported worst. The 1.434 ms above is
 > read straight from the A17's own `benchmarkData.json`.
 
 ---
 
 ## Verdict
 
-The hop is genuinely eliminable and would genuinely save ~0.65 ms — but the
-saving is **imperceptible** (a tenth of a frame, dwarfed by the foreign app's
-~16 ms cold start), and a direct path has a real price: it would drop
+The hop is genuinely eliminable and would genuinely save ~0.57 ms — but the
+saving is **imperceptible** (an eighth of a frame, dwarfed by the foreign app's
+~25 ms cold start), and a direct path has a real price: it would drop
 `recordAppLaunchUseCase`, freezing the drawer's usage-based ordering. That
 trade-off, plus the Activity-context and event-bus-uniformity reasons, is
 documented on `AppManagementDelegate.onAppClicked`.
@@ -107,9 +111,13 @@ on a substantially different device.
 
 ---
 
-*Measured 2026-08-25 on a Galaxy A17 5G (`SM-A176B`, Android 16), build
-`0.99.198` (versionCode 218), release. §3 cold-start data carried forward from
-the 2026-08-24 A17 run (build `0.99.198`). Numbers are device- and
-build-specific; re-measure after a hot-path change. Historical Pixel 9a / Galaxy
-A36 hop distributions are archived in
+*Measured 2026-08-28 on a Galaxy A17 5G (`SM-A176B`, `s5e8535`, Android 16), build
+`0.99.202` (versionCode 222), release, on the current reference unit `R5GL51D5VHZ`.
+The earlier unit `R5GL71YWEPH` — on which the original ~378 ms / ~0.65 ms numbers
+were taken — was retired; this unit is ~170 ms slower on cold start, verified as
+**device, not code** by re-running build `0.99.198` on it (identical 546 / 607 ms
+Partial / None). §3 cold-start is pooled from three isolated 20-iteration runs.
+Numbers are device- and build-specific; re-measure after a hot-path change.
+Historical Pixel 9a / Galaxy A36 hop distributions — and the retired-unit A17
+numbers — are archived in
 [`../history/APP-START-PERFORMANCE.md`](../history/APP-START-PERFORMANCE.md).*

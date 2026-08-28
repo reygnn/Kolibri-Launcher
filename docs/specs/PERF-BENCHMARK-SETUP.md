@@ -34,7 +34,8 @@ Two independent things, often confused:
 | OS | Android 16 |
 | Display | 1080×2340, ~386 dpi, adaptive **90 Hz / 60 Hz** |
 | Frame budget | **11.11 ms** @ 90 Hz · **16.67 ms** @ 60 Hz |
-| Build under test | `0.99.198` (versionCode 218), **release**, R8 minify on, `<profileable shell="true">` |
+| Build under test | `0.99.202` (versionCode 222), **release**, R8 minify on, `<profileable shell="true">` |
+| Reference unit | `R5GL51D5VHZ` (current); the earlier `R5GL71YWEPH` was retired — see [`PERF-RESULTS`](PERF-RESULTS.md) footer |
 
 Low-end is deliberate. The two effects being measured — the interpreter-vs-AOT
 gap the Baseline Profile closes, and any frame added to the hop — are felt on a
@@ -131,12 +132,15 @@ copied from the other.
 
 - **Gates on:** `startupBaselineProfile` (the `CompilationMode.Partial` arm)
   `timeToInitialDisplayMs` **median**.
-- **Threshold: 420 ms.** Sits in the corridor *between* the profiled and
-  unprofiled distributions (see results): ~11 % over the healthy profiled median
-  **and** over its max, so noise never trips it — yet **below** the unprofiled
-  median, so it fails exactly when the profile goes **silent** (a dependency bump
-  drops the generated rules, or heavy init sneaks onto the startup path) and the
-  Partial arm degrades back toward the unprofiled number.
+- **Threshold: 580 ms.** Sits in the corridor *between* the profiled and
+  unprofiled distributions (see results): ~6 % over the healthy profiled median
+  **and** over its p95 (569 ms), so noise never trips it — yet **33 ms below** the
+  unprofiled median (613 ms), so it fails exactly when the profile goes **silent**
+  (a dependency bump drops the generated rules, or heavy init sneaks onto the
+  startup path) and the Partial arm degrades back toward the unprofiled number.
+  (Buffer is over **p95**, not the Partial max the earlier faster unit's fully
+  disjoint arms allowed — this slower reference unit's tails graze on lone
+  outliers, so the max-clearance property is gone; the median gate is unaffected.)
 - **Median, not maximum** (opposite of `verifyLaunchBenchmark`): TTID is a
   whole-render aggregate, so a single slow cold start (Doze, background I/O) is
   noise and the **shifted median** is the structural signal. A naive
@@ -246,9 +250,10 @@ not treated as signal.
 
 **Recipe for a clean cold-start number:** run `StartupBenchmark` on its own
 (command above), on a device that has been idle a few minutes after any
-reboot/onboarding. Confirmed reproducible: an isolated, settled run landed the
-profiled median at **376.3 ms** — within ~2 ms of the reference **378.2 ms**
-(see [`PERF-RESULTS`](PERF-RESULTS.md)), with `Thermal Status` 0 throughout.
+reboot/onboarding. Confirmed reproducible: three isolated, settled runs landed the
+profiled median at **545.5 / 549.7 / 547.1 ms** — within ~2 ms of each other and of
+the pooled reference **547.4 ms** (see [`PERF-RESULTS`](PERF-RESULTS.md)), with
+`Thermal Status` 0 throughout.
 
 To watch it live during a run, poll in a shell loop:
 
