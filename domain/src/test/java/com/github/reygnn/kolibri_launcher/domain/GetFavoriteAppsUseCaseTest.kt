@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -49,6 +50,8 @@ class GetFavoriteAppsUseCaseTest {
     private lateinit var hiddenAppsRepository: HiddenAppsRepository
     @MockK
     private lateinit var customNamesRepository: CustomNamesRepository
+    @MockK
+    private lateinit var componentLabelResolver: ComponentLabelResolver
 
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
     private lateinit var favoritesFlow: MutableStateFlow<Set<String>>
@@ -78,6 +81,11 @@ class GetFavoriteAppsUseCaseTest {
         every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
         every { favoritesOrderRepository.favoriteComponentsOrderFlow } returns orderFlow
         every { customNamesRepository.customNamesFlow } returns customNamesFlow
+        // Live first-paint resolver: default returns null (component not resolvable),
+        // so every EXISTING test keeps its `Loading` first emission (no favorite
+        // resolves → no provisional). The provisional-specific tests below stub real
+        // labels per component.
+        coEvery { componentLabelResolver.resolveLabel(any()) } returns null
 
         useCase = GetFavoriteAppsUseCase(
             installedAppsStateRepository,
@@ -85,6 +93,7 @@ class GetFavoriteAppsUseCaseTest {
             favoritesOrderRepository,
             hiddenAppsRepository,
             customNamesRepository,
+            componentLabelResolver,
             dispatcher = mainDispatcherRule.testDispatcher
         )
     }
@@ -209,6 +218,7 @@ class GetFavoriteAppsUseCaseTest {
             favoritesOrderRepository,
             hiddenAppsRepository,
             customNamesRepository,
+            componentLabelResolver,
             dispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -241,6 +251,7 @@ class GetFavoriteAppsUseCaseTest {
             favoritesOrderRepository,
             hiddenAppsRepository,
             customNamesRepository,
+            componentLabelResolver,
             dispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -417,6 +428,129 @@ class GetFavoriteAppsUseCaseTest {
             val result = successState.data
             assertTrue(result.isFallback)
             assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
+        }
+    }
+
+    // ========== FIRST-PAINT PROVISIONAL FAVORITES (live label resolution) ==========
+
+    @Test
+    fun `favoriteApps emits provisional favorites from live labels while raw apps still empty`() = runTest {
+        // Cold-start shape: enumeration has not run (rawApps empty), but the favorite
+        // set + order + custom names are already read from DataStore. The favorite
+        // labels are resolved LIVE (targeted per-component lookup) so the favorites
+        // paint at once instead of Loading. app1 is a RENAMED favorite (custom
+        // displayName "Config", true live label "Settings") to pin that the
+        // provisional AppInfo carries the TRUE originalName, not the custom-name
+        // placeholder (reset-rename edge).
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        customNamesFlow.value = mapOf(app1.packageName to "Config")
+        coEvery { componentLabelResolver.resolveLabel(app1.componentName) } returns "Settings"
+        coEvery { componentLabelResolver.resolveLabel(app2.componentName) } returns "App C"
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            assertFalse(provisional.data.isFallback)
+            assertEquals(listOf("Config", "App C"), provisional.data.apps.map { it.displayName })
+            // originalName is the TRUE live label, so a reset-rename clears the
+            // override instead of persisting a spurious custom name.
+            assertEquals("Settings", provisional.data.apps[0].originalName)
+            // componentName round-trips so DiffUtil identity matches the authoritative
+            // entry that later replaces this provisional one in place.
+            assertEquals(app1.componentName, provisional.data.apps[0].componentName)
+            assertTrue(provisional.data.apps[0].isFavorite)
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `favoriteApps replaces provisional with authoritative result once enumerated`() = runTest {
+        favoritesFlow.value = setOf(app1.componentName)
+        // Live label at provisional time differs from the enumeration's label (e.g.
+        // app updated between) so the swap is observable; when they match, the
+        // redundant re-emission is collapsed by distinctUntilChanged.
+        coEvery { componentLabelResolver.resolveLabel(app1.componentName) } returns "Old A"
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            assertEquals(listOf("Old A"), provisional.data.apps.map { it.displayName })
+
+            rawAppsFlow.value = allApps
+
+            val authoritative = awaitItem()
+            assertTrue(authoritative is UiState.Success)
+            // Real label from the enumeration replaces the provisional one in place.
+            assertEquals(listOf("App A"), authoritative.data.apps.map { it.displayName })
+            assertFalse(authoritative.data.isFallback)
+        }
+    }
+
+    @Test
+    fun `favoriteApps omits a favorite whose component no longer resolves - no ghost`() = runTest {
+        // A favorite uninstalled while the launcher was dead: its live lookup returns
+        // null, so it is simply omitted from the provisional paint (no ghost), unlike
+        // a persisted cache which would show it until reconciliation.
+        favoritesFlow.value = setOf(app1.componentName, "com.dead/Gone")
+        coEvery { componentLabelResolver.resolveLabel(app1.componentName) } returns "App A"
+        coEvery { componentLabelResolver.resolveLabel("com.dead/Gone") } returns null
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            assertEquals(listOf("App A"), provisional.data.apps.map { it.displayName })
+            assertFalse(provisional.data.isFallback)
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `favoriteApps provisional replays the order returned by sortFavoriteComponents`() = runTest {
+        // The provisional list must respect whatever sortFavoriteComponents returns
+        // (the saved-order arrangement), not the raw favorite-set iteration order.
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        coEvery { componentLabelResolver.resolveLabel(app1.componentName) } returns "App A"
+        coEvery { componentLabelResolver.resolveLabel(app2.componentName) } returns "App C"
+        // Reverse-alphabetical on purpose: set order is [App A, App C], so this proves
+        // the provisional replays the sort result rather than the set order.
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>().sortedByDescending { it.displayName }
+        }
+
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            assertEquals(listOf("App C", "App A"), provisional.data.apps.map { it.displayName })
+        }
+    }
+
+    @Test
+    fun `favoriteApps provisional truncates to MAX_FAVORITES_ON_HOME`() = runTest {
+        val limit = AppConstants.MAX_FAVORITES_ON_HOME
+        val many = (1..(limit + 3)).map {
+            AppInfo("App $it", "App $it", "com.app$it", "class$it")
+        }
+        favoritesFlow.value = many.map { it.componentName }.toSet()
+        many.forEach { app ->
+            coEvery { componentLabelResolver.resolveLabel(app.componentName) } returns app.displayName
+        }
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            assertEquals(limit, provisional.data.apps.size)
         }
     }
 }
