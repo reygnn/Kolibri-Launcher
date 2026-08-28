@@ -950,9 +950,14 @@ class HomeFragment : Fragment() {
         binding.favoritesRecyclerView.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = favoritesAdapter
-            // Items are programmatically constructed Buttons whose width
-            // changes per text — fixed-size optimization would not apply.
-            setHasFixedSize(false)
+            // This flag is about the RecyclerView's OWN size, not the items'.
+            // favoritesRecyclerView is match_parent inside favoritesContainer
+            // (0dp + layout_weight="1"), so its bounds are parent-fixed and
+            // content-independent — adapter changes can never resize it. true
+            // lets each submitList() skip a requestLayout up the view tree,
+            // which matters at the favorites build-up on cold start. (Item
+            // widths still vary per text; that is unrelated to this flag.)
+            setHasFixedSize(true)
             // No item animations: a restore (and any favorites reorder/add)
             // fires several submitList() rounds as the underlying combine
             // re-emits, so DefaultItemAnimator would play an add/move
