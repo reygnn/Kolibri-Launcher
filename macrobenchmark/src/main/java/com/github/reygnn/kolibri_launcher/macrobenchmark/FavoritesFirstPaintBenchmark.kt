@@ -25,10 +25,33 @@ import org.junit.runner.RunWith
  * creation and closed one frame after the first non-empty favorites paint;
  * [TraceSectionMetric] reads its duration.
  *
- * It is the A/B instrument for the `favorites-first-paint-snapshot` feature: run it
- * on this baseline branch for the enumeration-gated number, then again with the
- * provisional-snapshot feature applied to see the span collapse to ~0 (the
- * provisional list paints before enumeration finishes).
+ * It is the A/B/C instrument for the favorites-first-paint work: run it on
+ * `measure/baseline` for the enumeration-gated number, and on the two fix variants
+ * — `measure/livelabel` (live component-label resolution) and `measure/snapshot`
+ * (persisted `FavoriteNameSnapshot`, a provisional list painted before enumeration
+ * finishes).
+ *
+ * ## Measured A/B/C result & decision
+ *
+ * A17 5G (`SM-A176B`, unit `R5GL51D5VHZ`), 20 iter/arm, two runs incl. a
+ * rest-paused rerun; medians reproduced to ~1 %:
+ *
+ * | variant | favorites-first-paint median | vs baseline |
+ * |---|---|---|
+ * | baseline (enumeration-gated) | ~2400 ms | — |
+ * | live-label | ~465 ms | −81 % |
+ * | snapshot | ~315 ms | −87 % |
+ *
+ * **Decision: live-label.** Both variants erase the ~2 s lag; snapshot is ~152 ms
+ * faster still, but that gain is not worth its cost — it expands the
+ * `FavoritesRepository` **contract triple** (Rule 2) and adds a persisted
+ * `FavoriteNameSnapshot` that can drift from reality (a stale name flashes before
+ * enumeration corrects it — a "ghost"). Live-label resolves labels live, so it is
+ * stateless and ghost-free for 81 % of the win. Speed was never the bottleneck
+ * (both land far under the "pops in late" threshold); long-term correctness and
+ * maintenance are, and live-label wins there. (The snapshot span does NOT collapse
+ * to ~0 as first hypothesised — ~315 ms is the provisional-paint floor: view
+ * inflation + snapshot read + first frame.)
  *
  * ## Preconditions
  *  - **At least one home favorite configured** on the device — with none the span
