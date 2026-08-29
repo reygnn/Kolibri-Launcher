@@ -1229,7 +1229,7 @@ laufen gegen Fake und Impl. Volle Suite + `checkConventions` grün. Branch
 
 ---
 
-## 16. (offen) `AppUpdateSignal.events`: `replay = 1` erwägen
+## 16. (verworfen 2026-08-29) `AppUpdateSignal.events`: `replay = 1` erwägen
 
 **Aufgedeckt 2026-05-04** beim Reparieren von `PackageUpdateReceiverGoAsyncTest`.
 `AppUpdateSignal._events = MutableSharedFlow<Unit>()` mit Default-Parametern
@@ -1257,6 +1257,31 @@ default `BufferOverflow.SUSPEND`, was bei `replay = 1` und keinen
 weiteren Subscribern nicht greift). Wenn der Test in
 `PackageUpdateReceiverGoAsyncTest` nach der Änderung auch ohne Turbine
 grün läuft: Test entsprechend vereinfachen.
+
+**Ergebnis (2026-08-29, verworfen — Produktions-Motivation bereits weg).**
+Der oben beschriebene Ausgangszustand (`MutableSharedFlow<Unit>()` mit
+Default-Buffer, rendezvous-Drop) stimmt nicht mehr: `_events` ist seit AUDIT-9 #5
+`MutableSharedFlow<PackageEvent>(extraBufferCapacity = 1)`
+(`AppUpdateSignal.kt:24`). Der eigentliche Produktions-Bug — ein Package-Event,
+das der von genau diesem Broadcast gestartete Prozess emittiert, bevor der
+Collector parkt — ist damit **bereits gefixt** (1-Slot-Buffer fängt ihn). Übrig
+bliebe an §16 nur noch `replay = 1` *zusätzlich*, und das ist ein schlechter
+Tausch:
+
+- **Nutzen:** rein Test-Ergonomie — der Turbine-Workaround in *einem* androidTest
+  (`PackageUpdateReceiverGoAsyncTest`) würde entfallen. Kein User-Effekt.
+- **Kosten:** `replay = 1` liefert dem einzigen Collector
+  (`AppManagementDelegate.kt:348`, viewModelScope-`.collect`) bei **jeder
+  Re-Subscription** (ViewModel-Recreation nach Rotation / Process-Death-Restore)
+  sofort das letzte gecachte Event → ein redundantes `refreshAppsUseCase()`.
+  Idempotent + debounced, also harmlos, aber macht das Laufzeitverhalten minimal
+  *schlechter*, nicht besser.
+
+Blast-Radius war minimal (1 Zeile, 1 Emitter `PackageUpdateReceiver:170`, 1
+Collector, kein Multicast; `appsUpdateTrigger`/`ErrorEventBus` separat) — aber der
+User-seitige Upside ist null und die Änderung ist netto leicht negativ. Daher
+geschlossen ohne Code-Änderung. Falls je ein zweiter Collector oder ein echter
+„late subscriber muss den letzten Stand kennen"-Consumer dazukommt, neu bewerten.
 
 ---
 
