@@ -57,6 +57,12 @@ object ConsentBootstrap {
      * distinction is not needed here — no dialog or write follows R1, only
      * `setEnabled(decision == Granted)` — so it lives in the repository's
      * [CrashReportConsentRepository.readState] (R2) instead.
+     *
+     * Why R1 stays here instead of routing the read through the Hilt R2 repository
+     * (even though Hilt is live by the time this runs in `onCreate`): the repo's
+     * `readState` reports failures via `silentError` (DEBUG-throw), which must not
+     * fire on the crash-bootstrap path before `AcraTree` is planted. Full rationale
+     * and rejected options: CONSENT_BOOTSTRAP_READ_ADR.
      */
     suspend fun readDecision(context: Context): ConsentDecision =
         readDecision(context.consentDataStore)
