@@ -54,6 +54,12 @@ import javax.inject.Inject
 @HiltAndroidApp
 class KolibriLauncherApp : Application() {
 
+    companion object {
+        // Compiled once instead of re-allocated per debug-log call: strips the
+        // anonymous-class suffix ("Foo$1") from the DebugTree stack tag. DEBUG-only.
+        private val ANON_CLASS_SUFFIX = Regex("\\$\\d+")
+    }
+
     @Inject
     lateinit var anrReporter: AnrReporter
     @Inject
@@ -133,7 +139,7 @@ class KolibriLauncherApp : Application() {
                     override fun createStackElementTag(element: StackTraceElement): String {
                         val className = element.className
                             .substringAfterLast('.')
-                            .replace(Regex("\\$\\d+"), "")
+                            .replace(ANON_CLASS_SUFFIX, "")
                             .replace("$", ".")
                         return "Kolibri_$className"
                     }

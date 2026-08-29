@@ -116,10 +116,10 @@ class FavoritesRepositoryImpl @Inject constructor(
                     return@edit
                 }
 
-                val currentFavoritePackages = currentFavorites.map { it.split('/')[0] }.toSet()
+                val currentFavoritePackages = currentFavorites.map { it.substringBefore('/') }.toSet()
 
                 if (currentFavoritePackages.size >= AppConstants.MAX_FAVORITES_ON_HOME) {
-                    val newPackageName = componentName.split('/')[0]
+                    val newPackageName = componentName.substringBefore('/')
                     if (!currentFavoritePackages.contains(newPackageName)) {
                         Timber.w("Favorites limit reached. Cannot add component from new package: $componentName")
                         success = false

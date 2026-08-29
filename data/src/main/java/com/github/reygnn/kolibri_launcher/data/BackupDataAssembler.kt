@@ -199,7 +199,7 @@ class BackupDataAssembler @Inject constructor(
 
         val installedComponentsSet = installedComponents.toHashSet()
         val installedPackagesSet = installedComponents
-            .mapTo(HashSet()) { it.split('/')[0] }
+            .mapTo(HashSet()) { it.substringBefore('/') }
 
         var importedCount = 0
         var skippedCount = 0
@@ -226,7 +226,7 @@ class BackupDataAssembler @Inject constructor(
             missingApps.addAll(backup.settings.favoriteComponents - installedComponentsSet)
 
             val uniquePackages = validFavorites
-                .mapTo(HashSet()) { it.split('/')[0] }
+                .mapTo(HashSet()) { it.substringBefore('/') }
 
             if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
                 return ImportResult.LimitExceeded(

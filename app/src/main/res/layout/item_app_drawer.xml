@@ -1,23 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Flat single-TextView row: the former vertical LinearLayout wrapper held
+     exactly one child and added a redundant measure/layout node per row. The
+     TextView is now the root and carries the row's padding, selectable
+     background and click/focus flags directly. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/app_name"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
     android:paddingStart="@dimen/app_row_padding_horizontal"
     android:paddingEnd="@dimen/app_row_padding_horizontal"
     android:paddingTop="@dimen/app_row_padding_vertical"
     android:paddingBottom="@dimen/app_row_padding_vertical"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
-    android:focusable="true">
-
-    <TextView
-        android:id="@+id/app_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="@dimen/app_row_text_size"
-        android:textColor="@color/default_text_color"
-        tools:text="Beispiel App Name" />
-
-</LinearLayout>
+    android:focusable="true"
+    android:textSize="@dimen/app_row_text_size"
+    android:textColor="@color/default_text_color"
+    tools:text="Beispiel App Name" />
