@@ -101,31 +101,36 @@ class UsageExportRepositoryImplDoomsdaySpec {
     }
 
     @Test
-    fun `load - unknown file size (statSize -1) with oversized content is rejected by the bounded read`() = runTest {
-        // The dangerous case #7 targets: statSize is unknown (-1) so the fast-path
-        // check is bypassed, but the stream exceeds the cap. The bounded read must
-        // reject it ("File too large") rather than reach an unbounded readText().
+    fun `load - unknown size + exactly one byte over the cap is rejected as too large`() = runTest {
+        // #7 boundary: statSize unknown (-1) bypasses the fast path, and the stream
+        // is EXACTLY cap+1 bytes. Pins the read width readNBytes(cap+1): a
+        // readNBytes(cap) off-by-one would read only cap bytes here, see size == cap,
+        // and wrongly import instead of rejecting.
         every { parcelFileDescriptor.statSize } returns -1L
         every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
-
         val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
-        val oversized = object : InputStream() {
-            private var remaining = cap + 4096 // comfortably past the cap
-            override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
-            override fun read(b: ByteArray, off: Int, len: Int): Int {
-                if (remaining <= 0) return -1
-                val n = minOf(len.toLong(), remaining).toInt()
-                b.fill('a'.code.toByte(), off, off + n)
-                remaining -= n
-                return n
-            }
-        }
-        every { contentResolver.openInputStream(eq(testUri)) } returns oversized
+        every { contentResolver.openInputStream(eq(testUri)) } returns fixedSizeStream(cap + 1)
 
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
         assertTrue(result.message.contains("too large", ignoreCase = true))
+    }
+
+    @Test
+    fun `load - unknown size + exactly the cap in bytes passes the size gate`() = runTest {
+        // #7 boundary: EXACTLY cap bytes must NOT be rejected — it passes the
+        // `> cap` gate and reaches the parser (non-JSON here → InvalidFormat). Pins
+        // `> cap` against a `>= cap` off-by-one that would wrongly reject a
+        // legitimate cap-sized file as "File too large".
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+        every { contentResolver.openInputStream(eq(testUri)) } returns fixedSizeStream(cap)
+
+        val result = manager.loadFromFile(testUriString, false)
+
+        assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
     @Test
@@ -204,5 +209,22 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val success = manager.saveToFile(testUriString)
 
         Assert.assertFalse("Save should fail if stream is null", success)
+    }
+
+    /**
+     * An [InputStream] yielding exactly [byteCount] bytes of `'a'`, then EOF — a
+     * lightweight fixed-size source for the bounded-read boundary tests (no
+     * byteCount-sized literal; `readNBytes` accumulates it in chunks).
+     */
+    private fun fixedSizeStream(byteCount: Long): InputStream = object : InputStream() {
+        private var remaining = byteCount
+        override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (remaining <= 0) return -1
+            val n = minOf(len.toLong(), remaining).toInt()
+            b.fill('a'.code.toByte(), off, off + n)
+            remaining -= n
+            return n
+        }
     }
 }
