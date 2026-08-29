@@ -116,6 +116,38 @@ unchanged by the favorites work (413, first frame); the gap is where the win lan
 > 580 ms TTID gate. Re-measuring TTID and TTFD in ONE warm session would let both
 > gates be re-baselined together.
 
+## 3c. Rejected: parallelizing the full-app `loadLabel` enumeration
+
+Tried on branch `perf/enumerate-parallel-labels` (2026-08-29, build `0.99.204`):
+`InstalledAppsRepositoryImpl.processResolveInfoList` rewritten from a sequential
+`for` loop to `coroutineScope { … async { Semaphore(4).withPermit { loadLabel } } }`
+on `Dispatchers.IO`, to shrink the enumeration wall time. Measured, then **rejected.**
+
+A/B vs `main` (Perfetto `drawer_apps_enumerate`, 8 cold starts each; StartupBenchmark 20 iter):
+
+| Metric | main | branch | Δ |
+|---|---|---|---|
+| `drawer_apps_enumerate` | 102 ms | 85 ms | **−17 %** |
+| `favorites_first_paint` (from `bindApplication`) | 93 ms | 94 ms | ~0 (+1 ms) |
+| `reportFullyDrawn` / TTFD | — | — | no reproducible move (StartupBench +48 ms vs manual capture −16 ms = noise) |
+
+**Why rejected.** The −17 % is real but lands on a **user-invisible** metric: the
+livelabel provisional-favorites path (§3b) already decouples first paint from the
+full enumeration, so `favorites_first_paint` is unchanged and TTFD shows no
+reproducible movement. It is a **drawer-open / authoritative-reconciliation lever,
+not a cold-start lever** — not worth adding coroutine/`Semaphore`/async-trace
+complexity to a hot path. The A17 carries only ~50 launcher apps (not the assumed
+~150) + cap 4 + the unparallelizable `queryIntentActivities`/sort (Amdahl) → limited
+headroom.
+
+Durable facts (independent of the decision): on this path `ResolveInfo.loadLabel` is
+**in-process** APK-resource work (arsc parse + I/O via `getResourcesForApplication`,
+since `queryIntentActivities` populates `applicationInfo`), **NOT** a binder IPC — so
+the cost is CPU + flash I/O bound by core count, not the system_server binder pool;
+and concurrent `loadLabel` across threads is thread-safe (`ResourcesManager` /
+`AssetManager` locks). **Do not re-attempt** without a device that actually carries
+~150 apps and a metric tied to drawer-open, not TTID/TTFD.
+
 ## 4. Gate results
 
 | Gate | Metric | Threshold | A17 value | Result |
