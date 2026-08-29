@@ -16,6 +16,9 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -201,9 +204,29 @@ class GetFavoriteAppsUseCase @Inject constructor(
     private suspend fun buildProvisional(step: RawStep.Empty): UiState<FavoriteAppsResult> {
         if (step.favorites.isEmpty()) return UiState.Loading
 
-        val resolved = step.favorites.mapNotNull { component ->
-            val label = componentLabelResolver.resolveLabel(component) ?: return@mapNotNull null
-            component.toProvisionalAppInfo(label)
+        // Resolve the favorite labels CONCURRENTLY. Each resolveLabel is its own
+        // withContext(IO) + scoped PackageManager IPC, so a sequential mapNotNull
+        // pays N serial IO round-trips on the first-paint critical path — and since
+        // a user may pin up to MAX_FAVORITES_ON_HOME favorites, the "a handful"
+        // assumption the provisional path rests on can break, eroding its whole
+        // speed advantage over the bulk enumeration. awaitAll overlaps the lookups
+        // on the IO pool (which caps real parallelism itself). coroutineScope keeps
+        // it structured: when the authoritative RawStep.Resolved arrives, mapLatest
+        // cancels this scope and the children cancel with it (CancellationException
+        // propagates out of resolveLabel). Iteration order is preserved (map +
+        // awaitAll are index-ordered), so the provisional list is identical to the
+        // sequential one before sortFavoriteComponents reorders it — the byte-
+        // identical-label tie in the class KDoc is unchanged.
+        val resolved = coroutineScope {
+            step.favorites
+                .map { component ->
+                    async {
+                        componentLabelResolver.resolveLabel(component)
+                            ?.let { label -> component.toProvisionalAppInfo(label) }
+                    }
+                }
+                .awaitAll()
+                .filterNotNull()
         }
         if (resolved.isEmpty()) return UiState.Loading
 
