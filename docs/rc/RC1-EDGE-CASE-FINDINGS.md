@@ -17,7 +17,20 @@ trigger, so no find is lost (RC gate Section 5).
   integer overflow, duplicate keys, Unicode/null-byte, deep nesting,
   snake↔camel, null-in-array, missing/unknown fields: all already pinned.
 
-## Fixed for RC1 (fix + regression test on branch fix/rc-edge-cases)
+## Fixed for RC1 (fix + regression test)
+- **#1 (MED) — Existing wallpaper wiped on an unrestorable-wallpaper restore.**
+  Resolved via **preserve-on-failure** (chosen over documenting the wipe as
+  intended). `BackupDataAssembler` Phase 7b no longer pre-clears the wallpaper
+  state before the restore. Investigation showed the pre-clear was redundant on
+  success (the restorer's `saveWallpaperState` is a full overwrite of the single
+  `KEY_LAYERS_JSON` blob — single↔multi share that one key, no stale-key risk)
+  and consequential only on TOTAL failure, where it produced the wipe. Removing
+  it means a backup whose wallpaper is entirely unrestorable (dead `content://`
+  from another device, missing ZIP entry) leaves the user's current wallpaper
+  intact; `droppedWallpaperLayers` still surfaces the failure. `clearWallpaper()`
+  never deleted files, so `gcOrphans` is unaffected. Pinned by
+  `BackupRepositoryImplWallpaperTest` (existing wallpaper survives an
+  inaccessible-backup-wallpaper restore).
 - **#2 (MED) — Usage import aborted by one out-of-range ISO timestamp.**
   `UsageExportRepositoryImpl.parseTimestamp` caught only `DateTimeParseException`;
   a valid ISO instant with an extreme year parses but overflows `Long` on
@@ -39,20 +52,6 @@ trigger, so no find is lost (RC gate Section 5).
   single-image resolve/fallback, and preview counts/flags.
 
 ## Deferred — logged with re-evaluation trigger
-
-- **#1 (MED) — Existing wallpaper wiped on an unrestorable-wallpaper restore.**
-  `BackupDataAssembler` Phase 7b calls `wallpaperRepository.clearWallpaper()`
-  BEFORE the restore; if the backup carries a wallpaper whose image is not
-  restorable on this device (legacy flat-JSON with a dead `content://`, or a
-  ZIP missing its `wallpapers/` entry) and the user currently has a wallpaper,
-  the clear runs, the restore adds no layer, and the old wallpaper is lost
-  (`droppedWallpaperLayers > 0` surfaces a warning, so not fully silent).
-  **Decision pending (user):** intended replace-semantics (→ pin behaviour +
-  ACCEPTED_LIMITATIONS) vs. preserve (reorder so clear runs only after ≥1 layer
-  restores — a restore-logic behaviour change). **Re-eval trigger:** decide
-  before RC1 tag; a Robolectric test in `BackupRepositoryImplWallpaperTest`
-  starting from an existing `WallpaperState.single(...)` documents whichever
-  direction is chosen.
 
 - **#8 (LOW) — `performImport` is non-atomic across the 8 repositories.**
   A repository write throwing mid-sequence (e.g. Phase 4 DataStore I/O after

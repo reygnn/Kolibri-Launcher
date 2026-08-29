@@ -248,6 +248,44 @@ class BackupRepositoryImplWallpaperTest {
     }
 
     @Test
+    fun `importFromJson - inaccessible wallpaper URI does not wipe the user's existing wallpaper`() = runTest {
+        // RC edge-case audit #1 (preserve-on-failure): a backup that CARRIES a
+        // wallpaper whose image is not restorable here (a dead content:// from
+        // another device, or a missing ZIP entry) must not destroy the wallpaper
+        // the user CURRENTLY has. Phase 7b used to clear the state BEFORE the
+        // restore, so a failed restore left NONE — wiping the existing wallpaper.
+        // Now the clear is gone: the restorer writes nothing on total failure, so
+        // the current state survives.
+        every { contentResolver.openInputStream(any()) } returns null
+
+        val existing = WallpaperState.single(
+            testWallpaperUri,
+            scale = 1.2f,
+            translateX = 10f,
+            translateY = 20f,
+        )
+        fakeWallpaperRepo.currentState = existing
+
+        val jsonWithWallpaper = createWallpaperBackupJson(
+            wallpaperUri = "content://media/external/images/media/99999",
+            wallpaperScale = 2.0f,
+            wallpaperTranslateX = 50f,
+            wallpaperTranslateY = 50f,
+        )
+
+        val result = backupManager.importFromJson(
+            jsonWithWallpaper,
+            ImportOptions(importThemeSettings = true),
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Preserved, NOT wiped to NONE.
+        assertThat(fakeWallpaperRepo.currentState).isEqualTo(existing)
+        // Still surfaced as a dropped layer so the UI can warn.
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(1)
+    }
+
+    @Test
     fun `importFromJson - without wallpaper in backup - keeps existing wallpaper`() = runTest {
         // A backup that carries NO wallpaper must not touch the user's current
         // wallpaper — same skip-on-null semantics as every other theme field

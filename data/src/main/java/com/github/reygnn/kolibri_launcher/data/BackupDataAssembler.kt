@@ -373,15 +373,21 @@ class BackupDataAssembler @Inject constructor(
         if (options.importWallpaper) {
             // "Has a wallpaper" means an actual image to restore — a layer with
             // a blank imageUri carries no image, so an all-image-less layer list
-            // must not trigger the clear (which would silently wipe the user's
-            // current wallpaper with dropped=0, i.e. no warning).
+            // must not trigger a restore attempt against the current wallpaper.
             val backupHasWallpaper = backup.settings.wallpaperLayers.any { !it.imageUri.isNullOrBlank() } ||
                 !backup.settings.wallpaperUri.isNullOrBlank()
             if (backupHasWallpaper) {
-                // Reset only the DataStore state — files are overwritten by the
-                // restorer below via copyToInternal(). Orphaned old files get
-                // reaped because only files referenced by the new state are kept.
-                wallpaperRepository.clearWallpaper()
+                // Preserve-on-failure (RC edge-case audit #1): NO pre-clear. The
+                // restorer writes the new state via saveWallpaperState, which is a
+                // full overwrite of the single KEY_LAYERS_JSON blob — so on SUCCESS
+                // a pre-clear is redundant (single↔multi share that one key; no
+                // stale-key risk), and on TOTAL failure (backup wallpaper entirely
+                // unrestorable: a dead content:// on another device, or a missing
+                // ZIP entry) the restorer writes nothing, so NOT clearing keeps the
+                // user's CURRENT wallpaper instead of wiping it to NONE. Clearing
+                // never deleted files anyway (only DataStore keys), so gcOrphans is
+                // unaffected. A partial/failed restore still surfaces via
+                // droppedWallpaperLayers.
                 droppedWallpaperLayers = wallpaperRestorer.restoreFromBackup(backup.settings)
             }
         }
