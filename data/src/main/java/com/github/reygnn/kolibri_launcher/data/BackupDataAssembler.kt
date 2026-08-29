@@ -195,10 +195,11 @@ class BackupDataAssembler @Inject constructor(
                 .first { it.apps.isNotEmpty() }
                 .apps
         } ?: error("Timed out waiting for InstalledAppsRepository to populate during backup import")
-        val installedComponents = installedApps.map { it.componentName }.toSet()
-
-        val installedComponentsSet = installedComponents.toHashSet()
-        val installedPackagesSet = installedComponents
+        // Build the component HashSet directly (dedup + membership store in one),
+        // then derive the package set from it — avoids the extra intermediate
+        // LinkedHashSet a `.toSet().toHashSet()` chain would allocate.
+        val installedComponentsSet = installedApps.mapTo(HashSet()) { it.componentName }
+        val installedPackagesSet = installedComponentsSet
             .mapTo(HashSet()) { it.substringBefore('/') }
 
         var importedCount = 0

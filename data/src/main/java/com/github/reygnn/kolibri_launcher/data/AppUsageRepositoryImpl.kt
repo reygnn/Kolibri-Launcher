@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.isValidUsageTimestamp
 import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.di.UsageDataStore
@@ -81,7 +82,7 @@ class AppUsageRepositoryImpl @Inject constructor(
      * [distinctUntilChanged] fires solely on a real usage change, and downstream
      * [sortAppsByTimeWeightedUsage] no longer re-reads or re-parses the store on
      * every re-sort. Timestamps are carried raw (not age-filtered); the sort
-     * applies [isValidTimestamp] against its own current time.
+     * applies [isValidUsageTimestamp] against its own current time.
      */
     override val usageSnapshotFlow: Flow<Map<String, List<Long>>> =
         dataStore.readFlowFailOpen("Error reading usage flow") { preferences ->
@@ -124,7 +125,7 @@ class AppUsageRepositoryImpl @Inject constructor(
                 // Validierung und Bereinigung alter Timestamps
                 val validTimestamps = currentTimestamps
                     .mapNotNull { it.toLongOrNull() }
-                    .filter { isValidTimestamp(it, currentTime) }
+                    .filter { isValidUsageTimestamp(it, currentTime) }
 
                 val updatedTimestamps = (validTimestamps + currentTime)
                     .sortedDescending()
@@ -180,7 +181,7 @@ class AppUsageRepositoryImpl @Inject constructor(
         return apps
             .map { appInfo ->
                 val timestamps = usageSnapshot[appInfo.packageName]
-                    ?.filter { isValidTimestamp(it, currentTime) }
+                    ?.filter { isValidUsageTimestamp(it, currentTime) }
                     ?: emptyList()
                 appInfo to timeWeightedUsageScore(timestamps, currentTime)
             }
@@ -208,7 +209,7 @@ class AppUsageRepositoryImpl @Inject constructor(
                     val timestamps = (value as? Set<String>) ?: return@mapNotNull null
                     val lastLaunch = timestamps
                         .mapNotNull { it.toLongOrNull() }
-                        .filter { isValidTimestamp(it, currentTime) }
+                        .filter { isValidUsageTimestamp(it, currentTime) }
                         .maxOrNull()
                         ?: return@mapNotNull null
                     val packageName = key.name.removePrefix(AppConstants.KEY_USAGE_PREFIX)
@@ -223,16 +224,6 @@ class AppUsageRepositoryImpl @Inject constructor(
             TimberWrapper.silentError(e, "Error reading recently launched packages")
             emptyList()
         }
-    }
-
-    /**
-     * Validates a timestamp for plausibility.
-     * Pure Long comparisons and subtraction — these don't throw.
-     */
-    private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
-        return timestamp > 0 &&
-                timestamp <= currentTime &&
-                (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
     }
 
     /**

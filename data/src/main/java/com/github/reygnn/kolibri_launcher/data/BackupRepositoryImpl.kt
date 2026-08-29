@@ -24,6 +24,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.OutputStreamWriter
 import java.util.concurrent.CancellationException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -251,7 +252,13 @@ class BackupRepositoryImpl @Inject constructor(
         context.contentResolver.openOutputStream(uri)?.use { outputStream ->
             ZipOutputStream(BufferedOutputStream(outputStream)).use { zipOut ->
                 zipOut.putNextEntry(ZipEntry("backup.json"))
-                zipOut.write(jsonString.toByteArray(Charsets.UTF_8))
+                // Encode the JSON straight into the entry via a Writer instead of a
+                // second full copy from jsonString.toByteArray(). The writer wraps
+                // the ZipOutputStream, so flush (do NOT close — closing the writer
+                // would close the whole zip stream before the image entries).
+                val jsonWriter = OutputStreamWriter(zipOut, Charsets.UTF_8)
+                jsonWriter.write(jsonString)
+                jsonWriter.flush()
                 zipOut.closeEntry()
 
                 for ((entryName, file) in imageEntries) {

@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
 import android.graphics.Color
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -233,9 +232,9 @@ class AppDrawerAdapter(
         }
 
         fun updateName(name: String) {
+            // maxLines=1 / ellipsize=end are declared statically in
+            // item_app_drawer.xml — invariant per row, no need to re-set per bind.
             appName?.text = name
-            appName?.maxLines = 1
-            appName?.ellipsize = TextUtils.TruncateAt.END
         }
 
         fun unbind() {

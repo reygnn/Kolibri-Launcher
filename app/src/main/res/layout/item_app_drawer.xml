@@ -17,4 +17,6 @@
     android:focusable="true"
     android:textSize="@dimen/app_row_text_size"
     android:textColor="@color/default_text_color"
+    android:maxLines="1"
+    android:ellipsize="end"
     tools:text="Beispiel App Name" />

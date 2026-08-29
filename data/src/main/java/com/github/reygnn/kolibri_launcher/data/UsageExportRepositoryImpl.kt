@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.isValidUsageTimestamp
 import com.github.reygnn.kolibri_launcher.di.UsageDataStore
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
@@ -20,6 +21,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
+import java.io.OutputStreamWriter
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import javax.inject.Inject
@@ -101,7 +103,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                     @Suppress("UNCHECKED_CAST")
                     val timestamps = (value as? Set<String>)
                         ?.mapNotNull { it.toLongOrNull() }
-                        ?.filter { isValidTimestamp(it, currentTime) }
+                        ?.filter { isValidUsageTimestamp(it, currentTime) }
                         ?.sortedDescending()
                         ?.map { formatTimestamp(it) }  // Konvertiere zu ISO 8601
                         ?: emptyList()
@@ -260,7 +262,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                     // file-order first MAX and drop newer entries for a non-descending
                     // (e.g. foreign/hand-edited) file. Keep the newest MAX instead.
                     val validImportedTimestamps = importedTimestamps
-                        .filter { isValidTimestamp(it, currentTime) }
+                        .filter { isValidUsageTimestamp(it, currentTime) }
                         .sortedDescending()
                         .take(AppConstants.MAX_TIMESTAMPS_PER_APP)
 
@@ -273,7 +275,7 @@ class UsageExportRepositoryImpl @Inject constructor(
                         // Merge: Bestehende + importierte, dedupliziert, sortiert, limitiert
                         val existingTimestamps = preferences[usageKey]
                             ?.mapNotNull { it.toLongOrNull() }
-                            ?.filter { isValidTimestamp(it, currentTime) }
+                            ?.filter { isValidUsageTimestamp(it, currentTime) }
                             ?: emptyList()
 
                         (existingTimestamps + validImportedTimestamps)
@@ -388,12 +390,6 @@ class UsageExportRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun isValidTimestamp(timestamp: Long, currentTime: Long): Boolean {
-        return timestamp > 0 &&
-                timestamp <= currentTime &&
-                (currentTime - timestamp) <= AppConstants.MAX_TIMESTAMP_AGE_MS
-    }
-
     override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
         try {
             if (uriString.isBlank()) {
@@ -411,7 +407,13 @@ class UsageExportRepositoryImpl @Inject constructor(
             val jsonString = exportToJson()
 
             context.contentResolver.openOutputStream(uri)?.use { output ->
-                output.write(jsonString.toByteArray())
+                // Encode the JSON straight to the stream via a Writer instead of
+                // materializing a second full copy with jsonString.toByteArray().
+                // The writer wraps the caller-owned stream, so flush (don't close)
+                // and let the enclosing use{} close the stream.
+                val writer = OutputStreamWriter(output, Charsets.UTF_8)
+                writer.write(jsonString)
+                writer.flush()
                 Timber.i("Usage data saved to: $uri")
                 true
             } ?: run {
