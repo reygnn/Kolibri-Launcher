@@ -91,7 +91,14 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
         // 2. Alarm abrufen
         if (showAlarm) {
             try {
-                getNextAlarm()?.let { events.add(it) }
+                // getNextAlarm() issues a synchronous AlarmManager Binder IPC; this
+                // use case is collected on the Main dispatcher (ClockDelegate →
+                // launchSafe(mainDispatcher)), so run the call off Main to match the
+                // calendar path (getCalendarEvents) and avoid a Main-thread IPC /
+                // StrictMode hit. getNextAlarm stays a plain (non-suspend) fun, so
+                // its internal catch keeps its "no suspension point" property;
+                // cancellation during withContext propagates via the arm below.
+                withContext(Dispatchers.IO) { getNextAlarm() }?.let { events.add(it) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
