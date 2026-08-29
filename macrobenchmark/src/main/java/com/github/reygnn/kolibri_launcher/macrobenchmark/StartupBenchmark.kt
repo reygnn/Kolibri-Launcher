@@ -83,8 +83,15 @@ class StartupBenchmark {
                 // start render the real favorites path. The selection persists to
                 // DataStore and survives the COLD kills below, so seeding once is
                 // enough for all iterations.
+                //
+                // ...IfPresent (tolerant): this class has TWO @Test methods (None +
+                // Partial) sharing ONE install. The first to run meets onboarding and
+                // seeds; the second finds the favorites already persisted and skips
+                // (the strict completeOnboardingWithFavorites would error on the
+                // absent onboarding list). pastOnboarding is per-instance, so both
+                // methods enter this block once.
                 startActivityAndWait()
-                completeOnboardingWithFavorites(TARGET_PACKAGE, SEED_FAVORITES_COUNT)
+                completeOnboardingWithFavoritesIfPresent(TARGET_PACKAGE, SEED_FAVORITES_COUNT)
                 pastOnboarding = true
             }
             pressHome()

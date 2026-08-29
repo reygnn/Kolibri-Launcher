@@ -78,6 +78,31 @@ fun MacrobenchmarkScope.completeOnboardingWithFavorites(targetPackage: String, c
     device.waitForIdle()
 }
 
+/**
+ * Tolerant variant of [completeOnboardingWithFavorites] for a benchmark whose class
+ * has MORE THAN ONE `@Test` method (e.g. [StartupBenchmark]: None + Partial arms).
+ * All methods of one `connectedBenchmarkAndroidTest` share a SINGLE install, so only
+ * the method that runs FIRST meets onboarding — it seeds, and the seeded favorites
+ * persist in DataStore for every later method (macrobenchmark does not reinstall or
+ * clear data between methods).
+ *
+ * Returns true if it onboarded + seeded on this call, false if the onboarding list
+ * was absent — which for a multi-method class is the normal "already seeded by an
+ * earlier method" case, NOT a failure, so (unlike the strict variant) it does not
+ * `error()`. Call it from each method's `setupBlock`; the first seeds, the rest
+ * no-op and measure the persisted favorites.
+ */
+fun MacrobenchmarkScope.completeOnboardingWithFavoritesIfPresent(
+    targetPackage: String,
+    count: Int,
+): Boolean {
+    if (!device.wait(Until.hasObject(By.res(targetPackage, ONBOARDING_LIST_ID)), SEED_TIMEOUT_MS)) {
+        return false // already past onboarding — favorites persisted from an earlier @Test method
+    }
+    completeOnboardingWithFavorites(targetPackage, count)
+    return true
+}
+
 private const val ONBOARDING_LIST_ID = "all_apps_recycler_view" // activity_onboarding.xml
 private const val ONBOARDING_ITEM_LABEL_ID = "app_label"        // item_app_selectable_text.xml
 private const val ONBOARDING_DONE_ID = "done_button"            // activity_onboarding.xml
