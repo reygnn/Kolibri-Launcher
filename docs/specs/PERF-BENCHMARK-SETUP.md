@@ -157,15 +157,33 @@ copied from the other.
   noise and the **shifted median** is the structural signal. A naive
   "just above the unprofiled value" threshold would miss the target case — a dead
   profile lands *under* it and passes green while broken.
-- **TTFD is emitted but not yet gated.** The same run now also reports
-  `timeToFullDisplayMs` (see the third measurement subject above), but no
-  `verifyStartupBenchmark`-style TTFD gate exists yet — no TTFD baseline has been
-  captured on the reference unit. **To add one:** run `StartupBenchmark` on the
-  A17, record the `startupBaselineProfile` `timeToFullDisplayMs` median in
-  `PERF-RESULTS.md`, then add a sibling gate (same corridor logic as the TTID
-  one, `metricName = "timeToFullDisplayMs"`). Until then TTFD is an observed
-  number, not a regression guard — the same "no gate until a baseline exists"
-  stance the `FavoritesFirstPaintBenchmark` documents.
+- **TTFD has its own gate: `verifyStartupFullyDrawnBenchmark`** (below). The same
+  run reports `timeToFullDisplayMs` (the third measurement subject above), gated
+  on its `startupBaselineProfile` median. It uniquely guards the favorites-READY
+  path — a regression in the enumeration / favorites-render tail inflates TTFD but
+  is invisible to the TTID gate (TTID is the first frame, before the favorites
+  paint). **Requires seeded favorites**: `reportFullyDrawn()` fires only on a
+  non-empty favorites paint, so `StartupBenchmark` seeds favorites in its
+  `setupBlock`; an unseeded run emits no TTFD and the gate fails "metric not
+  found". Threshold calibration (940 ms, anchored to §3's warm TTID baseline plus
+  the thermally-stable enumeration gap so it stays a consistent sibling of the
+  580 ms TTID gate) is argued in `PERF-RESULTS.md §3b/§4` and the task comment.
+
+### `verifyStartupFullyDrawnBenchmark` — the favorites-ready path stays fast
+
+```bash
+./gradlew :macrobenchmark:connectedBenchmarkAndroidTest   # runs StartupBenchmark (emits TTID + TTFD)
+./gradlew :macrobenchmark:verifyStartupFullyDrawnBenchmark # threshold gate
+```
+
+- **Gates on:** `startupBaselineProfile` `timeToFullDisplayMs` **median**.
+- **Threshold: 940 ms.** Calibrated as a consistent sibling of the 580 ms TTID
+  gate (see the task comment / `PERF-RESULTS.md §3b`), not fit to the idle session
+  that first measured TTFD. It fires on profile-silence like its TTID sibling, and
+  additionally catches a regression that inflates ONLY the favorites-ready tail
+  (enumeration / favorites render) — which TTID cannot see.
+- Same run produces both metrics, so one `connectedBenchmarkAndroidTest` feeds
+  both this gate and `verifyStartupBenchmark`.
 
 ---
 
@@ -173,10 +191,16 @@ copied from the other.
 
 Preconditions on the A17: connected over USB, **unlocked**. Onboarding needs
 **no** manual setup: each class clears the first-run gates itself in its
-`setupBlock` (shared `dismissFirstRunGatesIfPresent()` — taps Onboarding's Done,
-declines the ACRA consent dialog; a no-op once past onboarding). This is needed
-because `connectedBenchmarkAndroidTest` reinstalls the target fresh each run, so
-a hand-done first-run would be wiped. No seam ships in the app — the benchmarks
+`setupBlock`. Classes that don't care about favorites use
+`dismissFirstRunGatesIfPresent()` (taps Onboarding's Done with an empty set,
+declines the ACRA consent dialog; a no-op once past onboarding). Classes that
+need favorites on Home — `StartupBenchmark` (TTFD only fires on a non-empty
+favorites paint) and `FavoritesFirstPaintBenchmark` — instead seed them via
+`completeOnboardingWithFavorites(...)`; `StartupBenchmark` uses the tolerant
+`...IfPresent` variant because its two `@Test` methods share one install, so only
+the first meets onboarding and the second measures the persisted favorites. This
+is all needed because `connectedBenchmarkAndroidTest` reinstalls the target fresh
+each run, so a hand-done first-run would be wiped. No seam ships in the app — the benchmarks
 measure the literal `release` build (full baseline profile). The cold-start
 class additionally needs **another launcher set as default home** (see the
 default-home caveat below).

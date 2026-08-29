@@ -31,10 +31,10 @@ import org.junit.runner.RunWith
  *    `endFavoritesFirstPaintTraceOnNextDraw`, `LaunchTrace.Names.FAVORITES_FIRST_PAINT`
  *    and PERF-BENCHMARK-SETUP.md.
  *
- * `verifyStartupBenchmark` currently gates only the TTID median (580 ms). No
- * TTFD gate yet — no TTFD baseline has been captured on the A17 reference unit.
- * Once one exists, add a sibling gate mirroring the TTID one (same precedent the
- * favorites-first-paint benchmark documents for its own missing gate).
+ * Two gates read this class: `verifyStartupBenchmark` (TTID median, 580 ms) and
+ * `verifyStartupFullyDrawnBenchmark` (TTFD median, 940 ms) — the latter added once
+ * a TTFD baseline was captured on the A17 (PERF-RESULTS.md §3b/§4). Both are fed by
+ * one `connectedBenchmarkAndroidTest` run.
  *
  * A launcher registered as HOME is *always running*, so macrobenchmark's
  * cold-start guard ("must not be running prior to cold start") makes this

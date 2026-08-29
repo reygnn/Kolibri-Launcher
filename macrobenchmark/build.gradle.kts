@@ -257,3 +257,107 @@ tasks.register("verifyStartupBenchmark") {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// Fully-drawn gate — sibling of verifyStartupBenchmark, on the SAME
+// startupBaselineProfile block but reading `timeToFullDisplayMs` (TTFD =
+// process fork → reportFullyDrawn, fired one frame after the favorites first
+// paint). It uniquely guards the favorites-READY path: a regression in the
+// PackageManager-enumeration / favorites-render tail inflates TTFD but is
+// INVISIBLE to the TTID gate above (TTID is the first frame, drawn before the
+// favorites paint). Same dependency-free JSON scan and same degraded-profile
+// escape hatch.
+// -----------------------------------------------------------------------------
+tasks.register("verifyStartupFullyDrawnBenchmark") {
+    group = "verification"
+    description = "Fail if StartupBenchmark.startupBaselineProfile timeToFullDisplayMs " +
+        "median exceeds the threshold (run the StartupBenchmark first)."
+
+    // Threshold in MILLISECONDS, gated on the MEDIAN of the ship-equivalent
+    // (CompilationMode.Partial) COLD-start TTFD.
+    //
+    // CALIBRATION — a deliberate sibling of the 580 ms TTID gate, NOT a naive fit
+    // to the idle session that first measured TTFD. That session (PERF-RESULTS §3b,
+    // thermalThrottleSleepSeconds = 0, cool device) read Partial TTFD median 751 /
+    // p95 802 / None median 830 — but its Partial TTID (410) sat ~137 ms below §3's
+    // warm 547 baseline that the TTID gate is calibrated to, so a threshold fit to
+    // 751/802 would false-fail whenever the device is in the warmer §3 state (where
+    // the TTID gate passes). The two gates must stay mutually consistent, so TTFD is
+    // anchored to the SAME warm baseline via the thermally-STABLE part of the metric:
+    // the TTFD − TTID gap (PackageManager enumeration + favorites render) measured at
+    // ~341 ms (median) and effectively equal in both arms. Warm Partial TTFD ≈ §3
+    // warm Partial TTID (547) + gap (341) ≈ 888 ms; +~6 % headroom (the same position
+    // the 580 gate takes over its 547 median) → 940 ms, still below the estimated warm
+    // None TTFD (612.9 + 341 ≈ 954), so it FIRES on profile-silence exactly like its
+    // TTID sibling. The idle session's measured Partial TTFD (751, p95 802) sits well
+    // under 940, so it never false-fails a cool run either. Device-calibrated — like
+    // the TTID gate, re-tune if the reference device changes; a single-session
+    // TTID+TTFD re-baseline would let both gates be re-derived from one thermal state.
+    //
+    // OPERATIONAL: same as verifyStartupBenchmark — cold start is UNMEASURABLE while
+    // Kolibri is the default home; the data is produced with another launcher default.
+    // Local device only; not wired into the device-free CI. Requires the favorites to
+    // be seeded (StartupBenchmark does this) — reportFullyDrawn only fires on a
+    // non-empty favorites paint, so an unseeded run emits no TTFD at all.
+    val thresholdMs = 940.0
+    val benchmarkName = "startupBaselineProfile"
+    val metricName = "timeToFullDisplayMs"
+
+    val minHealthyProfileLines = 6_000
+    val appReleaseArtProfileDir =
+        project(":app").layout.buildDirectory.dir("intermediates/merged_art_profile/release")
+
+    doLast {
+        val outDir = layout.buildDirectory.get().asFile
+        val jsons = outDir.walkTopDown()
+            .filter { it.isFile && it.name.endsWith("-benchmarkData.json") }
+            .toList()
+        if (jsons.isEmpty()) {
+            throw GradleException(
+                "No *-benchmarkData.json under ${outDir.path}. Run " +
+                    ":macrobenchmark:connectedBenchmarkAndroidTest (StartupBenchmark) first.",
+            )
+        }
+        var worstMedian = -1.0
+        var found = false
+        jsons.forEach { f ->
+            val text = f.readText()
+            val nameIdx = text.indexOf("\"$benchmarkName\"")
+            if (nameIdx >= 0) {
+                val block = text.substring(nameIdx)
+                val median = Regex(
+                    "\"${Regex.escape(metricName)}\"\\s*:\\s*\\{[^}]*?\"median\"\\s*:\\s*([0-9.eE+-]+)",
+                ).find(block)?.groupValues?.get(1)?.toDoubleOrNull()
+                if (median != null) { found = true; if (median > worstMedian) worstMedian = median }
+            }
+        }
+        if (!found) {
+            throw GradleException(
+                "Metric '$metricName' for '$benchmarkName' not found in benchmark JSON. TTFD is only " +
+                    "emitted when reportFullyDrawn() fires (non-empty favorites paint) — did StartupBenchmark " +
+                    "run with seeded favorites (and a non-Kolibri default home)?",
+            )
+        }
+        logger.lifecycle(
+            "Cold-start TTFD (baseline profile), median: %.1f ms (threshold %.1f ms)".format(worstMedian, thresholdMs),
+        )
+        if (worstMedian > thresholdMs) {
+            val profileFile = appReleaseArtProfileDir.get().asFile
+                .walkTopDown().firstOrNull { it.name == "baseline-prof.txt" }
+            val profileLines = profileFile?.readLines()?.size ?: 0
+            if (profileLines < minHealthyProfileLines) {
+                throw GradleException(
+                    "Cold-start TTFD %.1f ms > %.1f ms, BUT the baked release baseline profile looks ".format(worstMedian, thresholdMs) +
+                        "degraded/absent ($profileLines lines; healthy ~15k, ~2.7k = library defaults only). " +
+                        "Almost certainly NOT a real regression: run `./gradlew :app:generateBaselineProfile` " +
+                        "(connected device), then re-run StartupBenchmark. See PERF-BENCHMARK-SETUP.md.",
+                )
+            }
+            throw GradleException(
+                "Cold-start TTFD REGRESSED: baseline-profile median %.1f ms > %.1f ms threshold ".format(worstMedian, thresholdMs) +
+                    "(profile healthy, $profileLines lines). Something inflated the favorites-ready path " +
+                    "(enumeration / favorites render) — note TTID may still pass; investigate before merging.",
+            )
+        }
+    }
+}
