@@ -165,9 +165,11 @@ copied from the other.
   paint). **Requires seeded favorites**: `reportFullyDrawn()` fires only on a
   non-empty favorites paint, so `StartupBenchmark` seeds favorites in its
   `setupBlock`; an unseeded run emits no TTFD and the gate fails "metric not
-  found". Threshold calibration (940 ms, anchored to §3's warm TTID baseline plus
-  the thermally-stable enumeration gap so it stays a consistent sibling of the
-  580 ms TTID gate) is argued in `PERF-RESULTS.md §3b/§4` and the task comment.
+  found". Threshold calibration (790 ms, anchored to §3's warm TTID baseline plus
+  the thermally-stable favorites-render gap so it stays a consistent sibling of the
+  580 ms TTID gate; re-baselined down from 940 after the provisional-resolution
+  parallelization cut the gap) is argued in `PERF-RESULTS.md §3b/§4` and the task
+  comment.
 
 ### `verifyStartupFullyDrawnBenchmark` — the favorites-ready path stays fast
 
@@ -177,11 +179,12 @@ copied from the other.
 ```
 
 - **Gates on:** `startupBaselineProfile` `timeToFullDisplayMs` **median**.
-- **Threshold: 940 ms.** Calibrated as a consistent sibling of the 580 ms TTID
+- **Threshold: 790 ms.** Calibrated as a consistent sibling of the 580 ms TTID
   gate (see the task comment / `PERF-RESULTS.md §3b`), not fit to the idle session
-  that first measured TTFD. It fires on profile-silence like its TTID sibling, and
-  additionally catches a regression that inflates ONLY the favorites-ready tail
-  (enumeration / favorites render) — which TTID cannot see.
+  that measures TTFD. Re-baselined down from 940 after the provisional favorite
+  resolution was parallelized (the favorites-render gap fell ~341 → ~193 ms). It
+  fires on profile-silence like its TTID sibling, and additionally catches a
+  regression that inflates ONLY the favorites-ready tail — which TTID cannot see.
 - Same run produces both metrics, so one `connectedBenchmarkAndroidTest` feeds
   both this gate and `verifyStartupBenchmark`.
 

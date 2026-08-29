@@ -276,30 +276,34 @@ tasks.register("verifyStartupFullyDrawnBenchmark") {
     // Threshold in MILLISECONDS, gated on the MEDIAN of the ship-equivalent
     // (CompilationMode.Partial) COLD-start TTFD.
     //
-    // CALIBRATION — a deliberate sibling of the 580 ms TTID gate, NOT a naive fit
-    // to the idle session that first measured TTFD. That session (PERF-RESULTS §3b,
-    // thermalThrottleSleepSeconds = 0, cool device) read Partial TTFD median 751 /
-    // p95 802 / None median 830 — but its Partial TTID (410) sat ~137 ms below §3's
-    // warm 547 baseline that the TTID gate is calibrated to, so a threshold fit to
-    // 751/802 would false-fail whenever the device is in the warmer §3 state (where
-    // the TTID gate passes). The two gates must stay mutually consistent, so TTFD is
-    // anchored to the SAME warm baseline via the thermally-STABLE part of the metric:
-    // the TTFD − TTID gap (PackageManager enumeration + favorites render) measured at
-    // ~341 ms (median) and effectively equal in both arms. Warm Partial TTFD ≈ §3
-    // warm Partial TTID (547) + gap (341) ≈ 888 ms; +~6 % headroom (the same position
-    // the 580 gate takes over its 547 median) → 940 ms, still below the estimated warm
-    // None TTFD (612.9 + 341 ≈ 954), so it FIRES on profile-silence exactly like its
-    // TTID sibling. The idle session's measured Partial TTFD (751, p95 802) sits well
-    // under 940, so it never false-fails a cool run either. Device-calibrated — like
-    // the TTID gate, re-tune if the reference device changes; a single-session
-    // TTID+TTFD re-baseline would let both gates be re-derived from one thermal state.
+    // CALIBRATION — a deliberate sibling of the 580 ms TTID gate, NOT a naive fit to
+    // the idle session that measures TTFD (thermalThrottleSleepSeconds = 0, cool
+    // device: its Partial TTID sits ~130 ms below §3's warm 547 baseline the TTID gate
+    // is calibrated to, so a threshold fit to the cool TTFD would false-fail in the
+    // warmer §3 state where the TTID gate passes). The two gates must stay mutually
+    // consistent, so TTFD is anchored to the SAME warm baseline via the thermally-
+    // STABLE part of the metric: the TTFD − TTID gap (PackageManager favorites-render
+    // tail), effectively equal in both arms.
+    //
+    // This threshold was RE-BASELINED after the favorites provisional-resolution was
+    // parallelized (perf(favorites), PERF-RESULTS §3b): that cut the cool gap from
+    // ~341 ms to ~193 ms (cool Partial TTFD 751 → 606). New derivation: warm Partial
+    // TTFD ≈ §3 warm Partial TTID (547) + gap (193) ≈ 741 ms; +~6 % headroom (the
+    // same position the 580 gate takes over its 547 median) → 790 ms, still below the
+    // estimated warm None TTFD (612.9 + 193 ≈ 806), so it FIRES on profile-silence
+    // exactly like its TTID sibling. The cool session's measured Partial TTFD (606,
+    // p95 666) sits well under 790, so it never false-fails a cool run either. (The
+    // pre-parallelization value was 940, off the 341 ms gap.) Device-calibrated —
+    // like the TTID gate, re-tune if the reference device changes or the favorites
+    // path is re-optimized; a single-session TTID+TTFD re-baseline would let both
+    // gates be re-derived from one thermal state.
     //
     // OPERATIONAL: same as verifyStartupBenchmark — cold start is UNMEASURABLE while
     // Kolibri is the default home; the data is produced with another launcher default.
     // Local device only; not wired into the device-free CI. Requires the favorites to
     // be seeded (StartupBenchmark does this) — reportFullyDrawn only fires on a
     // non-empty favorites paint, so an unseeded run emits no TTFD at all.
-    val thresholdMs = 940.0
+    val thresholdMs = 790.0
     val benchmarkName = "startupBaselineProfile"
     val metricName = "timeToFullDisplayMs"
 

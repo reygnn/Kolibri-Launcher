@@ -74,46 +74,55 @@ single Partial outlier — unlike the retired, faster reference unit whose range
 were fully disjoint (27 ms), this slower unit's tails just graze. No significance
 test is needed — the working distributions do not overlap.
 
-## 3b. Kolibri fully drawn (TTFD) + the enumeration tail
+## 3b. Kolibri fully drawn (TTFD) + the favorites-ready tail
 
 `StartupBenchmark`, same **3×20 pooled (60)** `StartupMode.COLD` run, now also
 emitting `timeToFullDisplayMs` — Kolibri calls `reportFullyDrawn()` one frame
-after the favorites first paint (the enumeration-gated "ready for interaction"
-point). All values **ms**; both TTID and TTFD are from the SAME 60 iterations.
+after the favorites first paint (the "ready for interaction" point). All values
+**ms**; both TTID and TTFD are from the SAME 60 iterations. Numbers below are
+**after** the favorites provisional-resolution was parallelized (see the delta
+note); the pre-parallelization figures are kept in that note for comparison.
 
 | Arm | metric | min | median | p95 | max | CoV |
 |---|---|---|---|---|---|---|
-| None (no profile) | TTID | 451.0 | 488.3 | 515.2 | 580.7 | 3.9 % |
-| None (no profile) | TTFD | 782.7 | 830.5 | 874.5 | 904.6 | 3.0 % |
-| Partial (profiled) | TTID | 377.1 | **410.3** | 454.1 | 471.2 | 4.9 % |
-| Partial (profiled) | TTFD | 720.9 | **751.1** | 802.2 | 891.0 | 4.1 % |
+| None (no profile) | TTID | 456.8 | 482.3 | 521.2 | 606.9 | 4.5 % |
+| None (no profile) | TTFD | 632.8 | 671.3 | 718.8 | 827.2 | 5.0 % |
+| Partial (profiled) | TTID | 370.2 | **413.1** | 445.6 | 458.2 | 4.5 % |
+| Partial (profiled) | TTFD | 551.3 | **606.4** | 666.3 | 761.8 | 5.9 % |
 
-**Cold start to ready ≈ 0.75 s** (Partial TTFD median 751). The profile buys
-**−78 ms on TTFD** (830 → 751), the same absolute win it gives TTID — because the
-**TTFD − TTID gap is ~341 ms in BOTH arms** (751−410, 830−488): the gap is the
-PackageManager-enumeration + favorites-render tail, which is I/O-bound, not
-code-compilation-bound, so the Baseline Profile shortens the CPU/AOT part (TTID)
-but not the tail. That ~341 ms tail is what a TTFD gate uniquely guards (a
-regression that inflates the favorites-ready path is invisible to TTID).
+**Cold start to ready ≈ 0.61 s** (Partial TTFD median 606). The **TTFD − TTID gap
+is now ~193 ms** (606−413) — the PackageManager favorites-render tail. TTID is
+unchanged by the favorites work (413, first frame); the gap is where the win landed.
+
+> **Parallelization delta (the driver: `perf(favorites)`).** Before parallelizing
+> the provisional favorite-label resolution, the same cool session read **Partial
+> TTFD 751 / None TTFD 830**, with a **~341 ms** TTFD−TTID gap. Parallelizing the
+> per-favorite `resolveLabel` (each a `withContext(IO)` + scoped PackageManager
+> query, previously run sequentially) cut the gap to **~193 ms** and Partial TTFD to
+> **606 (−145 ms, −19 %)** — measured with 3 seeded favorites; the win scales with
+> favorite count. The effect is present in BOTH arms (None 830 → 671), confirming it
+> is code, not the Baseline Profile. The sibling `perf(coldstart)` change (moving
+> `getWallpaperColors` off the Main thread) showed **no** measurable TTID move
+> (413 vs 410) — kept as structural hygiene, not for a number.
 
 > **Session note — read before comparing to §3.** This run had
-> `thermalThrottleSleepSeconds = 0` on every iteration (cool, idle device), and
-> its Partial TTID median (410) sits **~137 ms below §3's 547** on the *same*
-> unit. §3 was measured in a warmer/busier state. So the **absolute** TTFD values
-> above are on the fast end; the robust, state-independent signals are the
-> **None−Partial deltas** and the **~341 ms enumeration gap**, not the raw
-> milliseconds. The TTFD gate threshold (§4) is therefore NOT set from this
-> session's fast numbers — it is anchored to §3's warm TTID baseline plus this
-> gap, so it stays a consistent sibling of the 580 ms TTID gate. Re-measuring
-> TTID and TTFD in ONE session would let both gates be re-baselined together.
+> `thermalThrottleSleepSeconds = 0` on every iteration (cool, idle device), and its
+> Partial TTID median (413) sits **~134 ms below §3's 547** on the *same* unit. §3
+> was measured in a warmer/busier state. So the **absolute** TTFD values are on the
+> fast end; the robust, state-independent signals are the **None−Partial deltas** and
+> the **~193 ms tail**, not the raw milliseconds. The TTFD gate (§4) is therefore NOT
+> set from this session's fast numbers — it is anchored to §3's warm TTID baseline
+> plus this (post-parallelization) gap, so it stays a consistent sibling of the
+> 580 ms TTID gate. Re-measuring TTID and TTFD in ONE warm session would let both
+> gates be re-baselined together.
 
 ## 4. Gate results
 
 | Gate | Metric | Threshold | A17 value | Result |
 |---|---|---|---|---|
 | `verifyLaunchBenchmark` | `launchDispatchGapMs` max | 4.0 ms | **1.434 ms** | **PASS** (« 4.0) |
-| `verifyStartupBenchmark` | `startupBaselineProfile` `timeToInitialDisplayMs` median | 580 ms | **547.4 ms** (§3) / 410.3 (§3b idle session) | **PASS** (« 580) |
-| `verifyStartupFullyDrawnBenchmark` | `startupBaselineProfile` `timeToFullDisplayMs` median | 940 ms | **751.1 ms** (§3b) | **PASS** (« 940) |
+| `verifyStartupBenchmark` | `startupBaselineProfile` `timeToInitialDisplayMs` median | 580 ms | **547.4 ms** (§3) / 413.1 (§3b idle session) | **PASS** (« 580) |
+| `verifyStartupFullyDrawnBenchmark` | `startupBaselineProfile` `timeToFullDisplayMs` median | 790 ms | **606.4 ms** (§3b, post-parallelization) | **PASS** (« 790) |
 
 > When reading `verifyLaunchBenchmark`'s console line, note the stale-JSON
 > gotcha in [`PERF-BENCHMARK-SETUP`](PERF-BENCHMARK-SETUP.md#the-gates): it

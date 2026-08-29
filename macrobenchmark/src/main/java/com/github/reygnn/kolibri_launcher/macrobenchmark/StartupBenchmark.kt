@@ -32,9 +32,10 @@ import org.junit.runner.RunWith
  *    and PERF-BENCHMARK-SETUP.md.
  *
  * Two gates read this class: `verifyStartupBenchmark` (TTID median, 580 ms) and
- * `verifyStartupFullyDrawnBenchmark` (TTFD median, 940 ms) — the latter added once
- * a TTFD baseline was captured on the A17 (PERF-RESULTS.md §3b/§4). Both are fed by
- * one `connectedBenchmarkAndroidTest` run.
+ * `verifyStartupFullyDrawnBenchmark` (TTFD median, 790 ms) — the latter added once
+ * a TTFD baseline was captured on the A17, re-baselined down from 940 after the
+ * favorites provisional-resolution parallelization (PERF-RESULTS.md §3b/§4). Both
+ * are fed by one `connectedBenchmarkAndroidTest` run.
  *
  * A launcher registered as HOME is *always running*, so macrobenchmark's
  * cold-start guard ("must not be running prior to cold start") makes this
