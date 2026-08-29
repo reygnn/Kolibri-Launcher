@@ -28,9 +28,13 @@ trigger, so no find is lost (RC gate Section 5).
   it means a backup whose wallpaper is entirely unrestorable (dead `content://`
   from another device, missing ZIP entry) leaves the user's current wallpaper
   intact; `droppedWallpaperLayers` still surfaces the failure. `clearWallpaper()`
-  never deleted files, so `gcOrphans` is unaffected. Pinned by
-  `BackupRepositoryImplWallpaperTest` (existing wallpaper survives an
-  inaccessible-backup-wallpaper restore).
+  never deleted files, so `gcOrphans` is unaffected. Pinned on BOTH restore
+  paths: `BackupRepositoryImplWallpaperTest` (single-layer) and
+  `BackupRepositoryImplMultiLayerImportTest` (multi-layer, all image-bearing
+  layers inaccessible) — each asserts an existing wallpaper survives an
+  unrestorable-backup-wallpaper restore. Verified safe by a two-agent
+  adversarial review (correctness + test validity); the review also noted the
+  change removes a pre-existing wipe-on-cancel window.
 - **#2 (MED) — Usage import aborted by one out-of-range ISO timestamp.**
   `UsageExportRepositoryImpl.parseTimestamp` caught only `DateTimeParseException`;
   a valid ISO instant with an extreme year parses but overflows `Long` on

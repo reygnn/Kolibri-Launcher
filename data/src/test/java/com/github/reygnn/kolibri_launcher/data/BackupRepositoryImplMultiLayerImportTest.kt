@@ -221,4 +221,35 @@ class BackupRepositoryImplMultiLayerImportTest {
         val restored = fakeWallpaperRepo.currentState
         assertThat(restored.layers.map { it.imageUri }).containsExactly("content://img/ok")
     }
+
+    @Test
+    fun `all image-bearing layers inaccessible does not wipe the existing wallpaper`() = runTest {
+        // Multi-layer twin of the single-layer preserve test (RC edge-case audit
+        // #1): a backup whose EVERY image-bearing layer is unreachable here must
+        // not wipe the user's current wallpaper. Build a two-image-layer backup,
+        // then make every layer URI inaccessible so validLayerStates ends empty
+        // → the restorer writes nothing → removing the Phase 7b pre-clear means
+        // the current state survives (previously it was wiped to NONE).
+        fakeWallpaperRepo.currentState = WallpaperState.multiLayer(
+            listOf(
+                WallpaperLayerState(imageUri = "content://img/gone0"),
+                WallpaperLayerState(imageUri = "content://img/gone1"),
+            )
+        )
+        val json = backupManager.exportToJson()
+
+        // Every layer URI now reads as inaccessible.
+        every { contentResolver.openInputStream(any()) } returns null
+
+        val existing = WallpaperState.single("content://existing/wp", scale = 1.3f)
+        fakeWallpaperRepo.currentState = existing
+
+        val result = backupManager.importFromJson(json, themeOnly)
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        // Both image-bearing layers dropped (so the UI warns)...
+        assertThat((result as ImportResult.Success).droppedWallpaperLayers).isEqualTo(2)
+        // ...and the current wallpaper is PRESERVED, not wiped to NONE.
+        assertThat(fakeWallpaperRepo.currentState).isEqualTo(existing)
+    }
 }
