@@ -17,8 +17,12 @@ import javax.inject.Singleton
  * value on subscription instead of waiting for the next system
  * change. Initial value is `null`; `KolibriLauncherApp` does an
  * initial poll of `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)`
- * during startup so the first non-null emission lands before any
- * UI subscribes.
+ * on a background thread (`applicationScope`, IO) shortly after
+ * `onCreate` — deliberately OFF the cold-start critical path, since
+ * the Home first frame needs no colour hints. The first non-null
+ * emission therefore lands a few ms into startup (not before the very
+ * first frame), still long before the AppDrawer AUTO surface — the
+ * only consumer — can be reached by a user gesture.
  *
  * `null` represents "system colour hints unknown" (either we
  * haven't polled yet, or the OS returned `null` for the system

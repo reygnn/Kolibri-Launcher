@@ -89,7 +89,10 @@ object LaunchTrace {
         const val COLD_START_ONCREATE_BOOTSTRAP = "cold_start_oncreate_bootstrap"
 
         /** `registerSystemWallpaperColorsListener` — WallpaperManager IPC
-         * (getInstance + getWallpaperColors) on the Main thread. */
+         * (getInstance + getWallpaperColors). Dispatched OFF the Main thread onto
+         * `applicationScope` (IO) so it no longer blocks the first frame; the Home
+         * render does not need system-colour hints (only the AppDrawer AUTO surface
+         * does). The section still marks the cost on the timeline, now on IO. */
         const val COLD_START_WALLPAPER_COLORS = "cold_start_wallpaper_colors"
 
         // --- Wallpaper full rebuild (jank investigation) ---

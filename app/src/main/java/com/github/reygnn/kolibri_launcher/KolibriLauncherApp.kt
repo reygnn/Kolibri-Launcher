@@ -187,10 +187,21 @@ class KolibriLauncherApp : Application() {
         // applies; the catch reports via reportToAcra (Rule 9, no DEBUG throw).
         // No unregister: Application.onTerminate isn't called on real
         // devices, and the signal is a process-lifetime singleton.
-        // Traced (cold-start): WallpaperManager IPC (getInstance +
-        // getWallpaperColors) on the Main thread — a potential blocker.
-        LaunchTrace.section(LaunchTrace.Names.COLD_START_WALLPAPER_COLORS) {
-            registerSystemWallpaperColorsListener()
+        //
+        // OFF the cold-start critical path: getWallpaperColors(FLAG_SYSTEM) is a
+        // blocking WallpaperManager IPC, and the Home first frame does NOT need the
+        // system-colour hints — only the AppDrawer AUTO surface does, on drawer open.
+        // Running it on applicationScope (IO) instead of synchronously on the Main
+        // thread in onCreate keeps the IPC out of the first-frame (TTID) budget. The
+        // signal starts null (SystemWallpaperColorsSignal — consumers already treat
+        // null as "no signal / fall back"), and the poll seeds it a few ms later, long
+        // before a user gesture can open the drawer. The trace section stays so the
+        // cost remains visible on the Perfetto timeline — now on the IO thread, not
+        // blocking the frame.
+        applicationScope.launch {
+            LaunchTrace.section(LaunchTrace.Names.COLD_START_WALLPAPER_COLORS) {
+                registerSystemWallpaperColorsListener()
+            }
         }
     }
 
