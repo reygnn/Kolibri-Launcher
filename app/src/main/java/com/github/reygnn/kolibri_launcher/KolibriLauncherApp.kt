@@ -79,10 +79,13 @@ class KolibriLauncherApp : Application() {
      * and before any other Application code, so it is the only safe place to
      * install the crash handler before something else can crash.
      *
-     * The whole ACRA bootstrap (init, the §12 ordering, the X2-gated synchronous
-     * consent read, the uncaught-handler install) lives in
-     * [CrashReportingBootstrap.attachBaseContext] — see there for the
-     * `runBlocking`/StrictMode rationale (§3.5) and the fail-closed sequence.
+     * ACRA init (the §12 ordering, the A1 disable-after-init) and the
+     * uncaught-handler install live in [CrashReportingBootstrap.attachBaseContext].
+     * The X2-gated synchronous consent read is NOT here — it moved to
+     * [CrashReportingBootstrap.onCreate] on 2026-08-14, because
+     * `context.consentDataStore` dereferences `applicationContext`, which is null
+     * during `attachBaseContext`; see there for the `runBlocking`/StrictMode
+     * rationale (§3.5) and the fail-closed sequence.
      * This override is thin glue: delegate inside the Rule-7 paranoia catch.
      */
     override fun attachBaseContext(base: Context?) {
@@ -90,11 +93,12 @@ class KolibriLauncherApp : Application() {
 
         if (base != null) {
             try {
-                // Owns ACRA init + the X2-gated consent read + the uncaught
-                // handler install, in the §12 order. See CrashReportingBootstrap.
+                // Owns ACRA init (A1) + the uncaught-handler install, in the §12
+                // order. The X2-gated consent read is NOT here — it runs in
+                // CrashReportingBootstrap.onCreate (applicationContext is null
+                // during attach). See CrashReportingBootstrap.
                 // Traced (cold-start): synchronous, runs before onCreate and
-                // blocks the Main thread; wraps the ACRA-init + consent-read
-                // sub-sections inside the delegate.
+                // blocks the Main thread; wraps the ACRA-init sub-section.
                 LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
                     CrashReportingBootstrap.attachBaseContext(this)
                 }

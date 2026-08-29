@@ -380,8 +380,9 @@ activities.
      and double-send the crash (one silent carrier + one fatal auto-report).
 
    **The one bare-`Timber.e` exception: the pre-wiring bootstrap path.**
-   `ConsentBootstrap.kt` runs before KolibriLog is wired and before `AcraTree`
-   is planted — `reportToAcra` would be a no-op and `silentError`'s DEBUG throw
+   `ConsentBootstrap.readDecision` runs in the `onCreate` consent gate, before
+   `AcraTree` is planted (planted later in `CrashReportingBootstrap.onCreate`) —
+   `reportToAcra` would be a no-op and `silentError`'s DEBUG throw
    would crash the app before the reporter exists. It keeps a bare `Timber.e`,
    flagged with a `pre-wiring bare` marker. (`ConsentDialog.kt`, the dialog UI
    helper, sits off the bootstrap path and uses `silentError` — the

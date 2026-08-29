@@ -79,9 +79,9 @@ object ConsentBootstrap {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // pre-wiring bare Timber.e (Rule 9): readDecision runs on the pre-Hilt
-            // bootstrap path (attachBaseContext / the onCreate consent gate) BEFORE
-            // KolibriLog is wired and BEFORE AcraTree is planted. reportToAcra
+            // pre-wiring bare Timber.e (Rule 9): readDecision runs in the onCreate
+            // consent gate, BEFORE AcraTree is planted (planted in
+            // CrashReportingBootstrap.onCreate only AFTER this gate runs). reportToAcra
             // would be a no-op here, and silentError's DEBUG throw would crash the
             // app before the reporter exists — so this stays a bare Timber.e.
             Timber.e(e, "Failed to read crash-report consent decision from DataStore.")
