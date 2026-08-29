@@ -43,27 +43,6 @@ class ResetRepositoryImpl @Inject constructor(
     private val timeBasedEventsRepository: TimeBasedEventsRepository // no purgeRepository needed
 ) : ResetRepository {
 
-    override suspend fun resetAllData(): Boolean {
-        // Outer try/catch removed per Rule 11 — the three reset
-        // methods each return Boolean (purgeAll handles their failures
-        // internally and never throws); Boolean composition + Timber
-        // logs are pure code paths.
-        Timber.d("Starting complete data reset")
-
-        val userDataSuccess = resetUserData()
-        val settingsSuccess = resetSettings()
-        val appUsageSuccess = resetAppUsageData()
-
-        val success = userDataSuccess && settingsSuccess && appUsageSuccess
-
-        if (success) {
-            Timber.d("Complete data reset successful")
-        } else {
-            Timber.w("Complete data reset completed with errors")
-        }
-        return success
-    }
-
     override suspend fun resetUserData(): Boolean {
         Timber.d("Starting user data reset")
 

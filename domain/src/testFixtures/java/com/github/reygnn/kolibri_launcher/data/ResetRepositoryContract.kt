@@ -11,13 +11,12 @@ package com.github.reygnn.kolibri_launcher.data
  * THE INTERFACE:
  * ```
  * interface ResetRepository {
- *     suspend fun resetAllData(): Boolean
  *     suspend fun resetUserData(): Boolean
  *     suspend fun resetSettings(): Boolean
  *     suspend fun resetAppUsageData(): Boolean
  * }
  * ```
- * Four suspend methods, each returning `Boolean`.
+ * Three suspend methods, each returning `Boolean`.
  *
  * WHY NO CONTRACT?
  *
@@ -44,10 +43,10 @@ package com.github.reygnn.kolibri_launcher.data
  *    MockK on each child interface.
  *
  * 3. **No `FakeResetRepository` exists.**
- *    No consumer needs one. `SettingsViewModel` calls `resetAllData` etc.
- *    directly; `SettingsViewModel` tests mock the repository where
- *    needed. Adding a fake purely to enable a contract test would be
- *    ceremony.
+ *    No consumer needs one. `FactoryResetUseCase` calls the granular
+ *    `resetSettings` / `resetUserData` / `resetAppUsageData` methods
+ *    directly; its tests mock the repository where needed. Adding a fake
+ *    purely to enable a contract test would be ceremony.
  *
  * WHEN TO REVISIT:
  *   - If the interface grows to expose observable state (e.g., a reset

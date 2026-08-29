@@ -335,15 +335,4 @@ class WallpaperFileManager @Inject constructor(
     fun gcOrphans(referencedUriStrings: Set<String>, minAgeMillis: Long = 60_000L) {
         gcOrphans(referencedUriStrings.mapTo(mutableSetOf()) { it.toUri() }, minAgeMillis)
     }
-
-    /**
-     * Gibt die Gesamtgröße aller internen Wallpaper-Dateien zurück (in Bytes).
-     */
-    fun getTotalSizeBytes(): Long {
-        return try {
-            getWallpaperDir().listFiles()?.sumOf { it.length() } ?: 0L
-        } catch (e: Throwable) {
-            0L
-        }
-    }
 }

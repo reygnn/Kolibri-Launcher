@@ -135,30 +135,4 @@ class ResetRepositoryImplTest {
 
         Assert.assertFalse(result)
     }
-
-    // ========== RESET ALL DATA TESTS ==========
-
-    @Test
-    fun `resetAllData - calls all reset methods and returns true on success`() = runTest {
-        val result = resetManager.resetAllData()
-
-        Assert.assertTrue(result)
-
-        coVerify { favoritesRepository.purgeRepository() }
-        coVerify { settingsRepository.purgeRepository() }
-        coVerify { appUsageRepository.purgeRepository() }
-    }
-
-    @Test
-    fun `resetAllData - when one part fails - executes others but returns false`() = runTest {
-        coEvery { favoritesRepository.purgeRepository() } throws RuntimeException("Fail")
-
-        val result = resetManager.resetAllData()
-
-        Assert.assertFalse(result)
-
-        coVerify { favoritesRepository.purgeRepository() }
-        coVerify { settingsRepository.purgeRepository() }
-        coVerify { appUsageRepository.purgeRepository() }
-    }
 }
