@@ -912,6 +912,14 @@ class HomeFragment : Fragment() {
             // every later submitList round via the once-per-process state guard.
             favoritesAdapter.submitList(apps) { endFavoritesFirstPaintTraceOnNextDraw() }
         } else {
+            // Empty favorite set (a user who onboarded selecting nothing): no
+            // first-paint trace close and no reportFullyDrawn() here — BY DESIGN.
+            // The ready-for-interaction point is the enumeration-gated favorites
+            // paint; with no favorites there is nothing to wait for, so this
+            // transient onboarding-edge state simply never signals fully-drawn
+            // (TTFD is absent for such a session). Do NOT "fix" this by reporting
+            // on the empty paint — it would decouple the report from the trace
+            // span the TTFD benchmark measures for no real user benefit.
             favoritesAdapter.submitList(apps)
         }
     }
