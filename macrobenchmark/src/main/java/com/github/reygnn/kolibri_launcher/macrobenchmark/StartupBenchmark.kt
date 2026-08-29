@@ -1,8 +1,10 @@
 package com.github.reygnn.kolibri_launcher.macrobenchmark
 
 import androidx.benchmark.macro.CompilationMode
+import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
+import androidx.benchmark.macro.TraceSectionMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
@@ -37,6 +39,15 @@ import org.junit.runner.RunWith
  * favorites provisional-resolution parallelization (PERF-RESULTS.md §3b/§4). Both
  * are fed by one `connectedBenchmarkAndroidTest` run.
  *
+ * Alongside those, a [TraceSectionMetric] reports the `cold_start_consent_read`
+ * slice ([LaunchTrace.Names.COLD_START_CONSENT_READ][com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace.Names.COLD_START_CONSENT_READ])
+ * — the synchronous `runBlocking` DataStore consent read in
+ * `CrashReportingBootstrap.onCreate`, the "prime suspect for cold-start latency".
+ * This is measurement-only (no `verify…` gate yet): it exists to answer whether the
+ * read's median is even worth attacking before touching the No-SharedPreferences
+ * rule. Present under both compilation modes, so the None−Partial delta reveals how
+ * much of the cost is one-time class-loading vs. work a profile cannot help.
+ *
  * A launcher registered as HOME is *always running*, so macrobenchmark's
  * cold-start guard ("must not be running prior to cold start") makes this
  * UNMEASURABLE while Kolibri is the default home. Run these with a DIFFERENT
@@ -68,9 +79,21 @@ class StartupBenchmark {
     @Test
     fun startupBaselineProfile() = measureStartup(CompilationMode.Partial())
 
+    @OptIn(ExperimentalMetricApi::class)
     private fun measureStartup(mode: CompilationMode) = rule.measureRepeated(
         packageName = TARGET_PACKAGE,
-        metrics = listOf(StartupTimingMetric()),
+        metrics = listOf(
+            StartupTimingMetric(),
+            // The synchronous DataStore consent read in CrashReportingBootstrap.onCreate
+            // (LaunchTrace.Names.COLD_START_CONSENT_READ, "prime suspect for cold-start
+            // latency"). It fires exactly once per main-process cold start (the :acra
+            // sender process returns before the read), so Mode.Sum reports that single
+            // occurrence's duration; the median across ITERATIONS is the number that
+            // decides whether the runBlocking DataStore read is worth attacking. Present
+            // under BOTH compilation modes, so the None−Partial delta also shows whether
+            // the baseline profile touches this slice (mostly one-time class-loading).
+            TraceSectionMetric(SECTION_CONSENT_READ, TraceSectionMetric.Mode.Sum),
+        ),
         iterations = ITERATIONS,
         startupMode = StartupMode.COLD,
         compilationMode = mode,
@@ -132,5 +155,6 @@ class StartupBenchmark {
         const val PAINT_TIMEOUT_MS = 5_000L
         const val POLL_MS = 16L // ~one frame between "have favorites painted yet?" checks
         const val FAVORITES_RV_ID = "favoritesRecyclerView" // fragment_home.xml
+        const val SECTION_CONSENT_READ = "cold_start_consent_read" // LaunchTrace.Names.COLD_START_CONSENT_READ
     }
 }

@@ -13,6 +13,10 @@ On-device start-up numbers for Kolibri, measured on the **Galaxy A17 5G**
 - **The Baseline Profile is worth keeping.** It cuts Kolibri's *own* cold start
   by **~11 % (613 → 547 ms median)**, with the profiled and unprofiled **5–95 %
   bands disjoint**.
+- **The "prime suspect" consent read is cheap.** The synchronous `runBlocking`
+  DataStore consent read on cold start is **~5.4 ms profiled (~1.2 % of TTID)**;
+  the Baseline Profile halves it, proving the cost is one-time class-loading, not
+  I/O — so it is **not** worth a `SharedPreferences` swap (§3d).
 - Both regression gates **PASS** with wide headroom.
 
 ---
@@ -147,6 +151,54 @@ the cost is CPU + flash I/O bound by core count, not the system_server binder po
 and concurrent `loadLabel` across threads is thread-safe (`ResourcesManager` /
 `AssetManager` locks). **Do not re-attempt** without a device that actually carries
 ~150 apps and a metric tied to drawer-open, not TTID/TTFD.
+
+## 3d. The consent read — "prime suspect", measured
+
+`StartupBenchmark`, **20 iterations per arm**, `StartupMode.COLD`, one cool/idle
+A17 session (so absolute TTID/TTFD sit on the fast end — per §3b's session note,
+read the **None−Partial delta**, not the raw ms). The `cold_start_consent_read`
+slice (`LaunchTrace.Names.COLD_START_CONSENT_READ`) is the synchronous
+`runBlocking { ConsentBootstrap.readDecision(app) }` DataStore read in
+`CrashReportingBootstrap.onCreate` — flagged in-code as the "prime suspect for
+cold-start latency". Measured with `TraceSectionMetric(…, Mode.Sum)`; `Count = 1`
+per iteration confirms it fires exactly once per main-process cold start (the
+`:acra` sender process returns before the read). All values **ms**.
+
+| Arm | slice min | slice median | slice max | median as % of same-arm TTID |
+|---|---|---|---|---|
+| None (no profile) | 8.4 | **10.4** | 11.6 | ~1.9 % of 536.8 |
+| Partial (profiled) | 4.7 | **5.4** | 13.8 | ~1.2 % of 461.5 |
+
+**The read is ~5–10 ms, ~1–2 % of TTID — and the Baseline Profile nearly halves
+it (10.4 → 5.4, −48 %).** That halving is the finding: disk I/O would be
+profile-invariant, so the dominant cost is **one-time class-loading / JIT** of the
+`runBlocking` event loop + DataStore / protobuf-lite / Okio machinery on this, the
+process's FIRST DataStore access — exactly the "first access front-loads
+everything" hypothesis that made this the traced suspect. The disk read of the
+tiny one-key `acra_consent` file is the minor part.
+
+> **Profile provenance — this `Partial` IS the ship build.** Unlike the generic
+> gitignored-profile trap (the Versioning note in
+> [`PERF-BENCHMARK-SETUP`](PERF-BENCHMARK-SETUP.md): a fresh checkout bakes only
+> ~2.7k library-default ART rules), the captured profile was fresh for this run —
+> `app/src/release/generated/baselineProfiles/baseline-prof.txt` is **13,068 lines**,
+> regenerated the same day — and `:macrobenchmark` measures the `release` variant
+> directly (`:app` has no separate benchmark build type; `matchingFallbacks +=
+> "release"`). The run's `:app:packageRelease` + `:app:compileReleaseArtProfile`
+> compiled that 13k-line profile into the installed APK, so **`Partial` = the true
+> ship compilation and 5.4 ms is the shipped consent-read cost, not an upper bound**.
+
+**Verdict: not worth attacking; keep the synchronous DataStore read.** A
+`SharedPreferences` swap (Rule 5 forbids it — the one exception, `CrashReportLimiter`,
+was deliberately removed) would avoid only the *machinery*, and the Baseline Profile
+already recovers ~5 ms of exactly that class-loading, while the tiny-file disk read
+stays and the consent single-source-of-truth (one file, one key, R1 + repository)
+would split across two stores with a write-consistency hazard. Best case it shaves
+low-single-digit ms off ~1 % of TTID, at the cost of a banned pattern. The
+synchronous read stays the deliberate, correct choice: ACRA must be enabled for a
+consenting user BEFORE the ANR drain and before any early crash can fire (Rule 8,
+privacy-by-default). **Measurement-only — no `verify…` gate added** (the metric
+stays in `StartupBenchmark` so the number is re-checkable, but it does not gate CI).
 
 ## 4. Gate results
 
