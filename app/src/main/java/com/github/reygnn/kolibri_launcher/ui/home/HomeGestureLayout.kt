@@ -90,6 +90,18 @@ class HomeGestureLayout @JvmOverloads constructor(
         dominanceFactor = GestureThresholds.DOMINANCE_FACTOR,
     )
 
+    /**
+     * Top exclusion band (px) reserved for the system notification
+     * shade. A swipe-DOWN whose ACTION_DOWN lands above this y-offset
+     * is ceded to the system so the notification pull-down no longer
+     * collides with the recent-apps gesture. See
+     * [GestureThresholds.TOP_NOTIFICATION_EXCLUSION_DP] for the
+     * dp-vs-px and scope rationale. This layout is the full-screen home
+     * root, so a touch's local y is its distance from the top edge.
+     */
+    private val topExclusionPx: Float =
+        resources.displayMetrics.density * GestureThresholds.TOP_NOTIFICATION_EXCLUSION_DP
+
     // ===========================================
     // GESTURE STATE (per-touch)
     // ===========================================
@@ -254,7 +266,13 @@ class HomeGestureLayout @JvmOverloads constructor(
                 val callback: (() -> Unit)? =
                     when (analyzer.analyze(dx, dy, vx, vy)) {
                         SwipeGestureAnalyzer.SwipeResult.UP -> onSwipeUp
-                        SwipeGestureAnalyzer.SwipeResult.DOWN -> onSwipeDown
+                        // A swipe-down that STARTS inside the top exclusion band is
+                        // ceded to the system notification shade — treat it as
+                        // IGNORED so the recent-apps gesture does not collide with
+                        // the user's notification pull-down. Only DOWN is gated;
+                        // up / left / right from the top edge stay live.
+                        SwipeGestureAnalyzer.SwipeResult.DOWN ->
+                            if (downY < topExclusionPx) null else onSwipeDown
                         SwipeGestureAnalyzer.SwipeResult.TOWARDS_LEFT -> onSwipeLeft
                         SwipeGestureAnalyzer.SwipeResult.TOWARDS_RIGHT -> onSwipeRight
                         SwipeGestureAnalyzer.SwipeResult.IGNORED -> null

@@ -50,4 +50,24 @@ object GestureThresholds {
      * strictly horizontal/vertical (less diagonal tolerance).
      */
     const val DOMINANCE_FACTOR = 1.5f
+
+    /**
+     * Height (in **dp**) of the top exclusion band reserved for the
+     * system notification shade. A home-screen swipe-down whose
+     * ACTION_DOWN lands within this band from the top edge is ceded to
+     * the system (the recent-apps gesture is suppressed there), so the
+     * user's pull-down for notifications no longer collides with it.
+     *
+     * dp, not px: at ~status-bar height plus a small buffer this stays
+     * consistent across screen densities (≈ 144 px on a 3x device,
+     * ≈ 96 px on 2x). Only the swipe-DOWN result is gated — up / left /
+     * right swipes starting in this band are unaffected.
+     *
+     * The band is consumed only by
+     * [com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout],
+     * which converts it to px via the display density. The AppDrawer's
+     * [com.github.reygnn.kolibri_launcher.ui.appdrawer.SwipeDownDismissLayout]
+     * does not use it — its swipe-down dismiss is intentional there.
+     */
+    const val TOP_NOTIFICATION_EXCLUSION_DP = 48f
 }
