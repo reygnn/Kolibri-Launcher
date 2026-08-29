@@ -55,34 +55,29 @@ trigger, so no find is lost (RC gate Section 5).
   (plain JVM) covering entry-present, entry-missing stale-URI fallback,
   single-image resolve/fallback, and preview counts/flags.
 
+## Low-findings follow-up (resolved)
+
+- **#8 (LOW) — `performImport` non-atomic across the 8 repositories.**
+  Cannot be fixed in code (DataStore offers no cross-store transaction, and the
+  separate stores are deliberate). Documented as `ACCEPTED_LIMITATIONS.md` §8
+  with rationale (import is user-initiated, re-runnable, idempotent per phase)
+  and a re-evaluation trigger.
+- **#5 (LOW) — Untested consent revoke-purge safety net.** Test-only. Added a
+  `ConsentControllerTest` case that injects a throwing `purgeReportQueue()` with
+  a capturing `CoroutineExceptionHandler` on the app scope and asserts nothing
+  escaped `applyConsent`'s catch (so removing the catch turns it red).
+- **#6 (INFO) — `ConsentController.currentDecision()` production-dead.** Verified
+  zero production callers (class, not an interface); deleted the method and its
+  test.
+
 ## Deferred — logged with re-evaluation trigger
-
-- **#8 (LOW) — `performImport` is non-atomic across the 8 repositories.**
-  A repository write throwing mid-sequence (e.g. Phase 4 DataStore I/O after
-  Phases 1-3 committed) returns `ImportResult.Error` with favorites/order/hidden
-  already persisted — a partial-state "lying failure". Inherent to spanning
-  independent DataStores; likely acceptable. **Action:** add an
-  `ACCEPTED_LIMITATIONS.md` entry. **Re-eval trigger:** if a single-transaction
-  store or a staged-commit import is ever introduced.
-
-- **#5 (LOW) — Untested consent revoke-purge safety net.**
-  `ConsentController.applyConsent` runs `purgeReportQueue()` on `applicationScope`
-  (no `CoroutineExceptionHandler`); the `catch (Throwable) { Timber.w }` is the
-  only thing preventing a throwing purge from crashing the launcher on revoke,
-  and no test makes the purge throw. **Action:** add a `ConsentControllerTest`
-  that injects a throwing `purgeReportQueue()` and asserts no exception surfaces.
-  **Re-eval trigger:** any refactor of the revoke path.
 
 - **#7 (LOW) — Usage `loadFromFile` size guard bypassed on unknown length.**
   `openFileDescriptor(...).statSize == -1` (streaming/pipe providers) skips the
   `> MAX_BACKUP_SIZE_BYTES` guard → unbounded `readText()`. Needs an adversarial/
   streaming provider (normal SAF documents report an accurate size), and the
-  downstream parse caps bound the graph. **Action:** treat non-positive
-  `statSize` as reject, or read through a hard byte cap. **Re-eval trigger:** if
-  a non-SAF import entry point is added.
-
-## Dead code (cleanup, not a bug)
-- **#6 (INFO) — `ConsentController.currentDecision()` is production-dead.**
-  The settings summary now flows through `CrashReportingHealthMonitor.evaluate()`;
-  `currentDecision()` has no production caller and its KDoc is stale. Delete (and
-  its test) or re-point the KDoc — no correctness/privacy impact.
+  downstream parse caps bound the graph. **Fix direction (own branch):** a
+  *bounded read* (read ≤ `MAX_BACKUP_SIZE_BYTES + 1` bytes, reject if over) — NOT
+  a naive "reject on non-positive statSize", which would regress legitimate small
+  files whose provider reports `-1`/`0`. **Re-eval trigger:** if a non-SAF import
+  entry point is added.

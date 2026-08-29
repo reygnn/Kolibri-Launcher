@@ -518,3 +518,39 @@ Reopen this entry if any of the following changes:
   native clock/calendar apps (i.e. it stops being a pure aggregator).
 - Feedback from an assistive-technology user indicates the announced-but-unopenable
   bell is a real obstacle in practice.
+
+## 8. Backup import is non-atomic across the independent DataStores
+
+`BackupDataAssembler.performImport` restores a backup by writing to the eight
+repositories in sequence (favorites, order, hidden, custom names, swipe actions,
+wallpaper, settings, time-based events), each backed by its own DataStore. There
+is no cross-store transaction. If a write throws partway through — e.g. a
+DataStore I/O failure in a later phase after the earlier phases have already
+committed — `importFromJson` returns `ImportResult.Error` while favorites/order/
+hidden are already persisted. The reported failure is therefore accompanied by a
+partially-mutated state rather than an all-or-nothing rollback.
+
+### Why it is accepted
+
+DataStore Preferences offers no multi-store transaction, and the app deliberately
+uses several separate stores (settings vs. usage vs. consent) for privacy and
+backup-scope reasons (see CLAUDE.md Rule 5). A true atomic import would require
+either collapsing every user-state key into one store — reversing that separation
+— or building a staged write-ahead/rollback layer, which is a large amount of
+machinery for a rare failure on a user-initiated, re-runnable action: the import
+can simply be repeated, and a repeated import is idempotent per phase (each phase
+overwrites, it does not append). The error is surfaced, not silent, so the user
+knows to retry. This matches the project's migration policy (no in-code migration
+machinery; export/reset/restore is the sanctioned path).
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- A single-transaction store or a staged-commit/rollback import layer is
+  introduced for other reasons — then making the import atomic on top of it is
+  cheap and should be done.
+- A phase is added whose partial application is *not* idempotent on a re-run (so a
+  repeated import would no longer be a clean recovery).
+- Real reports show users hitting mid-import failures often enough that the
+  partial-state outcome is a practical problem, not a theoretical one.

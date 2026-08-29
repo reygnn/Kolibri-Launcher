@@ -3,8 +3,10 @@ package com.github.reygnn.kolibri_launcher.crashreporting.consent
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -16,6 +18,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -280,11 +283,26 @@ class ConsentControllerTest {
     }
 
     @Test
-    fun `currentDecision returns the stored read result`() = runTest {
-        val controller = buildController()
-        val expected = ConsentReadResult.Loaded(ConsentDecision.Denied)
-        coEvery { repository.readState() } returns expected
+    fun `applyConsent false swallows a throwing queue purge instead of crashing`() = runTest {
+        // The revoke purge runs on applicationScope, which in production has NO
+        // CoroutineExceptionHandler. The catch (Throwable) inside applyConsent is
+        // the only thing stopping a failed best-effort purge from reaching the
+        // global uncaught handler and crashing the launcher on revoke. Model the
+        // missing handler with a capturing one and assert nothing reached it — if
+        // that catch is ever removed, the throwing purge lands in `uncaught`.
+        val uncaught = mutableListOf<Throwable>()
+        val appScope = CoroutineScope(
+            StandardTestDispatcher(testScheduler) + SupervisorJob() +
+                CoroutineExceptionHandler { _, e -> uncaught += e },
+        )
+        val controller = ConsentController(appScope, repository, acraToggle, saveFailureNotifier)
+        every { acraToggle.purgeReportQueue() } throws IOException("disk gone")
 
-        assertEquals(expected, controller.currentDecision())
+        controller.applyConsent(false)
+        advanceUntilIdle()
+
+        assertTrue("A throwing queue purge escaped applyConsent's catch", uncaught.isEmpty())
+        verify(exactly = 1) { acraToggle.purgeReportQueue() }
+        coVerify(exactly = 1) { repository.setConsent(false) }
     }
 }

@@ -151,7 +151,4 @@ class ConsentController @Inject constructor(
             }
         }
     }
-
-    /** The current stored decision (used to render the settings summary). */
-    suspend fun currentDecision(): ConsentReadResult = repository.readState()
 }
