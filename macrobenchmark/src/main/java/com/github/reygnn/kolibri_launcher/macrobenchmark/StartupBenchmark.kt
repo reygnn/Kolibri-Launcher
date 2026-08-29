@@ -5,6 +5,7 @@ import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.uiautomator.By
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,23 +75,41 @@ class StartupBenchmark {
         compilationMode = mode,
         setupBlock = {
             if (!pastOnboarding) {
-                // First iteration only: launch once to clear the first-run gates.
-                // The tap writes onboarding-complete + consent to DataStore, which
-                // persist across iterations; the COLD measure below kills this
-                // process, so every measured cold start still starts from scratch
-                // — and now renders Home instead of the onboarding gate.
+                // First iteration only: onboard AND seed favorites. TTFD is emitted
+                // only when reportFullyDrawn() fires, and that fires solely on the
+                // NON-EMPTY favorites paint (HomeFragment.renderFavorites) — an
+                // empty-set Home would report TTID but never TTFD. Seeding here (vs
+                // the empty dismissFirstRunGatesIfPresent) makes every measured cold
+                // start render the real favorites path. The selection persists to
+                // DataStore and survives the COLD kills below, so seeding once is
+                // enough for all iterations.
                 startActivityAndWait()
-                dismissFirstRunGatesIfPresent(TARGET_PACKAGE)
+                completeOnboardingWithFavorites(TARGET_PACKAGE, SEED_FAVORITES_COUNT)
                 pastOnboarding = true
             }
             pressHome()
         },
     ) {
-        startActivityAndWait()
+        startActivityAndWait() // returns at the FIRST frame — the TTID point.
+        // reportFullyDrawn() fires later, one frame after the enumeration-gated
+        // favorites paint. startActivityAndWait does not wait for it, so hold the
+        // traced iteration open until the favorites RecyclerView has a painted row —
+        // otherwise StartupTimingMetric can stop the trace before the TTFD marker and
+        // timeToFullDisplayMs comes back intermittently absent. Mirrors the poll in
+        // FavoritesFirstPaintBenchmark (TTID is unaffected — it is the first frame,
+        // already captured above).
+        var waited = 0L
+        while (waited < PAINT_TIMEOUT_MS) {
+            val favorites = device.findObject(By.res(TARGET_PACKAGE, FAVORITES_RV_ID))
+            if (favorites != null && favorites.childCount > 0) break
+            Thread.sleep(POLL_MS)
+            waited += POLL_MS
+        }
+        device.waitForIdle()
     }
 
-    // Onboarding cleared once (first setupBlock iteration); see
-    // dismissFirstRunGatesIfPresent() in OnboardingSetup.kt. NOTE: cold start is
+    // Onboarding + favorites seeded once (first setupBlock iteration); see
+    // completeOnboardingWithFavorites() in FavoriteSeeding.kt. NOTE: cold start is
     // only measurable with ANOTHER launcher set as default home — a default-home
     // Kolibri is restarted by the system after kill ("must not be running prior
     // to cold start").
@@ -99,5 +118,11 @@ class StartupBenchmark {
     private companion object {
         const val TARGET_PACKAGE = "com.github.reygnn.kolibri_launcher"
         const val ITERATIONS = 20 // cold start is heavier than the dispatch gate; 20 keeps runtime sane
+        // A small non-empty favorite set so the TTFD ready point (favorites paint)
+        // is reached; matches FavoritesFirstPaintBenchmark's seed count.
+        const val SEED_FAVORITES_COUNT = 3
+        const val PAINT_TIMEOUT_MS = 5_000L
+        const val POLL_MS = 16L // ~one frame between "have favorites painted yet?" checks
+        const val FAVORITES_RV_ID = "favoritesRecyclerView" // fragment_home.xml
     }
 }
