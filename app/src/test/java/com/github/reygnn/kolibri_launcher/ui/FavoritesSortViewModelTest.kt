@@ -245,4 +245,31 @@ class FavoritesSortViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // ------------------------------------------------------------------
+    // Save-over-empty gate (RC edge-case audit)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `onSortAlphabetically does not persist when never initialized`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // No setInitialApps: the Fragment's fail-open parcelable-parse path
+            // can hand the VM an empty list after process death. A Sort tap must
+            // NOT write an empty order "[]" over the stored one.
+            viewModel.onSortAlphabetically()
+            advanceUntilIdle()
+
+            assertEquals(0, fakeRepository.saveOrderCallCount)
+        }
+
+    @Test
+    fun `onResetToOriginal does not persist when initialized with an empty list`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            viewModel.setInitialApps(emptyList())
+
+            viewModel.onResetToOriginal()
+            advanceUntilIdle()
+
+            assertEquals(0, fakeRepository.saveOrderCallCount)
+        }
 }

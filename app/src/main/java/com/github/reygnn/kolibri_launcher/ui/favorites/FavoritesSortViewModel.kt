@@ -104,6 +104,19 @@ class FavoritesSortViewModel @Inject constructor(
      * change broadcast.
      */
     private fun persistOrder(apps: List<AppInfo>, successToastResId: Int?) {
+        // Save-over-empty gate (RC edge-case audit): this screen only ever
+        // REORDERS an existing, non-empty favorites list — SettingsFragment
+        // short-circuits on NoFavorites before opening it, and there is no way
+        // to empty the list from here. An empty list at this point therefore
+        // means the initial input never loaded (e.g. FavoritesSortFragment fell
+        // back to emptyList() on a parcelable-parse failure after process
+        // death). Persisting it would write "[]" over the stored order — the
+        // save-over-empty data loss the sibling gates (Onboarding PreselectState,
+        // HiddenApps diff-against-initial, SwipeActions isLoaded) fail CLOSED
+        // against. This surface used to fail OPEN; block it here to match.
+        if (!initialized || apps.isEmpty()) {
+            return
+        }
         launchSafe {
             try {
                 val componentNames = apps.map { it.componentName }

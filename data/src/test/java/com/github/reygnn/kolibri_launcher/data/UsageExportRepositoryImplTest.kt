@@ -296,6 +296,36 @@ class UsageExportRepositoryImplTest {
     }
 
     @Test
+    fun `importFromJson - skips an out-of-range ISO timestamp instead of rejecting the whole file`() = runTest {
+        // RC edge-case audit regression: a syntactically valid ISO-8601 instant
+        // with an extreme year (Instant.MAX territory) parses successfully but
+        // overflows Long on toEpochMilli(). parseTimestamp used to catch only
+        // DateTimeParseException, so the ArithmeticException propagated to the
+        // file-level catch and the WHOLE import was rejected as InvalidFormat.
+        // It must instead be skipped like any other unusable entry, keeping the
+        // valid siblings — the graceful-skip contract garbage strings already get.
+        val validTs = currentTime - 10000
+        val validIso = Instant.ofEpochMilli(validTs).toString()
+
+        val json = """
+            {
+                "version": "1.0.0",
+                "usage_data": {
+                    "com.test": [
+                        "$validIso",
+                        "+1000000000-01-01T00:00:00Z"
+                    ]
+                }
+            }
+        """.trimIndent()
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
+
+        assertIs<UsageImportResult.Success>(result)
+        assertEquals(1, result.timestampsImported)
+    }
+
+    @Test
     fun `importFromJson - merge mode - combines with existing data`() = runTest {
         // Arrange - existing data
         val existingTimestamp = currentTime - TimeUnit.HOURS.toMillis(1)

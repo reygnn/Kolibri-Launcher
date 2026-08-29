@@ -83,6 +83,13 @@ class UsageExportRepositoryImpl @Inject constructor(
             return Instant.parse(value).toEpochMilli()
         } catch (e: DateTimeParseException) {
             // Nicht ISO 8601, versuche als Zahl
+        } catch (e: ArithmeticException) {
+            // Valid ISO 8601 but its epoch-millis overflow a Long (extreme
+            // year, e.g. "+1000000000-01-01T00:00:00Z"): Instant.parse succeeds,
+            // toEpochMilli() throws. Skip just this one entry (fall through to
+            // the raw-Long attempt, which returns null for an ISO string)
+            // instead of letting it propagate and abort the whole import —
+            // preserving the graceful-skip contract that garbage strings get.
         }
 
         // Versuch 2: Als rohe Millisekunden parsen (Rückwärtskompatibilität)
