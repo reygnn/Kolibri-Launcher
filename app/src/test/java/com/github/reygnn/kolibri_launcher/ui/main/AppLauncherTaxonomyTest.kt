@@ -2,10 +2,15 @@ package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.LauncherApps
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.slot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -91,5 +96,33 @@ class AppLauncherTaxonomyTest {
 
         assertTrue(result is AppLaunchResult.Failed)
         assertTrue((result as AppLaunchResult.Failed).cause is IllegalStateException)
+    }
+
+    @Test
+    fun `launch builds the ComponentName from the normalized long-form className`() {
+        // The raw className here is a leading-dot relative spelling; the launcher
+        // must expand it to the fully-qualified form (via AppInfo.normalizedClassName),
+        // or startMainActivity would not resolve the activity against the manifest.
+        // Regression guard for the raw-vs-normalized className divergence.
+        val launcherApps = mockk<LauncherApps>()
+        val activity = mockk<Activity>()
+        every { activity.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns launcherApps
+
+        val component = slot<ComponentName>()
+        every { launcherApps.startMainActivity(capture(component), any(), any(), any()) } just Runs
+
+        val appInfo = AppInfo(
+            originalName = "X",
+            displayName = "X",
+            packageName = "com.example.x",
+            className = ".Main",
+        )
+
+        val result = AppLauncherImpl().launch(activity, appInfo)
+
+        assertEquals(AppLaunchResult.Launched, result)
+        assertEquals("com.example.x", component.captured.packageName)
+        // Expanded long form, NOT the raw ".Main".
+        assertEquals("com.example.x.Main", component.captured.className)
     }
 }

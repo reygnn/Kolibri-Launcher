@@ -84,4 +84,63 @@ class AppInfoTest {
         assertEquals(a, b)
         assertEquals(a.componentName, b.componentName)
     }
+
+    @Test
+    fun `normalizedClassName expands a short-form className to the long form`() {
+        val shortForm = AppInfo(
+            originalName = "X",
+            displayName = "X",
+            packageName = "com.example",
+            className = ".MainActivity",
+        )
+        // The launcher builds its ComponentName from this — a relative spelling
+        // must be expanded, or the launch would not resolve against the manifest.
+        assertEquals("com.example.MainActivity", shortForm.normalizedClassName)
+    }
+
+    @Test
+    fun `normalizedClassName leaves a long-form className unchanged`() {
+        val longForm = AppInfo(
+            originalName = "X",
+            displayName = "X",
+            packageName = "com.example",
+            className = "com.other.Activity",
+        )
+        assertEquals("com.other.Activity", longForm.normalizedClassName)
+    }
+
+    @Test
+    fun `componentName is derived from normalizedClassName so launch and identity agree`() {
+        // The single normalization source: componentName must equal
+        // "package/normalizedClassName" for both the relative and the
+        // fully-qualified spelling — otherwise the launcher (which uses
+        // normalizedClassName) could target a different component than identity.
+        val shortForm = AppInfo(
+            originalName = "X",
+            displayName = "X",
+            packageName = "com.example",
+            className = ".MainActivity",
+        )
+        assertEquals(
+            "com.example/${shortForm.normalizedClassName}",
+            shortForm.componentName,
+        )
+        assertEquals("com.example/com.example.MainActivity", shortForm.componentName)
+    }
+
+    @Test
+    fun `normalizedClassName is cached - repeated reads return the same instance`() {
+        val app = appInfo("Camera")
+        assertSame(app.normalizedClassName, app.normalizedClassName)
+    }
+
+    @Test
+    fun `normalizedClassName is excluded from equals`() {
+        // Body val, not a constructor param, so it never affects equals — same
+        // guarantee as displayNameLower / componentName.
+        val a = appInfo("App")
+        val b = appInfo("App")
+        assertEquals(a, b)
+        assertEquals(a.normalizedClassName, b.normalizedClassName)
+    }
 }

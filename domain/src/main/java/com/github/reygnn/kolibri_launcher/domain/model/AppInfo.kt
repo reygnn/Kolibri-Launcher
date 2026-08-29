@@ -31,6 +31,24 @@ data class AppInfo(
     val displayNameLower: String = displayName.lowercase()
 
     /**
+     * The [className] in its long form: a leading-dot relative spelling
+     * (`.Activity`) is expanded to `package.Activity`, a fully-qualified name is
+     * left untouched. Android accepts both spellings, but an explicit
+     * `ComponentName` used to launch must carry the fully-qualified class — the
+     * system resolves the activity by exact class-name match against the parsed
+     * manifest (which stores long-form names), so a relative spelling would fail
+     * to resolve. This is the single source of truth for that normalization,
+     * shared by [componentName] (identity) and by the launcher (`AppLauncherImpl`
+     * builds its `ComponentName` from this, not from raw [className]).
+     *
+     * A body `val` (declared before [componentName], so it is initialized first),
+     * which — like [displayNameLower] and [componentName] — keeps it out of
+     * `equals`/`hashCode`/`copy`/`componentN`.
+     */
+    val normalizedClassName: String =
+        if (className.startsWith(".")) "$packageName$className" else className
+
+    /**
      * Ein eindeutiger Bezeichner für einen spezifischen Launcher-Eintrag.
      * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
      * (z.B. "Google" und "Voice Search").
@@ -46,11 +64,5 @@ data class AppInfo(
     // essentially every AppInfo (hidden-filter, favorites membership, DiffUtil
     // identity), including twice per AppInfoDiffCallback comparison (AUDIT-14
     // Nit §212).
-    val componentName: String = run {
-        // Normalize the short form (.Activity) to the long form
-        // (package.Activity); Android accepts both spellings.
-        val normalizedClassName =
-            if (className.startsWith(".")) "$packageName$className" else className
-        "$packageName/$normalizedClassName"
-    }
+    val componentName: String = "$packageName/$normalizedClassName"
 }

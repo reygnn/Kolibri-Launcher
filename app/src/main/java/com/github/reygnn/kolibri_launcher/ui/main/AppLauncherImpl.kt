@@ -35,7 +35,11 @@ class AppLauncherImpl @Inject constructor() : AppLauncher {
                 )
 
         return runLaunchCatching {
-            val componentName = ComponentName(appInfo.packageName, appInfo.className)
+            // Use the normalized (long-form) class name, not the raw one: a
+            // leading-dot relative spelling would not resolve against the parsed
+            // manifest. Shares AppInfo's single normalization source with
+            // componentName (identity), so launch and identity can never diverge.
+            val componentName = ComponentName(appInfo.packageName, appInfo.normalizedClassName)
             // Traced: the actual startMainActivity binder call — the last slice
             // the launcher owns before the target app's cold start takes over.
             // Null options bundle → system default open transition.
