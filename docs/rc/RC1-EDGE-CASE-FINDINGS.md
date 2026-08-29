@@ -69,15 +69,17 @@ trigger, so no find is lost (RC gate Section 5).
 - **#6 (INFO) — `ConsentController.currentDecision()` production-dead.** Verified
   zero production callers (class, not an interface); deleted the method and its
   test.
+- **#7 (LOW) — Usage `loadFromFile` size guard bypassed on unknown length.**
+  `openFileDescriptor(...).statSize == -1` (streaming/pipe providers) skipped the
+  `> MAX_BACKUP_SIZE_BYTES` fast-path, reaching an unbounded `readText()`. Fixed
+  with a **bounded read**: read ≤ `MAX_BACKUP_SIZE_BYTES + 1` bytes and reject if
+  over — deliberately NOT "reject on non-positive statSize" (which would regress
+  legitimate small files whose provider reports `-1`/`0`). Pinned by two
+  `UsageExportRepositoryImplDoomsdaySpec` cases: unknown-size + small content
+  still imports (regression guard against the naive fix), and unknown-size +
+  oversized content is rejected "File too large".
 
 ## Deferred — logged with re-evaluation trigger
 
-- **#7 (LOW) — Usage `loadFromFile` size guard bypassed on unknown length.**
-  `openFileDescriptor(...).statSize == -1` (streaming/pipe providers) skips the
-  `> MAX_BACKUP_SIZE_BYTES` guard → unbounded `readText()`. Needs an adversarial/
-  streaming provider (normal SAF documents report an accurate size), and the
-  downstream parse caps bound the graph. **Fix direction (own branch):** a
-  *bounded read* (read ≤ `MAX_BACKUP_SIZE_BYTES + 1` bytes, reject if over) — NOT
-  a naive "reject on non-positive statSize", which would regress legitimate small
-  files whose provider reports `-1`/`0`. **Re-eval trigger:** if a non-SAF import
-  entry point is added.
+_None — all audit findings are resolved. (Re-evaluation triggers for the
+architectural limitations #8 and #7 are recorded above / in `ACCEPTED_LIMITATIONS.md`.)_

@@ -464,9 +464,24 @@ class UsageExportRepositoryImpl @Inject constructor(
                     return@withContext UsageImportResult.Error("File too large")
                 }
 
-                val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                    input.bufferedReader().readText()
+                // Bounded read. The statSize check above is only a fast path: a
+                // streaming/pipe ContentProvider reports statSize == -1 (unknown),
+                // which slips past `> MAX` and would otherwise reach an UNBOUNDED
+                // readText() → OOM on a hostile/huge stream. Cap the ACTUAL read at
+                // MAX_BACKUP_SIZE_BYTES instead. Read one byte past the cap so an
+                // over-limit stream is detected; a legitimate file whose provider
+                // simply doesn't report a size still imports (do NOT reject on a
+                // non-positive statSize — real small files can report -1/0).
+                val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.readNBytes((cap + 1).toInt())
                 } ?: return@withContext UsageImportResult.Error("Cannot read file")
+
+                if (bytes.size.toLong() > cap) {
+                    return@withContext UsageImportResult.Error("File too large")
+                }
+
+                val jsonString = String(bytes, Charsets.UTF_8)
 
                 importFromJson(jsonString, mergeWithExisting)
 

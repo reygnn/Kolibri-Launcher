@@ -25,6 +25,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.FileDescriptor
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import kotlin.test.assertIs
 
@@ -78,6 +79,53 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
+    }
+
+    @Test
+    fun `load - unknown file size (statSize -1) with valid small content still imports`() = runTest {
+        // RC edge-case audit #7 regression guard: streaming/pipe providers report
+        // statSize == -1 (unknown). The fast-path size check must NOT reject them
+        // — real small files can report -1/0 — so a legitimate small export still
+        // imports. Guards against a naive "reject on non-positive statSize" fix.
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+
+        val validTs = System.currentTimeMillis() - 10_000
+        val json = """{"version":"1.0.0","usage_data":{"com.test":["$validTs"]}}"""
+        every { contentResolver.openInputStream(eq(testUri)) } returns
+            ByteArrayInputStream(json.toByteArray(Charsets.UTF_8))
+
+        val result = manager.loadFromFile(testUriString, false)
+
+        assertIs<UsageImportResult.Success>(result)
+    }
+
+    @Test
+    fun `load - unknown file size (statSize -1) with oversized content is rejected by the bounded read`() = runTest {
+        // The dangerous case #7 targets: statSize is unknown (-1) so the fast-path
+        // check is bypassed, but the stream exceeds the cap. The bounded read must
+        // reject it ("File too large") rather than reach an unbounded readText().
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+
+        val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+        val oversized = object : InputStream() {
+            private var remaining = cap + 4096 // comfortably past the cap
+            override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (remaining <= 0) return -1
+                val n = minOf(len.toLong(), remaining).toInt()
+                b.fill('a'.code.toByte(), off, off + n)
+                remaining -= n
+                return n
+            }
+        }
+        every { contentResolver.openInputStream(eq(testUri)) } returns oversized
+
+        val result = manager.loadFromFile(testUriString, false)
+
+        assertIs<UsageImportResult.Error>(result)
+        assertTrue(result.message.contains("too large", ignoreCase = true))
     }
 
     @Test
