@@ -149,20 +149,36 @@ class UsageExportRepositoryImpl @Inject constructor(
                 return UsageImportResult.InvalidFormat
             }
 
-            if (!validateJsonStructure(jsonString)) {
+            // Parse the JSON tree ONCE here; validation and extraction below both
+            // walk this shared JSONObject instead of each re-parsing the raw string
+            // (org.json parses eagerly, so a second construction re-does the full
+            // parse). Malformed syntax → InvalidFormat, preserving the prior UX and
+            // diagnostic. An allocation failure (OOM) is an Error, not a
+            // JSONException, so it propagates to the outer Throwable catch → Error,
+            // exactly as when validateJsonStructure used to construct here.
+            val root = try {
+                JSONObject(jsonString)
+            } catch (e: JSONException) {
+                TimberWrapper.silentError(e, "JSON structure validation failed")
                 return UsageImportResult.InvalidFormat
             }
 
-            // Phase 2: Parse
+            if (!validateJsonStructure(root)) {
+                return UsageImportResult.InvalidFormat
+            }
+
+            // Phase 2: Extract version + usage data from the parsed tree
             val (version, usageData) = try {
-                parseUsageData(jsonString)
+                parseUsageData(root)
             } catch (e: Throwable) {
                 // No suspension point: guarded body is synchronous today; if a call here becomes suspend, switch to a CancellationException rethrow arm (AUDIT-12 whitelist review).
-                // Widened from Exception per the breadth check: parseUsageData builds a
-                // JSONObject graph plus boxed Long lists from a string that may be up to
-                // MAX_BACKUP_SIZE_BYTES, so the live object graph runs well above the raw
-                // string size — an OOM here is an Error, which `Exception` would have
-                // missed. Same shape as the BackupRepositoryImpl JSON/ZIP umbrella.
+                // Widened from Exception per the breadth check: parseUsageData walks
+                // the shared JSONObject and builds boxed Long lists whose live object
+                // graph can run well above the raw string size (bounded only by the
+                // validation caps), so an OOM here is an Error that `Exception` would
+                // miss. Same shape as the BackupRepositoryImpl JSON/ZIP umbrella. (The
+                // JSONObject itself is constructed once above; a construction OOM
+                // propagates to the outer catch.)
                 TimberWrapper.silentError(e, "Failed to parse usage export")
                 return UsageImportResult.InvalidFormat
             }
@@ -187,8 +203,7 @@ class UsageExportRepositoryImpl @Inject constructor(
      * Parst das JSON und extrahiert Version + Usage-Daten.
      * Unterstützt sowohl ISO 8601 Strings als auch rohe Long-Werte.
      */
-    private fun parseUsageData(jsonString: String): Pair<String, Map<String, List<Long>>> {
-        val root = JSONObject(jsonString)
+    private fun parseUsageData(root: JSONObject): Pair<String, Map<String, List<Long>>> {
         val version = root.optString("version", "1.0.0")
 
         // camelCase bevorzugt, snake_case nur als Fallback
@@ -298,10 +313,8 @@ class UsageExportRepositoryImpl @Inject constructor(
      * Validiert die JSON-Struktur gegen Type Confusion Attacks.
      * Akzeptiert jetzt sowohl Number als auch String für Timestamps.
      */
-    private fun validateJsonStructure(jsonString: String): Boolean {
+    private fun validateJsonStructure(root: JSONObject): Boolean {
         return try {
-            val root = JSONObject(jsonString)
-
             // Version muss String sein
             if (root.has("version") && root.get("version") !is String) {
                 Timber.w("Type validation failed: version is not a string")
