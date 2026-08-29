@@ -57,7 +57,13 @@ object LaunchTrace {
          * start this span is enumeration-gated — it is the measurable form of the
          * "favorites pop in late" lag documented in `FavoriteNameSnapshot`'s KDoc.
          * Fires exactly once per process (cold start only); a warm Home return does
-         * not re-measure. */
+         * not re-measure.
+         *
+         * The frame that closes this span is also where `HomeFragment` calls
+         * `Activity.reportFullyDrawn()` — the favorites are the last content to
+         * appear, so their first paint is the "ready for interaction" point. That
+         * lets `StartupTimingMetric` add `timeToFullDisplayMs` (TTFD) next to the
+         * first-frame `timeToInitialDisplayMs` (TTID); see StartupBenchmark. */
         const val FAVORITES_FIRST_PAINT = "favorites_first_paint"
 
         // --- Launcher process cold start (Application bootstrap) ---

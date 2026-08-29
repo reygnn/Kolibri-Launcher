@@ -436,8 +436,9 @@ class HomeFragment : Fragment() {
 
         // Anchor the cold-start favorites first-paint trace as early as the Home
         // view exists (LaunchTrace.Names.FAVORITES_FIRST_PAINT). Ended a frame
-        // after the first non-empty favorites paint in renderFavorites; guarded
-        // to fire once per process (cold start only).
+        // after the first non-empty favorites paint in renderFavorites, which is
+        // also where reportFullyDrawn() fires (TTFD ready point); guarded to fire
+        // once per process (cold start only).
         beginFavoritesFirstPaintTrace()
 
         recalculateLayoutCache(
@@ -1591,16 +1592,31 @@ class HomeFragment : Fragment() {
 
     /**
      * Closes the favorites first-paint span one frame after the first non-empty
-     * favorites list commits. [doOnPreDraw] fires just before the frame that
-     * actually draws the new rows, so the span ends at the true first paint, not
-     * at the (earlier) list commit. Called from [renderFavorites]; the state
-     * transition [FavFirstPaint.STARTED] -> [AWAITING_DRAW][FavFirstPaint.AWAITING_DRAW]
-     * -> [DONE][FavFirstPaint.DONE] guarantees exactly one `endAsync` even across
-     * the several `submitList` rounds a restore/reorder fires.
+     * favorites list commits, and reports the launcher fully drawn at the same
+     * instant. [doOnPreDraw] fires just before the frame that actually draws the
+     * new rows, so both fire at the true first paint, not at the (earlier) list
+     * commit. Called from [renderFavorites]; the state transition
+     * [FavFirstPaint.STARTED] -> [AWAITING_DRAW][FavFirstPaint.AWAITING_DRAW]
+     * -> [DONE][FavFirstPaint.DONE] guarantees exactly one `endAsync` /
+     * `reportFullyDrawn` even across the several `submitList` rounds a
+     * restore/reorder fires.
+     *
+     * The favorites are the last, enumeration-gated content to appear on a cold
+     * start (clock/date/battery/wallpaper are already on screen), so their first
+     * paint IS the "ready for user interaction" point. Calling
+     * [android.app.Activity.reportFullyDrawn] here lets `StartupTimingMetric`
+     * emit `timeToFullDisplayMs` (TTFD) alongside the first-frame
+     * `timeToInitialDisplayMs` (TTID) — see [StartupBenchmark] and
+     * PERF-BENCHMARK-SETUP.md. It is the AndroidX `ComponentActivity` override
+     * (via `AppCompatActivity`), which swallows the legacy `SecurityException`
+     * itself, so no catch is needed (Rule 11). Cheap and idempotent; the guard
+     * keeps it to one call per process.
      *
      * If the view is torn down between commit and draw the span is left open on
      * purpose: an unclosed async slice simply does not match in the benchmark,
-     * which is the correct signal for "favorites never painted".
+     * which is the correct signal for "favorites never painted". `activity?` (not
+     * `requireActivity()`) mirrors that — a teardown race silently skips the
+     * report rather than crashing.
      */
     private fun endFavoritesFirstPaintTraceOnNextDraw() {
         if (favFirstPaint != FavFirstPaint.STARTED) return
@@ -1613,6 +1629,7 @@ class HomeFragment : Fragment() {
                     LaunchTrace.Names.FAVORITES_FIRST_PAINT,
                     FAVORITES_FIRST_PAINT_COOKIE,
                 )
+                activity?.reportFullyDrawn()
             }
         }
     }

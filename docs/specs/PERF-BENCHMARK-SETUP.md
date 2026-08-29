@@ -23,6 +23,17 @@ Two independent things, often confused:
    fork to the home screen's first frame. This *is* Kolibri's to optimise: it is
    the user's every-unlock experience.
 
+3. **Kolibri fully drawn (TTFD)** — `timeToFullDisplayMs` from process fork to
+   "ready for user interaction". `HomeFragment` calls
+   `Activity.reportFullyDrawn()` one frame after the favorites first paint, which
+   is the true ready point: the favorites are the last, enumeration-gated content
+   to appear, while clock/date/battery/wallpaper are already on screen by TTID.
+   TTID answers "when is something on screen", TTFD answers "when can the user
+   act"; the **TTFD − TTID gap is the favorites-enumeration tail** (the same lag
+   the `FavoritesFirstPaintBenchmark` span measures, but expressed from process
+   fork rather than from Home-view creation). Emitted by the same
+   `StartupTimingMetric` run — no extra benchmark.
+
 ---
 
 ## The device
@@ -58,7 +69,7 @@ The `:macrobenchmark` module (`com.android.test`) drives everything on the
 | Benchmark class | Measures | Metric(s) |
 |---|---|---|
 | `LaunchDispatchBenchmark` | the hop (drawer launch) | `LaunchDispatchGapMetric` + three `LaunchTrace` sections |
-| `StartupBenchmark` | Kolibri's own cold start | `timeToInitialDisplayMs`, None vs Partial |
+| `StartupBenchmark` | Kolibri's own cold start | `timeToInitialDisplayMs` (TTID) + `timeToFullDisplayMs` (TTFD, via `reportFullyDrawn`), None vs Partial |
 | `DrawerScrollJankBenchmark` | drawer-fling jank | `FrameTimingMetric`, None vs Partial |
 | `WallpaperCompositeBenchmark` | wallpaper composite cache A/B | (out of scope here) |
 
@@ -146,6 +157,15 @@ copied from the other.
   noise and the **shifted median** is the structural signal. A naive
   "just above the unprofiled value" threshold would miss the target case — a dead
   profile lands *under* it and passes green while broken.
+- **TTFD is emitted but not yet gated.** The same run now also reports
+  `timeToFullDisplayMs` (see the third measurement subject above), but no
+  `verifyStartupBenchmark`-style TTFD gate exists yet — no TTFD baseline has been
+  captured on the reference unit. **To add one:** run `StartupBenchmark` on the
+  A17, record the `startupBaselineProfile` `timeToFullDisplayMs` median in
+  `PERF-RESULTS.md`, then add a sibling gate (same corridor logic as the TTID
+  one, `metricName = "timeToFullDisplayMs"`). Until then TTFD is an observed
+  number, not a regression guard — the same "no gate until a baseline exists"
+  stance the `FavoritesFirstPaintBenchmark` documents.
 
 ---
 

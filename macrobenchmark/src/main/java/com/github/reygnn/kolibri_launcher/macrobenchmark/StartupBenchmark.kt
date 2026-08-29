@@ -17,14 +17,31 @@ import org.junit.runner.RunWith
  * The None−Partial delta IS the value of the profile. Feeds the
  * `verifyStartupBenchmark` gate (reads the `startupBaselineProfile` median).
  *
- * [StartupTimingMetric] under [StartupMode.COLD]. A launcher registered as HOME
- * is *always running*, so macrobenchmark's cold-start guard ("must not be running
- * prior to cold start") makes this UNMEASURABLE while Kolibri is the default
- * home. Run these with a DIFFERENT launcher set as default (so Kolibri can be
- * force-stopped and cold-started), then restore Kolibri — an operational step,
- * not something the test can do itself. Cold start still matters in the real
- * world: the post-boot / post-LMK home render is exactly where the profile pays
- * off.
+ * [StartupTimingMetric] under [StartupMode.COLD]. It emits two numbers:
+ *  - `timeToInitialDisplayMs` (TTID) — process fork to the FIRST home frame.
+ *    Always present.
+ *  - `timeToFullDisplayMs` (TTFD) — process fork to "ready for user
+ *    interaction". Present only because `HomeFragment` calls
+ *    `Activity.reportFullyDrawn()` one frame after the favorites first paint
+ *    (their enumeration-gated appearance is the true ready point — clock, date,
+ *    battery and wallpaper are already on screen by TTID). TTID answers "when is
+ *    something on screen", TTFD answers "when can the user act"; the TTFD−TTID
+ *    gap is the favorites-enumeration tail. See `HomeFragment`'s
+ *    `endFavoritesFirstPaintTraceOnNextDraw`, `LaunchTrace.Names.FAVORITES_FIRST_PAINT`
+ *    and PERF-BENCHMARK-SETUP.md.
+ *
+ * `verifyStartupBenchmark` currently gates only the TTID median (580 ms). No
+ * TTFD gate yet — no TTFD baseline has been captured on the A17 reference unit.
+ * Once one exists, add a sibling gate mirroring the TTID one (same precedent the
+ * favorites-first-paint benchmark documents for its own missing gate).
+ *
+ * A launcher registered as HOME is *always running*, so macrobenchmark's
+ * cold-start guard ("must not be running prior to cold start") makes this
+ * UNMEASURABLE while Kolibri is the default home. Run these with a DIFFERENT
+ * launcher set as default (so Kolibri can be force-stopped and cold-started),
+ * then restore Kolibri — an operational step, not something the test can do
+ * itself. Cold start still matters in the real world: the post-boot / post-LMK
+ * home render is exactly where the profile pays off.
  *
  * Drawer-scroll jank (the profile's other surface) lives in the separate
  * [DrawerScrollJankBenchmark] — split out 2026-08-25 so its fling can't churn the
