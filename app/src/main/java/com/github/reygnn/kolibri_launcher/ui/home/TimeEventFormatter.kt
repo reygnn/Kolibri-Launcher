@@ -3,6 +3,10 @@ package com.github.reygnn.kolibri_launcher.ui.home
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -87,5 +91,51 @@ class TimeEventFormatter {
         val pattern = if (is24Hour) "HH:mm" else "h:mm a"
         val formatter = SimpleDateFormat(pattern, locale)
         return formatter.format(Date(timeMillis))
+    }
+
+    /**
+     * A row in the upcoming-events dialog: either an event, or the separator
+     * that splits today's events from tomorrow's.
+     */
+    sealed interface EventRow {
+        data class Item(val event: TimeBasedEvent) : EventRow
+        data object TomorrowSeparator : EventRow
+    }
+
+    /**
+     * Splits a chronologically-sorted [events] list into today's and tomorrow's
+     * groups and inserts a single [EventRow.TomorrowSeparator] between them (only
+     * when BOTH groups are non-empty). The repository window is today + tomorrow,
+     * so there are at most two groups.
+     *
+     * Grouping is by the event's LOCAL calendar day, computed the same way the
+     * repository filters: an all-day event's [TimeBasedEvent.triggerTimeMillis] is
+     * a UTC midnight, read back in UTC; a timed event / alarm is read in [zone].
+     * Partitioning (rather than a single split index) keeps the groups correct
+     * even if an all-day timestamp does not sort monotonically against timed ones.
+     * Order within each group is preserved.
+     */
+    fun buildEventRows(
+        events: List<TimeBasedEvent>,
+        today: LocalDate,
+        zone: ZoneId
+    ): List<EventRow> {
+        if (events.isEmpty()) return emptyList()
+        val tomorrow = today.plusDays(1)
+
+        fun localDateOf(event: TimeBasedEvent): LocalDate {
+            val readZone = if (event.isAllDay) ZoneOffset.UTC else zone
+            return Instant.ofEpochMilli(event.triggerTimeMillis).atZone(readZone).toLocalDate()
+        }
+
+        val (tomorrowEvents, todayEvents) = events.partition { localDateOf(it) == tomorrow }
+
+        val rows = ArrayList<EventRow>(events.size + 1)
+        todayEvents.forEach { rows.add(EventRow.Item(it)) }
+        if (todayEvents.isNotEmpty() && tomorrowEvents.isNotEmpty()) {
+            rows.add(EventRow.TomorrowSeparator)
+        }
+        tomorrowEvents.forEach { rows.add(EventRow.Item(it)) }
+        return rows
     }
 }

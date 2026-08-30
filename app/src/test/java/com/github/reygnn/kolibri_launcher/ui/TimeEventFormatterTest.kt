@@ -8,6 +8,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Locale
 
@@ -140,6 +143,101 @@ class TimeEventFormatterTest {
 
         assertTrue("expected the alarm time, was: $row", row.startsWith("06:30"))
         assertFalse("expected no all-day label, was: $row", row.contains(ALL_DAY))
+    }
+
+    // =========================================================================
+    // buildEventRows — today/tomorrow grouping + separator
+    // =========================================================================
+
+    private val zone: ZoneId = ZoneId.of("Europe/Berlin")
+    private val today: LocalDate = LocalDate.of(2026, 8, 30)
+    private val tomorrow: LocalDate = today.plusDays(1)
+
+    private fun timedOn(
+        date: LocalDate,
+        hour: Int,
+        title: String,
+        type: TimeBasedEventType = TimeBasedEventType.CALENDAR
+    ): TimeBasedEvent {
+        val millis = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
+        return TimeBasedEvent(millis, title, type)
+    }
+
+    private fun allDayOn(date: LocalDate, title: String): TimeBasedEvent {
+        // All-day BEGIN is UTC midnight, matching the repository.
+        val millis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        return TimeBasedEvent(millis, title, TimeBasedEventType.CALENDAR, isAllDay = true)
+    }
+
+    @Test
+    fun `buildEventRows - empty input yields no rows`() {
+        assertTrue(formatter.buildEventRows(emptyList(), today, zone).isEmpty())
+    }
+
+    @Test
+    fun `buildEventRows - only today events has no separator`() {
+        val events = listOf(timedOn(today, 9, "A"), timedOn(today, 14, "B"))
+        val rows = formatter.buildEventRows(events, today, zone)
+
+        assertEquals(2, rows.size)
+        assertTrue(rows.none { it is TimeEventFormatter.EventRow.TomorrowSeparator })
+    }
+
+    @Test
+    fun `buildEventRows - only tomorrow events has no separator`() {
+        val events = listOf(timedOn(tomorrow, 9, "A"), timedOn(tomorrow, 14, "B"))
+        val rows = formatter.buildEventRows(events, today, zone)
+
+        assertEquals(2, rows.size)
+        assertTrue(rows.none { it is TimeEventFormatter.EventRow.TomorrowSeparator })
+    }
+
+    @Test
+    fun `buildEventRows - today and tomorrow get exactly one separator at the boundary`() {
+        val events = listOf(
+            timedOn(today, 9, "T1"),
+            timedOn(today, 18, "T2"),
+            timedOn(tomorrow, 8, "M1")
+        )
+        val rows = formatter.buildEventRows(events, today, zone)
+
+        // T1, T2, <separator>, M1
+        assertEquals(4, rows.size)
+        assertTrue(rows[0] is TimeEventFormatter.EventRow.Item)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.Item)
+        assertTrue(rows[2] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertTrue(rows[3] is TimeEventFormatter.EventRow.Item)
+        assertEquals(
+            "M1",
+            (rows[3] as TimeEventFormatter.EventRow.Item).event.title
+        )
+    }
+
+    @Test
+    fun `buildEventRows - all-day events are grouped by their UTC date`() {
+        // all-day today + all-day tomorrow → one on each side of the separator.
+        val events = listOf(allDayOn(today, "AllToday"), allDayOn(tomorrow, "AllTomorrow"))
+        val rows = formatter.buildEventRows(events, today, zone)
+
+        assertEquals(3, rows.size)
+        assertEquals("AllToday", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertEquals("AllTomorrow", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+    }
+
+    @Test
+    fun `buildEventRows - a tomorrow alarm lands in the tomorrow group`() {
+        val events = listOf(
+            timedOn(today, 12, "TodayEvent"),
+            timedOn(tomorrow, 7, "Wakeup", type = TimeBasedEventType.ALARM)
+        )
+        val rows = formatter.buildEventRows(events, today, zone)
+
+        assertEquals(3, rows.size)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        val last = rows[2] as TimeEventFormatter.EventRow.Item
+        assertEquals("Wakeup", last.event.title)
+        assertEquals(TimeBasedEventType.ALARM, last.event.type)
     }
 
     // --- Helper ---

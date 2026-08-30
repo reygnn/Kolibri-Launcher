@@ -18,10 +18,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
+import android.widget.BaseAdapter
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -55,12 +57,15 @@ import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHe
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -328,6 +333,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
+
+        // Alpha (0-255) for the upcoming-events dialog today/tomorrow separator
+        // line, applied to the wallpaper-aware onSurface colour. ~24% reads as a
+        // subtle divider rather than a bold rule.
+        private const val SEPARATOR_ALPHA = 61
     }
 
     private val onboardingLauncher = registerForActivityResult(
@@ -1026,26 +1036,36 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         if (events.isEmpty()) return
 
         val is24Hour = DateFormat.is24HourFormat(this)
-        val labels = events.map { event ->
-            // Untitled events carry an empty title from :data (which holds no display
-            // strings); resolve the localized fallback here by type.
-            val titled = if (event.title.isBlank()) {
-                event.copy(
-                    title = getString(
-                        when (event.type) {
-                            TimeBasedEventType.ALARM -> R.string.events_fallback_alarm
-                            TimeBasedEventType.CALENDAR -> R.string.events_fallback_calendar
-                        }
-                    )
-                )
-            } else {
-                event
+        val allDayLabel = getString(R.string.event_all_day)
+
+        // Split into today's / tomorrow's groups with a separator row between them
+        // (pure logic — TimeEventFormatter). rows[] is the single source of truth
+        // for both rendering and click routing, so positions never drift.
+        val rows = timeEventFormatter.buildEventRows(events, LocalDate.now(), ZoneId.systemDefault())
+
+        // Per-row label, resolved once. Null for the separator.
+        val rowLabels = rows.map { row ->
+            when (row) {
+                is TimeEventFormatter.EventRow.Item -> {
+                    // Untitled events carry an empty title from :data (which holds no
+                    // display strings); resolve the localized fallback here by type.
+                    val event = row.event
+                    val titled = if (event.title.isBlank()) {
+                        event.copy(
+                            title = getString(
+                                when (event.type) {
+                                    TimeBasedEventType.ALARM -> R.string.events_fallback_alarm
+                                    TimeBasedEventType.CALENDAR -> R.string.events_fallback_calendar
+                                }
+                            )
+                        )
+                    } else {
+                        event
+                    }
+                    timeEventFormatter.formatEventRow(titled, is24Hour, allDayLabel = allDayLabel)
+                }
+                TimeEventFormatter.EventRow.TomorrowSeparator -> null
             }
-            timeEventFormatter.formatEventRow(
-                titled,
-                is24Hour,
-                allDayLabel = getString(R.string.event_all_day)
-            )
         }
 
         // Same wallpaper-aware theming reasoning as showRecentAppsDialog: the row
@@ -1053,37 +1073,70 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         // not the Activity theme, or text can vanish when wallpaper luminance and
         // system night mode diverge.
         val rowContext = ContextThemeWrapper(this, wallpaperAwareDialogStyle())
-        // Each row carries a leading monochrome vector icon (alarm / calendar)
-        // instead of the old inline emoji glyph. labels[] and events[] are
-        // parallel, so position maps straight to the event type; the icon is
-        // tinted to the row's already-resolved wallpaper-aware text colour so it
-        // tracks the same adaptive contrast as the label.
+        val rowInflater = layoutInflater.cloneInContext(rowContext)
+        // Each event row carries a leading monochrome vector icon (alarm /
+        // calendar); it is tinted to the row's already-resolved wallpaper-aware
+        // text colour so it tracks the same adaptive contrast as the label.
         val iconSize = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_size)
         val iconPadding = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_padding)
-        val adapter = object : ArrayAdapter<String>(
-            rowContext, R.layout.item_recent_app, R.id.recent_app_name, labels
-        ) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = super.getView(position, convertView, parent)
-                val row = view.findViewById<TextView>(R.id.recent_app_name)
-                val iconRes = when (events[position].type) {
-                    TimeBasedEventType.ALARM -> R.drawable.ic_alarm
-                    TimeBasedEventType.CALENDAR -> R.drawable.ic_calendar
+        // The dialog theme overrides colorOnSurface (black/white per wallpaper
+        // luminance) but not colorOutline, so the separator colour is derived from
+        // onSurface at reduced alpha rather than a theme divider attr.
+        val separatorColor = ColorUtils.setAlphaComponent(
+            MaterialColors.getColor(
+                rowContext,
+                com.google.android.material.R.attr.colorOnSurface,
+                Color.GRAY
+            ),
+            SEPARATOR_ALPHA
+        )
+        val adapter = object : BaseAdapter() {
+            override fun getCount(): Int = rows.size
+            override fun getItem(position: Int): Any = rows[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+            override fun getViewTypeCount(): Int = 2
+            override fun getItemViewType(position: Int): Int =
+                if (rows[position] is TimeEventFormatter.EventRow.Item) 0 else 1
+
+            // The separator is not selectable, so a tap can never land on it.
+            override fun areAllItemsEnabled(): Boolean = false
+            override fun isEnabled(position: Int): Boolean =
+                rows[position] is TimeEventFormatter.EventRow.Item
+
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                when (val row = rows[position]) {
+                    is TimeEventFormatter.EventRow.Item -> {
+                        val view = convertView
+                            ?: rowInflater.inflate(R.layout.item_recent_app, parent, false)
+                        val label = view.findViewById<TextView>(R.id.recent_app_name)
+                        label.text = rowLabels[position]
+                        val iconRes = when (row.event.type) {
+                            TimeBasedEventType.ALARM -> R.drawable.ic_alarm
+                            TimeBasedEventType.CALENDAR -> R.drawable.ic_calendar
+                        }
+                        val icon = ContextCompat.getDrawable(rowContext, iconRes)?.mutate()?.apply {
+                            setBounds(0, 0, iconSize, iconSize)
+                            setTint(label.currentTextColor)
+                        }
+                        label.setCompoundDrawablesRelative(icon, null, null, null)
+                        label.compoundDrawablePadding = iconPadding
+                        view
+                    }
+                    TimeEventFormatter.EventRow.TomorrowSeparator -> {
+                        val view = convertView
+                            ?: rowInflater.inflate(R.layout.item_events_divider, parent, false)
+                        view.findViewById<View>(R.id.events_divider_line)
+                            .setBackgroundColor(separatorColor)
+                        view
+                    }
                 }
-                val icon = ContextCompat.getDrawable(rowContext, iconRes)?.mutate()?.apply {
-                    setBounds(0, 0, iconSize, iconSize)
-                    setTint(row.currentTextColor)
-                }
-                row.setCompoundDrawablesRelative(icon, null, null, null)
-                row.compoundDrawablePadding = iconPadding
-                return view
-            }
         }
         val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.events_dialog_title))
             .setAdapter(adapter) { _, which ->
+                val row = rows[which] as? TimeEventFormatter.EventRow.Item ?: return@setAdapter
                 runDialogAction("Error opening event target") {
-                    when (events[which].type) {
+                    when (row.event.type) {
                         TimeBasedEventType.ALARM -> openClockApp()
                         TimeBasedEventType.CALENDAR -> openCalendarApp()
                     }
