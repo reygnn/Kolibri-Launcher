@@ -119,10 +119,34 @@ class TimeBasedEventsRepositoryImplCalendarTest {
 
     @Test
     fun `timed event that already ended today is dropped`() = runTest {
+        // begin 3h ago, ended 2.5h ago → end < now.
         val begin = now - 3 * 60 * 60 * 1000L
         val result = query(listOf(Row("PastMeeting", begin, begin + 1_800_000, allDay = false)))
 
         assertTrue("past timed event must be dropped, was: $result", result.isEmpty())
+    }
+
+    @Test
+    fun `timed event in progress is kept until its end time`() = runTest {
+        // Started 35 min ago, ends in 25 min: begin < now but end > now. A late
+        // joiner must still see it (the reason the filter is end > now, not
+        // begin >= now).
+        val begin = now - 35 * 60 * 1000L
+        val end = now + 25 * 60 * 1000L
+        val result = query(listOf(Row("Standup", begin, end, allDay = false)))
+
+        assertEquals(1, result.size)
+        assertEquals("Standup", result[0].title)
+        assertEquals(begin, result[0].triggerTimeMillis)
+    }
+
+    @Test
+    fun `timed event ending exactly now is dropped`() = runTest {
+        // Boundary: end == now is NOT still running (end > now is strict).
+        val end = now
+        val result = query(listOf(Row("JustEnded", now - 60 * 60 * 1000L, end, allDay = false)))
+
+        assertTrue("event ending exactly now must be dropped, was: $result", result.isEmpty())
     }
 
     @Test

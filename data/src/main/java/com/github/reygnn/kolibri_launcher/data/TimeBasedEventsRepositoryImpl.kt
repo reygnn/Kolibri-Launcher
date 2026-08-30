@@ -249,6 +249,7 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                         // Einzelne Row-Fehler sollten nicht alles abbrechen
                         try {
                             val begin = cursor.getLong(beginIdx)
+                            val end = cursor.getLong(endIdx)
                             val isAllDay = cursor.getInt(allDayIdx) == 1
 
                             // Per-row window filter:
@@ -256,15 +257,17 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                             //   The provider stores an all-day BEGIN as UTC midnight,
                             //   so its calendar date is read back in UTC (not the
                             //   local zone) to avoid an off-by-one day at the edges.
-                            // - timed: keep only if it is still upcoming (begin >= now),
-                            //   so an appointment that already ended today is dropped.
+                            // - timed: keep while the event has not yet ended (end > now),
+                            //   so an appointment that is currently in progress stays
+                            //   visible until its end time — a late joiner still sees it.
+                            //   Only an event that already ended today is dropped.
                             val keep = if (isAllDay) {
                                 val date = Instant.ofEpochMilli(begin)
                                     .atZone(ZoneOffset.UTC)
                                     .toLocalDate()
                                 date == today || date == tomorrow
                             } else {
-                                begin >= now
+                                end > now
                             }
                             if (!keep) continue
 
@@ -274,7 +277,7 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                                     // fallback (no display strings in :data).
                                     title = cursor.getString(titleIdx).orEmpty(),
                                     startTimeMillis = begin,
-                                    endTimeMillis = cursor.getLong(endIdx),
+                                    endTimeMillis = end,
                                     isAllDay = isAllDay
                                 )
                             )
