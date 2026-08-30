@@ -70,14 +70,14 @@
 # Build & Kotlin
 agp = "9.3.2"  # Current: 9.3.x line (patch-bumped over time). Patch 2026-08-30: 9.3.1 → 9.3.2 (AS-offered patch on the 9.3.x line; builds + full test suite green, Gradle wrapper unchanged at 9.6.1). Origin — mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x), coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
 kotlin = "2.3.21"  # Mega-bundle lift 2026-05-15: 2.2.21 → 2.3.21 as foundation for KSP2 + AGP 9 + Hilt 2.59. kotlin-test must match exactly. Held at 2.3.x on the SDK-37 lift (2026-07-18): KSP2 has no 2.4.x release yet (latest 2.3.10), and ksp must track the Kotlin minor line.
-ksp = "2.3.8"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags (no `<kotlin>-<ksp>` schema). 2.3.8 is the current latest stable on the 2.3.x line.
+ksp = "2.3.11"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags (no `<kotlin>-<ksp>` schema). Patch 2026-08-30: 2.3.8 → 2.3.11 (current latest stable on the 2.3.x line; still matches the kotlin 2.3.21 minor line — KSP2 still has no 2.4.x, so kotlin stays on 2.3.x).
 
 # Hilt
 hilt = "2.60.1"  # Mega-bundle lift 2026-05-15: 2.58 → 2.59.2 (requires AGP ≥ 9.0 + Gradle ≥ 9.1). 2.59.0 shipped broken (issue #5099 missing ComponentTreeDeps annotation), 2.59.1 fixed jetifierEnabled compile under AGP 9, 2.59.2 fixed slow incremental builds with HiltSyncTask under AGP 9 — DO NOT downgrade to 2.59.0 or 2.59.1. SDK-37 lift 2026-07-18: 2.59.2 → 2.60.1 (minor, builds + full test suite green with Kotlin 2.3.21 / KSP 2.3.8).
 
 # UI / Material
 material = "1.14.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
-appcompat = "1.7.1"  # bringt älteres MaterialYou mit; deshalb material vorrang. Recheck 2026-Q3: current = latest stable (no 1.8.x stable in sight).
+appcompat = "1.8.0"  # bringt älteres MaterialYou mit; deshalb material vorrang. Lifted 2026-08-30: 1.7.1 → 1.8.0 (minor, now stable). MaterialYou-precedence concern unchanged — `material` still takes priority; verify visually on device after a release build.
 core-ktx = "1.19.0"  # SDK-37 lift 2026-07-18: 1.18.0 → 1.19.0 — REQUIRES compileSdk 37 (drove the :app + :data compileSdk bump). Previously 1.17.0 → 1.18.0 (2026-05-06), additive minors.
 core-splashscreen = "1.2.0"  # Recheck 2026-Q3: current = latest stable.
 activity = "1.13.0"  # Recheck 2026-Q3: lifted from 1.12.4 (2026-05-06). Note: 1.13.0 re-invokes EdgeToEdge on config-changes (rotation, theme switch) — verified harmless in this codebase via the existing instrumented suite.
@@ -86,7 +86,7 @@ recyclerview = "1.4.0"  # Recheck 2026-Q3: current = latest stable.
 
 # Lifecycle & Navigation
 lifecycle = "2.11.0"  # OK to upgrade. SDK-37 lift 2026-07-18: 2.10.0 → 2.11.0, now the latest stable (2.11.0 promoted alpha→beta→rc01→stable).
-navigation = "2.9.8"  # OK to upgrade. Recheck 2026-05-15: lifted 2.9.7 → 2.9.8 (patch on 2.9.x line); 2.10.x still alpha.
+navigation = "2.10.0"  # OK to upgrade. Lifted 2026-08-30: 2.9.8 → 2.10.0 (minor; 2.10.x now stable). Prior: 2.9.7 → 2.9.8 patch on 2026-05-15.
 
 # Data & Async
 datastore = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
