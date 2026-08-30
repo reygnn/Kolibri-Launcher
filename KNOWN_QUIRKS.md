@@ -72,7 +72,8 @@ stale/epoch-zero value. A "reject past/zero trigger time" filter would therefore
 `TimeBasedEventsRepositoryImpl.getNextAlarm()` reads the `AlarmClockInfo`'s
 `showIntent` and inspects its `PendingIntent.getCreatorPackage()`. If the creator
 is on a small blocklist of known non-alarm sources
-(`NON_ALARM_CLOCK_PACKAGES`, currently just `com.samsung.android.calendar`), the
+(`NON_ALARM_CLOCK_PACKAGES` — `com.samsung.android.calendar` and
+`com.android.providers.calendar`, see the second source below), the
 alarm is dropped and no indicator is shown.
 
 **Blocklist, fail-open, by design.** An unrecognised or `null` creator package is
@@ -86,10 +87,44 @@ The `PendingIntent` creator package is the only signal that generalises across
 OEMs — the `showIntent`'s *action* is opaque to a foreign receiver, and the
 trigger time is a legitimate future value.
 
+### Second source: calendar event reminders (`com.android.providers.calendar`)
+
+The same blocklist mechanism catches a distinct, non-Samsung offender found on
+the A17 while testing the calendar preview: the **calendar provider** schedules
+each event's REMINDER via `setAlarmClock()`.
+
+```
+Next alarm clock information:
+  user:0 time:1788090600000 = 2026-08-30 13:50:00.000
+
+RTC_WAKEUP #46: Alarm{... com.android.providers.calendar}
+  tag=*walarm*:android.intent.action.EVENT_REMINDER
+    triggerTime=2026-08-30 13:50:00.000
+    showIntent=PendingIntent{... com.android.providers.calendar ...}
+--
+    triggerTime=2026-08-30 17:00:00.000
+    showIntent=PendingIntent{... com.sec.android.app.clockpackage ...}
+```
+
+Because `getNextAlarmClock()` returns only the **single chronologically-next**
+entry, the 13:50 event reminder is returned instead of the user's real 17:00
+Samsung Clock alarm — so the launcher displayed the alarm as **13:50** (and, for
+another event, **09:50**). Blocklisting `com.android.providers.calendar` drops
+the reminder; the event it belongs to still shows via the separate calendar path,
+so nothing is lost.
+
+**Trade-off specific to this source.** Unlike the Samsung midnight phantom (which
+is only "next" briefly around 00:00), an event reminder can be the next alarm
+clock for hours. While it is, `getNextAlarmClock()` never exposes the real alarm
+behind it, so the alarm indicator shows **nothing** until the reminder time
+passes — then the real alarm surfaces. This is the fail-open contract in action:
+better to show nothing than the wrong time. There is no public API to enumerate
+past the single next entry.
+
 ### Extending
 
 Add further confirmed non-alarm sources to `NON_ALARM_CLOCK_PACKAGES` in
-`TimeBasedEventsRepositoryImpl`. Confirm a candidate the same way this one was
+`TimeBasedEventsRepositoryImpl`. Confirm a candidate the same way these were
 found: `adb shell dumpsys alarm | grep -A8 "Next alarm clock"` on the affected
 device, and read the `showIntent` package on the `Alarm clock:` entry whose
 `triggerTime` matches the reported phantom.

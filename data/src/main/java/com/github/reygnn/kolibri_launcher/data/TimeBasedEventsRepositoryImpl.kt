@@ -53,28 +53,42 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
 
         /**
          * Packages whose [AlarmManager.getNextAlarmClock] entries are NOT
-         * user-facing alarms and must not light the alarm indicator.
+         * user-facing clock alarms and must not light the alarm indicator.
          *
-         * Some OEM system apps misuse [AlarmManager.setAlarmClock] — the API
-         * reserved for user-visible alarms — for internal scheduling. Samsung
-         * Calendar registers its daily midnight rollover
-         * (`ACTION_MIDNIGHT_DATE_CHANGED_FOR_NOTIFICATION`) this way, so it
-         * surfaces through `getNextAlarmClock()` as a phantom "alarm" at 00:00
-         * even when the user has set none. Samsung's own SystemUI suppresses the
-         * status-bar icon for it; a third-party launcher only has the
+         * Some system apps schedule via [AlarmManager.setAlarmClock] — the API
+         * reserved for user-visible alarms — for their own purposes, so those
+         * entries surface through `getNextAlarmClock()` as phantom "alarms".
+         * Two confirmed sources:
+         * - `com.samsung.android.calendar`: Samsung Calendar's daily midnight
+         *   rollover (`ACTION_MIDNIGHT_DATE_CHANGED_FOR_NOTIFICATION`) → a
+         *   phantom "alarm" at 00:00 even when the user has set none.
+         * - `com.android.providers.calendar`: the calendar provider schedules
+         *   each event's REMINDER (`android.intent.action.EVENT_REMINDER`) as an
+         *   alarm clock. Because `getNextAlarmClock()` returns only the single
+         *   chronologically-next entry, an event reminder that fires before the
+         *   user's real clock alarm would otherwise be shown as "the alarm" — at
+         *   the reminder's time, not the alarm's (observed on an A17: a 17:00
+         *   Samsung Clock alarm displayed as 13:50, the next event's reminder).
+         *   The event itself already shows via the calendar path, so dropping the
+         *   reminder loses nothing.
+         *
+         * A third-party launcher only has the
          * [android.app.PendingIntent.getCreatorPackage] of the alarm's
          * `showIntent` to tell them apart. Match by that package and drop it.
          *
          * Blocklist (fail-open) is deliberate: an unrecognised source is treated
          * as a real alarm, so a genuine user alarm is never hidden — a phantom is
-         * a nuisance, a missed alarm is not. Add further known offenders here as
-         * they surface; the discriminator is the PendingIntent creator package,
-         * the only cross-OEM signal that separates a calendar-rollover alarm from
-         * a user-set one. Full rationale + how to confirm a candidate:
-         * KNOWN_QUIRKS.md §1.
+         * a nuisance, a missed alarm is not. TRADE-OFF: since `getNextAlarmClock()`
+         * yields only the next entry, while a blocklisted source is the next one
+         * the real alarm behind it is not visible until the phantom passes (the
+         * indicator shows nothing rather than a wrong time). Add further known
+         * offenders here as they surface; the discriminator is the PendingIntent
+         * creator package, the only cross-OEM signal available. Full rationale +
+         * how to confirm a candidate: KNOWN_QUIRKS.md §1.
          */
         private val NON_ALARM_CLOCK_PACKAGES = setOf(
-            "com.samsung.android.calendar"
+            "com.samsung.android.calendar",
+            "com.android.providers.calendar"
         )
     }
 

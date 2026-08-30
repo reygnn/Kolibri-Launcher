@@ -109,6 +109,29 @@ class TimeBasedEventsRepositoryImplTest {
     }
 
     @Test
+    fun `getUpcomingTimeBasedEvents - alarm from calendar provider event reminder - filtered out`() = runTest {
+        // The calendar provider schedules each event's EVENT_REMINDER via
+        // setAlarmClock(), so getNextAlarmClock() can return a reminder (owned by
+        // com.android.providers.calendar) that fires before the user's real clock
+        // alarm — which would otherwise be shown at the reminder's time, not the
+        // alarm's (A17: a 17:00 alarm displayed as 13:50). It must not surface.
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val showIntent = mockk<PendingIntent>()
+        every { showIntent.creatorPackage } returns "com.android.providers.calendar"
+
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns System.currentTimeMillis() + 10000
+        every { alarmInfo.showIntent } returns showIntent
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertTrue(result.isEmpty())
+    }
+
+    @Test
     fun `getUpcomingTimeBasedEvents - alarm from real clock app - kept`() = runTest {
         // A genuine alarm-clock app's PendingIntent is not on the blocklist and
         // must still show.
