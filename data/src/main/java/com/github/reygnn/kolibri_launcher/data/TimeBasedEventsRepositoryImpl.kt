@@ -19,6 +19,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,7 +40,15 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
 ) : TimeBasedEventsRepository {
 
     companion object {
-        private val QUERY_DURATION = DateUtils.HOUR_IN_MILLIS * 12
+        /**
+         * Alarm look-ahead window: the next alarm only surfaces when it fires
+         * within the next 12h. A far-off alarm (e.g. set for the weekend) is not
+         * "upcoming" for an at-a-glance preview, so it is suppressed until it
+         * enters the window. Calendar events use a day-based window instead (see
+         * [getCalendarEvents]) — today + tomorrow — because "upcoming appointments"
+         * is naturally a calendar-day notion, not a rolling-hours one.
+         */
+        private val ALARM_LOOKAHEAD = DateUtils.HOUR_IN_MILLIS * 12
         private const val MAX_EVENTS_DEFAULT = 5
 
         /**
@@ -118,7 +130,8 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                         TimeBasedEvent(
                             triggerTimeMillis = calEvent.startTimeMillis,
                             title = calEvent.title,
-                            type = TimeBasedEventType.CALENDAR
+                            type = TimeBasedEventType.CALENDAR,
+                            isAllDay = calEvent.isAllDay
                         )
                     )
                 }
@@ -150,6 +163,14 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
             // null here means "unknown source" and is kept (fail-open).
             val creatorPackage = nextAlarm.showIntent?.creatorPackage
             if (creatorPackage != null && creatorPackage in NON_ALARM_CLOCK_PACKAGES) {
+                return null
+            }
+
+            // Only surface the alarm when it fires within the look-ahead window.
+            // getNextAlarmClock() returns the single next alarm regardless of how
+            // far off it is; a far-future alarm is not "upcoming" for the preview.
+            val now = System.currentTimeMillis()
+            if (nextAlarm.triggerTime > now + ALARM_LOOKAHEAD) {
                 return null
             }
 
@@ -185,25 +206,36 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                 val projection = arrayOf(
                     CalendarContract.Instances.TITLE,
                     CalendarContract.Instances.BEGIN,
-                    CalendarContract.Instances.END
+                    CalendarContract.Instances.END,
+                    CalendarContract.Instances.ALL_DAY
                 )
 
+                // Window: today + tomorrow. Query the whole span from the start of
+                // today so today's all-day events (whose instance begins at local
+                // midnight, already in the past) are still returned; timed events
+                // that already passed today are dropped in the per-row filter below.
+                val zone = ZoneId.systemDefault()
+                val today = LocalDate.now(zone)
+                val tomorrow = today.plusDays(1)
                 val now = System.currentTimeMillis()
-                val endOfQueryRange = now + QUERY_DURATION
+                val rangeStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
+                // Exclusive upper bound: start of the day after tomorrow.
+                val rangeEnd = today.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
 
                 val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
                     .also {
-                        ContentUris.appendId(it, now)
-                        ContentUris.appendId(it, endOfQueryRange)
+                        ContentUris.appendId(it, rangeStart)
+                        ContentUris.appendId(it, rangeEnd)
                     }.build()
 
-                val selection = "${CalendarContract.Instances.ALL_DAY} = 0"
+                // No ALL_DAY filter: all-day events are now included. Both kinds are
+                // separated and filtered per-row below.
                 val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
 
                 context.contentResolver.query(
                     uri,
                     projection,
-                    selection,
+                    null,
                     null,
                     sortOrder
                 )?.use { cursor ->
@@ -211,17 +243,39 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                     val titleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
                     val beginIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
                     val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                    val allDayIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
 
                     while (cursor.moveToNext() && events.size < maxCount) {
                         // Einzelne Row-Fehler sollten nicht alles abbrechen
                         try {
+                            val begin = cursor.getLong(beginIdx)
+                            val isAllDay = cursor.getInt(allDayIdx) == 1
+
+                            // Per-row window filter:
+                            // - all-day: keep only if its date is today or tomorrow.
+                            //   The provider stores an all-day BEGIN as UTC midnight,
+                            //   so its calendar date is read back in UTC (not the
+                            //   local zone) to avoid an off-by-one day at the edges.
+                            // - timed: keep only if it is still upcoming (begin >= now),
+                            //   so an appointment that already ended today is dropped.
+                            val keep = if (isAllDay) {
+                                val date = Instant.ofEpochMilli(begin)
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate()
+                                date == today || date == tomorrow
+                            } else {
+                                begin >= now
+                            }
+                            if (!keep) continue
+
                             events.add(
                                 CalendarEvent(
                                     // Empty = untitled → UI resolves a localized
                                     // fallback (no display strings in :data).
                                     title = cursor.getString(titleIdx).orEmpty(),
-                                    startTimeMillis = cursor.getLong(beginIdx),
-                                    endTimeMillis = cursor.getLong(endIdx)
+                                    startTimeMillis = begin,
+                                    endTimeMillis = cursor.getLong(endIdx),
+                                    isAllDay = isAllDay
                                 )
                             )
                         } catch (e: Exception) {

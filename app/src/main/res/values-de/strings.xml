@@ -103,6 +103,7 @@
     <string name="events_indicator_calendar_content_description">Anstehender Termin</string>
     <string name="events_fallback_alarm">Alarm</string>
     <string name="events_fallback_calendar">Termin</string>
+    <string name="event_all_day">Ganztägig</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App-Informationen</string>

@@ -123,6 +123,7 @@
     <string name="events_indicator_calendar_content_description">Upcoming calendar event</string>
     <string name="events_fallback_alarm">Alarm</string>
     <string name="events_fallback_calendar">Event</string>
+    <string name="event_all_day">All day</string>
 
     <string name="category_system_title">System</string>
     <string name="app_info_title">App Information</string>

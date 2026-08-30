@@ -154,6 +154,41 @@ class TimeBasedEventsRepositoryImplTest {
     }
 
     @Test
+    fun `getUpcomingTimeBasedEvents - alarm beyond 12h look-ahead window - filtered out`() = runTest {
+        // getNextAlarmClock() returns the next alarm regardless of distance; an
+        // alarm more than 12h away is not "upcoming" for the preview and must be
+        // suppressed until it enters the window.
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns System.currentTimeMillis() + 13 * 60 * 60 * 1000L
+        every { alarmInfo.showIntent } returns null
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `getUpcomingTimeBasedEvents - alarm just inside 12h look-ahead window - kept`() = runTest {
+        every { settingsRepository.showAlarmFlow } returns flowOf(true)
+        every { settingsRepository.showCalendarEventFlow } returns flowOf(false)
+
+        val triggerTime = System.currentTimeMillis() + 11 * 60 * 60 * 1000L
+        val alarmInfo = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmInfo.triggerTime } returns triggerTime
+        every { alarmInfo.showIntent } returns null
+        every { alarmManager.nextAlarmClock } returns alarmInfo
+
+        val result = manager.getUpcomingTimeBasedEvents(5)
+
+        Assert.assertEquals(1, result.size)
+        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
+    }
+
+    @Test
     fun `getUpcomingTimeBasedEvents - alarm enabled but none set - returns empty`() = runTest {
         every { settingsRepository.showAlarmFlow } returns flowOf(true)
         every { settingsRepository.showCalendarEventFlow } returns flowOf(false)

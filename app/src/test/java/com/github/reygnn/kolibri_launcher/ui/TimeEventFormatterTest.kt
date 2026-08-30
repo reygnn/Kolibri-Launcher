@@ -21,6 +21,9 @@ class TimeEventFormatterTest {
     // Wir nutzen Locale.US für vorhersehbare "AM/PM" Tests
     private val testLocale = Locale.US
 
+    // Stand-in for the localized R.string.event_all_day the Activity resolves.
+    private val ALL_DAY = "All day"
+
     @Test
     fun `alarm - exact minute stays exact`() {
         // 14:30:00.000
@@ -91,7 +94,7 @@ class TimeEventFormatterTest {
         val time = createTime(7, 0, 30, 0)
         val event = TimeBasedEvent(time, "Alarm", TimeBasedEventType.ALARM)
 
-        val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
+        val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
 
         // The type is now conveyed by a leading vector icon in the dialog adapter,
         // not by an inline glyph — the row text must start with the time.
@@ -106,11 +109,37 @@ class TimeEventFormatterTest {
         val time = createTime(14, 30, 30, 0)
         val event = TimeBasedEvent(time, "Standup", TimeBasedEventType.CALENDAR)
 
-        val row = formatter.formatEventRow(event, is24Hour = true, locale = testLocale)
+        val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
 
         assertTrue("expected no leading glyph, was: $row", row.startsWith("14:30"))
         assertFalse("expected no calendar glyph, was: $row", row.contains("📅"))
         assertTrue("expected title, was: $row", row.contains("Standup"))
+    }
+
+    @Test
+    fun `formatEventRow - all-day calendar event shows the all-day label, not a time`() {
+        // An all-day event's triggerTime is a midnight timestamp; the row must NOT
+        // format it as a clock time but show the localized all-day label instead.
+        val midnight = createTime(0, 0, 0, 0)
+        val event = TimeBasedEvent(midnight, "Birthday", TimeBasedEventType.CALENDAR, isAllDay = true)
+
+        val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
+
+        assertTrue("expected all-day label, was: $row", row.startsWith(ALL_DAY))
+        assertFalse("expected no midnight time, was: $row", row.contains("00:00"))
+        assertTrue("expected title, was: $row", row.contains("Birthday"))
+    }
+
+    @Test
+    fun `formatEventRow - all-day flag on an alarm is ignored (alarms always show a time)`() {
+        // isAllDay only applies to calendar events; an alarm always renders its time.
+        val time = createTime(6, 30, 0, 0)
+        val event = TimeBasedEvent(time, "Alarm", TimeBasedEventType.ALARM, isAllDay = true)
+
+        val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
+
+        assertTrue("expected the alarm time, was: $row", row.startsWith("06:30"))
+        assertFalse("expected no all-day label, was: $row", row.contains(ALL_DAY))
     }
 
     // --- Helper ---

@@ -1041,7 +1041,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
             } else {
                 event
             }
-            timeEventFormatter.formatEventRow(titled, is24Hour)
+            timeEventFormatter.formatEventRow(
+                titled,
+                is24Hour,
+                allDayLabel = getString(R.string.event_all_day)
+            )
         }
 
         // Same wallpaper-aware theming reasoning as showRecentAppsDialog: the row

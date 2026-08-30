@@ -62,13 +62,25 @@ class TimeEventFormatter {
      * colour. The time is formatted with the type-appropriate rule (alarms
      * round up seconds, calendar times do not). Pure JVM logic — no Android
      * dependencies.
+     *
+     * An all-day calendar event has no meaningful clock time, so [allDayLabel]
+     * (a localized string resolved by the caller — :app owns display strings)
+     * is shown in place of the time. The caller passes it unconditionally; it
+     * is only used when [TimeBasedEvent.isAllDay] is set.
      */
-    fun formatEventRow(event: TimeBasedEvent, is24Hour: Boolean, locale: Locale = Locale.getDefault()): String {
-        val time = when (event.type) {
-            TimeBasedEventType.ALARM -> formatAlarmTime(event.triggerTimeMillis, is24Hour, locale)
-            TimeBasedEventType.CALENDAR -> formatCalendarTime(event.triggerTimeMillis, is24Hour, locale)
+    fun formatEventRow(
+        event: TimeBasedEvent,
+        is24Hour: Boolean,
+        allDayLabel: String,
+        locale: Locale = Locale.getDefault()
+    ): String {
+        val lead = when {
+            event.type == TimeBasedEventType.CALENDAR && event.isAllDay -> allDayLabel
+            event.type == TimeBasedEventType.ALARM ->
+                formatAlarmTime(event.triggerTimeMillis, is24Hour, locale)
+            else -> formatCalendarTime(event.triggerTimeMillis, is24Hour, locale)
         }
-        return "$time  ${event.title}"
+        return "$lead  ${event.title}"
     }
 
     private fun formatTimeInternal(timeMillis: Long, is24Hour: Boolean, locale: Locale): String {
