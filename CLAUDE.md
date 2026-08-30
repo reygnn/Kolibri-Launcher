@@ -77,7 +77,10 @@ in `:app`.
   core/                   AppConstants, ColorMath, KolibriLog, TimberWrapper,
                           AppUpdateSignal, Qualifiers, CoerceExtensions
   domain/repository/      interfaces (FavoritesRepository,
-                          CrashReportConsentRepository, …) — 18 of them
+                          SettingsRepository, …) — 17 here (18 *Repository
+                          interfaces across :domain; the 18th,
+                          CrashReportConsentRepository, lives under
+                          crashreporting/consent/, not repository/)
   domain/usecase/         ~55 fine-grained use cases (GetDrawerAppsUseCase,
                           Get/SetCrashReportConsent +
                           GetCrashReportConsentState, …)
@@ -95,15 +98,19 @@ in `:app`.
                           …), ConsentBootstrap, PackageUpdateReceiver
   data/service/           ShortcutLauncherServiceImpl
   di/RepositoryModule     @Binds for every repository interface
-  di/DataStoreModule      two Preferences DataStores + their internal
-                          Context.settingsDataStore / .consentDataStore
-                          extensions. Both are Hilt-provided (the consent
+  di/DataStoreModule      three Preferences DataStores + their internal
+                          Context.settingsDataStore / .consentDataStore /
+                          .usageDataStore extensions. All are Hilt-provided (the consent
                           one qualified, @ConsentDataStore, injected by
                           CrashReportConsentRepositoryImpl); consentDataStore
                           is a separate store (own backing file) so ACRA
                           consent stays privacy-by-default and out of Auto
                           Backup, and it is additionally read via its
                           extension on the pre-Hilt bootstrap path.
+                          usageDataStore is likewise a separate store (own
+                          backing file) holding the time-weighted app-usage
+                          data — the AUDIT-19 F1 usage-store split (qualified
+                          @UsageDataStore, provideUsageDataStore).
 
 :app     (Android Application, depends on :domain + :data)
   ui/                     features: home, appdrawer, settings, onboarding,
@@ -365,8 +372,10 @@ activities.
    would recurse into the path they are the safety net for. They report via
    `reportToAcra` (report, no throw):
 
-   - `KolibriLauncherApp.kt` — the app-scope `CoroutineExceptionHandler` and the
-     `onCreate` / lifecycle init catches.
+   - `KolibriLauncherApp.kt` — the `onCreate` / lifecycle init catches (its
+     `applicationScope` is a plain `SupervisorJob() + Dispatchers.IO` with no
+     `CoroutineExceptionHandler`; the crash-safety here is the per-block
+     `try { … } catch (e: Throwable)` guards of Rule 7, not a handler).
    - `BaseActivity.kt` and `BaseViewModel.kt` — the `CoroutineExceptionHandler`
      and the `ErrorEventBus` / event collectors. A throw here escapes the
      safety-net coroutine and lands at the global uncaught handler, which is
