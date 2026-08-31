@@ -6,8 +6,8 @@ as user-visible wrongness on some devices, and the workaround needs a home for
 its rationale so future-us doesn't "clean it up" without understanding why it
 exists.
 
-This is the third sibling in a family of "deliberately-not-obvious" docs, each
-a different axis:
+This is one of a family of "deliberately-not-obvious" docs, each a different
+axis:
 
 - **`KNOWN_ISSUES.md`** — StrictMode violations (framework/OEM/library, or
   intentional app-side). We *tolerate or mitigate* these.
@@ -16,10 +16,15 @@ a different axis:
 - **`KNOWN_QUIRKS.md`** (this file) — OEM/framework behaviours we *do work
   around* with real code. Each entry pins the quirk + why the workaround is
   shaped the way it is.
+- **`KNOWN_OS_GLITCHES.md`** — rare platform glitches with *no workaround* and
+  no code change: transient OS/framework races we neither caused nor can
+  address, recorded only for recognition.
 
 The distinction from `ACCEPTED_LIMITATIONS.md` is the verb: a limitation is
 priced-in and left alone; a quirk here has a live workaround whose logic must
-not be reverted by someone who only sees "odd-looking filter code".
+not be reverted by someone who only sees "odd-looking filter code". The
+distinction from `KNOWN_OS_GLITCHES.md` is also the verb: a quirk has code, a
+glitch has none.
 
 ---
 

@@ -990,8 +990,9 @@ into `main` once the maintainer signs off (memory `feedback-git-workflow`).
 - Not the full testing reference (see `app/src/test/CLAUDE.md` and
   `TESTING_CONVENTIONS.kt`).
 - Not the place for known StrictMode issues (see `KNOWN_ISSUES.md`),
-  intentional UX limitations (see `ACCEPTED_LIMITATIONS.md`), or
-  OEM/framework quirks worked around in code (see `KNOWN_QUIRKS.md`).
+  intentional UX limitations (see `ACCEPTED_LIMITATIONS.md`),
+  OEM/framework quirks worked around in code (see `KNOWN_QUIRKS.md`), or
+  rare platform glitches with no workaround (see `KNOWN_OS_GLITCHES.md`).
 - Not a holding pen for transient refactor notes — those belong in commit
   messages on short-lived feature branches.
 
