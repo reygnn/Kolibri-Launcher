@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import com.github.reygnn.kolibri_launcher.domain.model.ChargeState
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
@@ -88,6 +89,12 @@ class ClockDelegateTest {
     fun `initial batteryString is default placeholder`() {
         val delegate = createDelegate()
         assertEquals("---%", delegate.batteryString.value)
+    }
+
+    @Test
+    fun `initial chargeState is NONE`() {
+        val delegate = createDelegate()
+        assertEquals(ChargeState.NONE, delegate.chargeState.value)
     }
 
     @Test
@@ -198,22 +205,32 @@ class ClockDelegateTest {
         assertEquals("---%", delegate.batteryString.value)
     }
 
+    // Builds a mocked battery Intent stubbing the four extras the delegate reads.
+    private fun batteryIntent(level: Int, scale: Int, status: Int, plugged: Int): Intent =
+        mockk {
+            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns level
+            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns scale
+            every {
+                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            } returns status
+            every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns plugged
+        }
+
     @Test
     fun `updateBatteryLevelFromIntent extracts values correctly`() {
         val delegate = createDelegate()
 
-        val intent: Intent = mockk {
-            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 80
-            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
-            every {
-                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-            } returns BatteryManager.BATTERY_STATUS_DISCHARGING
-        }
-
-        delegate.updateBatteryLevelFromIntent(intent)
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 80,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_DISCHARGING,
+                plugged = 0
+            )
+        )
 
         assertEquals("80%", delegate.batteryString.value)
-        assertEquals(false, delegate.isCharging.value)
+        assertEquals(ChargeState.NONE, delegate.chargeState.value)
     }
 
     @Test
@@ -223,68 +240,83 @@ class ClockDelegateTest {
         delegate.updateBatteryLevelFromIntent(null)
 
         assertEquals("---%", delegate.batteryString.value)
-        assertEquals(false, delegate.isCharging.value)
+        assertEquals(ChargeState.NONE, delegate.chargeState.value)
     }
 
     @Test
-    fun `updateBatteryLevelFromIntent sets isCharging when status is charging`() {
+    fun `updateBatteryLevelFromIntent sets CHARGING when status is charging`() {
         val delegate = createDelegate()
 
-        val intent: Intent = mockk {
-            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 42
-            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
-            every {
-                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-            } returns BatteryManager.BATTERY_STATUS_CHARGING
-        }
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 42,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_CHARGING,
+                plugged = BatteryManager.BATTERY_PLUGGED_AC
+            )
+        )
 
-        delegate.updateBatteryLevelFromIntent(intent)
-
-        assertEquals(true, delegate.isCharging.value)
+        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
     }
 
     @Test
-    fun `updateBatteryLevelFromIntent treats full status as charging`() {
+    fun `updateBatteryLevelFromIntent treats full status as CHARGING`() {
         val delegate = createDelegate()
 
-        val intent: Intent = mockk {
-            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 100
-            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
-            every {
-                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-            } returns BatteryManager.BATTERY_STATUS_FULL
-        }
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 100,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_FULL,
+                plugged = BatteryManager.BATTERY_PLUGGED_AC
+            )
+        )
 
-        delegate.updateBatteryLevelFromIntent(intent)
-
-        assertEquals(true, delegate.isCharging.value)
+        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
     }
 
     @Test
-    fun `updateBatteryLevelFromIntent clears isCharging when status is not charging`() {
+    fun `updateBatteryLevelFromIntent sets PROTECTED when plugged but not charging`() {
         val delegate = createDelegate()
 
-        // First mark it charging, then a not-charging update must clear it.
-        val chargingIntent: Intent = mockk {
-            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 50
-            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
-            every {
-                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-            } returns BatteryManager.BATTERY_STATUS_CHARGING
-        }
-        delegate.updateBatteryLevelFromIntent(chargingIntent)
-        assertEquals(true, delegate.isCharging.value)
+        // Battery protection / charge limit: plugged in, charge held at the cap.
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 80,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_NOT_CHARGING,
+                plugged = BatteryManager.BATTERY_PLUGGED_AC
+            )
+        )
 
-        val dischargingIntent: Intent = mockk {
-            every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 50
-            every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
-            every {
-                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-            } returns BatteryManager.BATTERY_STATUS_NOT_CHARGING
-        }
-        delegate.updateBatteryLevelFromIntent(dischargingIntent)
+        assertEquals(ChargeState.PROTECTED, delegate.chargeState.value)
+    }
 
-        assertEquals(false, delegate.isCharging.value)
+    @Test
+    fun `updateBatteryLevelFromIntent sets NONE when unplugged and not charging`() {
+        val delegate = createDelegate()
+
+        // First mark it charging, then an unplugged not-charging update must clear it.
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 50,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_CHARGING,
+                plugged = BatteryManager.BATTERY_PLUGGED_AC
+            )
+        )
+        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
+
+        delegate.updateBatteryLevelFromIntent(
+            batteryIntent(
+                level = 50,
+                scale = 100,
+                status = BatteryManager.BATTERY_STATUS_NOT_CHARGING,
+                plugged = 0
+            )
+        )
+
+        assertEquals(ChargeState.NONE, delegate.chargeState.value)
     }
 
     // ===========================================

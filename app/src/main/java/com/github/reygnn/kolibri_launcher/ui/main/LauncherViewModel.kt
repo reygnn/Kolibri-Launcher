@@ -263,14 +263,14 @@ class LauncherViewModel @Inject constructor(
         clockDelegate.timeString,
         clockDelegate.dateString,
         clockDelegate.batteryString,
-        clockDelegate.isCharging,
+        clockDelegate.chargeState,
         clockDelegate.timeBasedEvents
-    ) { time, date, battery, charging, events ->
+    ) { time, date, battery, chargeState, events ->
         HomeUiState(
             timeString = time,
             dateString = date,
             batteryString = battery,
-            isCharging = charging,
+            chargeState = chargeState,
             timeBasedEvents = events
         )
     }.stateIn(

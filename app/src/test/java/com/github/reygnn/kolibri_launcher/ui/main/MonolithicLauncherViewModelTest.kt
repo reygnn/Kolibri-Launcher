@@ -1321,6 +1321,7 @@ class MonolithicLauncherViewModelTest {
                 BatteryManager.BATTERY_STATUS_UNKNOWN
             )
         } returns BatteryManager.BATTERY_STATUS_DISCHARGING
+        every { batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
 
         // WICHTIG: Wenn das ViewModel den Context fragt, muss dieser Intent zurückkommen!
         every { context.registerReceiver(

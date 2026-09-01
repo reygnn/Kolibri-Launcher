@@ -16,6 +16,7 @@ import android.os.BatteryManager
 import android.text.format.DateFormat
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
+import com.github.reygnn.kolibri_launcher.domain.model.ChargeState
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,11 +57,12 @@ class ClockDelegate(
     private val _batteryString = MutableStateFlow(DEFAULT_BATTERY)
     val batteryString: StateFlow<String> = _batteryString.asStateFlow()
 
-    // Charging flag driven by the battery Intent's EXTRA_STATUS. Consumed by the
-    // home-screen charging indicator (a monochrome bolt icon), separate from the
-    // percentage text so the string plumbing stays untouched.
-    private val _isCharging = MutableStateFlow(false)
-    val isCharging: StateFlow<Boolean> = _isCharging.asStateFlow()
+    // Charge state driven by the battery Intent's status + plugged extras. Consumed by
+    // the home-screen charge indicators (bolt = charging, shield = charge held /
+    // battery protection), separate from the percentage text so the string plumbing
+    // stays untouched.
+    private val _chargeState = MutableStateFlow(ChargeState.NONE)
+    val chargeState: StateFlow<ChargeState> = _chargeState.asStateFlow()
 
     private val _timeBasedEvents = MutableStateFlow<List<TimeBasedEvent>>(emptyList())
     val timeBasedEvents: StateFlow<List<TimeBasedEvent>> = _timeBasedEvents.asStateFlow()
@@ -108,25 +110,35 @@ class ClockDelegate(
                 val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                 updateBatteryLevel(level, scale)
 
-                // FULL only occurs while plugged in (once unplugged the status turns
-                // DISCHARGING/NOT_CHARGING), so treating it as charging keeps the bolt
-                // visible at 100 % on the charger instead of blinking off.
                 val status = intent.getIntExtra(
                     BatteryManager.EXTRA_STATUS,
                     BatteryManager.BATTERY_STATUS_UNKNOWN
                 )
-                _isCharging.value = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                    status == BatteryManager.BATTERY_STATUS_FULL
+                val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+                _chargeState.value = when {
+                    // FULL only occurs while plugged in (once unplugged the status turns
+                    // DISCHARGING/NOT_CHARGING), so treating it as charging keeps the
+                    // bolt visible at 100 % on the charger instead of blinking off.
+                    status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL -> ChargeState.CHARGING
+                    // Plugged in but not charging = the charge is being deliberately
+                    // held (charge limit / battery protection / adaptive-charging hold,
+                    // e.g. capped at 80 %). There is no public API for the protection
+                    // toggle; this is the observable held state.
+                    plugged != 0 && status == BatteryManager.BATTERY_STATUS_NOT_CHARGING ->
+                        ChargeState.PROTECTED
+                    else -> ChargeState.NONE
+                }
             } else {
                 _batteryString.value = DEFAULT_BATTERY
-                _isCharging.value = false
+                _chargeState.value = ChargeState.NONE
             }
         } catch (e: Throwable) {
             // Non-suspend method reading Intent extras — no suspension point,
             // so no CancellationException can reach this catch.
             TimberWrapper.silentError(e, "Failed to update battery level from intent")
             _batteryString.value = DEFAULT_BATTERY
-            _isCharging.value = false
+            _chargeState.value = ChargeState.NONE
         }
     }
 

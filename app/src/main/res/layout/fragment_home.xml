@@ -182,6 +182,21 @@
                     android:contentDescription="@string/charging_indicator_content_description"
                     android:visibility="gone"
                     android:layout_marginStart="@dimen/spacing_small" />
+
+                <!-- Battery-protection shield, shown only while the charge is held
+                     (plugged but not charging). Mutually exclusive with the bolt above,
+                     so at most one is VISIBLE; both GONE otherwise. Same OutlinedImageView
+                     + two-layer vector treatment (adaptive icon colour + tonal outline in
+                     HomeFragment.updateAllColors). -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/protectedIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_shield_outlined"
+                    android:contentDescription="@string/battery_protection_indicator_content_description"
+                    android:visibility="gone"
+                    android:layout_marginStart="@dimen/spacing_small" />
             </LinearLayout>
         </LinearLayout>
 

@@ -102,6 +102,7 @@
     <string name="events_indicator_alarm_content_description">Anstehender Alarm</string>
     <string name="events_indicator_calendar_content_description">Anstehender Termin</string>
     <string name="charging_indicator_content_description">Wird geladen</string>
+    <string name="battery_protection_indicator_content_description">Akkuschutz aktiv</string>
     <string name="events_fallback_alarm">Alarm</string>
     <string name="events_fallback_calendar">Termin</string>
     <string name="event_all_day">Ganztägig</string>

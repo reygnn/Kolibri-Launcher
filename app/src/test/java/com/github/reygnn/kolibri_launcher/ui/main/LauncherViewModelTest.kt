@@ -318,6 +318,7 @@ class LauncherViewModelTest {
             every {
                 getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
             } returns BatteryManager.BATTERY_STATUS_DISCHARGING
+            every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
 
         vm.updateBatteryLevelFromIntent(intent)

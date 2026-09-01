@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen "battery protection" indicator — FILL layer. Shown while the charge is
+  held (plugged but not charging, e.g. capped at 80 %). Monochrome hollow line art in
+  ONE colour, tinted at runtime to the adaptive home text colour (OutlinedImageView +
+  HomeFragment.updateAllColors). The #FFFFFFFF here is only a fallback; the colour
+  filter overrides it. Same construction as ic_bolt.xml (line-art shield silhouette).
+
+  Geometry note (keep in sync with ic_shield_outline.xml, which shares this exact
+  pathData and differs ONLY in strokeWidth):
+  - A <group> scale of 0.8 about the centre (12,12) reserves margin so the fatter
+    outline stroke can peek outward without clipping at the viewport edge.
+  - strokeWidth 2.8 renders at ~1.9dp (2.8 * 0.8(group) * 20/24); the outline twin
+    uses 5.8, so its rim peeks (3.9-1.9)/2 = 1.0dp = TEXT_OUTLINE_WIDTH_DP/2, exactly
+    matching the text's centered-stroke outline.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- Shield outline, stroke only (hollow), round joins. -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M 12 3 L 4.5 6 L 4.5 12 C 4.5 16.5 7.8 19.8 12 21 C 16.2 19.8 19.5 16.5 19.5 12 L 19.5 6 Z" />
+    </group>
+</vector>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OUTLINE layer twin of ic_shield.xml — SAME pathData, only a fatter strokeWidth.
+  Composed underneath the fill in ic_shield_outlined.xml (a layer-list) and tinted
+  with the adaptive tonal outline colour by OutlinedImageView, giving a crisp,
+  single-pass contour.
+
+  strokeWidth 5.8 renders at ~3.9dp on-screen (5.8 * 0.8(group) * 20/24); the fill
+  twin's 2.8 renders at ~1.9dp, so this peeks (3.9-1.9)/2 = 1.0dp beyond the fill
+  on every side = TEXT_OUTLINE_WIDTH_DP/2. KEEP pathData identical to ic_shield.xml —
+  the two must register pixel-for-pixel.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- Shield outline, stroke only (hollow), round joins. -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="5.8"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M 12 3 L 4.5 6 L 4.5 12 C 4.5 16.5 7.8 19.8 12 21 C 16.2 19.8 19.5 16.5 19.5 12 L 19.5 6 Z" />
+    </group>
+</vector>

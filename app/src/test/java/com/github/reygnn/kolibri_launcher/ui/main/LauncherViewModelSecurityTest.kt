@@ -395,6 +395,7 @@ class LauncherViewModelSecurityTest {
             every {
                 getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
             } returns BatteryManager.BATTERY_STATUS_DISCHARGING
+            every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
         viewModel.updateBatteryLevelFromIntent(emptyIntent)
         assertEquals("---%", viewModel.uiState.value.batteryString)
@@ -408,6 +409,7 @@ class LauncherViewModelSecurityTest {
             every {
                 getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
             } returns BatteryManager.BATTERY_STATUS_DISCHARGING
+            every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
         viewModel.updateBatteryLevelFromIntent(maliciousIntent)
         assertTrue(viewModel.uiState.value.batteryString.isNotEmpty())

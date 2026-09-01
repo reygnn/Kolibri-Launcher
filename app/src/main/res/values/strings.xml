@@ -122,6 +122,7 @@
     <string name="events_indicator_alarm_content_description">Upcoming alarm</string>
     <string name="events_indicator_calendar_content_description">Upcoming calendar event</string>
     <string name="charging_indicator_content_description">Charging</string>
+    <string name="battery_protection_indicator_content_description">Battery protection active</string>
     <string name="events_fallback_alarm">Alarm</string>
     <string name="events_fallback_calendar">Event</string>
     <string name="event_all_day">All day</string>

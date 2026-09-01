@@ -30,6 +30,7 @@ import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.kolibri_launcher.domain.model.ChargeState
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
@@ -583,12 +584,12 @@ class HomeFragment : Fragment() {
         }
 
         collectOnStarted(
-            flow = viewModel.uiState.map { it.isCharging }.distinctUntilChanged(),
-            errorTag = "isCharging",
+            flow = viewModel.uiState.map { it.chargeState }.distinctUntilChanged(),
+            errorTag = "chargeState",
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
-        ) { isCharging ->
+        ) { chargeState ->
             if (_binding == null) return@collectOnStarted
-            updateChargingIndicator(isCharging)
+            updateChargeIndicators(chargeState)
         }
 
         // Observer 4: TimeBasedEvents
@@ -1022,6 +1023,8 @@ class HomeFragment : Fragment() {
         binding.calendarIndicator.setOutline(outlineWidthPx, outlineColor)
         binding.chargingIndicator.setIconColor(textColor)
         binding.chargingIndicator.setOutline(outlineWidthPx, outlineColor)
+        binding.protectedIndicator.setIconColor(textColor)
+        binding.protectedIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
     }
 
@@ -1064,15 +1067,19 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Toggles the charging bolt next to the battery percentage. Unlike the
-     * alarm/calendar pair (INVISIBLE, to hold a fixed slot in the clock chain), this
-     * one is GONE when idle: it sits at the END of the date/battery row, so collapsing
-     * it leaves no empty gap after the percentage. The visibility write is a pure View
-     * property write (Rule 11).
+     * Toggles the two mutually exclusive charge indicators next to the battery
+     * percentage: the bolt when charging, the shield when the charge is held (battery
+     * protection). Unlike the alarm/calendar pair (INVISIBLE, to hold a fixed slot in
+     * the clock chain), these are GONE when idle: they sit at the END of the
+     * date/battery row, so collapsing leaves no empty gap after the percentage. At most
+     * one is ever VISIBLE. The visibility writes are pure View property writes (Rule 11).
      */
-    private fun updateChargingIndicator(isCharging: Boolean) {
+    private fun updateChargeIndicators(chargeState: ChargeState) {
         if (_binding == null) return
-        binding.chargingIndicator.visibility = if (isCharging) View.VISIBLE else View.GONE
+        binding.chargingIndicator.visibility =
+            if (chargeState == ChargeState.CHARGING) View.VISIBLE else View.GONE
+        binding.protectedIndicator.visibility =
+            if (chargeState == ChargeState.PROTECTED) View.VISIBLE else View.GONE
     }
 
     // ============================================================================
@@ -1522,7 +1529,7 @@ class HomeFragment : Fragment() {
         binding.timeText.text = state.timeString
         binding.dateText.text = state.dateString
         binding.batteryText.text = state.batteryString
-        updateChargingIndicator(state.isCharging)
+        updateChargeIndicators(state.chargeState)
     }
 
     override fun onResume() {
