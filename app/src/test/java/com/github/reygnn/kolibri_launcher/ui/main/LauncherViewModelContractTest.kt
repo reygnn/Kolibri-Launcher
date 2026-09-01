@@ -302,6 +302,9 @@ class LauncherViewModelContractTest {
         val intent: Intent = mockk {
             every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns 95
             every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
+            every {
+                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            } returns BatteryManager.BATTERY_STATUS_DISCHARGING
         }
         vm.updateBatteryLevelFromIntent(intent)
 

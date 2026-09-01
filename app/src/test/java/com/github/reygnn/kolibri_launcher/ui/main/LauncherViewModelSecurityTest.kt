@@ -392,6 +392,9 @@ class LauncherViewModelSecurityTest {
         val emptyIntent: Intent = mockk {
             every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns -1
             every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns -1
+            every {
+                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            } returns BatteryManager.BATTERY_STATUS_DISCHARGING
         }
         viewModel.updateBatteryLevelFromIntent(emptyIntent)
         assertEquals("---%", viewModel.uiState.value.batteryString)
@@ -402,6 +405,9 @@ class LauncherViewModelSecurityTest {
         val maliciousIntent: Intent = mockk {
             every { getIntExtra(BatteryManager.EXTRA_LEVEL, -1) } returns Int.MIN_VALUE
             every { getIntExtra(BatteryManager.EXTRA_SCALE, -1) } returns 100
+            every {
+                getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            } returns BatteryManager.BATTERY_STATUS_DISCHARGING
         }
         viewModel.updateBatteryLevelFromIntent(maliciousIntent)
         assertTrue(viewModel.uiState.value.batteryString.isNotEmpty())

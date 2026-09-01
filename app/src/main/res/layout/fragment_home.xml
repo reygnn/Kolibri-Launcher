@@ -167,6 +167,21 @@
                     android:textColor="@color/default_text_color"
                     android:padding="@dimen/touch_target_padding"
                     android:layout_marginStart="@dimen/spacing_medium" />
+
+                <!-- Charging bolt shown only while the battery is charging (GONE
+                     otherwise, so it collapses cleanly at the row's end without a
+                     reserved slot). Same OutlinedImageView + two-layer vector as the
+                     alarm/calendar indicators, so it gets the identical adaptive icon
+                     colour + tonal outline in HomeFragment.updateAllColors. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/chargingIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_bolt_outlined"
+                    android:contentDescription="@string/charging_indicator_content_description"
+                    android:visibility="gone"
+                    android:layout_marginStart="@dimen/spacing_small" />
             </LinearLayout>
         </LinearLayout>
 

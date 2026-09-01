@@ -6,5 +6,6 @@ data class HomeUiState(
     val timeString: String = "",
     val dateString: String = "",
     val batteryString: String = "",
+    val isCharging: Boolean = false,
     val timeBasedEvents: List<TimeBasedEvent> = emptyList()
 )

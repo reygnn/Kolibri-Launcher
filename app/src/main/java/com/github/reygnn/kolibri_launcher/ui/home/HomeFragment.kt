@@ -582,6 +582,15 @@ class HomeFragment : Fragment() {
             binding.batteryText.text = batteryString
         }
 
+        collectOnStarted(
+            flow = viewModel.uiState.map { it.isCharging }.distinctUntilChanged(),
+            errorTag = "isCharging",
+            coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
+        ) { isCharging ->
+            if (_binding == null) return@collectOnStarted
+            updateChargingIndicator(isCharging)
+        }
+
         // Observer 4: TimeBasedEvents
         collectOnStarted(
             flow = viewModel.uiState
@@ -1011,6 +1020,8 @@ class HomeFragment : Fragment() {
         binding.alarmIndicator.setOutline(outlineWidthPx, outlineColor)
         binding.calendarIndicator.setIconColor(textColor)
         binding.calendarIndicator.setOutline(outlineWidthPx, outlineColor)
+        binding.chargingIndicator.setIconColor(textColor)
+        binding.chargingIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
     }
 
@@ -1050,6 +1061,18 @@ class HomeFragment : Fragment() {
         binding.alarmIndicator.visibility = if (hasAlarm) View.VISIBLE else View.INVISIBLE
         binding.calendarIndicator.visibility = if (hasCalendar) View.VISIBLE else View.INVISIBLE
         updateDynamicSpacing()
+    }
+
+    /**
+     * Toggles the charging bolt next to the battery percentage. Unlike the
+     * alarm/calendar pair (INVISIBLE, to hold a fixed slot in the clock chain), this
+     * one is GONE when idle: it sits at the END of the date/battery row, so collapsing
+     * it leaves no empty gap after the percentage. The visibility write is a pure View
+     * property write (Rule 11).
+     */
+    private fun updateChargingIndicator(isCharging: Boolean) {
+        if (_binding == null) return
+        binding.chargingIndicator.visibility = if (isCharging) View.VISIBLE else View.GONE
     }
 
     // ============================================================================
@@ -1499,6 +1522,7 @@ class HomeFragment : Fragment() {
         binding.timeText.text = state.timeString
         binding.dateText.text = state.dateString
         binding.batteryText.text = state.batteryString
+        updateChargingIndicator(state.isCharging)
     }
 
     override fun onResume() {

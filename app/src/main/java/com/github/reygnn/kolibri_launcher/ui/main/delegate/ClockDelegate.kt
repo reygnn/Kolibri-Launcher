@@ -56,6 +56,12 @@ class ClockDelegate(
     private val _batteryString = MutableStateFlow(DEFAULT_BATTERY)
     val batteryString: StateFlow<String> = _batteryString.asStateFlow()
 
+    // Charging flag driven by the battery Intent's EXTRA_STATUS. Consumed by the
+    // home-screen charging indicator (a monochrome bolt icon), separate from the
+    // percentage text so the string plumbing stays untouched.
+    private val _isCharging = MutableStateFlow(false)
+    val isCharging: StateFlow<Boolean> = _isCharging.asStateFlow()
+
     private val _timeBasedEvents = MutableStateFlow<List<TimeBasedEvent>>(emptyList())
     val timeBasedEvents: StateFlow<List<TimeBasedEvent>> = _timeBasedEvents.asStateFlow()
 
@@ -101,14 +107,26 @@ class ClockDelegate(
                 val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                 val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                 updateBatteryLevel(level, scale)
+
+                // FULL only occurs while plugged in (once unplugged the status turns
+                // DISCHARGING/NOT_CHARGING), so treating it as charging keeps the bolt
+                // visible at 100 % on the charger instead of blinking off.
+                val status = intent.getIntExtra(
+                    BatteryManager.EXTRA_STATUS,
+                    BatteryManager.BATTERY_STATUS_UNKNOWN
+                )
+                _isCharging.value = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
             } else {
                 _batteryString.value = DEFAULT_BATTERY
+                _isCharging.value = false
             }
         } catch (e: Throwable) {
             // Non-suspend method reading Intent extras — no suspension point,
             // so no CancellationException can reach this catch.
             TimberWrapper.silentError(e, "Failed to update battery level from intent")
             _batteryString.value = DEFAULT_BATTERY
+            _isCharging.value = false
         }
     }
 
