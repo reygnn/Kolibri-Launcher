@@ -554,3 +554,58 @@ Reopen this entry if any of the following changes:
   repeated import would no longer be a clean recovery).
 - Real reports show users hitting mid-import failures often enough that the
   partial-state outcome is a practical problem, not a theoretical one.
+
+---
+
+## 9. Google Tasks (Aufgaben) are never shown in the upcoming-events dialog
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Any user who has a Google **Task** due today/tomorrow and expects
+  it in the launcher's upcoming-events dialog
+- **Affected:** `TimeBasedEventsRepositoryImpl.getCalendarEvents` — the calendar
+  path reads `CalendarContract.Instances`; tasks live outside it.
+
+### Explanation
+
+The upcoming-events dialog sources calendar rows exclusively from the platform
+calendar provider (`content://com.android.calendar`, `Instances` table). A Google
+**Task** (the "Aufgabe" items the Google Calendar app renders as an all-day-looking
+bar with a check-circle glyph) is **not** a calendar event: it is stored in the
+Google Tasks backend and exposed through the separate Google Tasks REST API, with
+no `ContentProvider` in `CalendarContract` at all. So a task never appears in an
+`Instances` query, and the launcher — which only reads `CalendarContract` — cannot
+see it, regardless of how it looks in the Google Calendar UI.
+
+This was diagnosed live on a Pixel 9a (2026-09-01): a task "Haare schneiden" shown
+as a today all-day bar in Google Calendar was **absent** from every
+`instances/whenbyday` query for today, while a genuine all-day *event* ("Ganzer
+Tag", `allDay=1`, `calendar_id=2`) the next day was returned and displayed
+correctly. The distinguishing signal in the Google Calendar UI is the check-circle
+glyph on the coloured bar — that marks a task, not an event. (The
+`fix/allday-calendar-julian-day` change is unrelated to this: it hardened the
+all-day *event* classification via the provider's local Julian day, and real
+all-day events work; tasks are simply not calendar data.)
+
+### Why it is accepted
+
+Reading Google Tasks would require a completely separate integration: Google
+Sign-In / OAuth 2.0 with the Tasks API scope, network calls to the Tasks REST
+endpoint, token refresh, and account handling — none of which the launcher has, and
+all of which pull a minimalist, provider-only launcher into online-account
+territory. That is a large, ongoing surface (auth, privacy, offline behaviour) for
+a convenience aggregator whose every other row is a local `ContentProvider` read.
+The tasks themselves remain fully reachable in the Google Calendar / Google Tasks
+apps; only the aggregated launcher shortcut omits them.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Android exposes tasks through a system `ContentProvider` (a `TasksContract`-style
+  API) that can be read with the same local, permission-based model the calendar
+  path already uses — at that point inclusion is cheap and consistent.
+- The launcher gains a Google-account / OAuth integration for another reason, so the
+  Tasks API scope is no longer a standalone cost.
+- Repeated user reports show the task omission is a frequent real-world confusion
+  rather than a one-off "why is my task missing" — worth at least a clearer in-app
+  hint even without full support.
