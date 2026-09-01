@@ -235,6 +235,38 @@ class TimeBasedEventsRepositoryImplCalendarTest {
     }
 
     @Test
+    fun `yearly birthday - today's expanded instance is kept and shown at local midnight`() = runTest {
+        // A birthday is an all-day event with a yearly recurrence. The Instances
+        // provider expands the RRULE, so we receive ONE instance for the current
+        // year on the birthday's month/day; this models that instance landing on
+        // today. The recurrence itself is the provider's job (see CONTENT_BY_DAY_URI)
+        // — this asserts only our per-row handling of the resulting instance.
+        val originalEvent = today.minusYears(30) // event created decades ago
+        // Deliberately adversarial BEGIN: the ORIGINAL year, not this year's
+        // instance. A real provider would put this year's date in BEGIN; feeding the
+        // original year proves classification uses START_DAY only and never BEGIN.
+        val begin = originalEvent.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val row = Row(
+            title = "Alex's Birthday",
+            begin = begin,
+            end = begin + 86_400_000,
+            allDay = true,
+            startDay = julian(today), // this year's expanded instance is today
+            endDay = julian(today)
+        )
+
+        val result = query(listOf(row))
+
+        assertEquals(1, result.size)
+        assertEquals("Alex's Birthday", result[0].title)
+        assertTrue("a birthday is an all-day event", result[0].isAllDay)
+        assertEquals(
+            "the expanded instance must show today, normalised to local midnight",
+            localMidnight(today), result[0].triggerTimeMillis
+        )
+    }
+
+    @Test
     fun `all-day event yesterday is dropped`() = runTest {
         val result = query(listOf(allDayRow("PastAllDay", today.minusDays(1))))
 
