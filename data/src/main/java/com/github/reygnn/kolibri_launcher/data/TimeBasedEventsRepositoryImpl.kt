@@ -19,10 +19,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +48,18 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
          */
         private val ALARM_LOOKAHEAD = DateUtils.HOUR_IN_MILLIS * 12
         private const val MAX_EVENTS_DEFAULT = 5
+
+        /**
+         * Julian day number of the Unix epoch (1970-01-01). CalendarContract
+         * expresses each instance's LOCAL calendar day as a Julian day number in
+         * [CalendarContract.Instances.START_DAY] / [CalendarContract.Instances.END_DAY],
+         * computed by the provider in the device timezone. Value matches
+         * `android.text.format.Time.EPOCH_JULIAN_DAY`; inlined here to avoid the
+         * deprecated `Time` class. Convert with:
+         *   julianDay = LocalDate.toEpochDay() + JULIAN_DAY_EPOCH
+         *   localDate = LocalDate.ofEpochDay(julianDay - JULIAN_DAY_EPOCH)
+         */
+        private const val JULIAN_DAY_EPOCH = 2440588L
 
         /**
          * Packages whose [AlarmManager.getNextAlarmClock] entries are NOT
@@ -221,28 +231,40 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                     CalendarContract.Instances.TITLE,
                     CalendarContract.Instances.BEGIN,
                     CalendarContract.Instances.END,
-                    CalendarContract.Instances.ALL_DAY
+                    CalendarContract.Instances.ALL_DAY,
+                    // START_DAY/END_DAY are the instance's LOCAL calendar day as a
+                    // Julian day number, computed by the provider in the device
+                    // timezone. We classify today/tomorrow by these — NOT by
+                    // re-deriving a date from BEGIN + a hard-coded zone. The old
+                    // code read BEGIN in UTC, assuming the provider stores an
+                    // all-day BEGIN at UTC midnight; on devices where that is not
+                    // true (e.g. BEGIN comes back at local midnight) the UTC read
+                    // lands on the previous day in a UTC+ zone, so today's all-day
+                    // event was misclassified as "yesterday" and dropped. See
+                    // KNOWN_QUIRKS.md.
+                    CalendarContract.Instances.START_DAY,
+                    CalendarContract.Instances.END_DAY
                 )
 
-                // Window: today + tomorrow. Query the whole span from the start of
-                // today so today's all-day events (whose instance begins at local
-                // midnight, already in the past) are still returned; timed events
-                // that already passed today are dropped in the per-row filter below.
+                // Window: today + tomorrow, expressed as Julian day numbers so the
+                // provider does the timezone-correct day expansion for us.
                 val zone = ZoneId.systemDefault()
                 val today = LocalDate.now(zone)
-                val tomorrow = today.plusDays(1)
                 val now = System.currentTimeMillis()
-                val rangeStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
-                // Exclusive upper bound: start of the day after tomorrow.
-                val rangeEnd = today.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+                val todayJulian = (today.toEpochDay() + JULIAN_DAY_EPOCH).toInt()
+                val tomorrowJulian = todayJulian + 1
 
-                val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
+                // CONTENT_BY_DAY_URI takes an inclusive [startDay, endDay] Julian-day
+                // range. This replaces the millis-range CONTENT_URI: the provider
+                // resolves all-day/timezone edges itself, and the per-row gate below
+                // uses the same Julian days as the authoritative filter.
+                val uri = CalendarContract.Instances.CONTENT_BY_DAY_URI.buildUpon()
                     .also {
-                        ContentUris.appendId(it, rangeStart)
-                        ContentUris.appendId(it, rangeEnd)
+                        ContentUris.appendId(it, todayJulian.toLong())
+                        ContentUris.appendId(it, tomorrowJulian.toLong())
                     }.build()
 
-                // No ALL_DAY filter: all-day events are now included. Both kinds are
+                // No ALL_DAY filter: all-day events are included. Both kinds are
                 // separated and filtered per-row below.
                 val sortOrder = "${CalendarContract.Instances.BEGIN} ASC"
 
@@ -258,6 +280,8 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                     val beginIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
                     val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
                     val allDayIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+                    val startDayIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.START_DAY)
+                    val endDayIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END_DAY)
 
                     while (cursor.moveToNext() && events.size < maxCount) {
                         // Einzelne Row-Fehler sollten nicht alles abbrechen
@@ -265,36 +289,52 @@ class TimeBasedEventsRepositoryImpl @Inject constructor(
                             val begin = cursor.getLong(beginIdx)
                             val end = cursor.getLong(endIdx)
                             val isAllDay = cursor.getInt(allDayIdx) == 1
+                            val startDay = cursor.getInt(startDayIdx)
+                            val endDay = cursor.getInt(endDayIdx)
 
-                            // Per-row window filter:
-                            // - all-day: keep only if its date is today or tomorrow.
-                            //   The provider stores an all-day BEGIN as UTC midnight,
-                            //   so its calendar date is read back in UTC (not the
-                            //   local zone) to avoid an off-by-one day at the edges.
-                            // - timed: keep while the event has not yet ended (end > now),
-                            //   so an appointment that is currently in progress stays
-                            //   visible until its end time — a late joiner still sees it.
-                            //   Only an event that already ended today is dropped.
-                            val keep = if (isAllDay) {
-                                val date = Instant.ofEpochMilli(begin)
-                                    .atZone(ZoneOffset.UTC)
-                                    .toLocalDate()
-                                date == today || date == tomorrow
-                            } else {
-                                end > now
-                            }
-                            if (!keep) continue
+                            // Authoritative window gate on the provider's LOCAL Julian
+                            // days: keep an instance whose [startDay, endDay] span
+                            // intersects [today, tomorrow]. The query range is only a
+                            // first pass; this line is what actually decides.
+                            if (startDay > tomorrowJulian || endDay < todayJulian) continue
 
-                            events.add(
-                                CalendarEvent(
-                                    // Empty = untitled → UI resolves a localized
-                                    // fallback (no display strings in :data).
-                                    title = cursor.getString(titleIdx).orEmpty(),
-                                    startTimeMillis = begin,
-                                    endTimeMillis = end,
-                                    isAllDay = isAllDay
+                            if (isAllDay) {
+                                // Normalise the all-day trigger to LOCAL midnight of
+                                // its in-window day. This makes triggerTimeMillis
+                                // self-consistent for chronological sorting and for the
+                                // formatter's day-grouping (which reads it back in the
+                                // local zone). A multi-day span that began earlier is
+                                // anchored to today. We deliberately do NOT trust BEGIN
+                                // for the day here (see projection comment).
+                                val dayJulian = maxOf(startDay, todayJulian)
+                                val date = LocalDate.ofEpochDay(dayJulian.toLong() - JULIAN_DAY_EPOCH)
+                                val localMidnight =
+                                    date.atStartOfDay(zone).toInstant().toEpochMilli()
+                                events.add(
+                                    CalendarEvent(
+                                        // Empty = untitled → UI resolves a localized
+                                        // fallback (no display strings in :data).
+                                        title = cursor.getString(titleIdx).orEmpty(),
+                                        startTimeMillis = localMidnight,
+                                        endTimeMillis = end,
+                                        isAllDay = true
+                                    )
                                 )
-                            )
+                            } else {
+                                // Timed: keep while not yet ended (end > now), so an
+                                // in-progress appointment stays visible until its end —
+                                // a late joiner still sees it. Only an event that
+                                // already ended is dropped.
+                                if (end <= now) continue
+                                events.add(
+                                    CalendarEvent(
+                                        title = cursor.getString(titleIdx).orEmpty(),
+                                        startTimeMillis = begin,
+                                        endTimeMillis = end,
+                                        isAllDay = false
+                                    )
+                                )
+                            }
                         } catch (e: Exception) {
                             // No suspension point: the guarded body only reads
                             // synchronous cursor columns — cancellation cannot

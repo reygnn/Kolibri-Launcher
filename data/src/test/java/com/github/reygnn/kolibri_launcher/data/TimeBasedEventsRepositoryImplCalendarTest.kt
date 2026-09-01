@@ -24,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -41,6 +42,13 @@ import java.time.ZoneOffset
  * FILTER (today + tomorrow window, all-day inclusion, past-timed drop) is
  * under test, so the mocked cursor returns fixed rows regardless of the query
  * range and the production per-row filter does the work.
+ *
+ * REGRESSION NOTE: classification is by the provider's LOCAL Julian day
+ * (START_DAY/END_DAY), never by re-reading BEGIN in a fixed zone. To prove the
+ * fix, every all-day row is fed a deliberately WRONG BEGIN ([wrongUtcBegin]) —
+ * the value seen on devices whose provider does not return all-day BEGIN at UTC
+ * midnight. Under the old UTC-based date read this landed on the previous day
+ * and dropped today's all-day event; the code must now ignore BEGIN for the day.
  */
 @ExperimentalCoroutinesApi
 @RunWith(RobolectricTestRunner::class)
@@ -63,6 +71,9 @@ class TimeBasedEventsRepositoryImplCalendarTest {
     private val tomorrow: LocalDate = today.plusDays(1)
     private val now: Long = System.currentTimeMillis()
 
+    // Must match TimeBasedEventsRepositoryImpl.JULIAN_DAY_EPOCH.
+    private val julianEpoch = 2_440_588L
+
     @Before
     fun setup() {
         MockKAnnotations.init(this)
@@ -76,11 +87,47 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         repository = TimeBasedEventsRepositoryImpl(context, settingsRepository)
     }
 
-    private data class Row(val title: String, val begin: Long, val end: Long, val allDay: Boolean)
+    private data class Row(
+        val title: String,
+        val begin: Long,
+        val end: Long,
+        val allDay: Boolean,
+        val startDay: Int,
+        val endDay: Int
+    )
 
-    /** An all-day instance BEGIN is stored as UTC midnight of the event's date. */
-    private fun allDayBegin(date: LocalDate): Long =
-        date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    /** CalendarContract Julian day number for a local calendar day. */
+    private fun julian(date: LocalDate): Int = (date.toEpochDay() + julianEpoch).toInt()
+
+    /** Local calendar day (as a Julian day) of a timed instant. */
+    private fun localDay(millis: Long): Int =
+        julian(Instant.ofEpochMilli(millis).atZone(zone).toLocalDate())
+
+    /**
+     * A deliberately WRONG all-day BEGIN: UTC midnight of the day BEFORE [date].
+     * Reading this in UTC (the old bug) yields yesterday; the production code must
+     * instead classify by the supplied START_DAY and ignore this value.
+     */
+    private fun wrongUtcBegin(date: LocalDate): Long =
+        date.minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+    private fun timedRow(title: String, begin: Long, end: Long) = Row(
+        title = title, begin = begin, end = end, allDay = false,
+        startDay = localDay(begin), endDay = localDay(end)
+    )
+
+    private fun allDayRow(title: String, date: LocalDate) = Row(
+        title = title,
+        begin = wrongUtcBegin(date),
+        end = wrongUtcBegin(date) + 86_400_000,
+        allDay = true,
+        startDay = julian(date),
+        endDay = julian(date)
+    )
+
+    /** The LOCAL-midnight trigger the repository must produce for an all-day day. */
+    private fun localMidnight(date: LocalDate): Long =
+        date.atStartOfDay(zone).toInstant().toEpochMilli()
 
     private fun cursorOf(rows: List<Row>): Cursor {
         val cursor = mockk<Cursor>(relaxed = true)
@@ -89,11 +136,15 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         every { cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN) } returns 1
         every { cursor.getColumnIndexOrThrow(CalendarContract.Instances.END) } returns 2
         every { cursor.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY) } returns 3
+        every { cursor.getColumnIndexOrThrow(CalendarContract.Instances.START_DAY) } returns 4
+        every { cursor.getColumnIndexOrThrow(CalendarContract.Instances.END_DAY) } returns 5
         every { cursor.moveToNext() } answers { pos++; pos < rows.size }
         every { cursor.getString(0) } answers { rows[pos].title }
         every { cursor.getLong(1) } answers { rows[pos].begin }
         every { cursor.getLong(2) } answers { rows[pos].end }
         every { cursor.getInt(3) } answers { if (rows[pos].allDay) 1 else 0 }
+        every { cursor.getInt(4) } answers { rows[pos].startDay }
+        every { cursor.getInt(5) } answers { rows[pos].endDay }
         return cursor
     }
 
@@ -109,7 +160,7 @@ class TimeBasedEventsRepositoryImplCalendarTest {
     @Test
     fun `timed event still upcoming today is kept`() = runTest {
         val begin = now + 2 * 60 * 60 * 1000L
-        val result = query(listOf(Row("Standup", begin, begin + 1_800_000, allDay = false)))
+        val result = query(listOf(timedRow("Standup", begin, begin + 1_800_000)))
 
         assertEquals(1, result.size)
         assertEquals("Standup", result[0].title)
@@ -119,9 +170,9 @@ class TimeBasedEventsRepositoryImplCalendarTest {
 
     @Test
     fun `timed event that already ended today is dropped`() = runTest {
-        // begin 3h ago, ended 2.5h ago → end < now.
+        // begin 3h ago, ended 2.5h ago -> end < now.
         val begin = now - 3 * 60 * 60 * 1000L
-        val result = query(listOf(Row("PastMeeting", begin, begin + 1_800_000, allDay = false)))
+        val result = query(listOf(timedRow("PastMeeting", begin, begin + 1_800_000)))
 
         assertTrue("past timed event must be dropped, was: $result", result.isEmpty())
     }
@@ -133,7 +184,7 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         // begin >= now).
         val begin = now - 35 * 60 * 1000L
         val end = now + 25 * 60 * 1000L
-        val result = query(listOf(Row("Standup", begin, end, allDay = false)))
+        val result = query(listOf(timedRow("Standup", begin, end)))
 
         assertEquals(1, result.size)
         assertEquals("Standup", result[0].title)
@@ -144,7 +195,7 @@ class TimeBasedEventsRepositoryImplCalendarTest {
     fun `timed event ending exactly now is dropped`() = runTest {
         // Boundary: end == now is NOT still running (end > now is strict).
         val end = now
-        val result = query(listOf(Row("JustEnded", now - 60 * 60 * 1000L, end, allDay = false)))
+        val result = query(listOf(timedRow("JustEnded", now - 60 * 60 * 1000L, end)))
 
         assertTrue("event ending exactly now must be dropped, was: $result", result.isEmpty())
     }
@@ -152,56 +203,78 @@ class TimeBasedEventsRepositoryImplCalendarTest {
     @Test
     fun `timed event tomorrow is kept`() = runTest {
         val begin = now + 25 * 60 * 60 * 1000L
-        val result = query(listOf(Row("TomorrowCall", begin, begin + 1_800_000, allDay = false)))
+        val result = query(listOf(timedRow("TomorrowCall", begin, begin + 1_800_000)))
 
         assertEquals(1, result.size)
         assertEquals("TomorrowCall", result[0].title)
     }
 
     @Test
-    fun `all-day event today is kept and flagged`() = runTest {
-        val begin = allDayBegin(today)
-        val result = query(listOf(Row("Holiday", begin, begin + 86_400_000, allDay = true)))
+    fun `all-day event today is kept, flagged and normalised to local midnight`() = runTest {
+        // begin is a WRONG UTC value (yesterday); START_DAY says today. The old
+        // UTC read dropped this; the fix keeps it and normalises the trigger.
+        val result = query(listOf(allDayRow("Holiday", today)))
 
         assertEquals(1, result.size)
         assertEquals("Holiday", result[0].title)
         assertTrue("expected all-day flag", result[0].isAllDay)
+        assertEquals(
+            "all-day trigger must be local midnight of today",
+            localMidnight(today), result[0].triggerTimeMillis
+        )
     }
 
     @Test
-    fun `all-day event tomorrow is kept and flagged`() = runTest {
-        val begin = allDayBegin(tomorrow)
-        val result = query(listOf(Row("Birthday", begin, begin + 86_400_000, allDay = true)))
+    fun `all-day event tomorrow is kept, flagged and normalised to local midnight`() = runTest {
+        val result = query(listOf(allDayRow("Birthday", tomorrow)))
 
         assertEquals(1, result.size)
         assertEquals("Birthday", result[0].title)
         assertTrue(result[0].isAllDay)
+        assertEquals(localMidnight(tomorrow), result[0].triggerTimeMillis)
     }
 
     @Test
     fun `all-day event yesterday is dropped`() = runTest {
-        val begin = allDayBegin(today.minusDays(1))
-        val result = query(listOf(Row("PastAllDay", begin, begin + 86_400_000, allDay = true)))
+        val result = query(listOf(allDayRow("PastAllDay", today.minusDays(1))))
 
         assertTrue("yesterday's all-day event must be dropped, was: $result", result.isEmpty())
     }
 
     @Test
     fun `all-day event day after tomorrow is dropped`() = runTest {
-        val begin = allDayBegin(today.plusDays(2))
-        val result = query(listOf(Row("FutureAllDay", begin, begin + 86_400_000, allDay = true)))
+        val result = query(listOf(allDayRow("FutureAllDay", today.plusDays(2))))
 
         assertTrue("out-of-window all-day event must be dropped, was: $result", result.isEmpty())
     }
 
     @Test
+    fun `multi-day all-day span that began before today is anchored to today`() = runTest {
+        // A 3-day span [yesterday, tomorrow]. It intersects the window, so it is
+        // kept and anchored to today's local midnight (not its earlier start).
+        val row = Row(
+            title = "Vacation",
+            begin = wrongUtcBegin(today.minusDays(1)),
+            end = wrongUtcBegin(today.minusDays(1)) + 3 * 86_400_000L,
+            allDay = true,
+            startDay = julian(today.minusDays(1)),
+            endDay = julian(tomorrow)
+        )
+        val result = query(listOf(row))
+
+        assertEquals(1, result.size)
+        assertTrue(result[0].isAllDay)
+        assertEquals(localMidnight(today), result[0].triggerTimeMillis)
+    }
+
+    @Test
     fun `mixed rows keep only in-window events`() = runTest {
         val rows = listOf(
-            Row("PastTimed", now - 3 * 60 * 60 * 1000L, now - 1_800_000, allDay = false),
-            Row("AllDayToday", allDayBegin(today), allDayBegin(today) + 86_400_000, allDay = true),
-            Row("UpcomingTimed", now + 2 * 60 * 60 * 1000L, now + 3 * 60 * 60 * 1000L, allDay = false),
-            Row("AllDayYesterday", allDayBegin(today.minusDays(1)), allDayBegin(today), allDay = true),
-            Row("AllDayTomorrow", allDayBegin(tomorrow), allDayBegin(tomorrow) + 86_400_000, allDay = true)
+            timedRow("PastTimed", now - 3 * 60 * 60 * 1000L, now - 1_800_000),
+            allDayRow("AllDayToday", today),
+            timedRow("UpcomingTimed", now + 2 * 60 * 60 * 1000L, now + 3 * 60 * 60 * 1000L),
+            allDayRow("AllDayYesterday", today.minusDays(1)),
+            allDayRow("AllDayTomorrow", tomorrow)
         )
 
         val titles = query(rows).map { it.title }.toSet()

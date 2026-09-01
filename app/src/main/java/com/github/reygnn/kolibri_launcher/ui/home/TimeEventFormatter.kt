@@ -6,7 +6,6 @@ import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -108,12 +107,13 @@ class TimeEventFormatter {
      * when BOTH groups are non-empty). The repository window is today + tomorrow,
      * so there are at most two groups.
      *
-     * Grouping is by the event's LOCAL calendar day, computed the same way the
-     * repository filters: an all-day event's [TimeBasedEvent.triggerTimeMillis] is
-     * a UTC midnight, read back in UTC; a timed event / alarm is read in [zone].
-     * Partitioning (rather than a single split index) keeps the groups correct
-     * even if an all-day timestamp does not sort monotonically against timed ones.
-     * Order within each group is preserved.
+     * Grouping is by the event's LOCAL calendar day in [zone]. The repository
+     * normalises an all-day event's [TimeBasedEvent.triggerTimeMillis] to LOCAL
+     * midnight of its day (it classifies via the provider's local Julian day, not
+     * via a UTC read of BEGIN), so every event — all-day, timed, or alarm — is
+     * grouped in the same zone. Partitioning (rather than a single split index)
+     * keeps the groups correct even if an all-day timestamp does not sort
+     * monotonically against timed ones. Order within each group is preserved.
      */
     fun buildEventRows(
         events: List<TimeBasedEvent>,
@@ -123,10 +123,8 @@ class TimeEventFormatter {
         if (events.isEmpty()) return emptyList()
         val tomorrow = today.plusDays(1)
 
-        fun localDateOf(event: TimeBasedEvent): LocalDate {
-            val readZone = if (event.isAllDay) ZoneOffset.UTC else zone
-            return Instant.ofEpochMilli(event.triggerTimeMillis).atZone(readZone).toLocalDate()
-        }
+        fun localDateOf(event: TimeBasedEvent): LocalDate =
+            Instant.ofEpochMilli(event.triggerTimeMillis).atZone(zone).toLocalDate()
 
         val (tomorrowEvents, todayEvents) = events.partition { localDateOf(it) == tomorrow }
 

@@ -133,3 +133,39 @@ Add further confirmed non-alarm sources to `NON_ALARM_CLOCK_PACKAGES` in
 found: `adb shell dumpsys alarm | grep -A8 "Next alarm clock"` on the affected
 device, and read the `showIntent` package on the `Alarm clock:` entry whose
 `triggerTime` matches the reported phantom.
+
+## 2. All-day calendar `BEGIN` is not reliably UTC midnight
+
+### The quirk
+
+`CalendarContract` documents an all-day event's `DTSTART`/`Instances.BEGIN` as
+UTC midnight of the event's date. In practice this does not hold on every
+device / sync-adapter combination: on some (observed on a Pixel 9a) the all-day
+`Instances.BEGIN` comes back at, or near, *local* midnight instead.
+
+### The symptom
+
+Deriving the event's calendar day by reading `BEGIN` in UTC then breaks in a
+UTC+ zone: local midnight read in UTC lands on the *previous* day. A today
+all-day event is misclassified as "yesterday" and dropped, while timed events
+(filtered by `end > now`, no zone assumption) show normally. Reported as:
+"an 11:00–12:00 event shows, but today's all-day event does not."
+
+### The workaround
+
+Never derive the day from `BEGIN` + a hard-coded zone. Query
+`Instances.CONTENT_BY_DAY_URI` with Julian-day bounds and classify each row by
+the provider's `START_DAY` / `END_DAY` — the instance's LOCAL calendar day as a
+Julian day number, computed by the provider in the device timezone. All-day
+triggers are then normalised to local midnight of their in-window day so the
+timestamp is self-consistent for sorting and for the dialog's day-grouping.
+See `getCalendarEvents` in `TimeBasedEventsRepositoryImpl` and
+`TimeEventFormatter.buildEventRows`.
+
+### Testing
+
+`TimeBasedEventsRepositoryImplCalendarTest` feeds every all-day row a
+deliberately wrong `BEGIN` (UTC midnight of the day before) while `START_DAY`
+carries the correct local day, so the test fails if the code ever reads `BEGIN`
+for the day again. The old test helper (`allDayBegin` = `atStartOfDay(UTC)`,
+read back in UTC) was circular and could not catch this.

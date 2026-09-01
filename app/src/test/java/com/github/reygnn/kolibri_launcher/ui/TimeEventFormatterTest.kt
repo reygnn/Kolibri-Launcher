@@ -10,7 +10,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Locale
 
@@ -164,8 +163,11 @@ class TimeEventFormatterTest {
     }
 
     private fun allDayOn(date: LocalDate, title: String): TimeBasedEvent {
-        // All-day BEGIN is UTC midnight, matching the repository.
-        val millis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        // The repository normalises an all-day trigger to LOCAL midnight of its
+        // day, so grouping reads it in the local zone (not UTC). Matching that
+        // here also guards the regression: under the old UTC read, a Berlin
+        // (UTC+2) local midnight would have grouped one day early.
+        val millis = date.atStartOfDay(zone).toInstant().toEpochMilli()
         return TimeBasedEvent(millis, title, TimeBasedEventType.CALENDAR, isAllDay = true)
     }
 
@@ -214,7 +216,7 @@ class TimeEventFormatterTest {
     }
 
     @Test
-    fun `buildEventRows - all-day events are grouped by their UTC date`() {
+    fun `buildEventRows - all-day events are grouped by their local date`() {
         // all-day today + all-day tomorrow → one on each side of the separator.
         val events = listOf(allDayOn(today, "AllToday"), allDayOn(tomorrow, "AllTomorrow"))
         val rows = formatter.buildEventRows(events, today, zone)
