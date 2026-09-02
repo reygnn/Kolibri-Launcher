@@ -335,9 +335,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
 
         // Alpha (0-255) for the upcoming-events dialog today/tomorrow separator
-        // line, applied to the wallpaper-aware onSurface colour. ~24% reads as a
-        // subtle divider rather than a bold rule.
-        private const val SEPARATOR_ALPHA = 61
+        // line, applied to the wallpaper-aware onSurface colour. ~35% reads as a
+        // clearly visible divider while staying short of a bold rule.
+        private const val SEPARATOR_ALPHA = 90
     }
 
     private val onboardingLauncher = registerForActivityResult(

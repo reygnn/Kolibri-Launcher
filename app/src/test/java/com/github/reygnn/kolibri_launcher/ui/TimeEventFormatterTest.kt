@@ -186,12 +186,15 @@ class TimeEventFormatterTest {
     }
 
     @Test
-    fun `buildEventRows - only tomorrow events has no separator`() {
+    fun `buildEventRows - only tomorrow events get a leading separator`() {
         val events = listOf(timedOn(tomorrow, 9, "A"), timedOn(tomorrow, 14, "B"))
         val rows = formatter.buildEventRows(events, today, zone)
 
-        assertEquals(2, rows.size)
-        assertTrue(rows.none { it is TimeEventFormatter.EventRow.TomorrowSeparator })
+        // <separator>, A, B — the divider leads the list as a "tomorrow" marker.
+        assertEquals(3, rows.size)
+        assertTrue(rows[0] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.Item)
+        assertTrue(rows[2] is TimeEventFormatter.EventRow.Item)
     }
 
     @Test

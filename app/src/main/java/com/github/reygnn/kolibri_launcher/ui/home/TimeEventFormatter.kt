@@ -103,9 +103,11 @@ class TimeEventFormatter {
 
     /**
      * Splits a chronologically-sorted [events] list into today's and tomorrow's
-     * groups and inserts a single [EventRow.TomorrowSeparator] between them (only
-     * when BOTH groups are non-empty). The repository window is today + tomorrow,
-     * so there are at most two groups.
+     * groups and inserts a single [EventRow.TomorrowSeparator] in front of the
+     * tomorrow group whenever that group is non-empty. With today's events present
+     * the separator sits at the boundary between the two groups; with only tomorrow
+     * events it leads the list as a "from here on it's tomorrow" marker. The
+     * repository window is today + tomorrow, so there are at most two groups.
      *
      * Grouping is by the event's LOCAL calendar day in [zone]. The repository
      * normalises an all-day event's [TimeBasedEvent.triggerTimeMillis] to LOCAL
@@ -130,7 +132,7 @@ class TimeEventFormatter {
 
         val rows = ArrayList<EventRow>(events.size + 1)
         todayEvents.forEach { rows.add(EventRow.Item(it)) }
-        if (todayEvents.isNotEmpty() && tomorrowEvents.isNotEmpty()) {
+        if (tomorrowEvents.isNotEmpty()) {
             rows.add(EventRow.TomorrowSeparator)
         }
         tomorrowEvents.forEach { rows.add(EventRow.Item(it)) }

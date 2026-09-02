@@ -15,6 +15,6 @@
     <View
         android:id="@+id/events_divider_line"
         android:layout_width="match_parent"
-        android:layout_height="1dp" />
+        android:layout_height="2dp" />
 
 </FrameLayout>
