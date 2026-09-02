@@ -125,7 +125,7 @@ jmh = "1.37"  # JMH core/generator version, pinned via the jmh { } block in :dom
 jmh-gradle-plugin = "0.7.3"  # me.champeau.jmh Gradle plugin (owns the src/jmh/ source set + jmh task). Latest stable.
 
 # Macrobenchmark (:macrobenchmark — on-device launch-latency gate, local device only)
-benchmark-macro = "1.5.0-rc01"  # androidx.benchmark macro-junit4 + drives the androidx.baselineprofile plugin (same release; see [plugins]). PRE-RELEASE ON PURPOSE: the baselineprofile Gradle plugin at the last stable (1.4.1) rejects :app under AGP 9.3.1 ("not a supported android module" — AgpPlugin AGP-version gate); AGP-9 support lands only in the 1.5.0 line. rc01 verified: applies on :app, both benchmark modules compile clean. DOWNGRADE to 1.4.1 breaks :app:generateBaselineProfile. Recheck 2026-Q4: move to 1.5.0 stable once it ships.
+benchmark-macro = "1.5.0-rc02"  # androidx.benchmark macro-junit4 + drives the androidx.baselineprofile plugin (same release; see [plugins]). PRE-RELEASE ON PURPOSE: the baselineprofile Gradle plugin at the last stable (1.4.1) rejects :app under AGP 9.3.1 ("not a supported android module" — AgpPlugin AGP-version gate); AGP-9 support lands only in the 1.5.0 line. rc02 verified 2026-09-02 (AS-offered on the 1.5.0-rc line, under AGP 9.4.0): applies on :app, both benchmark modules compile clean, :app:generateBaselineProfile green on the A17. rc01 was likewise verified. DOWNGRADE to 1.4.1 breaks :app:generateBaselineProfile. Recheck 2026-Q4: move to 1.5.0 stable once it ships.
 uiautomator = "2.4.0"  # androidx.test.uiautomator, used only by :macrobenchmark to drive taps. Latest stable.
 
 # Baseline Profile (:baselineprofile — release-profile producer, local device only)
