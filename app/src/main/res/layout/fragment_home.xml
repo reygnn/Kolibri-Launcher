@@ -181,7 +181,7 @@
                     android:src="@drawable/ic_bolt_outlined"
                     android:contentDescription="@string/charging_indicator_content_description"
                     android:visibility="gone"
-                    android:layout_marginStart="@dimen/spacing_small" />
+                    android:layout_marginStart="@dimen/spacing_tiny" />
 
                 <!-- Battery-protection shield, shown only while the charge is held
                      (plugged but not charging). Mutually exclusive with the bolt above,
@@ -196,7 +196,7 @@
                     android:src="@drawable/ic_shield_outlined"
                     android:contentDescription="@string/battery_protection_indicator_content_description"
                     android:visibility="gone"
-                    android:layout_marginStart="@dimen/spacing_small" />
+                    android:layout_marginStart="@dimen/spacing_tiny" />
             </LinearLayout>
         </LinearLayout>
 
