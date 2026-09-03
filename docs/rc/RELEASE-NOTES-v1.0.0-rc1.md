@@ -4,8 +4,9 @@ First release candidate for **1.0**. This is the release that hardens the
 launcher to a 1.0 milestone: new visible features on the frozen minimalist
 surface, plus a large robustness and cold-start-performance pass.
 
-> Draft release notes — not yet tagged or uploaded. `versionName = 1.0.0-rc1`,
-> `versionCode = 233`. Range: `v0.99.188-stable..HEAD` (148 commits).
+> `versionName = 1.0.0-rc1`, `versionCode = 233`. Tag: `v1.0.0-rc1-stable`
+> (kept on the historical `-stable` suffix). Range: `v0.99.188-stable..HEAD`
+> (148 commits). Published as a GitHub **pre-release**.
 
 ---
 
@@ -67,4 +68,4 @@ surface, plus a large robustness and cold-start-performance pass.
   ART rules (see the Versioning section in `CLAUDE.md`).
 - The public GitHub AAB is a plain `./gradlew bundleRelease` (dev commands
   compiled out). Do **not** pass `-PdailyDriver` for the public artifact.
-- Tag mirrors the version: `v1.0.0-rc1`.
+- Tag: `v1.0.0-rc1-stable` (historical `-stable` suffix).
