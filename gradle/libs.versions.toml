@@ -18,8 +18,11 @@
 #     in `app/build.gradle.kts` resolutionStrategy.
 #   - `kotlin-test` (test) and the Kotlin compiler version MUST match;
 #     mismatching gives "compiler errors" rather than a clean test failure.
-#   - `acra` and `proguard-rules.pro` must stay in sync; changing one without
-#     the other can produce silent crash-report failures in release builds.
+#   - `acra` and `proguard-rules.pro` must stay in sync: ACRA's own keep rules
+#     ship as consumer rules in its AAR, our file only adds the app-side
+#     pieces (BuildConfig reflection, Throwable names, AutoService dontwarn).
+#     Bumping ACRA can change what those consumer rules cover — re-verify a
+#     release build (configuration.txt) after any bump.
 #   - `fragment` (fragment-ktx and fragment-testing) MUST share one version.
 #
 # -----------------------------------------------------------------------------
@@ -96,7 +99,7 @@ kotlinx-serialization = "1.11.0"  # Mega-bundle lift 2026-05-15: matched to Kotl
 
 # Utilities
 timber = "5.0.1"  # Recheck 2026-05-15: 5.0.1 is the only stable release; no 6.x line exists, only 5.1.0-SNAPSHOT in trunk. The previous DO-NOT-UPGRADE marker referenced "6.x breaking changes" that don't exist — dropped. Re-add the marker IF a 6.x ships and turns out hostile.
-acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). proguard-rules.pro keeps are package-wide (`-keep class org.acra.**`) — verified compatible. Header comment in proguard-rules.pro updated.
+acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). 2026-09-03: the package-wide `-keep class org.acra.**` was dropped in the R8 rewrite — ACRA's consumer rules (Plugin impls, enums, Configuration ctors) cover it; our file only keeps BuildConfig + the AutoService-processor dontwarn.
 browser = "1.10.0"  # Recheck 2026-05-15: lifted 1.9.0 → 1.10.0 (developer.android.com stable channel now lists 1.10.0).
 leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
 json = "20260814"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
