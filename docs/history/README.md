@@ -2,8 +2,10 @@
 
 One-off historical documents kept for provenance, not as live reference:
 
-- [`REVIEWS.md`](REVIEWS.md) — the in-character "Ash" review flavor piece (see
-  `HISTORY.md`).
+- [`REVIEWS-anthology.md`](REVIEWS-anthology.md) — the collected in-character
+  fictional reviews. The original "Ash" flavor piece now lives back in the root
+  [`REVIEWS.md`](../../REVIEWS.md) where it started; this is the later anthology
+  (see `HISTORY.md`).
 - [`TODO-completed.md`](TODO-completed.md) — completed roadmap sections moved out
   of the active `TODO.md`.
 - [`APP-START-PERFORMANCE.md`](APP-START-PERFORMANCE.md) — the original combined

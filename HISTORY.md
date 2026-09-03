@@ -234,7 +234,7 @@ way out, then deleted with the rest.)
 
 ## Coda — Ash's review as the unconscious target
 
-The fictional Ash review at the top of [REVIEWS.md](docs/history/REVIEWS.md) was
+The fictional Ash review at the top of [REVIEWS.md](REVIEWS.md) was
 added almost on day one. It was not a programmatic spec the project
 worked toward; it was an early articulation of a craft intuition the
 user kept reaching for at each decision point. Conscious planning, as
@@ -252,12 +252,13 @@ not feature scope creep.
 > "I admire its purity. A launcher unclouded by widgets, legacy code,
 > or delusions of necessity. A structural perfection matched only by
 > its efficiency."
-> — Ash, Android Science Officer, [REVIEWS.md](docs/history/REVIEWS.md)
+> — Ash, Android Science Officer, [REVIEWS.md](REVIEWS.md)
 
 ---
 
 *Architecture rules live in [CLAUDE.md](CLAUDE.md), current
 work-in-progress in [TODO.md](TODO.md), known unfixable issues in
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md), and fictional reviews in
-[REVIEWS.md](docs/history/REVIEWS.md). The why-Claude collaboration story is in
+[REVIEWS.md](REVIEWS.md) plus the
+[anthology](docs/history/REVIEWS-anthology.md). The why-Claude collaboration story is in
 [WHY_CLAUDE.md](WHY_CLAUDE.md).*
