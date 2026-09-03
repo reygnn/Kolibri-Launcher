@@ -167,6 +167,15 @@ android {
         // the true ship build. See macrobenchmark/build.gradle.kts.
     }
 
+    androidResources {
+        // Keep only the locales the app itself ships (values/ + values-de/).
+        // Without this filter, androidx/Material contribute their string
+        // translations in ~85 locales to resources.arsc, which is stored
+        // uncompressed (mandatory for targetSdk >= 30) and made up ~30 % of
+        // the release APK. See tmp/APK_SIZE_FINDINGS.md (2026-09-02).
+        localeFilters += listOf("en", "de")
+    }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true
