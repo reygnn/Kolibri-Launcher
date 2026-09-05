@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 // NUR FÜR unitTest !!!
 // TIMESTAMP 2025-12-04 19:22
 
+import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,9 @@ class FakeCustomNamesRepository : CustomNamesRepository {
             throw IOException("Simulated failure")
         }
 
-        if (customName.isBlank()) {
+        // Mirror the impl: effectively-blank (empty / whitespace / combining-only)
+        // is a remove on the single-set path.
+        if (customName.isEffectivelyBlank()) {
             customNames.remove(packageName)
         } else {
             customNames[packageName] = customName.trim()
@@ -75,7 +78,8 @@ class FakeCustomNamesRepository : CustomNamesRepository {
 
         batchSetCalled = true
         names.forEach { (packageName, customName) ->
-            if (customName.isNotBlank()) {
+            // Mirror the impl: batch ignores (skips) effectively-blank values.
+            if (!customName.isEffectivelyBlank()) {
                 customNames[packageName] = customName.trim()
             }
         }

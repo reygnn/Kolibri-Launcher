@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -69,7 +70,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
      */
     override suspend fun setCustomNameForPackage(packageName: String, customName: String): Boolean {
         // Die Logik, ob ein Name entfernt oder gesetzt wird, ist hier gekapselt.
-        val isSuccessful = if (customName.isBlank()) {
+        // Effectively-blank covers empty, whitespace AND combining-mark-only
+        // (visually empty) names — all mean "remove", never persist an invisible label.
+        val isSuccessful = if (customName.isEffectivelyBlank()) {
             // Rufe die interne Logik zum Entfernen auf, um doppelten Trigger-Code zu vermeiden.
             removeCustomNameInternal(packageName)
         } else {
@@ -185,7 +188,9 @@ class CustomNamesRepositoryImpl @Inject constructor(
             dataStore.edit { preferences ->
                 names.forEach { (packageName, customName) ->
                     val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
-                    if (customName.isNotBlank()) {
+                    // Batch path: skip (ignore) effectively-blank values — the
+                    // documented asymmetry to the single-set path, which removes.
+                    if (!customName.isEffectivelyBlank()) {
                         preferences[nameKey] = customName.trim()
                     }
                 }

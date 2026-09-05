@@ -18,6 +18,10 @@ class RenameDecisionTest {
 
     private val originalName = "Camera"
 
+    /** Builds a String from Unicode code points, keeping the source ASCII. */
+    private fun cp(vararg codePoints: Int): String =
+        buildString { codePoints.forEach { appendCodePoint(it) } }
+
     // ------------------------------------------------------------------
     // The four base branches
     // ------------------------------------------------------------------
@@ -81,12 +85,28 @@ class RenameDecisionTest {
     }
 
     @Test
-    fun `decide treats whitespace-only input as Set (matches pre-extraction behavior)`() {
-        // `isEmpty`, not `isBlank` — see KDoc on RenameDecision.decide.
-        // The downstream ViewModel maps blank-or-equals-original to a
-        // remove, so the user-visible outcome is still "no custom name".
+    fun `decide treats whitespace-only input as Remove`() {
+        // isEffectivelyBlank routes whitespace-only straight to Remove — the same
+        // user-visible outcome the downstream ViewModel already produced, now
+        // decided here at one place (see KDoc on RenameDecision.decide).
         val result = RenameDecision.decide(newName = "   ", originalName = originalName)
-        assertEquals(RenameDecision.Set("   "), result)
+        assertEquals(RenameDecision.Remove, result)
+    }
+
+    @Test
+    fun `decide treats a combining-mark-only input as Remove`() {
+        // A lone U+0301 (combining acute) is visually empty. It must clear the
+        // name, not persist an invisible label — the case a plain isBlank() misses.
+        val result = RenameDecision.decide(newName = cp(0x0301), originalName = originalName)
+        assertEquals(RenameDecision.Remove, result)
+    }
+
+    @Test
+    fun `decide keeps an emoji-only name as Set`() {
+        // U+1F41B (bug) renders fine, so it is a legitimate custom name, not blank.
+        val emoji = cp(0x1F41B)
+        val result = RenameDecision.decide(newName = emoji, originalName = originalName)
+        assertEquals(RenameDecision.Set(emoji), result)
     }
 
     @Test

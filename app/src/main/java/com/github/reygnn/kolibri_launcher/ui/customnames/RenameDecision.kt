@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.customnames
 
+import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
+
 /**
  * Four-way decision for what to do with a rename input from the
  * `CustomNamesActivity` rename dialog. Pure logic, no Android types —
@@ -14,8 +16,9 @@ package com.github.reygnn.kolibri_launcher.ui.customnames
 sealed interface RenameDecision {
 
     /**
-     * Either the input is empty, or it equals the app's original name.
-     * Both should clear any custom name (the original is restored).
+     * Either the input is effectively blank (empty, whitespace, or only
+     * invisible combining / format marks), or it equals the app's original
+     * name. Both should clear any custom name (the original is restored).
      */
     data object Remove : RenameDecision
 
@@ -41,21 +44,21 @@ sealed interface RenameDecision {
 
         /**
          * Branch precedence:
-         *  1. empty input       → [Remove]
-         *  2. too long          → [TooLong]
-         *  3. equals original   → [Remove]
-         *  4. otherwise         → [Set]
+         *  1. effectively blank input → [Remove]
+         *  2. too long                → [TooLong]
+         *  3. equals original         → [Remove]
+         *  4. otherwise               → [Set]
          *
-         * Note: emptiness is checked with `isEmpty`, not `isBlank` — a
-         * pure-whitespace input still routes to [Set] here, matching the
-         * pre-extraction behavior of `CustomNamesActivity.handleRename`.
-         * The downstream `CustomNamesViewModel.setCustomName` then maps
-         * blank-or-equals-original back to a remove. Preserving that
-         * historical behavior was a deliberate non-goal of this
-         * extraction; revisit if a test surfaces a real symptom.
+         * "Effectively blank" ([isEffectivelyBlank]) is broader than `isEmpty`
+         * and `isBlank`: it also catches a name made only of invisible combining
+         * marks (e.g. a lone U+0301), which would otherwise be persisted as a
+         * visually empty row. Whitespace-only and combining-only inputs alike
+         * therefore route straight to [Remove] here — the same user-visible
+         * outcome the downstream ViewModel already produced for whitespace, now
+         * decided at one place and extended to the invisible-mark case.
          */
         fun decide(newName: String, originalName: String): RenameDecision = when {
-            newName.isEmpty() -> Remove
+            newName.isEffectivelyBlank() -> Remove
             newName.length > MAX_APP_NAME_LENGTH -> TooLong(MAX_APP_NAME_LENGTH)
             newName == originalName -> Remove
             else -> Set(newName)

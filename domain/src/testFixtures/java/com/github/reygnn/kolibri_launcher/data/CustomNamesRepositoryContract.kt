@@ -81,6 +81,10 @@ abstract class CustomNamesRepositoryContract {
     private val pkgB = "com.example.b"
     private val pkgC = "com.example.c"
 
+    /** Builds a String from Unicode code points, keeping the source ASCII. */
+    private fun cp(vararg codePoints: Int): String =
+        buildString { codePoints.forEach { appendCodePoint(it) } }
+
     // ---------- Fresh state ----------
 
     @Test
@@ -166,6 +170,39 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNameForPackage(pkgA, "   ")
 
         assertFalse(repo.hasCustomNameForPackage(pkgA))
+    }
+
+    /**
+     * A combining-mark-only name (a lone U+0301, visually empty) counts as
+     * effectively blank, so the single-set path removes the entry rather than
+     * persisting an invisible label. `isBlank()` alone would miss this — a
+     * combining mark is not whitespace — so both fake and impl guard with
+     * `isEffectivelyBlank()`.
+     */
+    @Test
+    fun `setCustomNameForPackage with a combining-mark-only string removes the custom name`() =
+        runTest {
+            val repo = createRepository()
+            repo.setCustomNameForPackage(pkgA, "Custom")
+            assertTrue(repo.hasCustomNameForPackage(pkgA))
+
+            repo.setCustomNameForPackage(pkgA, cp(0x0301))
+
+            assertFalse(repo.hasCustomNameForPackage(pkgA))
+        }
+
+    /**
+     * The blank guard must not over-reach: an emoji-only name (U+1F41B) renders
+     * fine and is a legitimate custom name, so it is persisted, not treated as a
+     * remove.
+     */
+    @Test
+    fun `setCustomNameForPackage keeps an emoji-only name`() = runTest {
+        val repo = createRepository()
+        val emoji = cp(0x1F41B)
+        repo.setCustomNameForPackage(pkgA, emoji)
+        assertTrue(repo.hasCustomNameForPackage(pkgA))
+        assertEquals(emoji, repo.getDisplayNameForPackage(pkgA, "Original"))
     }
 
     // ---------- removeCustomNameForPackage ----------
@@ -386,6 +423,22 @@ abstract class CustomNamesRepositoryContract {
         assertFalse(repo.hasCustomNameForPackage(pkgB))
         // pkgC wurde gesetzt.
         assertEquals("Valid", repo.getDisplayNameForPackage(pkgC, "OriginalC"))
+    }
+
+    /**
+     * A combining-mark-only value (a lone U+0301, visually empty) is effectively
+     * blank, so the batch path IGNORES it — same asymmetry as an empty/whitespace
+     * value: the existing entry is preserved, not removed.
+     */
+    @Test
+    fun `setCustomNamesInBatch ignores a combining-mark-only name`() = runTest {
+        val repo = createRepository()
+        repo.setCustomNameForPackage(pkgA, "Keep me")
+
+        repo.setCustomNamesInBatch(mapOf(pkgA to cp(0x0301), pkgB to "Valid"))
+
+        assertEquals("Keep me", repo.getDisplayNameForPackage(pkgA, "OriginalA"))
+        assertEquals("Valid", repo.getDisplayNameForPackage(pkgB, "OriginalB"))
     }
 
     // ---------- reconcileCustomNames ----------
