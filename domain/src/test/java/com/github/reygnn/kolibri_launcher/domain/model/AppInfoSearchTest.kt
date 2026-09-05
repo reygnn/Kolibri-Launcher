@@ -1,9 +1,11 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.withDefaultLocale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 /**
  * Unit tests for [filterByName] — the shared display-name search predicate that
@@ -60,5 +62,23 @@ class AppInfoSearchTest {
         // "a" is in displayName (Camera/Calendar/Dialer) — the OR must not emit twice.
         val result = apps.filterByName("a", includeOriginalName = true)
         assertEquals(result.distinct(), result)
+    }
+
+    @Test
+    fun `search is locale-invariant under the Turkish locale (dotless-i)`() {
+        // Regression guard for the Turkish-i trap: a locale-sensitive lowercase
+        // folds 'I' to dotless 'ı' under tr-TR, so "Instagram" would stop matching
+        // the query "instagram". filterByName and AppInfo.displayNameLower both use
+        // the locale-invariant Kotlin lowercase(), so the match must survive a
+        // Turkish default locale. The AppInfo is built INSIDE the block so a
+        // regression to a locale-sensitive fold on the name side is also caught.
+        withDefaultLocale(Locale.forLanguageTag("tr-TR")) {
+            val instagram = app("Instagram")
+            val apps = listOf(instagram)
+            assertEquals(listOf(instagram), apps.filterByName("instagram"))
+            assertEquals(listOf(instagram), apps.filterByName("INSTAGRAM"))
+            // An uppercase-I query must fold to the same key as the app name.
+            assertEquals(listOf(instagram), apps.filterByName("I"))
+        }
     }
 }

@@ -62,4 +62,16 @@ class UsageScoreTest {
         val score = timeWeightedUsageScore(listOf(now + 1L, now + 2L, now + 3L), now)
         assertTrue(score >= 0.0)
     }
+
+    @Test
+    fun `score is always finite — never NaN or infinite`() {
+        // The coerce guards must neutralize any NaN/Infinity out of exp(). A mix of
+        // now, a future skew, a far-past overflow launch and a recent launch drives
+        // every branch of the decay math at once; the result must stay finite.
+        val score = timeWeightedUsageScore(
+            listOf(now, now + 5_000L, now - 2_000_000_000_000L, now - 1_000_000L),
+            now,
+        )
+        assertTrue(score.isFinite())
+    }
 }
