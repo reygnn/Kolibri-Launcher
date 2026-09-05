@@ -609,3 +609,57 @@ Reopen this entry if any of the following changes:
 - Repeated user reports show the task omission is a frequent real-world confusion
   rather than a one-off "why is my task missing" — worth at least a clearer in-app
   hint even without full support.
+
+---
+
+## 10. Alarm-time display can jump an hour on the DST spring-forward gap minute
+
+- **Status:** 🟡 Intentional / Documented
+- **Frequency:** Vanishingly rare — needs an alarm whose trigger time lands in the
+  one non-existent local minute of the spring-forward night, *and* carries
+  seconds/millis > 0 so the round-up fires; once a year at most, per affected alarm
+- **Affected:** `TimeEventFormatter.formatAlarmTime` — the only function in the file
+  that does wall-clock *arithmetic* (`Calendar.add(Calendar.MINUTE, 1)`), and it does
+  it in the device-default zone, not the display `zone`
+
+### Explanation
+
+`formatAlarmTime` rounds an alarm trigger up to the next full minute when it carries
+seconds/millis > 0 (the "next-alarm APIs report the *ringing* alarm's slightly-past
+time" correction). It does this with `Calendar.add(Calendar.MINUTE, 1)` in the device
+default time zone. On the spring-forward night the local wall clock skips an hour
+(e.g. Berlin 02:00 → 03:00, so 02:xx does not exist). An alarm at 01:59:30 that night
+rounds +1 minute to 02:00, which `Calendar` normalises across the gap to 03:00 — so
+the label reads **"03:00"** where the user expected "02:00".
+
+This is the counterpart to `buildEventRows`, the DST-sensitive *decision* logic, which
+is offset-correct by design (`Instant … atZone(zone).toLocalDate()`) and is pinned by a
+fall-back-day test in `TimeEventFormatterTest`. Only `formatAlarmTime` does forward
+arithmetic on a wall-clock value, so only it is exposed to the gap.
+
+### Why it is accepted
+
+- **The formatter only *displays*; it does not fire the alarm.** The alarm subsystem
+  owns the real trigger; `formatAlarmTime` renders a label. A wrong label on this one
+  minute misinforms, it does not misfire — the alarm still rings when the OS scheduled
+  it.
+- **The trigger is a single non-existent minute per year, with seconds > 0.** An alarm
+  set to a normal `HH:00` has no sub-minute part to round, so the `+1` never runs; the
+  jump needs a trigger that is simultaneously on the gap minute and carries seconds/
+  millis. Constructible, not something a user stumbles into.
+- **A correct fix is disproportionate.** Rounding in the display `zone` (a
+  `ZonedDateTime.plusMinutes(1)` that honours the gap) instead of a default-zone
+  `Calendar` would fix it, but it reworks the rounding path for a label that is right
+  364-plus days a year, and the *decision* logic that actually groups events is already
+  offset-correct.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- `formatAlarmTime` is reworked to take the display `zone` (it currently reads the
+  device default via `Calendar.getInstance()`) — at that point rounding via
+  `ZonedDateTime` in that zone is a cheap, consistent fix and should be taken.
+- Real reports show an alarm label off by an hour around a DST change (distinct from
+  the alarm actually *firing* at the wrong time, which is an OS/alarm-subsystem
+  concern, not this formatter).

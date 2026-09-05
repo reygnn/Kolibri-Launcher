@@ -245,6 +245,69 @@ class TimeEventFormatterTest {
         assertEquals(TimeBasedEventType.ALARM, last.event.type)
     }
 
+    @Test
+    fun `buildEventRows - a 02_30 event on the DST fall-back day groups as today`() {
+        // Regression + intent guard for the one case the summer `today` (2026-08-30)
+        // above cannot cover: `today` IS a DST-transition day. On 2026-10-25 Berlin
+        // falls back 03:00 -> 02:00, so local 02:30 exists twice. buildEventRows is
+        // DST-safe by design — `atZone(zone).toLocalDate()` is offset-correct, so
+        // either 02:30 is unambiguously 2026-10-25. This pins that against anyone
+        // reintroducing manual offset math (e.g. deriving the day from a raw UTC
+        // instant), which would misgroup the event; it also proves nothing throws on
+        // an ambiguous local time.
+        val dstZone = ZoneId.of("Europe/Berlin")
+        val fallBackDay = LocalDate.of(2026, 10, 25)
+        val nextDay = fallBackDay.plusDays(1)
+
+        val ambiguousMillis =
+            fallBackDay.atTime(2, 30).atZone(dstZone).toInstant().toEpochMilli()
+        val fallBackEvent = TimeBasedEvent(ambiguousMillis, "FallBack", TimeBasedEventType.CALENDAR)
+        val nextDayEvent = TimeBasedEvent(
+            nextDay.atTime(9, 0).atZone(dstZone).toInstant().toEpochMilli(),
+            "NextDay",
+            TimeBasedEventType.CALENDAR,
+        )
+
+        val rows = formatter.buildEventRows(listOf(fallBackEvent, nextDayEvent), fallBackDay, dstZone)
+
+        // FallBack (today), <separator>, NextDay — the 02:30 event stays in today.
+        assertEquals(3, rows.size)
+        assertEquals("FallBack", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertEquals("NextDay", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+    }
+
+    @Test
+    fun `buildEventRows - a 02_30 event on the DST spring-forward day groups as today`() {
+        // Sibling of the fall-back test for the other DST direction: `today` is the
+        // spring-forward day. On 2026-03-29 Berlin springs 02:00 -> 03:00, so local
+        // 02:30 does NOT exist — `atZone` resolves the gap forward (02:30 -> 03:30).
+        // buildEventRows reads that instant back via `atZone(zone).toLocalDate()`,
+        // which is still 2026-03-29, so the event stays in today. Same design
+        // guarantee, opposite transition: the day is unambiguous whether the local
+        // time is doubled (fall-back) or missing (spring-forward), and nothing throws.
+        val dstZone = ZoneId.of("Europe/Berlin")
+        val springForwardDay = LocalDate.of(2026, 3, 29)
+        val nextDay = springForwardDay.plusDays(1)
+
+        val gapMillis =
+            springForwardDay.atTime(2, 30).atZone(dstZone).toInstant().toEpochMilli()
+        val gapEvent = TimeBasedEvent(gapMillis, "SpringForward", TimeBasedEventType.CALENDAR)
+        val nextDayEvent = TimeBasedEvent(
+            nextDay.atTime(9, 0).atZone(dstZone).toInstant().toEpochMilli(),
+            "NextDay",
+            TimeBasedEventType.CALENDAR,
+        )
+
+        val rows = formatter.buildEventRows(listOf(gapEvent, nextDayEvent), springForwardDay, dstZone)
+
+        // SpringForward (today), <separator>, NextDay — the gap event stays in today.
+        assertEquals(3, rows.size)
+        assertEquals("SpringForward", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
+        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertEquals("NextDay", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+    }
+
     // --- Helper ---
     private fun createTime(hour: Int, minute: Int, second: Int, millis: Int): Long {
         val c = Calendar.getInstance()
