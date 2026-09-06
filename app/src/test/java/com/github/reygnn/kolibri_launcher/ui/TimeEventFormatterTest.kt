@@ -10,8 +10,10 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 class TimeEventFormatterTest {
 
@@ -306,6 +308,78 @@ class TimeEventFormatterTest {
         assertEquals("SpringForward", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
         assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
         assertEquals("NextDay", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+    }
+
+    // =========================================================================
+    // formatAlarmTime across DST transitions — characterization of ACCEPTED
+    // LIMITATION #10 (spring-forward gap-minute display jump)
+    //
+    // The buildEventRows DST tests above cover the DECISION logic, which is
+    // offset-correct by design. formatAlarmTime is different: it is the only
+    // function that does wall-clock ARITHMETIC (Calendar.add(MINUTE, 1)) in the
+    // DEVICE-DEFAULT zone, so it — and only it — is exposed to the spring-forward
+    // gap. That behaviour is documented as accepted, but nothing pinned it. These
+    // tests lock the exact accepted behaviour so a rework that moves the rounding
+    // into the display zone (the limitation's re-evaluation trigger) turns them
+    // red instead of changing the label silently. Expected values were verified
+    // empirically before pinning.
+    // =========================================================================
+
+    /** Runs [block] with the JVM default time zone pinned to [zoneId], restoring
+     *  it afterwards — formatAlarmTime reads the default zone for its arithmetic. */
+    private inline fun withDefaultZone(zoneId: String, block: () -> Unit) {
+        val original = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(zoneId))
+            block()
+        } finally {
+            TimeZone.setDefault(original)
+        }
+    }
+
+    private fun berlinInstant(
+        year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int, millis: Int = 0
+    ): Long = ZonedDateTime
+        .of(year, month, day, hour, minute, second, millis * 1_000_000, ZoneId.of("Europe/Berlin"))
+        .toInstant()
+        .toEpochMilli()
+
+    @Test
+    fun `formatAlarmTime - spring-forward gap minute rounds across the gap to 03_00 (accepted limitation 10)`() {
+        // Berlin 2026-03-29: the wall clock skips 02:00 -> 03:00, so 02:xx does not
+        // exist. An alarm at 01:59:30 (seconds > 0, so the +1-minute round fires)
+        // rounds to 02:00, which Calendar normalises across the gap to 03:00 — the
+        // documented one-minute-a-year display jump. formatAlarmTime does its
+        // arithmetic in the device-default zone, so the default is pinned to Berlin.
+        withDefaultZone("Europe/Berlin") {
+            val gap = berlinInstant(2026, 3, 29, 1, 59, 30)
+            assertEquals("03:00", formatter.formatAlarmTime(gap, true, testLocale))
+        }
+    }
+
+    @Test
+    fun `formatAlarmTime - an exact-minute alarm on the spring-forward night does not round or jump`() {
+        // The jump needs BOTH the gap minute AND seconds/millis > 0. At exactly
+        // 01:59:00.000 there is no sub-minute part, so the +1-minute round never
+        // runs and the time renders as-is — no jump. Pins the precondition the
+        // limitation names ("an alarm set to a normal HH:00 has no sub-minute part").
+        withDefaultZone("Europe/Berlin") {
+            val onMinute = berlinInstant(2026, 3, 29, 1, 59, 0)
+            assertEquals("01:59", formatter.formatAlarmTime(onMinute, true, testLocale))
+        }
+    }
+
+    @Test
+    fun `formatAlarmTime - the fall-back night does not jump, mirroring spring-forward`() {
+        // Sibling of the spring-forward pin, opposite transition. Berlin 2026-10-25
+        // falls back 03:00 -> 02:00, so 02:00 EXISTS. An alarm at 01:59:30 rounds to
+        // 02:00 and stays there — no jump. This is the asymmetry the limitation rests
+        // on: only the forward gap (a missing minute) jumps; the backward overlap
+        // does not.
+        withDefaultZone("Europe/Berlin") {
+            val fallBack = berlinInstant(2026, 10, 25, 1, 59, 30)
+            assertEquals("02:00", formatter.formatAlarmTime(fallBack, true, testLocale))
+        }
     }
 
     // --- Helper ---
