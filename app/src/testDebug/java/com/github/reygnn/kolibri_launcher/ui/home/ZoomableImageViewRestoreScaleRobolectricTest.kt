@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -9,6 +10,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,6 +131,77 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
                         0.0001f,
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * The corrupt-scale test above always passes translate = 0, so it never
+     * covered a corrupt persisted TRANSLATE — which feeds `postTranslate()` and
+     * builds a degenerate matrix just as a bad scale does. With a VALID scale but
+     * a non-finite translate, the scale guard alone lets the bad translate through;
+     * each must fall back to 0.
+     */
+    @Test
+    fun `applyTransform sanitizes a corrupt persisted translate to zero (single-layer)`() {
+        ActivityScenario.launch(HiltTestActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val corruptTranslates = listOf(
+                    Float.POSITIVE_INFINITY,
+                    Float.NEGATIVE_INFINITY,
+                    Float.NaN,
+                )
+                corruptTranslates.forEach { corrupt ->
+                    val view = ZoomableImageView(activity)
+                    view.setImageDrawable(sizedDrawable(1000, 1000))
+                    view.layoutTo(100, 100)
+
+                    view.applyTransform(2.0f, corrupt, corrupt)
+
+                    // Scale is valid and honored; only the translate is sanitized.
+                    assertEquals(2.0f, view.currentScale, 0.0001f)
+                    assertEquals(
+                        "Corrupt translateX $corrupt must fall back to 0, not reach the matrix.",
+                        0f, view.currentTranslateX, 0.0001f,
+                    )
+                    assertEquals(
+                        "Corrupt translateY $corrupt must fall back to 0, not reach the matrix.",
+                        0f, view.currentTranslateY, 0.0001f,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * The single-layer path sanitizes corrupt input; the multi-layer path used
+     * `coerceIn`, which passes NaN through unchanged (`NaN.coerceIn(a,b) == NaN`),
+     * and assigned translate raw — and no test exercised it. This pins the parity:
+     * on the active layer, a non-finite scale falls back to a finite value and a
+     * non-finite translate falls back to 0.
+     */
+    @Test
+    fun `applyTransform sanitizes corrupt scale and translate in multi-layer mode`() {
+        ActivityScenario.launch(HiltTestActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val view = ZoomableImageView(activity)
+                view.layoutTo(100, 100)
+                // A real bitmap layer becomes the active layer -> multi-layer mode.
+                val bitmap = Bitmap.createBitmap(1000, 1000, Bitmap.Config.ARGB_8888)
+                view.addLayer(bitmap)
+                assertTrue("addLayer must enter multi-layer mode", view.isMultiLayerMode)
+
+                // Corrupt scale: coerceIn would keep NaN; must become finite/positive.
+                view.applyTransform(Float.NaN, 0f, 0f)
+                assertTrue(
+                    "Corrupt multi-layer scale must not survive as non-finite",
+                    view.currentScale.isFinite() && view.currentScale > 0f,
+                )
+
+                // Corrupt translate on the active layer: must fall back to 0.
+                view.applyTransform(1.0f, Float.NaN, Float.POSITIVE_INFINITY)
+                assertEquals(0f, view.currentTranslateX, 0.0001f)
+                assertEquals(0f, view.currentTranslateY, 0.0001f)
             }
         }
     }

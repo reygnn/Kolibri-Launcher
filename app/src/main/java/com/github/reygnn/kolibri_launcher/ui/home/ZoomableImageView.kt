@@ -182,6 +182,10 @@ class ZoomableImageView @JvmOverloads constructor(
     private fun computeLayerBaseScale(layer: WallpaperLayer): Float {
         val bmp = layer.bitmap ?: return 1f
         if (width == 0 || height == 0) return 1f
+        // Guard the bitmap dims too, mirroring updateSingleBaseScale's dw/dh <= 0
+        // check — a zero-dimension bitmap divides to +Infinity and would poison
+        // every effectiveMin/MaxScale and CenterCrop matrix derived from it.
+        if (bmp.width <= 0 || bmp.height <= 0) return 1f
         return max(width.toFloat() / bmp.width, height.toFloat() / bmp.height)
     }
 
@@ -362,9 +366,14 @@ class ZoomableImageView @JvmOverloads constructor(
 
         if (isMultiLayerMode) {
             val layer = activeLayer ?: return
-            layer.scale = scale.coerceIn(effectiveMinScale, effectiveMaxScale)
-            layer.translateX = translateX
-            layer.translateY = translateY
+            // Mirror the single-layer path's corrupt-input guard: coerceIn does
+            // NOT reject NaN (NaN.coerceIn(a, b) == NaN), so a non-finite scale
+            // would otherwise land in layer.scale unchecked, and a non-finite
+            // translate would build a degenerate matrix. Sanitize both.
+            val safeScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE
+            layer.scale = safeScale.coerceIn(effectiveMinScale, effectiveMaxScale)
+            layer.translateX = if (translateX.isFinite()) translateX else 0f
+            layer.translateY = if (translateY.isFinite()) translateY else 0f
             invalidate()
         } else {
             // Refresh the cover base scale so subsequent gesture bounds
@@ -379,10 +388,12 @@ class ZoomableImageView @JvmOverloads constructor(
             // zoom (the #12 bug). The gesture path already bounds interactive
             // input, so the only thing to guard here is corrupt persisted input
             // (non-finite or non-positive) that would otherwise build a
-            // degenerate image matrix.
+            // degenerate image matrix — scale AND translate, since a non-finite
+            // translate feeds postTranslate() just as degenerate a matrix as a
+            // bad scale (bad scale -> DEFAULT_SCALE, bad translate -> 0).
             _singleScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE
-            _singleTranslateX = translateX
-            _singleTranslateY = translateY
+            _singleTranslateX = if (translateX.isFinite()) translateX else 0f
+            _singleTranslateY = if (translateY.isFinite()) translateY else 0f
             rebuildSingleMatrix()
         }
     }
@@ -721,9 +732,13 @@ class ZoomableImageView @JvmOverloads constructor(
         val minS = minOf(MULTI_LAYER_MIN_SCALE, baseScale * ZOOM_OUT_MULTIPLIER)
         val maxS = maxOf(MULTI_LAYER_MAX_SCALE, baseScale * ZOOM_IN_MULTIPLIER)
 
-        layer.scale = scale.coerceIn(minS, maxS)
-        layer.translateX = translateX
-        layer.translateY = translateY
+        // Same corrupt-input guard as the active-layer applyTransform: coerceIn
+        // passes NaN through, so sanitize scale and translate before they reach
+        // the layer (and the image matrix).
+        val safeScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE
+        layer.scale = safeScale.coerceIn(minS, maxS)
+        layer.translateX = if (translateX.isFinite()) translateX else 0f
+        layer.translateY = if (translateY.isFinite()) translateY else 0f
         invalidate()
     }
 
