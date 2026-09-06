@@ -183,4 +183,47 @@ class BackupSerializerNamingAndInfinityTest {
         assertThat(parsed).isNotNull()
         assertThat(parsed!!.settings.layoutScale).isEqualTo(1.5f)
     }
+
+    // ---- Link 6: the finite-Double / infinite-Float band -----------------
+    //
+    // Every non-finite test above uses 1e309, which is > Double.MAX_VALUE and so is
+    // ALREADY infinite as a Double — caught at decode / by getStrictFloat's
+    // isFinite() guard. The finite pass-through test uses 9999.0, safely inside
+    // Float range. Nothing exercises the band BETWEEN them:
+    //
+    //     Float.MAX_VALUE (~3.4e38)  <  value  <=  Double.MAX_VALUE (~1.8e308)
+    //
+    // A value like 1e300 there is a FINITE Double (passes a naive
+    // `doubleVal.isFinite()` check) but becomes Float.POSITIVE_INFINITY the moment
+    // it is narrowed by `.toFloat()`. getStrictFloat therefore guards the NARROWED
+    // Float (isFinite() AFTER .toFloat()) and rejects this band at the serializer
+    // itself; the downstream coerceInSafe import clamp is now a second line of
+    // defence, not the only one.
+
+    /** Language-level linchpin: the exact reason getStrictFloat's Double-side
+     *  isFinite() check does not protect the Float it returns. */
+    @Test
+    fun `a finite Double above Float MAX narrows to Float infinity`() {
+        assertThat(1e300.isFinite()).isTrue()
+        assertThat(1e300.toFloat()).isEqualTo(Float.POSITIVE_INFINITY)
+    }
+
+    /**
+     * Safety invariant at the serializer boundary: parseBackupData must never hand
+     * the model a non-finite Float. getStrictFloat re-checks isFinite() AFTER the
+     * `.toFloat()` narrowing, so a finite-Double / Float-overflow value like 1e300
+     * is rejected here (layoutScale stays null) rather than surviving as
+     * Float.POSITIVE_INFINITY. Written to never fail spuriously (null asserts
+     * nothing), so a RED here means that narrowed-Float guard regressed.
+     */
+    @Test
+    fun `parse never yields a non-finite float for a finite-Double, Float-overflow value`() {
+        val parsed = serializer.parseBackupData(backupJson("\"layoutScale\": 1e300"))
+        // layoutScale is nullable in the DTO: null means "no value parsed" (nothing to
+        // assert); only a non-null value must be finite. Keeps the test from ever
+        // failing spuriously -- a RED here is a genuine non-finite-Float finding.
+        parsed?.settings?.layoutScale?.let {
+            assertThat(it.isFinite()).isTrue()
+        }
+    }
 }
