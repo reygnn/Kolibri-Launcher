@@ -553,4 +553,96 @@ class GetFavoriteAppsUseCaseTest {
             assertEquals(limit, provisional.data.apps.size)
         }
     }
+
+    // ========== ARCHITECTURE RULE: favorite status breaks the hidden filter ==========
+    //
+    // The class KDoc's central rule — an installed favorite that is ALSO hidden stays
+    // pinned on the home screen — had no direct test. The existing
+    // `with all favorites hidden - returns fallback` mocks sortFavoriteComponents to
+    // emptyList(), so its `isFallback` comes from the forced-empty sort, not from the
+    // hidden logic. These pin the rule with an identity sort, so a hidden filter
+    // wrongly added to the favorites path (the exact thing the KDoc forbids) turns
+    // them red.
+
+    @Test
+    fun `favoriteApps - an installed favorite that is also hidden stays pinned on home`() = runTest {
+        // Identity sort — NOT mocked empty — so the favorites survive unless a hidden
+        // filter wrongly drops them.
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            assertEquals(UiState.Loading, awaitItem())
+
+            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+            // Both favorites are ALSO hidden — they must still appear.
+            hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
+            rawAppsFlow.value = allApps
+
+            val successState = awaitItem()
+            assertTrue(successState is UiState.Success)
+            val result = successState.data
+
+            assertFalse(result.isFallback, "A hidden favorite must stay pinned, not fall back")
+            assertEquals(2, result.apps.size)
+            assertEquals(
+                setOf(app1.componentName, app2.componentName),
+                result.apps.map { it.componentName }.toSet(),
+            )
+            assertTrue(result.apps.all { it.isFavorite })
+        }
+    }
+
+    @Test
+    fun `favoriteApps - a mix of hidden and visible favorites all stay on home`() = runTest {
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            assertEquals(UiState.Loading, awaitItem())
+
+            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+            // Only app1 is hidden; app2 is visible. Neither may be dropped.
+            hiddenAppsFlow.value = setOf(app1.componentName)
+            rawAppsFlow.value = allApps
+
+            val successState = awaitItem()
+            assertTrue(successState is UiState.Success)
+            val result = successState.data
+
+            assertFalse(result.isFallback)
+            assertEquals(
+                setOf(app1.componentName, app2.componentName),
+                result.apps.map { it.componentName }.toSet(),
+            )
+        }
+    }
+
+    @Test
+    fun `favoriteApps - favorites set but all uninstalled - falls back via the filter, not a mocked-empty sort`() = runTest {
+        // Distinct from `returns default fallback apps when no favorites are set` and
+        // from the all-hidden test: here favorites ARE set and the sort is identity —
+        // the favorites list empties purely because NONE of the components are
+        // installed (the processApps filter-empty branch), which no test pinned.
+        coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
+            firstArg<List<AppInfo>>()
+        }
+
+        useCase.favoriteApps.test {
+            assertEquals(UiState.Loading, awaitItem())
+
+            favoritesFlow.value = setOf("com.gone.one/Main", "com.gone.two/Main")
+            rawAppsFlow.value = allApps
+
+            val successState = awaitItem()
+            assertTrue(successState is UiState.Success)
+            val result = successState.data
+
+            assertTrue(result.isFallback, "All favorites uninstalled must fall back to top-N")
+            // Fallback = all visible apps, alphabetical.
+            assertEquals(listOf("App A", "App B", "App C"), result.apps.map { it.displayName })
+        }
+    }
 }
