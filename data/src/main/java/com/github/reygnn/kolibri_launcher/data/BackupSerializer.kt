@@ -567,11 +567,15 @@ class BackupSerializer @Inject constructor() {
             if (!this.has(key) || this.isNull(key)) continue
             try {
                 val doubleVal = this.getDouble(key)
-                if (!doubleVal.isFinite()) {
+                val floatVal = doubleVal.toFloat()
+                // Guard the NARROWED Float, not the Double: a finite Double in the
+                // Float.MAX < x <= Double.MAX band (e.g. 1e300) narrows to
+                // Float.POSITIVE_INFINITY, which a Double-side isFinite() would miss.
+                if (!floatVal.isFinite()) {
                     Timber.w("Rejected non-finite float for $key: $doubleVal")
                     continue
                 }
-                return doubleVal.toFloat()
+                return floatVal
             } catch (e: JSONException) { /* try next alias */ }
         }
         return null
