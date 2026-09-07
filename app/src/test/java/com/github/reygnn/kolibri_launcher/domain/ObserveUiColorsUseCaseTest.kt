@@ -131,6 +131,37 @@ class ObserveUiColorsUseCaseTest {
         }
     }
 
+    // The two BLACK/WHITE tests above only exercise band 1 (<0.1) and the else
+    // band (>=0.9) — luminance 0 and 1 by definition. The interpolated middle
+    // bands run for any GRAY user text color and were unpinned (RC edge-case
+    // audit B1). The expected packed ARGB below was computed from the real
+    // ColorMath.calculateLuminance (WCAG sRGB) — JVM double math is deterministic,
+    // so these are exact, and they also pin the white/black inversion per band.
+
+    @Test
+    fun `shadow for mid-dark gray text is an interpolated white shadow (band 2)`() = runTest {
+        settingsRepository.setTextColor(0xFF808080.toInt()) // luminance ~0.216 -> band 2 (<0.5)
+        settingsRepository.setTextShadowEnabled(true)
+
+        useCase().test {
+            // Interpolated alpha between band 1 (0.75) and band 3-onset (0.4), white channel.
+            assertThat(awaitItem().shadowColor).isEqualTo(0xA5FFFFFF.toInt()) // argb(165,255,255,255)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `shadow for mid-light gray text is an interpolated black shadow (band 3)`() = runTest {
+        settingsRepository.setTextColor(0xFFC8C8C8.toInt()) // luminance ~0.578 -> band 3 (<0.9)
+        settingsRepository.setTextShadowEnabled(true)
+
+        useCase().test {
+            // Interpolated alpha between 0.3 and 0.6, black channel (inversion vs band 2).
+            assertThat(awaitItem().shadowColor).isEqualTo(0x5B000000) // argb(91,0,0,0)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test
     fun `auto surface shadow inverts against the classifier-derived text color`() = runTest {
         // The real auto path (no user override): LIGHT surface -> black text ->
