@@ -1599,6 +1599,92 @@ class WallpaperDelegateTest {
         verify(exactly = 0) { wallpaperFileManager.deleteFile(any<Uri>()) }
     }
 
+    @Test
+    fun `add then remove of the same layer in one session - commit deletes the file exactly once`() = runTest {
+        // Combination the single-op tests above never exercise: within ONE session the
+        // user adds a layer (its copied file is tracked in pendingRemovalsOnCancel) and
+        // then removes that SAME layer (its file is deferred into pendingRemovalsOnCommit),
+        // so the one URI is in BOTH sets. On commit only pendingRemovalsOnCommit is
+        // processed — the file must be deleted, and EXACTLY once (never double-deleted,
+        // never orphaned).
+        val addedLayer: WallpaperLayerState = mockk { every { imageUri } returns internalUriString }
+        val afterRemove: WallpaperState = mockk(relaxed = true) {
+            every { layers } returns listOf(WallpaperLayerState(imageUri = null))
+            every { hasWallpaper } returns true
+        }
+        val afterAdd: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns addedLayer          // the just-added layer
+            every { withRemovedLayer(0) } returns afterRemove
+        }
+        val baseState: WallpaperState = mockk(relaxed = true) {
+            every { hasWallpaper } returns true
+            every { withAddedLayer(any()) } returns afterAdd
+        }
+
+        val stateFlow = MutableStateFlow(baseState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onAddWallpaperLayer(testUri)   // copyToInternal → internalUriString
+        advanceUntilIdle()
+        delegate.onRemoveWallpaperLayer(0)       // removes that same layer
+        advanceUntilIdle()
+
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(internalUriString) }
+        // ...and only that one file — the double set-membership must not double-delete.
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(any<String>()) }
+    }
+
+    @Test
+    fun `add then remove of the same layer in one session - cancel deletes the file exactly once and restores the snapshot`() = runTest {
+        // Same combination, opposite exit. On cancel only pendingRemovalsOnCancel is
+        // processed: the in-session-added file is cleaned up (exactly once), and the
+        // pre-session snapshot — which never contained the layer — is restored.
+        val addedLayer: WallpaperLayerState = mockk { every { imageUri } returns internalUriString }
+        val afterRemove: WallpaperState = mockk(relaxed = true) {
+            every { layers } returns listOf(WallpaperLayerState(imageUri = null))
+            every { hasWallpaper } returns true
+        }
+        val afterAdd: WallpaperState = mockk(relaxed = true) {
+            every { getLayer(0) } returns addedLayer
+            every { withRemovedLayer(0) } returns afterRemove
+        }
+        val baseState: WallpaperState = mockk(relaxed = true) {
+            every { hasWallpaper } returns true
+            every { withAddedLayer(any()) } returns afterAdd
+        }
+
+        val stateFlow = MutableStateFlow(baseState)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()      // snapshot = baseState
+        delegate.onAddWallpaperLayer(testUri)
+        advanceUntilIdle()
+        delegate.onRemoveWallpaperLayer(0)
+        advanceUntilIdle()
+
+        delegate.onCancelWallpaperEditMode()
+        // Snapshot restored synchronously, before the async cleanup runs.
+        assertEquals(baseState, delegate.wallpaperState.value)
+
+        advanceUntilIdle()
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(internalUriString) }
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(any<String>()) }
+    }
+
     // ===========================================
     // wallpaperImageChanged signal (scrim-reset offer)
     // ===========================================
