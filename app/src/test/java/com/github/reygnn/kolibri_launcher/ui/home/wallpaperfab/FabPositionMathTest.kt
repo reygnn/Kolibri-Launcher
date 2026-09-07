@@ -63,6 +63,42 @@ class FabPositionMathTest {
         assertEquals(0, topLeft)
     }
 
+    // Non-finite persisted fractions (RC edge-case audit B7). Exact 0f/1f are already
+    // covered above; NaN and ±Infinity were not. A corrupt value (old build / manual
+    // DataStore edit) must still yield a valid on-screen top-left, never NaN/∞.
+
+    @Test
+    fun `centerFractionToTopLeftPx bounds a NaN fraction to a valid coordinate`() {
+        // coerceIn does not clamp NaN, but the final toInt() maps it to 0 — a valid
+        // top-left rather than a NaN view coordinate.
+        val topLeft = FabPositionMath.centerFractionToTopLeftPx(
+            centerFraction = Float.NaN,
+            fabSize = 100,
+            parentSize = 1000,
+        )
+        assertEquals(0, topLeft)
+    }
+
+    @Test
+    fun `centerFractionToTopLeftPx clamps positive infinity to the bottom-right edge`() {
+        val topLeft = FabPositionMath.centerFractionToTopLeftPx(
+            centerFraction = Float.POSITIVE_INFINITY,
+            fabSize = 100,
+            parentSize = 1000,
+        )
+        assertEquals(900, topLeft) // max top-left = parent - fab
+    }
+
+    @Test
+    fun `centerFractionToTopLeftPx clamps negative infinity to the top-left edge`() {
+        val topLeft = FabPositionMath.centerFractionToTopLeftPx(
+            centerFraction = Float.NEGATIVE_INFINITY,
+            fabSize = 100,
+            parentSize = 1000,
+        )
+        assertEquals(0, topLeft)
+    }
+
     // ---------- topLeftPxToCenterFraction ----------
 
     @Test
