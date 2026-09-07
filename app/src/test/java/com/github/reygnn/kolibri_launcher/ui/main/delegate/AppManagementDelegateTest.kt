@@ -268,6 +268,23 @@ class AppManagementDelegateTest {
         coVerify(exactly = 2) { recordAppLaunchUseCase.invoke(testApp) }
     }
 
+    @Test
+    fun `onAppClicked allows a second tap exactly at the throttle boundary`() = runTest {
+        // Boundary between the two tests above: the guard is `now < nextLaunchAllowedAt`
+        // (strict), so a tap landing EXACTLY at nextLaunchAllowedAt (first tap + 300ms) is
+        // allowed, not swallowed. Pins < vs <= — a regression to `<=` would eat this tap.
+        val delegate = createDelegate()
+
+        fakeNow = 1000L
+        delegate.onAppClicked(testApp)   // nextLaunchAllowedAt = 1000 + 300 = 1300
+        fakeNow = 1300L                  // exactly the boundary
+        delegate.onAppClicked(testApp)
+        advanceUntilIdle()
+
+        assertEquals(2, sentEvents.count { it is UiEvent.LaunchApp })
+        coVerify(exactly = 2) { recordAppLaunchUseCase.invoke(testApp) }
+    }
+
     // ===========================================
     // TOGGLE FAVORITE
     // ===========================================
