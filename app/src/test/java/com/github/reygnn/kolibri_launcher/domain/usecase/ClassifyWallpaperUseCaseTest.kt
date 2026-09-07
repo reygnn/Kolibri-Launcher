@@ -234,4 +234,47 @@ class ClassifyWallpaperUseCaseTest {
             coVerify(exactly = 1) { bitmapLuminance.compute(uri) }
             assertEquals(listOf(LuminanceClassification.LIGHT), seen)
         }
+
+    // ============================================================
+    // Multi-layer boundary/fallback pins (RC edge-case audit B3)
+    // The single-layer path pins the 0.5 threshold; the multi (composite)
+    // path did not, and the 2-layer null-fallback + null-composite combo
+    // was untested (the existing "empty layer 0" test is a 1-element list,
+    // i.e. the None path, not Multi).
+    // ============================================================
+
+    @Test
+    fun `multi-layer composite luminance exactly at the threshold 0_5 classifies DARK (strict greater-than)`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            fakeWallpaperRepository.currentState = WallpaperState.multiLayer(
+                listOf(
+                    WallpaperLayerState(imageUri = "file:///wallpapers/a.png"),
+                    WallpaperLayerState(imageUri = "file:///wallpapers/b.png"),
+                ),
+            )
+            // classifyByLuminance uses `> 0.5`, so exactly 0.5 is DARK — on the COMPOSITE path,
+            // and the layers are never sampled because the composite wins.
+            compositeLuminanceSignal.emit(0.5f)
+            assertEquals(LuminanceClassification.DARK, useCase().first())
+            coVerify(exactly = 0) { bitmapLuminance.compute(any()) }
+        }
+
+    @Test
+    fun `multi-layer with null layer-0 image and no composite falls through to the system signal`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // Two layers -> the Multi path (not None), but layers[0] carries no image, so the
+            // fallback URI is null; with no composite luminance the Kolibri signal yields null
+            // and classification comes from the system signal. No layer is ever sampled.
+            fakeWallpaperRepository.currentState = WallpaperState.multiLayer(
+                listOf(
+                    WallpaperLayerState(imageUri = null),
+                    WallpaperLayerState(imageUri = null),
+                ),
+            )
+            systemColorsSignal.emit(
+                DomainWallpaperColors(supportsDarkText = true, secondaryColorArgb = null),
+            )
+            assertEquals(LuminanceClassification.LIGHT, useCase().first())
+            coVerify(exactly = 0) { bitmapLuminance.compute(any()) }
+        }
 }
