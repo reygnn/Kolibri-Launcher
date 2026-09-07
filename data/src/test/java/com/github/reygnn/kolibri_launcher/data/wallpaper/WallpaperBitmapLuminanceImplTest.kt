@@ -376,4 +376,48 @@ class WallpaperBitmapLuminanceImplTest {
             ?: error("Test resource not found: $resourcePath")
         every { contentResolver.openInputStream(any()) } answers { ByteArrayInputStream(bytes) }
     }
+
+    // ============================================================
+    // Exact-boundary pins (RC edge-case audit B2)
+    // Existing tests exercise 0.25/0.75 coverage and full-opaque/transparent
+    // alpha; the exact gate values were unpinned.
+    // ============================================================
+
+    @Test
+    fun `coverage exactly at the gate is accepted (inclusive lower bound)`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // opaqueFraction 0.5 -> 512/1024 opaque -> coverage == MIN_OPAQUE_COVERAGE (0.5).
+            // The gate is `coverage < MIN` (strict), so exactly 0.5 must NOT be rejected.
+            val bitmap = bitmapWithCoverage(opaqueColor = Color.WHITE, opaqueFraction = 0.5f)
+            stubContentResolver(bitmap)
+            val result = luminance.compute("file:///half-opaque-white.png")
+            assertNotNull(result)
+            assertEquals(1.0f, result!!, 0.01f)
+        }
+
+    @Test
+    fun `opaque pixels exactly at the alpha threshold 204 are counted`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // alpha == OPAQUE_PIXEL_ALPHA_THRESHOLD (204); gate is `alpha >= 204`, so every
+            // pixel counts -> full coverage -> not rejected.
+            val bitmap = bitmapWithCoverage(
+                opaqueColor = Color.argb(204, 255, 255, 255),
+                opaqueFraction = 1.0f,
+            )
+            stubContentResolver(bitmap)
+            assertNotNull(luminance.compute("file:///alpha-204.png"))
+        }
+
+    @Test
+    fun `opaque pixels just below the alpha threshold 203 are excluded`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // alpha == 203 (< 204): every pixel fails the gate -> coverage 0 -> null.
+            // Together with the 204 case this pins `>=` vs `>` at the exact threshold.
+            val bitmap = bitmapWithCoverage(
+                opaqueColor = Color.argb(203, 255, 255, 255),
+                opaqueFraction = 1.0f,
+            )
+            stubContentResolver(bitmap)
+            assertNull(luminance.compute("file:///alpha-203.png"))
+        }
 }
