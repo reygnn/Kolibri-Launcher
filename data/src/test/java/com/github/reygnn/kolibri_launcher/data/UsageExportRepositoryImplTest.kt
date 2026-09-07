@@ -616,6 +616,30 @@ class UsageExportRepositoryImplTest {
         assertIs<UsageImportResult.InvalidFormat>(result)
     }
 
+    @Test
+    fun `importFromJson - an empty timestamp array counts toward packagesSkipped`() = runTest {
+        // RC edge-case audit B8: a package with an empty array was dropped at the parse
+        // stage — before the import stage's skip counter — so packagesSkipped undercounted
+        // it. It must now be reported like any other unusable entry while valid siblings
+        // still import.
+        val validTs = currentTime - 10_000
+        val json = """
+            {
+                "version": "1.0.0",
+                "usage_data": {
+                    "com.empty": [],
+                    "com.valid": [$validTs]
+                }
+            }
+        """.trimIndent()
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
+
+        assertIs<UsageImportResult.Success>(result)
+        assertEquals(1, result.packagesImported)
+        assertEquals(1, result.packagesSkipped)
+    }
+
     // ========== DOS PROTECTION TESTS ==========
 
     @Test

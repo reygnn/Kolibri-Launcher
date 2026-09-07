@@ -233,9 +233,12 @@ class UsageExportRepositoryImpl @Inject constructor(
                         else -> null
                     }
                 }
-                if (timestamps.isNotEmpty()) {
-                    usageData[packageName] = timestamps
-                }
+                // Keep the package even when the parse yields nothing (an empty array, or
+                // one whose entries were all unparseable): the import stage has a single
+                // skip-counting point (validImportedTimestamps.isEmpty() -> packagesSkipped++)
+                // that then records it. Dropping it here undercounted packagesSkipped for the
+                // empty/all-junk case (RC edge-case audit B8).
+                usageData[packageName] = timestamps
             }
         }
 
