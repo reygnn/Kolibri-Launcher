@@ -179,7 +179,23 @@ class FavoritesRepositoryImpl @Inject constructor(
 
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {
         try {
-            val filtered = componentNames.filter { it.isNotBlank() }.toSet()
+            // Enforce the same distinct-package cap as addFavoriteComponent, so a bulk save
+            // (onboarding CompleteOnboardingUseCase / restore BackupDataAssembler) can never
+            // persist a set that exceeds the limit the incremental add path guards — the
+            // display only .take()-trims, so without this the STORE could diverge from the
+            // invariant. Order-preserving: keep every component while under the package cap,
+            // plus any further component of an already-kept package. No-op for the common
+            // (<= cap) case.
+            val keptPackages = HashSet<String>()
+            val filtered = LinkedHashSet<String>()
+            for (cn in componentNames) {
+                if (cn.isBlank()) continue
+                val pkg = cn.substringBefore('/')
+                if (pkg in keptPackages || keptPackages.size < AppConstants.MAX_FAVORITES_ON_HOME) {
+                    filtered.add(cn)
+                    keptPackages.add(pkg)
+                }
+            }
             dataStore.edit { preferences ->
                 preferences[PreferencesKeys.FAVORITES] = filtered
             }

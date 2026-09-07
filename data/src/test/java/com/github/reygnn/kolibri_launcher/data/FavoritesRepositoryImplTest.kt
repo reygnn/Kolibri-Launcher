@@ -484,6 +484,37 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
+    fun `saveFavoriteComponents - caps the persisted set at the distinct-package limit`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
+
+        // One more DISTINCT package than the limit: a bulk save (onboarding / restore) must
+        // not persist a set exceeding what the incremental addFavoriteComponent path guards.
+        val overLimit = (1..(AppConstants.MAX_FAVORITES_ON_HOME + 1)).map { "com.app$it/Component" }
+        favoritesRepositoryImpl.saveFavoriteComponents(overLimit)
+
+        val saved = fakeDataStore.data.first()[favoritesKey]
+        Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, saved?.size)
+    }
+
+    @Test
+    fun `saveFavoriteComponents - extra activities of kept packages do not count against the package cap`() = runTest {
+        val fakeDataStore = FakeDataStore()
+        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
+
+        // MAX distinct packages PLUS a second activity of the first package. The package
+        // count is still MAX, so all MAX+1 components are kept — same rule as
+        // addFavoriteComponent (a further activity of an already-favorited package is fine).
+        val components = (1..AppConstants.MAX_FAVORITES_ON_HOME).map { "com.app$it/Component" } +
+            "com.app1/AnotherComponent"
+        favoritesRepositoryImpl.saveFavoriteComponents(components)
+
+        val saved = fakeDataStore.data.first()[favoritesKey]
+        Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME + 1, saved?.size)
+        Assert.assertTrue(saved?.contains("com.app1/AnotherComponent") == true)
+    }
+
+    @Test
     fun `purgeRepository - clears all favorites`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/App")))
