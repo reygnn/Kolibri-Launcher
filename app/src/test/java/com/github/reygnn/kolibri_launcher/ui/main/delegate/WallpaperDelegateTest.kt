@@ -2139,4 +2139,32 @@ class WallpaperDelegateTest {
             setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER)
         }
     }
+
+    @Test
+    fun `onToggleWallpaperBackdrop retries the same target after a failed persist`() = runTest {
+        // lastWrittenBackdrop advances ONLY after a successful write (KDoc), so a
+        // failed persist must leave the NEXT toggle computing from the last STORED
+        // value, not the never-persisted one. Default is SYSTEM_WALLPAPER; the first
+        // toggle targets BLACK but its persist throws (DataStore write failure), so the
+        // tracker stays put. The retry must therefore target BLACK AGAIN — never
+        // SYSTEM_WALLPAPER, which is what it would flip to if the failed write had
+        // wrongly advanced the tracker to BLACK (a lost, un-retryable toggle).
+        var attempts = 0
+        coEvery { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) } answers {
+            attempts++
+            if (attempts == 1) throw RuntimeException("simulated persist failure")
+            // second attempt: succeeds (returns Unit)
+        }
+
+        val delegate = createDelegate()
+
+        delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK, persist throws
+        advanceUntilIdle()
+        delegate.onToggleWallpaperBackdrop() // must recompute BLACK, not flip to SYSTEM
+        advanceUntilIdle()
+
+        // Both taps targeted BLACK (fail, then succeed); SYSTEM_WALLPAPER never written.
+        coVerify(exactly = 2) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
+        coVerify(exactly = 0) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
+    }
 }
