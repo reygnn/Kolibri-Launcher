@@ -97,11 +97,19 @@ class BackupDataAssembler @Inject constructor(
 
         val textColor = settingsRepository.textColorFlow.first()
         val textShadowEnabled = settingsRepository.textShadowEnabledFlow.first()
+        // Belt-and-suspenders symmetry with the restore side (which coerces these same
+        // four floats before persisting, below): a non-finite value from a pre-coercion
+        // build would otherwise serialize into the backup JSON, which cannot represent
+        // NaN/Infinity (the writer would emit invalid JSON or throw). Clamp on export too.
         val layoutScale = settingsRepository.layoutScaleStateFlow.first()
+            .coerceInSafe(AppConstants.LAYOUT_SCALE_MIN, AppConstants.LAYOUT_SCALE_MAX)
         val wallpaperScrimAlpha = settingsRepository.wallpaperScrimAlphaStateFlow.first()
+            .coerceInSafe(AppConstants.WALLPAPER_SCRIM_ALPHA_MIN, AppConstants.WALLPAPER_SCRIM_ALPHA_MAX)
         val verticalPaddingScale = settingsRepository.verticalPaddingStateFlow.first()
+            .coerceInSafe(AppConstants.VERTICAL_PADDING_SCALE_MIN, AppConstants.VERTICAL_PADDING_SCALE_MAX)
         val isFontBold = settingsRepository.isFontBoldStateFlow.first()
         val contentTopMarginScale = settingsRepository.contentTopMarginScaleFlow.first()
+            .coerceInSafe(AppConstants.CONTENT_TOP_MARGIN_SCALE_MIN, AppConstants.CONTENT_TOP_MARGIN_SCALE_MAX)
         val favoritesAlignment = settingsRepository.favoritesAlignmentFlow.first()
         val wallpaperSurfaceMode = settingsRepository.wallpaperSurfaceModeFlow.first()
         val wallpaperBackdrop = settingsRepository.wallpaperBackdropFlow.first()
