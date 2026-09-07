@@ -198,4 +198,32 @@ class BackupRepositoryImplIoTest {
 
         assertThat(result).isEqualTo(ImportResult.InvalidFormat)
     }
+
+    @Test
+    fun `previewBackup - unknown size statSize -1 with over-preview-limit stream - returns null (bounded at preview limit)`() = runTest {
+        // The preview path caps the statSize == -1 read at MAX_PREVIEW_SIZE_BYTES (1 MB for
+        // non-ZIP), NOT the larger import cap — matching its own fast-path check. A stream
+        // just past the preview limit must be rejected, so previewBackup returns null. A
+        // fresh stream per openInputStream call: isZipFile reads the 2 magic bytes (leading
+        // 'a' != "PK", so it is treated as JSON), then the bounded JSON read runs.
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        val previewLimit = AppConstants.MAX_PREVIEW_SIZE_BYTES
+        every { contentResolver.openInputStream(testUri) } answers {
+            object : InputStream() {
+                private var remaining = previewLimit + 1
+                override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    if (remaining <= 0L) return -1
+                    val n = minOf(len.toLong(), remaining).toInt()
+                    remaining -= n
+                    return n
+                }
+            }
+        }
+
+        val result = backupManager.previewBackup(testUri.toString())
+
+        assertThat(result).isNull()
+    }
 }
