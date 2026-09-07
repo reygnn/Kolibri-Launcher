@@ -75,4 +75,19 @@ class BackupSerializerComponentArrayTest {
             .containsExactly("com.b/B", "com.a/A", "com.b/B")
             .inOrder()
     }
+
+    @Test
+    fun `parse drops non-string customAppNames values (map), mirroring the arrays`() {
+        // customAppNames is a MAP; its values had asymmetric handling vs the arrays —
+        // getString(key) COERCED a non-string (123 -> "123") instead of dropping it, so a
+        // type-confusion payload survived as a garbage name. The fix filters to String
+        // values only: the numeric entry is dropped (app keeps its real name), the string
+        // entry is kept. (kotlinx rejects the mixed map → strict org.json fallback applies.)
+        val parsed = serializer.parseBackupData(
+            backupJson("\"customAppNames\": {\"com.a/A\": 123, \"com.b/B\": \"Custom\"}"),
+        )
+
+        assertThat(parsed).isNotNull()
+        assertThat(parsed!!.settings.customAppNames).containsExactly("com.b/B", "Custom")
+    }
 }

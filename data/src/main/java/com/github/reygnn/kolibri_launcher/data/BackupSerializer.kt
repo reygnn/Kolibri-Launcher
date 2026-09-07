@@ -293,7 +293,14 @@ class BackupSerializer @Inject constructor() {
         if (settingsJson.has("customAppNames") && !settingsJson.isNull("customAppNames")) {
             val namesObj = settingsJson.getJSONObject("customAppNames")
             namesObj.keys().forEach { key ->
-                customAppNames[key] = namesObj.getString(key)
+                // Keep only String values — mirrors the array fields' `is String` filter in
+                // getStrictStringList. getString(key) would COERCE a non-string (123 -> "123"),
+                // letting a type-confusion payload survive as a garbage name; drop it instead so
+                // the app keeps its real label (symmetric with favorites/hidden handling).
+                val value = namesObj.opt(key)
+                if (value is String) {
+                    customAppNames[key] = value
+                }
             }
         }
 
