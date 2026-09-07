@@ -226,4 +226,18 @@ class BackupRepositoryImplIoTest {
 
         assertThat(result).isNull()
     }
+
+    @Test
+    fun `loadBackupFromFile - file size exactly at MAX is accepted (inclusive, not rejected for size)`() = runTest {
+        // The size gate is `fileSize > MAX` (strict), so a file exactly at the limit must NOT
+        // be rejected for size — only MAX+1 was tested (RC edge-case audit B9a). Empty content
+        // at the boundary flows to the normal InvalidFormat path, not a "too large" Error.
+        every { parcelFileDescriptor.statSize } returns AppConstants.MAX_BACKUP_SIZE_BYTES
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(testUri) } answers { ByteArrayInputStream(ByteArray(0)) }
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+    }
 }
