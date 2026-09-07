@@ -41,18 +41,31 @@ class ToggleFavoriteUseCase @Inject constructor(
      * @param currentMaxFavorites Das aktuelle UI-Limit (wird vom VM übergeben).
      */
     suspend operator fun invoke(app: AppInfo, currentMaxFavorites: Int): Result {
-        // Cold flow (DATASTORE_READ_SPEC Belang A): favoriteComponentsFlow.first()
-        // is a fresh read of the store — the count is always current, no replay
-        // cache and no warm-subscriber assumption.
-        val realFavoritesCount = favoritesRepository.favoriteComponentsFlow.first().size
+        // Cold flow (DATASTORE_READ_SPEC Belang A): a fresh read of the store — always
+        // current, no replay cache, no warm-subscriber assumption.
+        val favorites = favoritesRepository.favoriteComponentsFlow.first()
+        val wasFavorite = app.componentName in favorites
 
-        if (!favoritesRepository.isFavoriteComponent(app.componentName) &&
-            realFavoritesCount >= currentMaxFavorites
-        ) {
-            return Result.Error.LimitReached(currentMaxFavorites)
+        // Limit on DISTINCT PACKAGES, matching FavoritesRepositoryImpl.addFavoriteComponent
+        // (a package with several launcher activities counts once). Counting COMPONENTS
+        // here diverged from the store: it wrongly reported LimitReached for a new package
+        // when the component count hit the limit but the package count had not.
+        if (!wasFavorite) {
+            val packages = favorites.mapTo(HashSet()) { it.substringBefore('/') }
+            val newPackage = app.componentName.substringBefore('/')
+            if (newPackage !in packages && packages.size >= currentMaxFavorites) {
+                return Result.Error.LimitReached(currentMaxFavorites)
+            }
         }
 
         val wasAdded = favoritesRepository.toggleFavoriteComponent(app.componentName)
-        return if (wasAdded) Result.Success.Added else Result.Success.Removed
+        return when {
+            wasAdded -> Result.Success.Added
+            // toggleFavoriteComponent returns false for BOTH a remove AND a rejected add
+            // (the store's own package guard, or a malformed key). Disambiguate with the
+            // pre-read state so a failed ADD is never mis-reported as a "Removed" success.
+            wasFavorite -> Result.Success.Removed
+            else -> Result.Error.LimitReached(currentMaxFavorites)
+        }
     }
 }

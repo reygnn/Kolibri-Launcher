@@ -181,6 +181,20 @@ class ToggleFavoriteUseCaseTest {
     /**
      * Fake das die echte Toggle-Logik implementiert.
      */
+    @Test
+    fun `adding a new package at the component-count limit but under the package limit is allowed (multi-activity)`() = runTest {
+        // The store limits DISTINCT PACKAGES (FavoritesRepositoryImpl), not components.
+        // {com.dual/A, com.dual/B} is 2 components but 1 package. At max=2, adding a NEW
+        // package must be allowed — counting components wrongly reported LimitReached.
+        favoritesRepository.favorites = setOf("com.dual/A", "com.dual/B")
+
+        val newApp = AppInfo("New", "New", "com.new", "com.new.Main")
+        val result = useCase(newApp, currentMaxFavorites = 2)
+
+        assertThat(result).isEqualTo(ToggleFavoriteUseCase.Result.Success.Added)
+        assertThat(favoritesRepository.favorites).contains(newApp.componentName)
+    }
+
     private class TestToggleFavoritesRepository : FavoritesRepository, Purgeable {
         private val flow = MutableStateFlow(setOf<String>())
 
