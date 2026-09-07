@@ -640,6 +640,36 @@ class UsageExportRepositoryImplTest {
         assertEquals(1, result.packagesSkipped)
     }
 
+    @Test
+    fun `importFromJson - unsupported version reaches the gate and echoes the version`() = runTest {
+        // A well-formed document with a future version passes structural validation (which
+        // only type-checks `version`, not its value) and must be rejected at the version
+        // gate with the original version echoed back for the UI. The backup path tests this
+        // end-to-end; the usage path previously only via a ViewModel-level mock.
+        val validTs = currentTime - 10_000
+        val json = """{"version":"2.0.0","usage_data":{"com.a":[$validTs]}}"""
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
+
+        assertIs<UsageImportResult.UnsupportedVersion>(result)
+        assertEquals("2.0.0", result.version)
+    }
+
+    @Test
+    fun `importFromJson - a blank package key is skipped while valid siblings import`() = runTest {
+        // validateJsonStructure does not reject an empty key, so the blank-key branch in the
+        // import loop is LIVE (not dead code): a "" package is counted as skipped and the
+        // valid sibling still imports.
+        val validTs = currentTime - 10_000
+        val json = """{"version":"1.0.0","usage_data":{"":[$validTs],"com.valid":[$validTs]}}"""
+
+        val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
+
+        assertIs<UsageImportResult.Success>(result)
+        assertEquals(1, result.packagesImported)
+        assertEquals(1, result.packagesSkipped)
+    }
+
     // ========== DOS PROTECTION TESTS ==========
 
     @Test
