@@ -620,13 +620,23 @@ class BackupRepositoryImpl @Inject constructor(
 
             // Legacy: plain JSON
             Timber.i("Detected legacy JSON backup format")
-            val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().readText()
+            // Bounded read (RC edge-case audit #1 — asymmetry with the usage-export
+            // path, which was already hardened): a streaming/pipe ContentProvider
+            // reports statSize == -1, which slips past the `fileSize > MAX` fast-path
+            // above (`-1 > MAX` is false) and would reach an UNBOUNDED readText() → OOM
+            // on a hostile/huge stream. Cap the ACTUAL read at MAX_BACKUP_SIZE_BYTES,
+            // one byte past so an over-limit stream is detected; a legitimate file whose
+            // provider simply does not report a size still imports (do NOT reject on a
+            // non-positive statSize). Same shape as UsageExportRepositoryImpl.
+            val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+            val jsonBytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                input.readNBytes((cap + 1).toInt())
             } ?: return@withContext ImportResult.Error("Cannot read from selected location")
 
-            if (jsonString.length > AppConstants.MAX_BACKUP_SIZE_BYTES) {
+            if (jsonBytes.size.toLong() > cap) {
                 return@withContext ImportResult.Error("Backup file is too large")
             }
+            val jsonString = String(jsonBytes, Charsets.UTF_8)
             if (jsonString.isBlank()) return@withContext ImportResult.InvalidFormat
             if (!jsonString.trim().startsWith("{")) return@withContext ImportResult.InvalidFormat
 
@@ -695,8 +705,12 @@ class BackupRepositoryImpl @Inject constructor(
             val jsonString = if (isZip) {
                 readJsonFromZip(uri)
             } else {
+                // Bounded read — same statSize == -1 OOM guard as the import path. Cap at
+                // the PREVIEW limit (sizeLimit = MAX_PREVIEW_SIZE_BYTES for non-ZIP),
+                // matching the fast-path check above, not the larger import cap.
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    input.bufferedReader().readText()
+                    val bytes = input.readNBytes((sizeLimit + 1).toInt())
+                    if (bytes.size.toLong() > sizeLimit) null else String(bytes, Charsets.UTF_8)
                 }
             }
 

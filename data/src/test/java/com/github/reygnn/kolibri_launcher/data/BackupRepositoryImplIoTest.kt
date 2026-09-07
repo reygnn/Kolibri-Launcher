@@ -33,6 +33,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.FileDescriptor
 import java.io.IOException
+import java.io.InputStream
 
 /**
  * I/O Torture Tests.
@@ -152,5 +153,49 @@ class BackupRepositoryImplIoTest {
         val result = backupManager.loadBackupFromFile("::invalid::uri", ImportOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+    }
+
+    @Test
+    fun `loadBackupFromFile - unknown size statSize -1 with over-cap stream - returns Error (bounded read)`() = runTest {
+        // RC edge-case audit #1: a streaming/pipe ContentProvider reports statSize == -1,
+        // which slips past the `fileSize > MAX` fast-path (`-1 > MAX` is false). The read
+        // must be BOUNDED (readNBytes(cap+1)) so a hostile over-cap stream is rejected
+        // instead of OOMing an unbounded readText() — the hardening the usage-export path
+        // already had. A FRESH stream per openInputStream call: isZipFile opens one (reads
+        // the 2 magic bytes), the JSON read opens another.
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+        every { contentResolver.openInputStream(testUri) } answers {
+            object : InputStream() {
+                private var remaining = cap + 1
+                override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    if (remaining <= 0L) return -1
+                    val n = minOf(len.toLong(), remaining).toInt()
+                    remaining -= n
+                    return n
+                }
+            }
+        }
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+        assertThat((result as ImportResult.Error).message).contains("too large")
+    }
+
+    @Test
+    fun `loadBackupFromFile - unknown size statSize -1 with small content is not rejected for size`() = runTest {
+        // Guards against a naive "reject when statSize <= 0" fix: a provider that simply
+        // does not report a size must still let a small file through. Empty content flows
+        // to the normal InvalidFormat path, NOT a "too large" Error.
+        every { parcelFileDescriptor.statSize } returns -1L
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        every { contentResolver.openInputStream(testUri) } answers { ByteArrayInputStream(ByteArray(0)) }
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
     }
 }
