@@ -216,4 +216,14 @@ class HandleSwipeActionUseCaseTest {
         // Assert
         assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(testApp2.componentName)
     }
+
+    @Test
+    fun `invoke NONE returns NoAction`() = runTest {
+        // NONE is the "no slot" sentinel that GestureDelegate never sends; the use case must
+        // short-circuit to NoAction before any store read. This early-return was unpinned
+        // (RC edge-case audit B5).
+        val result = useCase(SwipeSlot.NONE)
+
+        assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
+    }
 }
