@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.junit.Test
@@ -173,5 +174,61 @@ class WallpaperStateTest {
     fun `NONE is an empty layer list`() {
         assertTrue(WallpaperState.NONE.layers.isEmpty())
         assertSame(WallpaperState.NONE, WallpaperState.NONE)
+    }
+
+    // ---------------------------------------------------------------
+    // Out-of-range mutation guards (RC edge-case audit B4)
+    //
+    // The layers-list mutators each guard their index and return `this`
+    // unchanged on an out-of-range access; getLayer is null-safe. These
+    // branches were only ever hit through mocked delegate tests, so the
+    // real guards ran in no unit test. Pinned here on the actual model.
+    // ---------------------------------------------------------------
+
+    private fun twoLayerState(): WallpaperState = WallpaperState.multiLayer(
+        listOf(
+            WallpaperLayerState(imageUri = "file:///a.png"),
+            WallpaperLayerState(imageUri = "file:///b.png"),
+        ),
+    )
+
+    @Test
+    fun `getLayer returns null for out-of-range and empty states`() {
+        val state = twoLayerState()
+        assertEquals("file:///a.png", state.getLayer(0)?.imageUri)
+        assertNull(state.getLayer(99))
+        assertNull(state.getLayer(-1))
+        assertNull(WallpaperState.NONE.getLayer(0))
+    }
+
+    @Test
+    fun `withRemovedLayer returns the same instance for an out-of-range index`() {
+        val state = twoLayerState()
+        assertSame(state, state.withRemovedLayer(-1))
+        assertSame(state, state.withRemovedLayer(99))
+    }
+
+    @Test
+    fun `withUpdatedLayer returns the same instance for an out-of-range index`() {
+        val state = twoLayerState()
+        assertSame(state, state.withUpdatedLayer(99) { it.copy(scale = 5f) })
+    }
+
+    @Test
+    fun `withSwappedLayers returns the same instance when either index is out of range`() {
+        val state = twoLayerState()
+        assertSame(state, state.withSwappedLayers(0, 99))
+        assertSame(state, state.withSwappedLayers(-1, 1))
+    }
+
+    @Test
+    fun `withSwappedLayers with identical in-range indices preserves layer order`() {
+        val state = twoLayerState()
+        val result = state.withSwappedLayers(1, 1)
+        // Both indices are valid, so the guard is not taken; swapping an index with
+        // itself must leave the order intact.
+        assertEquals(state.layers, result.layers)
+        assertEquals("file:///a.png", result.getLayer(0)?.imageUri)
+        assertEquals("file:///b.png", result.getLayer(1)?.imageUri)
     }
 }
