@@ -293,13 +293,21 @@ class BackupSerializer @Inject constructor() {
         if (settingsJson.has("customAppNames") && !settingsJson.isNull("customAppNames")) {
             val namesObj = settingsJson.getJSONObject("customAppNames")
             namesObj.keys().forEach { key ->
-                // Keep only String values — mirrors the array fields' `is String` filter in
-                // getStrictStringList. getString(key) would COERCE a non-string (123 -> "123"),
-                // letting a type-confusion payload survive as a garbage name; drop it instead so
-                // the app keeps its real label (symmetric with favorites/hidden handling).
-                val value = namesObj.opt(key)
-                if (value is String) {
-                    customAppNames[key] = value
+                when (val value = namesObj.opt(key)) {
+                    // A valid custom name.
+                    is String -> customAppNames[key] = value
+                    // A structural value (object/array) where a name string is expected is not a
+                    // plausible mistype — it signals a malformed or hostile file (e.g. a deeply
+                    // nested object). Reject the whole backup, as the strict parse did before this
+                    // filter existed: the old getString(key) also threw here, and parseStrictly's
+                    // caller maps a JSONException to InvalidFormat/Error.
+                    is JSONObject, is JSONArray ->
+                        throw JSONException("customAppNames['$key'] is a ${value.javaClass.simpleName}, not a string")
+                    // A scalar of the wrong type (Number/Boolean/JSON null) is a benign
+                    // type-confusion: drop it instead of COERCING it to a garbage name
+                    // (getString would have turned 123 into "123"). Symmetric with the array
+                    // fields' `is String` filter in getStrictStringList.
+                    else -> Unit
                 }
             }
         }

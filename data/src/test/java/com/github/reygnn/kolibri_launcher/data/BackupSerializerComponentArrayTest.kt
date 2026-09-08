@@ -90,4 +90,17 @@ class BackupSerializerComponentArrayTest {
         assertThat(parsed).isNotNull()
         assertThat(parsed!!.settings.customAppNames).containsExactly("com.b/B", "Custom")
     }
+
+    @Test
+    fun `parse rejects a structural (object) customAppNames value`() {
+        // A scalar type-confusion (a number) is dropped (test above), but an object/array
+        // value where a name string is expected is malformed/hostile (e.g. a deeply nested
+        // object) — the whole backup is rejected rather than silently importing a partial
+        // map. Matches the pre-existing "deeply nested JSON" predator test.
+        val parsed = serializer.parseBackupData(
+            backupJson("\"customAppNames\": {\"com.a/A\": {\"nested\": \"x\"}}"),
+        )
+
+        assertThat(parsed).isNull()
+    }
 }
