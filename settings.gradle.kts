@@ -32,6 +32,7 @@ rootProject.name = "unity-launcher"
 // module paths, no code/namespace changes yet. Both apps build unchanged.
 include(":core")
 include(":common-ui")
+include(":feature-crashreporting")
 include(":kolibri:app")
 include(":kolibri:domain")
 include(":kolibri:data")

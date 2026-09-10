@@ -5,7 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.feature.crashreporting.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 

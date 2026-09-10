@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.feature.crashreporting.R
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import dagger.hilt.android.qualifiers.ApplicationContext

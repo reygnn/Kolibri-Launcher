@@ -6,7 +6,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReport
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrDrainer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -37,7 +37,7 @@ import org.junit.Test
 class CrashReportingBootstrapProcessGateTest {
 
     private val app = mockk<Application>(relaxed = true)
-    private val anrReporter = mockk<AnrReporter>(relaxed = true)
+    private val anrReporter = mockk<AnrDrainer>(relaxed = true)
     private var treePlants = 0
     private var watchdogStarts = 0
     private val enableCalls = mutableListOf<Boolean>()

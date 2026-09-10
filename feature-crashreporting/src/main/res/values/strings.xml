@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="crash_report_dialog_title">Improve App Stability</string>
+    <string name="crash_report_button_accept">Yes, help</string>
+    <string name="crash_report_button_decline">No, thanks</string>
+<string name="crash_report_dialog_message">
+    Help us make the app better!
+    &lt;br>&lt;br>
+    When the app crashes, we can send anonymized technical data:
+    &lt;br>
+    &#8226; Device model and Android version&lt;br>
+    &#8226; App version&lt;br>
+    &#8226; Error log (stack trace)
+    &lt;br>&lt;br>
+    What we &lt;b>DO NOT&lt;/b> collect:
+    &lt;br>
+    &#8226; No personal data&lt;br>
+    &#8226; No location or usage data
+    &lt;br>&lt;br>
+    The data is encrypted and stored on a server in Germany.
+    &lt;br>&lt;br>
+    &lt;b>For more details, please see our &lt;a href="https://docs.kolibri-launcher.ch/privacy.html">Privacy Policy&lt;/a>.&lt;/b>
+</string>
+    <string name="crash_report_health_channel_name">Crash-report health</string>
+    <string name="crash_report_health_notif_title">Kolibri: crash reporting inactive</string>
+    <string name="crash_report_health_notif_text">The crash-report bootstrap failed on startup, so crash and ANR reports aren\'t being sent. Check the logcat.</string>
+    <string name="toast_crash_report_consent_save_failed">Your choice could not be saved and applies to this session only. Please try again.</string>
+</resources>

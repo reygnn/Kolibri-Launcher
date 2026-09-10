@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.di
 
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.BackupRepositoryImpl
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.CrashReportConsentRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FabPositionRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
@@ -24,7 +23,6 @@ import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceIm
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.CrashReportConsentRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -66,12 +64,6 @@ abstract class RepositoryModule {
     abstract fun bindDataStoreMaintenanceRepository(
         impl: DataStoreMaintenanceRepositoryImpl,
     ): DataStoreMaintenanceRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindCrashReportConsentRepository(
-        impl: CrashReportConsentRepositoryImpl,
-    ): CrashReportConsentRepository
 
     @Binds
     @Singleton

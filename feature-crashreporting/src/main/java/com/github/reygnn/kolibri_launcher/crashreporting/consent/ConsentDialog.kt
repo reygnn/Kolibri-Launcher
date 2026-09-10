@@ -5,7 +5,7 @@ import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.text.HtmlCompat
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.feature.crashreporting.R
 import com.github.reygnn.launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

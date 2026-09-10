@@ -261,6 +261,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 dependencies {
     implementation(project(":common-ui"))
+    implementation(project(":feature-crashreporting"))
     // Project modules
     implementation(project(":kolibri:domain"))
     implementation(project(":kolibri:data"))
