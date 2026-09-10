@@ -14,7 +14,7 @@ import com.github.reygnn.kolibri_launcher.databinding.ActivitySwipeActionsBindin
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.launcher.common.ui.collectOnStarted
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow

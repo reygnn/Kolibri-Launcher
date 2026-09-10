@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.util
+package com.github.reygnn.launcher.common.ui
 
 import java.util.concurrent.atomic.AtomicBoolean
 

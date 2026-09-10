@@ -18,7 +18,7 @@ import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import dagger.hilt.android.AndroidEntryPoint

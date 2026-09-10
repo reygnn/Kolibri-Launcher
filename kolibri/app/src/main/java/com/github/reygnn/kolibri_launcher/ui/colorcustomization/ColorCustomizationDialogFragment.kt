@@ -28,7 +28,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
-import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.home.ScrimRender
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
+import com.github.reygnn.launcher.common.ui.ErrorEventBus
+
 import android.util.Log
 import timber.log.Timber
 

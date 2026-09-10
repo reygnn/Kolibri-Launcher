@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.util
+package com.github.reygnn.launcher.common.ui
 
 /**
  * Ein einfacher, anwendungsweiter Event-Bus, der auf einem SharedFlow basiert.

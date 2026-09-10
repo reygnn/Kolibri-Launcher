@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.flow
+package com.github.reygnn.launcher.common.ui
 
 import androidx.activity.ComponentActivity
 import androidx.fragment.app.Fragment

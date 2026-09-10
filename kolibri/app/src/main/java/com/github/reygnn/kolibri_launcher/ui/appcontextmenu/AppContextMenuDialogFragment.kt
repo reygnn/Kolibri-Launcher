@@ -28,7 +28,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.kolibri_launcher.domain.usecase.BuildAppContextMenuUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.customnames.RenameDecision
-import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
+import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
