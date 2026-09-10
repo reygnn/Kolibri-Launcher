@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -89,7 +91,7 @@ class SettingsRepositoryImplTest {
         fakeDataStore.edit { it[FAVORITES_ALIGNMENT_KEY] = "INVALID_ALIGNMENT_VALUE" }
 
         Assert.assertEquals(
-            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
             settingsManager.favoritesAlignmentFlow.first(),
         )
     }

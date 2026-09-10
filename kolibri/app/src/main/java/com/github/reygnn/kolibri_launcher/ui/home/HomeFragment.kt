@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -302,7 +304,7 @@ class HomeFragment : Fragment() {
     private var currentTextSizePx: Float = 0f
     private var currentVerticalPaddingPx: Int = 0
     private var isCurrentFontBold: Boolean = AppConstants.DEFAULT_FONT_BOLD
-    private var currentFavoritesAlignment: FavoritesAlignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+    private var currentFavoritesAlignment: FavoritesAlignment = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT
     private var currentUserPreferredMarginPx: Int = 0
 
     // ===========================================

@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.SavedStateHandle
@@ -115,7 +117,7 @@ class LauncherViewModelDoomsdayTest {
             every { verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
             every { isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
             every { contentTopMargin } returns flowOf(0f)
-            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+            every { favoritesAlignment } returns flowOf(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         recordAppLaunchUseCase = mockk(relaxed = true)

@@ -8,6 +8,8 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -232,7 +234,7 @@ class MonolithicLauncherViewModelTest {
         every { getLayoutSettingsUseCase.verticalPadding } returns flowOf(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         every { getLayoutSettingsUseCase.isFontBold } returns flowOf(AppConstants.DEFAULT_FONT_BOLD)
         every { getLayoutSettingsUseCase.contentTopMargin } returns flowOf(0f)
-        every { getLayoutSettingsUseCase.favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        every { getLayoutSettingsUseCase.favoritesAlignment } returns flowOf(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
 
         every { observeWallpaperStateUseCase.invoke() } returns flowOf(WallpaperState.NONE)
 

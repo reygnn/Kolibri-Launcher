@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -267,7 +269,7 @@ class AppDrawerFragment : Fragment() {
         // AppDrawer is not satisfying. Until the visual concept is
         // settled, the state is no longer pushed into the adapter —
         // the AppDrawer falls back to the default alignment
-        // (AppConstants.DEFAULT_FAVORITES_ALIGNMENT, i.e. START).
+        // (SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT, i.e. START).
         // To re-enable: just uncomment this block; the adapter setter
         // and ViewHolder.updateAlignment are still correct.
         //

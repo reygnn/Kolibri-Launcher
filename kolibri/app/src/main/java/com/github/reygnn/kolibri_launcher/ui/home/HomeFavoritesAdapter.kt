@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.text.TextUtils
@@ -291,7 +293,7 @@ class HomeFavoritesAdapter(
             textColor = AppConstants.DEFAULT_TEXT_COLOR,
             shadowColor = AppConstants.DEFAULT_TEXT_COLOR,
             outlineWidthPx = 0f,
-            alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            alignment = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
         )
 
         private fun createSubtlePressColor(normalColor: Int): ColorStateList {

@@ -124,6 +124,8 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.R
@@ -295,7 +297,7 @@ class WallpaperDelegate(
         .stateIn(
             scope = scope.coroutineScope,
             started = SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS),
-            initialValue = AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+            initialValue = SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP,
         )
 
     /**

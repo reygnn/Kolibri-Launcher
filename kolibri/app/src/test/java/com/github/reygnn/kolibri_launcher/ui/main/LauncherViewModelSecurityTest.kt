@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
@@ -132,7 +134,7 @@ class LauncherViewModelSecurityTest {
             every { verticalPadding } returns flowOf(1.0f)
             every { isFontBold } returns flowOf(false)
             every { contentTopMargin } returns flowOf(0f)
-            every { favoritesAlignment } returns flowOf(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+            every { favoritesAlignment } returns flowOf(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
         }
 
         val appUpdateSignal: AppUpdateSignal = mockk {

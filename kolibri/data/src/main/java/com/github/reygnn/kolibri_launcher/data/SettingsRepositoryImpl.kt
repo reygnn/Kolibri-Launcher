@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -164,7 +166,7 @@ class SettingsRepositoryImpl @Inject constructor(
     // a redundant full re-sort. Other settings flows are UI-cheap; leaving the
     // helper untouched keeps the blast radius to this key (AUDIT-14 F2).
     override val sortOrderFlow: Flow<SortOrder> =
-        enumFlow(PreferenceKeys.SORT_ORDER_KEY, AppConstants.DEFAULT_SORT_ORDER)
+        enumFlow(PreferenceKeys.SORT_ORDER_KEY, SettingsDefaults.DEFAULT_SORT_ORDER)
             .distinctUntilChanged()
 
     override suspend fun setSortOrder(sortOrder: SortOrder) =
@@ -237,19 +239,19 @@ class SettingsRepositoryImpl @Inject constructor(
         putValue(PreferenceKeys.IS_FONT_BOLD, isBold)
 
     override val favoritesAlignmentFlow: Flow<FavoritesAlignment> =
-        enumFlow(PreferenceKeys.FAVORITES_ALIGNMENT, AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        enumFlow(PreferenceKeys.FAVORITES_ALIGNMENT, SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
 
     override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) =
         putValue(PreferenceKeys.FAVORITES_ALIGNMENT, alignment.name)
 
     override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> =
-        enumFlow(PreferenceKeys.APP_DRAWER_MODE, AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE)
+        enumFlow(PreferenceKeys.APP_DRAWER_MODE, SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE)
 
     override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) =
         putValue(PreferenceKeys.APP_DRAWER_MODE, mode.name)
 
     override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
-        enumFlow(PreferenceKeys.WALLPAPER_BACKDROP, AppConstants.DEFAULT_WALLPAPER_BACKDROP)
+        enumFlow(PreferenceKeys.WALLPAPER_BACKDROP, SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
 
     override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) =
         putValue(PreferenceKeys.WALLPAPER_BACKDROP, backdrop.name)

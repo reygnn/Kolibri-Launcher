@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import android.content.Context
 import android.net.Uri
@@ -2077,7 +2079,7 @@ class WallpaperDelegateTest {
     fun `wallpaperBackdrop starts at DEFAULT when the use case has not emitted`() {
         // observe returns emptyFlow() (setUp) — stateIn holds its initialValue.
         val delegate = createDelegate()
-        assertEquals(AppConstants.DEFAULT_WALLPAPER_BACKDROP, delegate.wallpaperBackdrop.value)
+        assertEquals(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP, delegate.wallpaperBackdrop.value)
     }
 
     @Test

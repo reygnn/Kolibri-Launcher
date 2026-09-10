@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
@@ -65,7 +67,7 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `fresh repository emits default sortOrder`() = runTest {
         val repo = createRepository()
-        assertEquals(AppConstants.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
+        assertEquals(SettingsDefaults.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
     }
 
     @Test
@@ -110,7 +112,7 @@ abstract class SettingsRepositoryContract {
     fun `fresh repository emits default favoritesAlignment`() = runTest {
         val repo = createRepository()
         assertEquals(
-            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
             repo.favoritesAlignmentFlow.first(),
         )
     }
@@ -119,7 +121,7 @@ abstract class SettingsRepositoryContract {
     fun `fresh repository emits default wallpaperSurfaceMode`() = runTest {
         val repo = createRepository()
         assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE,
+            SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE,
             repo.wallpaperSurfaceModeFlow.first(),
         )
     }
@@ -128,7 +130,7 @@ abstract class SettingsRepositoryContract {
     fun `fresh repository emits default wallpaperBackdrop`() = runTest {
         val repo = createRepository()
         assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+            SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP,
             repo.wallpaperBackdropFlow.first(),
         )
     }
@@ -139,7 +141,7 @@ abstract class SettingsRepositoryContract {
     fun `setSortOrder reflects in flow`() = runTest {
         val repo = createRepository()
         // Neue Wert muss != Default sein, damit der Test aussagekräftig bleibt.
-        val newValue = SortOrder.entries.first { it != AppConstants.DEFAULT_SORT_ORDER }
+        val newValue = SortOrder.entries.first { it != SettingsDefaults.DEFAULT_SORT_ORDER }
         repo.setSortOrder(newValue)
         assertEquals(newValue, repo.sortOrderFlow.first())
     }
@@ -181,7 +183,7 @@ abstract class SettingsRepositoryContract {
     fun `setFavoritesAlignment reflects in flow`() = runTest {
         val repo = createRepository()
         val newValue = FavoritesAlignment.entries
-            .first { it != AppConstants.DEFAULT_FAVORITES_ALIGNMENT }
+            .first { it != SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT }
         repo.setFavoritesAlignment(newValue)
         assertEquals(newValue, repo.favoritesAlignmentFlow.first())
     }
@@ -190,7 +192,7 @@ abstract class SettingsRepositoryContract {
     fun `setWallpaperSurfaceMode reflects in flow`() = runTest {
         val repo = createRepository()
         val newValue = WallpaperSurfaceMode.entries
-            .first { it != AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE }
+            .first { it != SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE }
         repo.setWallpaperSurfaceMode(newValue)
         assertEquals(newValue, repo.wallpaperSurfaceModeFlow.first())
     }
@@ -199,7 +201,7 @@ abstract class SettingsRepositoryContract {
     fun `setWallpaperBackdrop reflects in flow`() = runTest {
         val repo = createRepository()
         val newValue = WallpaperBackdrop.entries
-            .first { it != AppConstants.DEFAULT_WALLPAPER_BACKDROP }
+            .first { it != SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP }
         repo.setWallpaperBackdrop(newValue)
         assertEquals(newValue, repo.wallpaperBackdropFlow.first())
     }
@@ -272,25 +274,25 @@ abstract class SettingsRepositoryContract {
     fun `purgeRepository resets sortOrder`() = runTest {
         val repo = createRepository()
         val nonDefaultSort =
-            SortOrder.entries.first { it != AppConstants.DEFAULT_SORT_ORDER }
+            SortOrder.entries.first { it != SettingsDefaults.DEFAULT_SORT_ORDER }
         repo.setSortOrder(nonDefaultSort)
 
         repo.purgeRepository()
 
-        assertEquals(AppConstants.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
+        assertEquals(SettingsDefaults.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
     }
 
     @Test
     fun `purgeRepository resets wallpaperSurfaceMode to default`() = runTest {
         val repo = createRepository()
         val nonDefault = WallpaperSurfaceMode.entries
-            .first { it != AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE }
+            .first { it != SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE }
         repo.setWallpaperSurfaceMode(nonDefault)
 
         repo.purgeRepository()
 
         assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE,
+            SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE,
             repo.wallpaperSurfaceModeFlow.first()
         )
     }
@@ -299,13 +301,13 @@ abstract class SettingsRepositoryContract {
     fun `purgeRepository resets wallpaperBackdrop to default`() = runTest {
         val repo = createRepository()
         val nonDefault = WallpaperBackdrop.entries
-            .first { it != AppConstants.DEFAULT_WALLPAPER_BACKDROP }
+            .first { it != SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP }
         repo.setWallpaperBackdrop(nonDefault)
 
         repo.purgeRepository()
 
         assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_BACKDROP,
+            SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP,
             repo.wallpaperBackdropFlow.first()
         )
     }
@@ -314,13 +316,13 @@ abstract class SettingsRepositoryContract {
     fun `purgeRepository resets favoritesAlignment to default`() = runTest {
         val repo = createRepository()
         val nonDefault = FavoritesAlignment.entries
-            .first { it != AppConstants.DEFAULT_FAVORITES_ALIGNMENT }
+            .first { it != SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT }
         repo.setFavoritesAlignment(nonDefault)
 
         repo.purgeRepository()
 
         assertEquals(
-            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
             repo.favoritesAlignmentFlow.first(),
         )
     }

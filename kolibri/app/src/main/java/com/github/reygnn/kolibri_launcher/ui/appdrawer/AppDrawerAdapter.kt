@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
@@ -28,7 +30,7 @@ class AppDrawerAdapter(
 
     private var textColor: Int = Color.WHITE
     private var shadowColor: Int = Color.BLACK
-    private var currentAlignment: FavoritesAlignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+    private var currentAlignment: FavoritesAlignment = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT
 
     companion object {
         const val PAYLOAD_COLOR_CHANGE = "color_change"

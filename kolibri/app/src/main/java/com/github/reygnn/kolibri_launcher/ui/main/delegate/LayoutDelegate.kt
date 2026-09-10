@@ -9,6 +9,8 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.core.coerceInSafe
@@ -94,12 +96,12 @@ class LayoutDelegate(
         .catch { e ->
             if (e is CancellationException) throw e
             TimberWrapper.silentError(e, "Error observing favorites alignment")
-            emit(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+            emit(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
         }
         .stateIn(
             scope = scope.coroutineScope,
             started = SharingStarted.Eagerly,
-            initialValue = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
+            initialValue = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT
         )
 
     // --- Public API: Setters ---
@@ -145,6 +147,6 @@ class LayoutDelegate(
         setVerticalPaddingUseCase(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         setFontBoldUseCase(AppConstants.DEFAULT_FONT_BOLD)
         setContentTopMarginUseCase(AppConstants.DEFAULT_TOP_MARGIN)
-        setFavoritesAlignmentUseCase(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        setFavoritesAlignmentUseCase(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 }

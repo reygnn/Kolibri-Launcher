@@ -1,10 +1,5 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
-import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
-import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-
 /**
  * Zentrale Konstanten für die gesamte Anwendung
  * Ersetzt Magic Numbers und hardcoded Values
@@ -63,15 +58,10 @@ object AppConstants {
     const val FALLBACK_TEXT_SIZE_PX = 48f
     const val FALLBACK_VERTICAL_PADDING_PX = 16
     const val FALLBACK_FONT_BOLD = DEFAULT_FONT_BOLD
-    val DEFAULT_SORT_ORDER = SortOrder.TIME_WEIGHTED_USAGE
-    val DEFAULT_FAVORITES_ALIGNMENT = FavoritesAlignment.START
-    val DEFAULT_WALLPAPER_SURFACE_MODE = WallpaperSurfaceMode.AUTO
-
-    // Preserve historical behaviour: the launcher window has always been
-    // transparent + FLAG_SHOW_WALLPAPER, so existing users (and legacy backups
-    // with no stored value) keep seeing the system wallpaper behind the collage.
-    // Product may flip this to BLACK for fresh multi-layer installs.
-    val DEFAULT_WALLPAPER_BACKDROP = WallpaperBackdrop.SYSTEM_WALLPAPER
+    // The four enum-typed setting defaults (DEFAULT_SORT_ORDER,
+    // DEFAULT_FAVORITES_ALIGNMENT, DEFAULT_WALLPAPER_SURFACE_MODE,
+    // DEFAULT_WALLPAPER_BACKDROP) moved to domain/model/SettingsDefaults — they
+    // carry domain-model types, which must not leak into the neutral :core.
 
     const val KEY_NAME_PREFIX = "name_"
     const val KEY_USAGE_PREFIX = "usage_"
@@ -113,7 +103,7 @@ object AppConstants {
      *
      * No migration from the old settings-store keys (same choice as the
      * consent split): on the update that ships this, usage history is not
-     * carried over — the store starts empty and the [SortOrder.TIME_WEIGHTED_USAGE]
+     * carried over — the store starts empty and the time-weighted-usage
      * default sort rebuilds as apps are launched. The old usage keys are left
      * untouched in the settings store; they are dead weight for existing
      * installs but no longer written, so they no longer drive the per-launch

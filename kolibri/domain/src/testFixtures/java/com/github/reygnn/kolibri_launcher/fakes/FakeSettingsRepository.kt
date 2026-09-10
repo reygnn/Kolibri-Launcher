@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 // TIMESTAMP 2025-12-07 12:59
 
 import com.github.reygnn.kolibri_launcher.core.AppConstants
@@ -215,11 +217,11 @@ class FakeSettingsRepository : SettingsRepository {
         autoShowKeyboard = AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD
         autoLaunchApp = AppConstants.DEFAULT_AUTO_LAUNCH_APP
 
-        sortOrderState.value = AppConstants.DEFAULT_SORT_ORDER
+        sortOrderState.value = SettingsDefaults.DEFAULT_SORT_ORDER
 
-        favoritesAlignmentState.value = AppConstants.DEFAULT_FAVORITES_ALIGNMENT
-        wallpaperSurfaceModeState.value = AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE
-        wallpaperBackdropState.value = AppConstants.DEFAULT_WALLPAPER_BACKDROP
+        favoritesAlignmentState.value = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT
+        wallpaperSurfaceModeState.value = SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE
+        wallpaperBackdropState.value = SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP
 
         onboardingCompletedState.value = wasOnboardingCompleted
     }
@@ -249,7 +251,7 @@ class FakeSettingsRepository : SettingsRepository {
 
     // favoritesAlignment
     private val favoritesAlignmentState =
-        MutableStateFlow(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+        MutableStateFlow(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
 
     var favoritesAlignment: FavoritesAlignment
         get() = favoritesAlignmentState.value
@@ -263,7 +265,7 @@ class FakeSettingsRepository : SettingsRepository {
 
     // wallpaperSurfaceMode
     private val wallpaperSurfaceModeState =
-        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_SURFACE_MODE)
+        MutableStateFlow(SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE)
 
     var wallpaperSurfaceMode: WallpaperSurfaceMode
         get() = wallpaperSurfaceModeState.value
@@ -277,7 +279,7 @@ class FakeSettingsRepository : SettingsRepository {
 
     // wallpaperBackdrop
     private val wallpaperBackdropState =
-        MutableStateFlow(AppConstants.DEFAULT_WALLPAPER_BACKDROP)
+        MutableStateFlow(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
 
     var wallpaperBackdrop: WallpaperBackdrop
         get() = wallpaperBackdropState.value

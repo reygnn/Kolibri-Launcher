@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -29,7 +31,7 @@ class LayoutSettingsUseCasesTest {
     private val verticalPaddingFlow = MutableStateFlow(1.0f)
     private val isFontBoldFlow = MutableStateFlow(false)
     private val contentTopMarginFlow = MutableStateFlow(1.0f)
-    private val favoritesAlignmentFlow = MutableStateFlow(AppConstants.DEFAULT_FAVORITES_ALIGNMENT)
+    private val favoritesAlignmentFlow = MutableStateFlow(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
 
     @Before
     fun setup() {

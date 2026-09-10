@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
+
 import android.content.Context
 import android.graphics.Typeface
 import android.view.View
@@ -52,7 +54,7 @@ class HomeFavoritesAdapterBindingTest {
         textColor = color,
         shadowColor = 0xFF000000.toInt(),
         outlineWidthPx = 3f,
-        alignment = AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+        alignment = SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
     )
 
     @Test
