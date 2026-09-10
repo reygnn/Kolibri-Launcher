@@ -2,7 +2,7 @@ package com.github.reygnn.nyx_launcher.home.repository
 
 import app.cash.turbine.test
 import com.github.reygnn.nyx_launcher.home.model.CellPos
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout

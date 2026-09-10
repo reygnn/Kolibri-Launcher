@@ -1,6 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.icon
 
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import java.security.MessageDigest
 
@@ -22,7 +22,7 @@ object IconCacheKey {
         }
         val packId = (ref as? IconRef.Pack)?.packId.orEmpty()
         val content = listOf(
-            key.packageName, key.className, key.userSerial.toString(),
+            key.packageName, key.className,
             sizePx.toString(), variant.name, packId,
         ).joinToString("|")
         return CacheKey("${shortHash(key.packageName)}-${shortHash(content)}")
@@ -40,7 +40,7 @@ object IconCacheKey {
      */
     fun folder(members: List<ComponentKey>, sizePx: Int, monochrome: Boolean): CacheKey {
         val content = members.joinToString("|") {
-            "${it.packageName}/${it.className}/${it.userSerial}"
+            "${it.packageName}/${it.className}"
         } + "@" + sizePx + if (monochrome) "#mono" else ""
         return CacheKey("folder-${shortHash(content)}")
     }

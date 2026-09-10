@@ -1,7 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
 import com.github.reygnn.nyx_launcher.home.model.CellPos
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
@@ -35,7 +35,7 @@ internal fun HomeItem.toDto(): HomeItemDto = when (this) {
 }
 
 internal fun ComponentKey.toDto(): ComponentKeyDto =
-    ComponentKeyDto(packageName, className, userSerial)
+    ComponentKeyDto(packageName, className)
 
 // DTO → domain ---------------------------------------------------------------
 
@@ -58,4 +58,4 @@ internal fun HomeItemDto.toDomain(): HomeItem = when (this) {
 }
 
 internal fun ComponentKeyDto.toDomain(): ComponentKey =
-    ComponentKey(packageName, className, userSerial)
+    ComponentKey(packageName, className)

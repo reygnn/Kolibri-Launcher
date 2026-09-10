@@ -1,6 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.transition
 
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId

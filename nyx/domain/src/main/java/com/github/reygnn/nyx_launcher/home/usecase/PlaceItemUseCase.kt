@@ -1,7 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.DefaultDispatcher
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.MoveResult

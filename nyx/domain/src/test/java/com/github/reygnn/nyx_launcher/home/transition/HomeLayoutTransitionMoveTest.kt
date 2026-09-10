@@ -1,7 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.transition
 
 import com.github.reygnn.nyx_launcher.home.model.CellPos
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem

@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.model
 
+import com.github.reygnn.launcher.core.ComponentKey
+
 /**
  * What the domain knows about an installed, launchable app.
  *

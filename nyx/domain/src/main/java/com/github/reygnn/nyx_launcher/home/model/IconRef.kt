@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.model
 
+import com.github.reygnn.launcher.core.ComponentKey
+
 /**
  * A reference to an icon — never the bitmap itself (IHM-INV-1). Resolving,
  * compositing and caching happen in `:data` (ICON_LOADER_SPEC).

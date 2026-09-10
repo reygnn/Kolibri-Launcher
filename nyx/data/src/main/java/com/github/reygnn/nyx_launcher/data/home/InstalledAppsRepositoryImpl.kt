@@ -5,7 +5,7 @@ import android.content.pm.LauncherApps
 import android.os.Process
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
-import com.github.reygnn.nyx_launcher.home.model.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext

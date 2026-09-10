@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.model
 
+import com.github.reygnn.launcher.core.ComponentKey
+
 /**
  * Position-independent, stable identity of a placed thing (app or folder).
  *

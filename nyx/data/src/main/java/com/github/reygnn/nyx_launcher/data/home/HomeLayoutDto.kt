@@ -51,5 +51,4 @@ sealed interface HomeItemDto {
 data class ComponentKeyDto(
     val packageName: String,
     val className: String,
-    val userSerial: Long = 0L,
 )
