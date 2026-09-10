@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 /*
  * :app — Android application. Hosts @HiltAndroidApp, the launcher Activity,
  * the home-grid / drawer / folder / dock UI (RecyclerView adapters + the
@@ -18,6 +21,14 @@ android {
     namespace = "com.github.reygnn.nyx_launcher"
     compileSdk = 37
 
+    // ACRA endpoint from the shared root secrets.properties (gitignored), same as
+    // Kolibri. Fed into :feature-crashreporting via AcraConfig at runtime.
+    val secretsPropertiesFile = rootProject.file("secrets.properties")
+    val secretsProperties = Properties()
+    if (secretsPropertiesFile.exists()) {
+        secretsProperties.load(FileInputStream(secretsPropertiesFile))
+    }
+
     defaultConfig {
         applicationId = "com.github.reygnn.nyx_launcher"
         minSdk = 36
@@ -25,16 +36,27 @@ android {
         versionCode = 1
         versionName = "0.1.0-dev"
 
+        buildConfigField("String", "ACRA_URL", "\"${secretsProperties.getProperty("acra.url", "")}\"")
+        buildConfigField("String", "ACRA_LOGIN", "\"${secretsProperties.getProperty("acra.login", "")}\"")
+        buildConfigField("String", "ACRA_PASSWORD", "\"${secretsProperties.getProperty("acra.password", "")}\"")
+
         testInstrumentationRunner = "com.github.reygnn.nyx_launcher.HiltTestRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     buildFeatures { buildConfig = true }
 
+    // Dev-command visibility: always on in debug; in release only for a personal
+    // build (`-PdevCommands` or the `-PdailyDriver` master flag). Public release = off.
+    fun personalProperty(name: String): Boolean =
+        (project.findProperty(name) as String?)?.let { it.isEmpty() || it.toBoolean() } ?: false
+    val devCommandsInRelease = personalProperty("dailyDriver") || personalProperty("devCommands")
+
     buildTypes {
         debug {
             isMinifyEnabled = false
             isDebuggable = true
+            buildConfigField("boolean", "SHOW_DEV_COMMANDS", "true")
         }
         release {
             isMinifyEnabled = true
@@ -43,6 +65,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            buildConfigField("boolean", "SHOW_DEV_COMMANDS", devCommandsInRelease.toString())
         }
     }
 
@@ -75,6 +98,7 @@ configurations.configureEach {
 dependencies {
     implementation(project(":nyx:domain"))
     implementation(project(":nyx:data"))
+    implementation(project(":feature-crashreporting"))
 
     implementation(libs.material)
     implementation(libs.androidx.appcompat)

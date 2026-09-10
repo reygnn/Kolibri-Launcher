@@ -7,10 +7,6 @@ import android.os.SystemClock
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggle
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.AcraToggleImpl
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifier
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentSaveFailureNotifierImpl
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.Module
@@ -62,24 +58,9 @@ object AppModule {
     fun provideMonotonicClock(): MonotonicClock =
         MonotonicClock { SystemClock.elapsedRealtime() }
 
-    /**
-     * The ACRA enable/disable + revoke-purge seam. Behind an interface so
-     * [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController]
-     * stays JVM-testable (see [AcraToggle] KDoc).
-     */
-    @Provides
-    @Singleton
-    fun provideAcraToggle(impl: AcraToggleImpl): AcraToggle = impl
-
-    /**
-     * The "consent could not be saved" seam. Behind an interface for the same
-     * reason as [AcraToggle] — see [ConsentSaveFailureNotifier] KDoc.
-     */
-    @Provides
-    @Singleton
-    fun provideConsentSaveFailureNotifier(
-        impl: ConsentSaveFailureNotifierImpl,
-    ): ConsentSaveFailureNotifier = impl
+    // AcraToggle + ConsentSaveFailureNotifier bindings moved to
+    // :feature-crashreporting (CrashReportConsentBindingModule) so both apps get
+    // them and ConsentController is providable everywhere.
 
     /**
      * The app's `versionName` from :app's BuildConfig, exposed for injection

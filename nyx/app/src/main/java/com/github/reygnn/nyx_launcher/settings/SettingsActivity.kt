@@ -2,7 +2,9 @@ package com.github.reygnn.nyx_launcher.settings
 
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.usecase.ExportLayoutUseCase
@@ -19,6 +24,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -37,6 +43,9 @@ class SettingsActivity : AppCompatActivity() {
 
     @Inject
     lateinit var preferences: PreferencesRepository
+
+    @Inject
+    lateinit var consentController: ConsentController
 
     private val createDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -68,6 +77,37 @@ class SettingsActivity : AppCompatActivity() {
                     if (monochrome.isChecked != enabled) monochrome.isChecked = enabled
                 }
             }
+        }
+
+        setupDevCommands()
+    }
+
+    /**
+     * ACRA dev commands (mirrors Kolibri's), gated by BuildConfig.SHOW_DEV_COMMANDS
+     * (always on in debug; release only with -PdevCommands / -PdailyDriver). Grant
+     * consent enables ACRA live via [ConsentController.applyConsent]; the throw /
+     * silent-error / warn buttons then verify delivery against the server.
+     */
+    private fun setupDevCommands() {
+        val section = findViewById<LinearLayout>(R.id.dev_commands_section)
+        if (!BuildConfig.SHOW_DEV_COMMANDS) return
+        section.visibility = View.VISIBLE
+
+        findViewById<Button>(R.id.dev_grant_consent).setOnClickListener {
+            consentController.applyConsent(true)
+            Toast.makeText(this, "ACRA consent granted + enabled", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.dev_throw_test).setOnClickListener {
+            throw RuntimeException("ACRA throw test from Nyx settings (v${BuildConfig.VERSION_NAME})")
+        }
+        findViewById<Button>(R.id.dev_silent_error).setOnClickListener {
+            TimberWrapper.silentError(
+                RuntimeException("ACRA silent-error test from Nyx (v${BuildConfig.VERSION_NAME})"),
+                "Nyx ACRA silent-error test",
+            )
+        }
+        findViewById<Button>(R.id.dev_warn_test).setOnClickListener {
+            Timber.w("Nyx ACRA warn test — untagged, must NOT reach the server")
         }
     }
 

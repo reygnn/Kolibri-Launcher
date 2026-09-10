@@ -6,11 +6,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Binds the crash-report consent repository within :feature-crashreporting.
- *
- * Moved here from Kolibri's :data `RepositoryModule` so :data no longer
- * references any crash-reporting type — that keeps the dependency one-way
- * (:app → :feature → :core), with no :data ↔ :feature cycle.
+ * Binds the crash-report consent collaborators within :feature-crashreporting so
+ * BOTH apps get them (they were split across Kolibri's :data RepositoryModule and
+ * :app AppModule). Keeps the dependency one-way (:app → :feature → :core), no
+ * :data ↔ :feature cycle, and makes ConsentController providable in every app.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -19,4 +18,12 @@ abstract class CrashReportConsentBindingModule {
     abstract fun bindCrashReportConsentRepository(
         impl: CrashReportConsentRepositoryImpl,
     ): CrashReportConsentRepository
+
+    @Binds
+    abstract fun bindAcraToggle(impl: AcraToggleImpl): AcraToggle
+
+    @Binds
+    abstract fun bindConsentSaveFailureNotifier(
+        impl: ConsentSaveFailureNotifierImpl,
+    ): ConsentSaveFailureNotifier
 }
