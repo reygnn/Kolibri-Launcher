@@ -1,6 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
-import com.github.reygnn.nyx_launcher.di.DefaultDispatcher
+import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.ReconcileOutcome

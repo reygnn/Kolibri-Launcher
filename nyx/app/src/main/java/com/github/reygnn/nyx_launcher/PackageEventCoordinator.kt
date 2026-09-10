@@ -5,7 +5,7 @@ import android.content.pm.LauncherApps
 import android.os.UserHandle
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
-import com.github.reygnn.nyx_launcher.di.IoDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher

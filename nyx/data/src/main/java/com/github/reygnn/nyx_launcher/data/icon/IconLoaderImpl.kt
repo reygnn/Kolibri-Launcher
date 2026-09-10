@@ -4,7 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.github.reygnn.nyx_launcher.di.IoDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext

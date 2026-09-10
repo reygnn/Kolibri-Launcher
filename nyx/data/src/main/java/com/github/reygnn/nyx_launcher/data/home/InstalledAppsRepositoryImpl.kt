@@ -3,7 +3,7 @@ package com.github.reygnn.nyx_launcher.data.home
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.os.Process
-import com.github.reygnn.nyx_launcher.di.IoDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
 import com.github.reygnn.nyx_launcher.home.model.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
