@@ -1,0 +1,83 @@
+package com.github.reygnn.kolibri_launcher.domain.model
+
+import com.github.reygnn.kolibri_launcher.core.ComponentKey
+
+/**
+ * Pure-Kotlin immutable data class for a text-based launcher entry.
+ *
+ * Holds the minimum information about an installed app and has no Android-framework
+ * dependencies — neither Context/Drawable nor Parcelable. The UI layer wraps this
+ * type via `AppInfoParcelable` for Bundle/Intent transport.
+ */
+data class AppInfo(
+    val originalName: String,
+    val displayName: String,
+    val packageName: String,
+    val className: String,
+    val isFavorite: Boolean = false
+) {
+    /**
+     * Precomputed lowercase sort key for [displayName].
+     *
+     * Computed once per instance (and correctly recomputed on
+     * `copy(displayName = …)`, since `copy` runs through the constructor), so name
+     * sorts do not reallocate a `lowercase()` per comparison — the O(N·log N)
+     * allocations in the comparator collapse to O(N) at instance creation
+     * (AUDIT-14 Nit §208).
+     *
+     * Deliberately a body `val` and **not** a constructor parameter, so it stays
+     * out of `equals`/`hashCode`/`toString`/`componentN`; the equals-based Flow
+     * `distinctUntilChanged` therefore behaves unchanged. `lowercase()` is
+     * locale-invariant, so the ordering is identical to the former comparator calls.
+     */
+    val displayNameLower: String = displayName.lowercase()
+
+    /**
+     * The [className] in its long form: a leading-dot relative spelling
+     * (`.Activity`) is expanded to `package.Activity`, a fully-qualified name is
+     * left untouched. Android accepts both spellings, but an explicit
+     * `ComponentName` used to launch must carry the fully-qualified class — the
+     * system resolves the activity by exact class-name match against the parsed
+     * manifest (which stores long-form names), so a relative spelling would fail
+     * to resolve. This is the single source of truth for that normalization,
+     * shared by [componentName] (identity) and by the launcher (`AppLauncherImpl`
+     * builds its `ComponentName` from this, not from raw [className]).
+     *
+     * A body `val` (declared before [componentName], so it is initialized first),
+     * which — like [displayNameLower] and [componentName] — keeps it out of
+     * `equals`/`hashCode`/`copy`/`componentN`.
+     */
+    val normalizedClassName: String =
+        if (className.startsWith(".")) "$packageName$className" else className
+
+    /**
+     * Ein eindeutiger Bezeichner für einen spezifischen Launcher-Eintrag.
+     * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
+     * (z.B. "Google" und "Voice Search").
+     *
+     * Normalisiert automatisch Kurzform (/.Activity) zu Langform (package.Activity)
+     * für konsistenten Vergleich, da Android beide Schreibweisen zulässt.
+     *
+     * z.B. "com.android.chrome/com.google.android.apps.chrome.Main"
+     */
+    /**
+     * The canonical structured identity of this entry.
+     *
+     * Carries the normalized (long-form) class name, so [key] and [componentName]
+     * never disagree; [ComponentKey.flat] is the single definition of the
+     * flattened wire format and [componentName] is now merely its projection.
+     *
+     * A body `val` (declared before [componentName], so it is initialized first),
+     * which — like [displayNameLower], [normalizedClassName] and [componentName] —
+     * keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
+     */
+    val key: ComponentKey = ComponentKey(packageName, normalizedClassName)
+
+    // Precomputed once per instance (body val, so it stays out of
+    // equals/hashCode/copy just like displayNameLower) — the former getter
+    // recomputed the concat on every read, and componentName is read on
+    // essentially every AppInfo (hidden-filter, favorites membership, DiffUtil
+    // identity), including twice per AppInfoDiffCallback comparison (AUDIT-14
+    // Nit §212). Projection of [key]: byte-for-byte the historical value.
+    val componentName: String = key.flat
+}

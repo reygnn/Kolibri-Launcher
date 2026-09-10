@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nyx</string>
+    <string name="folder_default_title">Ordner</string>
+    <string name="remove_from_home">Vom Startbildschirm entfernen</string>
+    <string name="settings_backup_title">Sichern &amp; Wiederherstellen</string>
+    <string name="monochrome_icons">Monochrome Symbole</string>
+    <string name="backup_export">Layout exportieren</string>
+    <string name="backup_import">Layout importieren</string>
+    <string name="backup_export_done">Layout exportiert</string>
+    <string name="backup_export_failed">Export fehlgeschlagen</string>
+    <string name="backup_import_done">Layout importiert</string>
+    <string name="backup_import_failed">Datei konnte nicht gelesen werden</string>
+    <string name="backup_import_invalid">Ungültige Sicherungsdatei</string>
+</resources>

@@ -1,0 +1,107 @@
+name: Android CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Convention linter (CLAUDE.md Rules 9/11/12, naming, Toast routing,
+      # cancellation-rethrow discipline). Runs first as a fast-fail gate so a
+      # swallowed CancellationException or a bare Timber.e cannot merge to main
+      # unnoticed — the check only fired on manual `./gradlew checkConventions`
+      # before. File-based scan, needs no git history.
+      - name: Run convention linter
+        run: ./gradlew checkConventions --stacktrace
+
+      # `:domain` is a pure-Kotlin JVM module (`kotlin("jvm")`), so it has no
+      # debug variant and NO `testDebugUnitTest` task — `./gradlew
+      # testDebugUnitTest` alone silently skipped it entirely. That left 365
+      # tests across 49 files (the use-case and domain-model layer) unverified
+      # in CI while the run still reported green. `:domain:test` is named
+      # explicitly rather than using a bare `./gradlew test`, which would also
+      # build the release unit-test variant of the two Android modules for no
+      # added coverage.
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest :domain:test --stacktrace
+
+      - name: Generate coverage report
+        run: ./gradlew jacocoTestReport
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      # Android Lint. Grandfathered by app/lint-baseline.xml (45 pre-existing
+      # warnings) so this only fails on NEW findings + the error-promoted
+      # checks (MissingTranslation/DefaultResource, UnusedResources — see the
+      # lint {} block). False positives / Rule-9 exceptions live in app/lint.xml.
+      # Regenerate the baseline after a deliberate cleanup:
+      # ./gradlew :app:updateLintBaseline
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --stacktrace
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-debug.html
+          retention-days: 14
+
+      # Build the debug APK as a packaging gate (catches manifest/resource/
+      # assembly errors the unit tests don't). The APK is intentionally NOT
+      # uploaded as an artifact — releases ship via local `bundleRelease` +
+      # install-aab.sh, so a CI debug APK was never downloaded and just
+      # filled the Actions storage quota (~2.8 GB of stale app-debug copies).
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      # Compile-only gate for the on-device :macrobenchmark module so it cannot
+      # rot against app changes (e.g. a renamed LaunchTrace section would break
+      # the custom TraceMetric). The benchmark is NOT run here: it needs a REAL
+      # device (perf on a hosted emulator is noise) and runs locally via
+      # `./gradlew :macrobenchmark:connectedBenchmarkAndroidTest` +
+      # `:macrobenchmark:verifyLaunchBenchmark`. This step triggers only
+      # :macrobenchmark tasks — no app build, no signing, no device.
+      - name: Compile macrobenchmark module
+        run: ./gradlew :macrobenchmark:compileBenchmarkSources --stacktrace
+
+      # Same rot-guard for the on-device :baselineprofile producer module (the
+      # BaselineProfileRule generator). Compile-only: the actual profile is
+      # generated locally on a real device via `./gradlew :app:generateBaselineProfile`
+      # (needs an unlocked, past-onboarding device — perf/instrumentation on a
+      # hosted emulator is noise). No app build, no signing, no device here.
+      - name: Compile baselineprofile module
+        run: ./gradlew :baselineprofile:compileNonMinifiedReleaseSources --stacktrace
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: app/build/test-results/
+          retention-days: 14

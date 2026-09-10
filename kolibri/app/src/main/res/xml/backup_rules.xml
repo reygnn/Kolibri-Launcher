@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy full-backup rules (fullBackupContent, only used on Android <= 11;
+  inert on this app's minSdk 36 but kept for completeness). Mirrors
+  data_extraction_rules.xml: back up the whole datastore/ dir and exclude
+  the ACRA consent store. The consent filename mirrors
+  AppConstants.CONSENT_DATASTORE_NAME and is drift-guarded by
+  BackupRulesSsotTest.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/" />
+    <exclude domain="file" path="datastore/acra_consent.preferences_pb" />
+</full-backup-content>

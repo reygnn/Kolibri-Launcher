@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- com.android.test module: the AGP plugin injects the <instrumentation> tag
+     and the target-package wiring from targetProjectPath. Nothing else needed. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

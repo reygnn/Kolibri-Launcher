@@ -1,0 +1,81 @@
+<resources>
+    <!-- =============================================================== -->
+    <!-- == GENERAL LAYOUT & SPACING                                  == -->
+    <!-- =============================================================== -->
+    <dimen name="layout_padding">24dp</dimen>
+    <dimen name="spacing_tiny">0.5dp</dimen>
+    <dimen name="spacing_small">4dp</dimen>
+    <dimen name="spacing_medium">8dp</dimen>
+    <dimen name="spacing_large">16dp</dimen>
+    <dimen name="spacing_xlarge">48dp</dimen>
+
+    <!-- App-list row metrics shared by the app drawer (item_app_drawer) and
+         the swipe-down recent-apps dialog (item_recent_app), so the two
+         "matching" lists stay in lockstep instead of drifting. -->
+    <dimen name="app_row_text_size">18sp</dimen>
+    <dimen name="app_row_padding_horizontal">16dp</dimen>
+    <dimen name="app_row_padding_vertical">12dp</dimen>
+    <!-- Klickflächen-Padding für bessere Barrierefreiheit -->
+    <dimen name="touch_target_padding">6dp</dimen>
+
+    <!-- Leading type icon (alarm / calendar vector) in the double-tap
+         time-based-events dialog rows. Tinted at runtime to the row's
+         wallpaper-aware text colour, replacing the old inline emoji glyph.
+         Sized to the row text (app_row_text_size = 18sp) with a small gap. -->
+    <dimen name="events_dialog_icon_size">24dp</dimen>
+    <dimen name="events_dialog_icon_padding">12dp</dimen>
+
+    <!-- =============================================================== -->
+    <!-- == HOME FRAGMENT                                             == -->
+    <!-- =============================================================== -->
+    <!-- Text sizes -->
+    <dimen name="text_size_time">60sp</dimen>
+    <dimen name="text_size_secondary_info">18sp</dimen> <!-- For date and battery -->
+    <dimen name="text_size_hint">14sp</dimen> <!-- Wallpaper-edit hint TextView -->
+
+    <!-- Event indicators (alarm / calendar) next to the clock, drawn by
+         OutlinedImageView from the two-layer ic_*_outlined drawables (fill + crisp
+         outline). The outline rim is baked INSIDE the vector viewport (via a 0.8
+         group scale that reserves margin), so unlike the old multi-copy approach
+         the padding no longer needs to reserve room for it — it only sets the
+         inter-icon gap (2×events_icon_padding = 8dp) and the box inset.
+         The size is tuned so the stacked pair's visible marks span the clock's
+         DIGIT height (~43dp at 60sp), positioned onto the digits by a vertical
+         bias on the packed chain in fragment_home.xml (the timeText view box is
+         much taller than its glyphs due to font padding, so the pair aligns to the
+         digits, not the view edges).
+         NOTE the coupling to the vector stroke: on-screen stroke =
+         strokeWidth * 0.8(group) * (size - 2*padding) / 24. The vectors keep
+         strokeWidth 2.8 (fill) / 5.8 (outline) and simply SCALE with this size —
+         at 28dp − 8dp = 20dp content that is ~1.9dp fill and ~1.0dp outline peek
+         (= TEXT_OUTLINE_WIDTH_DP/2, matching the clock/date text's outward stroke;
+         the outline tracks the text's tonal stroke in colour and style too). Resize
+         and the whole mark scales together; only re-derive the strokeWidths if you
+         need to hold an ABSOLUTE on-screen line width. -->
+    <dimen name="events_icon_size">28dp</dimen>
+    <dimen name="events_icon_padding">4dp</dimen>
+
+    <!-- Wallpaper-edit overflow panel: slide-in distance for the
+         show/hide animation. Density-aware so the offset is visible
+         on high-dpi displays. -->
+    <dimen name="wallpaper_panel_slide_distance">24dp</dimen>
+
+    <!-- Elevations -->
+    <dimen name="elevation_card">4dp</dimen>
+     
+    <!-- =============================================================== -->
+    <!-- == BOTTOM-SHEET DIALOGS (colour / layout customisation)      == -->
+    <!-- =============================================================== -->
+    <!-- Shared corner radius so both draggable sheets round identically. -->
+    <dimen name="dialog_corner_radius">8dp</dimen>
+    <!-- Drag-handle touch area: a comfortable grab target. Kept narrow enough
+         (72dp) that the centred handle doesn't collide with the end-aligned
+         Reset button in the layout dialog. -->
+    <dimen name="drag_handle_touch_width">72dp</dimen>
+    <dimen name="drag_handle_touch_height">24dp</dimen>
+    <!-- Visible pill, drawn centred inside the touch area (drag_handle.xml).
+         Sized independently of the touch area, so the two can be tuned
+         separately. -->
+    <dimen name="drag_handle_pill_width">40dp</dimen>
+    <dimen name="drag_handle_pill_height">4dp</dimen>
+</resources>

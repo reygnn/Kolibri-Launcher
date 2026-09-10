@@ -1,0 +1,24 @@
+# Build / Gradle
+build/
+.gradle/
+local.properties
+*.hprof
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# Secrets — never commit (family key credentials, per global CLAUDE.md)
+keystore.properties
+secrets.properties
+*.keystore
+*.jks
+
+# APK / mapping / runtime artifacts carried over from the Kolibri import
+**/apk/
+mapping/
+tombstones/
+monkey_reports/
+acra-source_*/
+tmp/

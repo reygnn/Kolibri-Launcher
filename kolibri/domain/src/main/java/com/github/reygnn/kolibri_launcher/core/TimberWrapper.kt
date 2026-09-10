@@ -1,0 +1,195 @@
+package com.github.reygnn.kolibri_launcher.core
+
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.system.exitProcess
+
+/**
+ * Wrapper für Timber mit Build-Type-abhängigem Verhalten.
+ *
+ * ENTWICKLUNG (DEBUG): Fehler werfen Exception → Sofortiger Crash → Bug sofort sichtbar
+ * PRODUKTION (RELEASE): Fehler nur loggen → App läuft weiter → User merkt nichts
+ *
+ * Das löst das "Fail Fast vs. Fail Safe" Dilemma:
+ * - Während der Entwicklung soll der Launcher LAUT crashen
+ * - In Produktion soll der Launcher STILL weiterlaufen
+ */
+object TimberWrapper {
+
+    /**
+     * Intent tag for `silentError` / `silentDeath`: routes the entry to ACRA
+     * AND marks it for DEBUG dev-toast suppression (a silentError already throws
+     * in DEBUG, so a toast would be redundant — see `BaseActivity.handleErrorEvent`).
+     */
+    const val SILENT_LOG_TAG = "SILENT_ERROR"
+
+    /**
+     * Intent tag for crash-infra / ANR / watchdog reports delivered via
+     * [reportToAcra]. Routes to ACRA like [SILENT_LOG_TAG] but does NOT suppress
+     * the DEBUG dev-toast: these paths do not throw in DEBUG, so the toast is a
+     * wanted dev signal. `AcraTree` gates on either intent tag; nothing else
+     * reaches ACRA ("report by intent", not by log level).
+     */
+    const val ACRA_REPORT_TAG = "ACRA_REPORT"
+
+    // Ein Schalter für Tests. Standardmässig false (aus).
+    // AtomicBoolean für Thread-Safety, falls Tests parallel laufen.
+    // val reicht, da AtomicBoolean intern mutable ist.
+    val preventCrashForTesting = AtomicBoolean(false)
+
+    /**
+     * Whether the app is running a DEBUG build. The `:app` module sets this
+     * once at startup from `BuildConfig.DEBUG` (see `KolibriLauncherApp`),
+     * because :domain is a pure-Kotlin module without its own BuildConfig.
+     *
+     * Volatile because read from arbitrary threads via [silentError].
+     * Default `false` is the safe fallback — production behaviour for
+     * any caller that runs before [KolibriLauncherApp]'s init has wired
+     * the flag.
+     */
+    @Volatile
+    var isDebugBuild: Boolean = false
+
+    /**
+     * Loggt einen Fehler, der nur im Logcat erscheinen soll.
+     * In DEBUG-Builds wird zusätzlich eine Exception geworfen für sofortige Sichtbarkeit.
+     *
+     * Three-way reporting contract:
+     * - `silentError(throwable, message)` — throw-in-DEBUG **and** report to ACRA
+     *   in RELEASE (SILENT_ERROR tag + non-null throwable, so `AcraTree` delivers).
+     * - [silentError] `(message)` — throw-in-DEBUG **but NOT reported** (no
+     *   throwable → dropped by `AcraTree`'s `t == null` gate). The deliberate
+     *   channel for "programmer error, loud in DEV, not worth a RELEASE report"
+     *   (self-healing artefacts, expected-degradation guards). If a RELEASE report
+     *   is wanted, use the `(throwable, message)` overload with a real cause.
+     * - [silentDeath] — die **and** report (see below).
+     */
+    fun silentError(throwable: Throwable, message: String) {
+        KolibriLog.taggedError(SILENT_LOG_TAG, throwable, message)
+        crashInDebug(throwable, message)
+    }
+
+    /** Throw-in-DEBUG only, NOT reported to ACRA — see the class contract on the
+     *  `(throwable, message)` overload. */
+    fun silentError(message: String) {
+        KolibriLog.taggedError(SILENT_LOG_TAG, null, message)
+        crashInDebug(null, message)
+    }
+
+    /**
+     * Report to ACRA by intent WITHOUT the DEBUG throw — for crash-infra / ANR /
+     * watchdog that must not re-enter the safety net they guard (Rule 9). Tags
+     * [ACRA_REPORT_TAG] so `AcraTree` routes it; no `crashInDebug`, so it is safe
+     * to call from a `CoroutineExceptionHandler` or the crash pipeline itself.
+     */
+    fun reportToAcra(throwable: Throwable, message: String) {
+        KolibriLog.taggedError(ACRA_REPORT_TAG, throwable, message)
+    }
+
+    fun silentError(throwable: Throwable) {
+        KolibriLog.taggedError(SILENT_LOG_TAG, throwable, throwable.message ?: "Unknown error")
+        crashInDebug(throwable, throwable.message ?: "Unknown error")
+    }
+
+    /**
+     * In Debug-Builds: Exception werfen für sofortige Crash-Sichtbarkeit.
+     * In Release-Builds: Nichts tun (Fehler wurde bereits geloggt).
+     */
+    private fun crashInDebug(cause: Throwable?, message: String) {
+        // Wenn der Test-Modus aktiv ist, brich hier ab -> Kein Crash!
+        if (preventCrashForTesting.get()) {
+            return
+        }
+
+        if (isDebugBuild) {
+            throw RuntimeException("SILENT_ERROR caught: $message", cause)
+        }
+    }
+
+    // ============================================================================
+    // SILENT DEATH — kontrolliertes Sterben in Lügen-Pfaden
+    // ============================================================================
+    //
+    // Ergänzung zu [silentError] für Pfade, in denen ein silent-fail nicht
+    // tolerierbar ist, weil die App danach in einem Zustand weiterlaufen würde,
+    // der dem User Korrektheit vortäuscht (halb-migrierte DataStore, falsch
+    // angenommener "First Launch", Activity ohne ViewModel, Endlos-Restart-
+    // Schleife einer Home-Activity nach finish()).
+    //
+    // Verhalten:
+    // - preventCrashForTesting==true: wirft RuntimeException, damit Tests
+    //   den Pfad assert-en können statt die JVM zu beenden.
+    // - sonst (DEBUG wie RELEASE): loggt FATAL, gibt dem ACRA-Sender ~100 ms
+    //   zum Flushen, dann exitProcess(1). Android startet HOME ggf. neu —
+    //   aber sauber, nicht in einem zombiehaft halb-toten State.
+    //
+    // Warum auch DEBUG exit statt throw: die Aufrufer von silentDeath sind
+    // typischerweise von paranoiden äußeren catch(Throwable)-Blöcken umgeben
+    // (KolibriLauncherApp). Ein DEBUG-Throw wird dort
+    // geschluckt, der Senior sieht nichts Fatales, und die App läuft mit
+    // demselben lügenden State weiter, den silentDeath verhindern soll.
+    // exitProcess(1) ist uncatchable und damit der einzige verlässliche Tod.
+    // Die Symmetrie zu silentError (das in DEBUG wirft) geht damit verloren —
+    // bewusst, weil silentDeath semantisch ein anderes Tier ist (Tod statt
+    // Fail-Safe). ACRA liefert in beiden Build-Typen den FATAL-Report.
+    //
+    // Return-Typ Nothing: der Compiler weiß, dass nach silentDeath kein
+    // Code mehr ausgeführt wird — keine if-else Verrenkungen am Aufrufort.
+
+    /**
+     * FATAL death without an existing cause. Synthesizes a carrier so the death
+     * actually reaches ACRA: `die()` routes the cause through
+     * `taggedError(SILENT_LOG_TAG, cause, …)`, and `AcraTree` requires a non-null
+     * throwable — a `null` cause here would be dropped and the death would exit
+     * the process invisibly. The synthetic carrier also becomes the
+     * `preventCrashForTesting` throw cause (tests assert on it).
+     */
+    fun silentDeath(message: String): Nothing {
+        die(cause = RuntimeException(message), message = message)
+    }
+
+    fun silentDeath(throwable: Throwable, message: String): Nothing {
+        die(cause = throwable, message = message)
+    }
+
+    private fun die(cause: Throwable?, message: String): Nothing {
+        // Loggen muss vor allem anderen passieren — wenn das Logging selbst
+        // failt, bringen weder ACRA-Flush noch exit den User-relevanten
+        // Hinweis ins ACRA-Backend.
+        try {
+            KolibriLog.taggedError(SILENT_LOG_TAG, cause, "FATAL: $message")
+        } catch (ignored: Throwable) {
+            // Last-resort log via System.err — JVM-only, can never depend on
+            // android.util.Log here because :domain is a pure-Kotlin module
+            // that cannot import Android types. Wrapped in a defensive catch:
+            // if even println throws (e.g. closed stderr), there is nothing
+            // left to salvage.
+            try {
+                System.err.println("[$SILENT_LOG_TAG] FATAL: $message")
+                cause?.printStackTrace(System.err)
+            } catch (ignored2: Throwable) {
+                // Wenn auch das failt, gibt's nichts mehr zu retten.
+            }
+        }
+
+        // Nur Tests werfen — sie wollen den Pfad assert-en, nicht die JVM
+        // beenden. Alle echten Builds (DEBUG wie RELEASE) sterben unten via
+        // exitProcess, weil ein Throw von äußeren catch(Throwable)-Blöcken
+        // geschluckt würde und silentDeath dann genau das nicht erreicht,
+        // wozu es da ist: den lügenden State zu beenden.
+        if (preventCrashForTesting.get()) {
+            throw RuntimeException("SILENT_DEATH: $message", cause)
+        }
+
+        // Dem ACRA-Sender (Worker-Thread) eine kleine Chance geben,
+        // den FATAL-Report rauszupusten, bevor der Process stirbt. 100 ms
+        // ist ein Kompromiss — kürzer und der Sender steht noch im Queue;
+        // länger und der User sieht eine fühlbare Pause.
+        try {
+            Thread.sleep(100)
+        } catch (ignored: InterruptedException) {
+            // Best-effort flush — bei Interrupt einfach weiter zum Exit.
+        }
+
+        exitProcess(1)
+    }
+}

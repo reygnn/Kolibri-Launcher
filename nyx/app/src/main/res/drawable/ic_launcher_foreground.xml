@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Crescent moon (Nyx = night): outer disc carved by an offset disc. -->
+    <path
+        android:fillColor="#EDEDF5"
+        android:fillType="evenOdd"
+        android:pathData="M28,54 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 z
+                          M42,50 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0 z" />
+    <!-- A couple of small stars. -->
+    <path android:fillColor="#EDEDF5" android:pathData="M78,34 l1.6,3.4 l3.4,1.6 l-3.4,1.6 l-1.6,3.4 l-1.6,-3.4 l-3.4,-1.6 l3.4,-1.6 z" />
+    <path android:fillColor="#B8B8D0" android:pathData="M70,72 l1.1,2.4 l2.4,1.1 l-2.4,1.1 l-1.1,2.4 l-1.1,-2.4 l-2.4,-1.1 l2.4,-1.1 z" />
+</vector>

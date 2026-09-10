@@ -1,0 +1,177 @@
+package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
+import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.ui.util.toStringResId
+
+class AppContextMenuAdapter(
+    private val onItemClicked: (AppContextMenuAction) -> Unit
+) : ListAdapter<AppContextMenuAction, RecyclerView.ViewHolder>(ActionDiffCallback()) {
+
+    /**
+     * Foreground colour for action labels. Mirrors AppDrawerAdapter's
+     * pattern — the host fragment observes the wallpaper-driven surface
+     * classification and pushes the right colour here. Null means
+     * "fall back to the Material3 theme colour", which is how the
+     * adapter behaves before the first emission.
+     */
+    private var actionTextColor: Int? = null
+
+    fun setActionTextColor(color: Int) {
+        if (actionTextColor == color) return
+        actionTextColor = color
+        // Colour-only payload: rebind just the label colour on the visible
+        // rows instead of re-running the full bind (label lookup incl.
+        // getString). Mirrors AppDrawerAdapter.setUiColors /
+        // HomeFavoritesAdapter.setStyling — the consistency half of AUDIT-15 F6.
+        notifyItemRangeChanged(0, itemCount, COLOR_PAYLOAD)
+    }
+
+    /**
+     * Bestimmt, welches Layout für welches Element in der Liste verwendet werden soll.
+     */
+    override fun getItemViewType(position: Int): Int {
+        return when (getItem(position)) {
+            is AppContextMenuAction.Separator -> VIEW_TYPE_SEPARATOR
+            else -> VIEW_TYPE_ACTION
+        }
+    }
+
+    /**
+     * Erstellt den korrekten ViewHolder basierend auf dem View-Typ.
+     */
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return when (viewType) {
+            VIEW_TYPE_ACTION -> {
+                val view = inflater.inflate(R.layout.item_context_menu_action, parent, false)
+                val holder = ActionViewHolder(view)
+                // Listener hoisted to creation instead of re-wired on every
+                // bind (AUDIT-15 F6): one allocation per holder, and the click
+                // resolves its item via bindingAdapterPosition at click time.
+                // Same idiom as AppDrawerAdapter / HomeFavoritesAdapter.
+                holder.itemView.setOnClickListener {
+                    val position = holder.bindingAdapterPosition
+                    if (position != RecyclerView.NO_POSITION) {
+                        onItemClicked(getItem(position))
+                    }
+                }
+                holder
+            }
+            VIEW_TYPE_SEPARATOR -> {
+                val view = inflater.inflate(R.layout.item_context_menu_separator, parent, false)
+                SeparatorViewHolder(view)
+            }
+            else -> throw IllegalArgumentException("Invalid view type")
+        }
+    }
+
+    /**
+     * Bindet die Daten an den jeweiligen ViewHolder.
+     */
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (holder) {
+            is ActionViewHolder -> holder.bind(getItem(position), actionTextColor)
+            is SeparatorViewHolder -> {
+                // Keine Daten zu binden, keine Klicks zu behandeln.
+            }
+        }
+    }
+
+    /**
+     * Partial rebind for [COLOR_PAYLOAD]: re-applies the label colour only,
+     * without re-resolving the label text (the per-bind getString for a
+     * LauncherAction). Empty payloads fall through to the full
+     * [onBindViewHolder]. Same shape as AppDrawerAdapter's payload override.
+     */
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>,
+    ) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
+        // The only payload this adapter emits is COLOR_PAYLOAD; the separator
+        // holder has no label to recolour.
+        if (holder is ActionViewHolder) {
+            holder.applyColor(actionTextColor)
+        }
+    }
+
+    /**
+     * ViewHolder für klickbare Aktionen (Shortcuts und LauncherActions).
+     */
+    class ActionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val labelView: TextView = itemView.findViewById(R.id.actionLabel)
+
+        fun bind(action: AppContextMenuAction, textColor: Int?) {
+            labelView.text = when (action) {
+                is AppContextMenuAction.Shortcut -> action.shortcut.shortLabel
+                is AppContextMenuAction.LauncherAction ->
+                    itemView.context.getString(action.label.toStringResId())
+                // Dieser Fall sollte nie eintreten, da der Separator seinen eigenen ViewHolder hat.
+                is AppContextMenuAction.Separator -> ""
+            }
+            applyColor(textColor)
+        }
+
+        /** Applies the label colour only. Shared by [bind] and the [COLOR_PAYLOAD] rebind. */
+        fun applyColor(textColor: Int?) {
+            textColor?.let(labelView::setTextColor)
+        }
+    }
+
+    /**
+     * Ein einfacher ViewHolder, der nur das Layout für den Trenner hält.
+     */
+    class SeparatorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+
+    /**
+     * DiffUtil Callback, der nun alle drei Typen der sealed class kennt.
+     */
+    private class ActionDiffCallback : DiffUtil.ItemCallback<AppContextMenuAction>() {
+        override fun areItemsTheSame(oldItem: AppContextMenuAction, newItem: AppContextMenuAction): Boolean {
+            return when {
+                oldItem is AppContextMenuAction.Shortcut && newItem is AppContextMenuAction.Shortcut ->
+                    oldItem.shortcut.id == newItem.shortcut.id
+                oldItem is AppContextMenuAction.LauncherAction && newItem is AppContextMenuAction.LauncherAction ->
+                    oldItem.id == newItem.id
+                oldItem is AppContextMenuAction.Separator && newItem is AppContextMenuAction.Separator ->
+                    true // Es gibt nur einen Separator-Typ.
+                else -> false
+            }
+        }
+
+        override fun areContentsTheSame(oldItem: AppContextMenuAction, newItem: AppContextMenuAction): Boolean {
+            // Mirrors areItemsTheSame so Lint sees the concrete data-class / object types
+            // after smart-cast — DiffUtilEquals can't prove equals() on the sealed parent.
+            return when {
+                oldItem is AppContextMenuAction.Shortcut && newItem is AppContextMenuAction.Shortcut ->
+                    oldItem == newItem
+                oldItem is AppContextMenuAction.LauncherAction && newItem is AppContextMenuAction.LauncherAction ->
+                    oldItem == newItem
+                oldItem is AppContextMenuAction.Separator && newItem is AppContextMenuAction.Separator ->
+                    true
+                else -> false
+            }
+        }
+    }
+
+    // Definiere die verschiedenen View-Typen, die der Adapter anzeigen kann.
+    companion object {
+        private const val VIEW_TYPE_ACTION = 0
+        private const val VIEW_TYPE_SEPARATOR = 1
+
+        // Marker payload for the colour-only partial rebind (see setActionTextColor).
+        private val COLOR_PAYLOAD = Any()
+    }
+}

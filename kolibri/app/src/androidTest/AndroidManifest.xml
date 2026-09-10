@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Replaces the production KolibriLauncherApp with HiltTestApplication
+        for all instrumented tests. HiltTestRunner (see testInstrumentationRunner
+        in app/build.gradle.kts) does the actual swap; this manifest entry is
+        what tells the manifest merger to allow the replacement.
+    -->
+    <application
+        android:name="dagger.hilt.android.testing.HiltTestApplication"
+        tools:replace="android:name"
+        android:debuggable="true"
+        tools:ignore="HardcodedDebugMode" />
+
+</manifest>

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/wallpaperContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Layer 0: Custom Wallpaper (unterster Layer) -->
+    <com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+        android:id="@+id/wallpaperView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="matrix"
+        android:visibility="gone" />
+
+    <!-- Layer 0.5: user-controlled home scrim. Above the wallpaper, below the
+         content. Alpha is baked into the background colour (View alpha stays 1 →
+         no offscreen saveLayer). GONE unless the user set a non-zero scrim and
+         not in wallpaper edit mode; driven by HomeFragment.applyScrim. -->
+    <View
+        android:id="@+id/wallpaperScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- Layer 1: Bestehender Content -->
+    <!--
+      Wrapped in HomeGestureLayout (since 2026-05-07) so that the
+      home-screen gestures (directional swipes + long-press) are
+      detected via dispatchTouchEvent at the parent
+      level, while the favoritesRecyclerView inside still receives
+      slow drags normally for scrolling. See homescroll.md and the
+      class KDoc on HomeGestureLayout for the full rationale.
+    -->
+    <com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout
+        android:id="@+id/homeGestureRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/rootLayout"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:padding="@dimen/layout_padding"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/timeContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xlarge"
+            android:orientation="vertical"
+            android:gravity="start">
+
+            <!-- Clock row: the clock glyph plus the two passive events indicators
+                 (alarm + calendar icons) pinned to its trailing side. A ConstraintLayout
+                 (not a horizontal LinearLayout) so the two icons can form a packed
+                 vertical chain, centred against the clock as a tight pair in one column
+                 just past its end (alarm on top, calendar directly below).
+                 Kept INSIDE timeContainer (not a rootLayout corner overlay) so the
+                 indicators travel with the START / CENTER / END alignment that
+                 HomeFragment.applyTimeContainerAlignment mirrors onto timeContainer
+                 — the corner overlay was overlapped by the block when END-aligned. -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/timeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/time_placeholder"
+                    android:textSize="@dimen/text_size_time"
+                    android:textColor="@color/default_text_color"
+                    android:fontFamily="sans-serif-light"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <!-- Two monochrome vector icons stacked as one PACKED pair next to the
+                     clock — alarm on top, calendar directly below it — via a packed
+                     vertical chain (alarm.top→clock.top, calendar.bottom→clock.bottom,
+                     chainStyle=packed on the head). The events_icon_size is tuned so the
+                     pair's visible marks span the clock's DIGIT height, and a vertical
+                     bias (0.58) on the head slides the pair onto the digits: alarm's top
+                     edge flush with the digit top, calendar's bottom edge flush with the
+                     digit bottom. The bias (not plain centring) is needed because the
+                     timeText view box is much taller than its glyphs — 60sp light has
+                     large asymmetric font padding — so a centred pair would sit low and
+                     loose; the bias re-anchors it to the visible digits. The gap between
+                     the two marks is their two paddings (2×events_icon_padding). Each is
+                     shown independently, only
+                     when an upcoming event of its type exists; together they just signal
+                     that events exist — the dialog opens via the home double-tap, the
+                     icons are pure status graphics (NOT clickable). OutlinedImageViews, so
+                     each inherits the SAME adaptive icon-outline + text-colour treatment
+                     as the clock/date/battery (HomeFragment.updateAllColors) — the
+                     src is a two-layer LayerDrawable (ic_*_outlined): a fatter-stroke
+                     outline layer tinted to the tonal contrast colour, and the fill
+                     tinted to the text colour, giving a crisp single-pass rim (the rim
+                     is baked inside the vector viewport, so no padding is needed to
+                     avoid clipping it). The padding here only sets the inter-icon gap
+                     (2×events_icon_padding) and the box inset. Each keeps a FIXED slot:
+                     HomeFragment.updateEventsIndicator toggles INVISIBLE (not GONE) — an
+                     INVISIBLE view still occupies its chain slot, so the pair's size stays
+                     constant and the clock never shifts when an event appears/disappears
+                     (END/CENTER alignment) — hence the initial state here is invisible,
+                     not gone. Each contentDescription supplies the TalkBack label. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/alarmIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_alarm_outlined"
+                    android:contentDescription="@string/events_indicator_alarm_content_description"
+                    android:visibility="invisible"
+                    android:layout_marginStart="@dimen/spacing_medium"
+                    app:layout_constraintStart_toEndOf="@id/timeText"
+                    app:layout_constraintTop_toTopOf="@id/timeText"
+                    app:layout_constraintBottom_toTopOf="@id/calendarIndicator"
+                    app:layout_constraintVertical_chainStyle="packed"
+                    app:layout_constraintVertical_bias="0.58" />
+
+                <!-- Calendar icon, same box size as the alarm icon, in the same column
+                     (start/end to the alarm icon) and the lower link of the packed chain:
+                     top-to-bottom of the alarm icon, bottom-to-bottom of the clock. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/calendarIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_calendar_outlined"
+                    android:contentDescription="@string/events_indicator_calendar_content_description"
+                    android:visibility="invisible"
+                    app:layout_constraintStart_toStartOf="@id/alarmIndicator"
+                    app:layout_constraintEnd_toEndOf="@id/alarmIndicator"
+                    app:layout_constraintTop_toBottomOf="@id/alarmIndicator"
+                    app:layout_constraintBottom_toBottomOf="@id/timeText" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="@dimen/spacing_small">
+
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/dateText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_placeholder"
+                    android:textSize="@dimen/text_size_secondary_info"
+                    android:textColor="@color/default_text_color"
+                    android:padding="@dimen/touch_target_padding" />
+
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
+                    android:id="@+id/batteryText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/battery_placeholder"
+                    android:textSize="@dimen/text_size_secondary_info"
+                    android:textColor="@color/default_text_color"
+                    android:padding="@dimen/touch_target_padding"
+                    android:layout_marginStart="@dimen/spacing_medium" />
+
+                <!-- Charging bolt shown only while the battery is charging (GONE
+                     otherwise, so it collapses cleanly at the row's end without a
+                     reserved slot). Same OutlinedImageView + two-layer vector as the
+                     alarm/calendar indicators, so it gets the identical adaptive icon
+                     colour + tonal outline in HomeFragment.updateAllColors. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/chargingIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_bolt_outlined"
+                    android:contentDescription="@string/charging_indicator_content_description"
+                    android:visibility="gone"
+                    android:layout_marginStart="@dimen/spacing_tiny" />
+
+                <!-- Battery-protection shield, shown only while the charge is held
+                     (plugged but not charging). Mutually exclusive with the bolt above,
+                     so at most one is VISIBLE; both GONE otherwise. Same OutlinedImageView
+                     + two-layer vector treatment (adaptive icon colour + tonal outline in
+                     HomeFragment.updateAllColors). -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/protectedIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_shield_outlined"
+                    android:contentDescription="@string/battery_protection_indicator_content_description"
+                    android:visibility="gone"
+                    android:layout_marginStart="@dimen/spacing_tiny" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/favoritesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="@dimen/spacing_medium"
+            android:orientation="horizontal"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/favoritesRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="none"
+                android:overScrollMode="ifContentScrolls" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    </com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
+
+    <!--
+      Layer 2: Edit-Mode Overlay — lazily inflated.
+
+      Behind a ViewStub so the CommandsPanel + SpeedDialFabCluster (~47ms
+      of layout inflation) are NOT built on every launcher cold start;
+      this UI is only ever shown in wallpaper-edit mode. WallpaperEditController
+      inflates the stub on first edit-mode entry and toggles VISIBLE/GONE
+      afterwards. Placed at the same (last) child index as the former
+      overlay so its z-order above Layer 1 is unchanged. See the
+      cold_start_* Perfetto measurement (feature/lazy-wallpaper-fab).
+    -->
+    <ViewStub
+        android:id="@+id/wallpaperEditOverlayStub"
+        android:layout="@layout/view_wallpaper_edit_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</FrameLayout>

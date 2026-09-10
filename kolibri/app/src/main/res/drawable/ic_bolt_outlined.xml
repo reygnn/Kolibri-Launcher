@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Composite charging indicator used as the OutlinedImageView src: the fatter-stroke
+  outline layer underneath, the fill on top. OutlinedImageView tints the TOP layer
+  with the icon (text) colour and every layer below it with the tonal outline colour
+  (and hides them when the outline is disabled). Layer order = paint order, so the
+  outline must come first. See OutlinedImageView for the tinting convention.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_bolt_outline" />
+    <item android:drawable="@drawable/ic_bolt" />
+</layer-list>

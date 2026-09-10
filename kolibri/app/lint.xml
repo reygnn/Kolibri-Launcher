@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- FALSE POSITIVE: file_paths.xml is referenced from the manifest
+         FileProvider (<meta-data android:resource="@xml/file_paths">), which
+         lint's UnusedResources analysis does not see. Keep it. -->
+    <issue id="UnusedResources">
+        <ignore regexp="res/xml/file_paths\.xml" />
+    </issue>
+
+    <!-- CLAUDE.md Rule 9: these files sit INSIDE the crash-reporting pipeline
+         and intentionally use android.util.Log, NOT Timber. A Timber.e here
+         would re-enter the process-wide AcraTree and double-send the crash
+         (silent carrier + fatal auto-report), or recurse on the bootstrap
+         path. So LogNotTimber is by-design for exactly these files.
+         (ZoomableImageView is deliberately NOT listed — its LogNotTimber is a
+         genuine finding, left in the baseline.) -->
+    <issue id="LogNotTimber">
+        <ignore regexp="(AcraTree|UncaughtCrashHandler|CrashReportingBootstrap|KolibriLauncherApp|RecoveryWatchdog)\.kt" />
+    </issue>
+</lint>

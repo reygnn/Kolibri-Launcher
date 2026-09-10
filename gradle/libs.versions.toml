@@ -1,0 +1,230 @@
+# =============================================================================
+# Kolibri Launcher — Gradle Version Catalog
+# =============================================================================
+#
+# IMPORTANT: pinning markers — DO NOT IGNORE
+#   - DO NOT CHANGE    = never modify
+#   - DO NOT UPGRADE   = do not raise version (breaks build or tests)
+#   - DO NOT DOWNGRADE = do not lower version (breaks build or tests)
+#   - OK to upgrade    = safe to raise version on the next pass
+#
+# minSdk = 36 (Android 16), compileSdk = targetSdk = 37 (Android 17, lifted
+# 2026-07-18 for core-ktx 1.19.0) are intentional and live in
+# `app/build.gradle.kts`, not in this catalog. Same for the jvmToolchain
+# (21) and the AndroidX Test runner / executor settings.
+#
+# Cross-cutting constraints to keep in mind when bumping anything:
+#   - `material` MUST resolve before `androidx.appcompat` — see the force()
+#     in `app/build.gradle.kts` resolutionStrategy.
+#   - `kotlin-test` (test) and the Kotlin compiler version MUST match;
+#     mismatching gives "compiler errors" rather than a clean test failure.
+#   - `acra` and `proguard-rules.pro` must stay in sync: ACRA's own keep rules
+#     ship as consumer rules in its AAR, our file only adds the app-side
+#     pieces (BuildConfig reflection, Throwable names, AutoService dontwarn).
+#     Bumping ACRA can change what those consumer rules cover — re-verify a
+#     release build (configuration.txt) after any bump.
+#   - `fragment` (fragment-ktx and fragment-testing) MUST share one version.
+#
+# -----------------------------------------------------------------------------
+# QUARTERLY RECHECK PROCESS  (TODO.md §10)
+# -----------------------------------------------------------------------------
+#
+# Pins decay: a "DO NOT UPGRADE" that was correct in 2025 may be karavanen-
+# aberglaube in 2027. To keep pin discipline from rotting into cargo cult,
+# every quarter (~30 min) walk every pin and either re-confirm or lift it.
+#
+# Recheck format (annotate next to the marker, replace the previous date):
+#   # DO NOT UPGRADE — Recheck YYYY-Qn: <kurz, was geprüft>
+#
+# What a recheck IS:
+#   - Re-read the pin's stated reason. Is it still load-bearing?
+#   - Spot-check upstream (changelog of the lib, GitHub release notes) for
+#     a published fix that would make the pin lift safely.
+#   - If the reason still holds, just bump the date.
+#   - If the reason no longer holds, plan the lift as a separate change —
+#     not as part of the recheck itself.
+#
+# What a recheck is NOT:
+#   - Not the upgrade itself. The recheck only DECIDES whether an upgrade
+#     is warranted. The actual lift goes on its own branch with its own
+#     test pass.
+#   - Not exhaustive. ~30 min per quarter is the budget; if a single pin
+#     needs deep investigation, capture it as a separate TODO item.
+#
+# Latest recheck: 2026-Q3 (2026-05-06, vorgezogen) — first pass with web
+#                 access; per-pin annotations below carry the findings.
+# Next recheck:   2026-Q4.
+#
+# Cross-lib lift bundles to keep in mind (recheck 2026-Q3 surfaced these):
+#   1. AGP 9 + Hilt ≥2.59 + Gradle 9.1 + kapt→ksp + (likely) Kotlin 2.3
+#      — coupled. Lift one, lift all together. AGP 8.13.2 is the last
+#      of the 8.x line; the next stop is the bundle. SPIKE attempted
+#      2026-05-06, abandoned after 7 blockers — see TODO.md §10 for
+#      the chain (kapt incompatible with built-in Kotlin → KSP1
+#      incompatible with built-in Kotlin → escape-hatch needed →
+#      either accept the escape-hatch as load-bearing, or migrate
+#      to KSP2 which couples to bundle 2 below).
+#   2. Kotlin 2.3 + kotlinx-serialization 1.10 + kotlin-test (auto-
+#      matched) + KSP 2.3.x — coupled. Same logic.
+#   3. JUnit 5 — standalone migration effort, no triggers visible.
+# =============================================================================
+
+[versions]
+viewpager2 = "1.1.0"  # Nyx-only (grid pager); catalog union Phase 0
+# Build & Kotlin
+agp = "9.4.0"  # Current: 9.4.x line. Minor 2026-09-02: 9.3.2 → 9.4.0 (AS-offered on the 9.x line; done via catalog edit only — NOT the AS upgrade assistant, which re-adds the org.jetbrains.kotlin.android plugin + deprecated gradle.properties flags. Gradle wrapper unchanged at 9.6.1; builds + full test suite + baseline-profile gate on :app verified green). Patch 2026-08-30: 9.3.1 → 9.3.2 (AS-offered patch on the 9.3.x line; builds + full test suite green, Gradle wrapper unchanged at 9.6.1). Origin — mega-bundle lift 2026-05-15: 8.13.2 → 9.2.0 (last 8.x → first stable 9.x), coupled with Gradle 9.5.1 + Hilt 2.59.2 + KSP2 + Kotlin 2.3 per AGP-9-bundle spike postmortem (TODO §10).
+kotlin = "2.3.21"  # Mega-bundle lift 2026-05-15: 2.2.21 → 2.3.21 as foundation for KSP2 + AGP 9 + Hilt 2.59. kotlin-test must match exactly. Held at 2.3.x on the SDK-37 lift (2026-07-18): KSP2 has no 2.4.x release yet (latest 2.3.10), and ksp must track the Kotlin minor line.
+ksp = "2.3.11"  # Mega-bundle lift 2026-05-15: KSP2 line uses single-version tags (no `<kotlin>-<ksp>` schema). Patch 2026-08-30: 2.3.8 → 2.3.11 (current latest stable on the 2.3.x line; still matches the kotlin 2.3.21 minor line — KSP2 still has no 2.4.x, so kotlin stays on 2.3.x).
+
+# Hilt
+hilt = "2.60.1"  # Mega-bundle lift 2026-05-15: 2.58 → 2.59.2 (requires AGP ≥ 9.0 + Gradle ≥ 9.1). 2.59.0 shipped broken (issue #5099 missing ComponentTreeDeps annotation), 2.59.1 fixed jetifierEnabled compile under AGP 9, 2.59.2 fixed slow incremental builds with HiltSyncTask under AGP 9 — DO NOT downgrade to 2.59.0 or 2.59.1. SDK-37 lift 2026-07-18: 2.59.2 → 2.60.1 (minor, builds + full test suite green with Kotlin 2.3.21 / KSP 2.3.8).
+
+# UI / Material
+material = "1.14.0"  # DO NOT DOWNGRADE — must load BEFORE appcompat (force() in app/build.gradle.kts). Recheck 2026-Q3: current = latest stable (2026-03-11).
+appcompat = "1.8.0"  # bringt älteres MaterialYou mit; deshalb material vorrang. Lifted 2026-08-30: 1.7.1 → 1.8.0 (minor, now stable). MaterialYou-precedence concern unchanged — `material` still takes priority; verify visually on device after a release build.
+core-ktx = "1.19.0"  # SDK-37 lift 2026-07-18: 1.18.0 → 1.19.0 — REQUIRES compileSdk 37 (drove the :app + :data compileSdk bump). Previously 1.17.0 → 1.18.0 (2026-05-06), additive minors.
+core-splashscreen = "1.2.0"  # Recheck 2026-Q3: current = latest stable.
+activity = "1.13.0"  # Recheck 2026-Q3: lifted from 1.12.4 (2026-05-06). Note: 1.13.0 re-invokes EdgeToEdge on config-changes (rotation, theme switch) — verified harmless in this codebase via the existing instrumented suite.
+fragment = "1.8.9"  # DO NOT UPGRADE — fragment-ktx and fragment-testing share this. Recheck 2026-Q3: current = latest stable in 1.8.x; 1.9.x not stable yet.
+recyclerview = "1.4.0"  # Recheck 2026-Q3: current = latest stable.
+
+# Lifecycle & Navigation
+lifecycle = "2.11.0"  # OK to upgrade. SDK-37 lift 2026-07-18: 2.10.0 → 2.11.0, now the latest stable (2.11.0 promoted alpha→beta→rc01→stable).
+navigation = "2.10.0"  # OK to upgrade. Lifted 2026-08-30: 2.9.8 → 2.10.0 (minor; 2.10.x now stable). Prior: 2.9.7 → 2.9.8 patch on 2026-05-15.
+
+# Data & Async
+datastore = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
+preference = "1.2.1"  # Recheck 2026-Q3: current = latest stable.
+coroutines = "1.11.0"  # OK to upgrade. Recheck 2026-05-15: lifted 1.10.2 → 1.11.0 (1.11.0 went stable 2026-05-08).
+kotlinx-serialization = "1.11.0"  # Mega-bundle lift 2026-05-15: matched to Kotlin 2.3.21. 1.11.0 added public Json exception API + redactable user input in error messages.
+
+# Utilities
+timber = "5.0.1"  # Recheck 2026-05-15: 5.0.1 is the only stable release; no 6.x line exists, only 5.1.0-SNAPSHOT in trunk. The previous DO-NOT-UPGRADE marker referenced "6.x breaking changes" that don't exist — dropped. Re-add the marker IF a 6.x ships and turns out hostile.
+acra = "5.13.1"  # DO NOT UPGRADE — proguard-rules.pro must stay in sync. Recheck 2026-05-15: lifted 5.11.4 → 5.13.1 (5.12 brought R8 hardening + custom notification channels; 5.13 brought TLS fix + Android 36 target + schedule-failure logging). 2026-09-03: the package-wide `-keep class org.acra.**` was dropped in the R8 rewrite — ACRA's consumer rules (Plugin impls, enums, Configuration ctors) cover it; our file only keeps BuildConfig + the AutoService-processor dontwarn.
+browser = "1.10.0"  # Recheck 2026-05-15: lifted 1.9.0 → 1.10.0 (developer.android.com stable channel now lists 1.10.0).
+leakcanary = "2.14"  # Recheck 2026-Q3: current = latest stable.
+json = "20260814"  # Recheck 2026-Q3: current = latest stable (Dec 2025; org.json uses YYYYMMDD versioning).
+
+# Test (JVM)
+junit = "4.13.2"  # DO NOT UPGRADE — JUnit 5 needs migration. Recheck 2026-Q3: current = latest 4.x stable. JUnit 5 lift is its own migration effort, no triggers visible.
+core-testing = "2.2.0"  # DO NOT CHANGE. Recheck 2026-Q3: current = latest stable; pin marker stays.
+kotlin-test = "2.3.21"  # DO NOT DOWNGRADE — 1.9.23 causes compiler errors; must match `kotlin`. Mega-bundle lift 2026-05-15: matched to kotlin 2.3.21.
+turbine = "1.2.1"  # OK to upgrade. Recheck 2026-Q3: current = latest stable (1.3.0-SNAPSHOT in trunk).
+truth = "1.4.5"  # OK to upgrade. Recheck 2026-Q3: current = latest stable.
+robolectric = "4.16.1"  # OK to upgrade. Recheck 2026-Q3: current = latest stable; supports SDK 36 + JDK 21 — fits the project.
+mockk = "1.14.11"  # SDK-37 lift 2026-07-18: 1.14.9 → 1.14.11, current latest stable (patch line; clearAllStubsFromMemory + any()-fix shipped in 1.14.9).
+
+# AndroidX Test (keep ALL in sync — runner/rules/core/junit-ktx)
+# `androidxTest` is camelCase to avoid an accessor-namespace clash with
+# `androidx-test-core` / `androidx-test-junit`: hyphen-keys are mapped to
+# dot-paths, so a leaf `androidx-test` would collide with the prefix.
+androidxTest = "1.7.0"  # Recheck 2026-Q3: current = latest stable.
+androidx-test-core = "1.7.0"  # Recheck 2026-Q3: current = latest stable; force-pinned in app/build.gradle.kts to dodge consistent-resolution downgrade — see commit bd0d236 for the ActivityInvoker$-CC story.
+androidx-test-junit = "1.3.0"  # Recheck 2026-Q3: current = latest stable.
+espresso = "3.7.0"  # Recheck 2026-Q3: current = latest stable.
+orchestrator = "1.6.1"  # Recheck 2026-Q3: current = latest stable.
+
+# Benchmark (JMH — :domain pure-Kotlin microbenchmarks)
+jmh = "1.37"  # JMH core/generator version, pinned via the jmh { } block in :domain. Recheck: current latest stable of the 1.x line.
+jmh-gradle-plugin = "0.7.3"  # me.champeau.jmh Gradle plugin (owns the src/jmh/ source set + jmh task). Latest stable.
+
+# Macrobenchmark (:macrobenchmark — on-device launch-latency gate, local device only)
+benchmark-macro = "1.5.0-rc02"  # androidx.benchmark macro-junit4 + drives the androidx.baselineprofile plugin (same release; see [plugins]). PRE-RELEASE ON PURPOSE: the baselineprofile Gradle plugin at the last stable (1.4.1) rejects :app under AGP 9.3.1 ("not a supported android module" — AgpPlugin AGP-version gate); AGP-9 support lands only in the 1.5.0 line. rc02 verified 2026-09-02 (AS-offered on the 1.5.0-rc line, under AGP 9.4.0): applies on :app, both benchmark modules compile clean, :app:generateBaselineProfile green on the A17. rc01 was likewise verified. DOWNGRADE to 1.4.1 breaks :app:generateBaselineProfile. Recheck 2026-Q4: move to 1.5.0 stable once it ships.
+uiautomator = "2.4.0"  # androidx.test.uiautomator, used only by :macrobenchmark to drive taps. Latest stable.
+
+# Baseline Profile (:baselineprofile — release-profile producer, local device only)
+# NOTE: the androidx.baselineprofile PLUGIN version is NOT pinned here — it is
+# published from the same androidx.benchmark release as `benchmark-macro`, so
+# the [plugins] alias reuses that version.ref to keep the two in lockstep
+# mechanically (one source of truth, cannot drift). Only the runtime
+# profileinstaller artifact needs its own line.
+profileinstaller = "1.4.1"  # androidx.profileinstaller — installs the baked baseline profile at first run (dexopt). Recheck 2026-Q3 together with benchmark-macro.
+
+
+[libraries]
+androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }  # Nyx-only
+# UI & Material
+material = { module = "com.google.android.material:material", version.ref = "material" }
+
+# Core Android
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "core-splashscreen" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
+androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
+androidx-fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref = "fragment" }
+androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
+
+# Lifecycle & Navigation
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-savedstate = { module = "androidx.lifecycle:lifecycle-viewmodel-savedstate", version.ref = "lifecycle" }
+androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
+androidx-navigation-fragment-ktx = { module = "androidx.navigation:navigation-fragment-ktx", version.ref = "navigation" }
+androidx-navigation-ui-ktx = { module = "androidx.navigation:navigation-ui-ktx", version.ref = "navigation" }
+
+# Data & Async
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preference" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# Utilities
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+acra-core = { module = "ch.acra:acra-core", version.ref = "acra" }
+acra-http = { module = "ch.acra:acra-http", version.ref = "acra" }
+leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }
+
+# Hilt
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-core = { module = "com.google.dagger:hilt-core", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+
+# Test (JVM)
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-arch-core-testing = { module = "androidx.arch.core:core-testing", version.ref = "core-testing" }
+kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin-test" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }
+json = { module = "org.json:json", version.ref = "json" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+# AndroidX Test
+androidx-test-core-ktx = { module = "androidx.test:core-ktx", version.ref = "androidx-test-core" }
+androidx-test-ext-junit-ktx = { module = "androidx.test.ext:junit-ktx", version.ref = "androidx-test-junit" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTest" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidxTest" }
+androidx-test-orchestrator = { module = "androidx.test:orchestrator", version.ref = "orchestrator" }
+androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+androidx-test-espresso-contrib = { module = "androidx.test.espresso:espresso-contrib", version.ref = "espresso" }
+androidx-test-espresso-intents = { module = "androidx.test.espresso:espresso-intents", version.ref = "espresso" }
+androidx-test-espresso-web = { module = "androidx.test.espresso:espresso-web", version.ref = "espresso" }
+androidx-test-espresso-idling-resource = { module = "androidx.test.espresso:espresso-idling-resource", version.ref = "espresso" }
+
+# Macrobenchmark (:macrobenchmark only)
+benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "benchmark-macro" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+
+# Baseline Profile (:app runtime installer)
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-test = { id = "com.android.test", version.ref = "agp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+jmh = { id = "me.champeau.jmh", version.ref = "jmh-gradle-plugin" }
+# Reuses the benchmark-macro version.ref on purpose: the androidx.baselineprofile
+# plugin ships from the same androidx.benchmark release, so pinning them together
+# is mechanical, not a coincidence to keep in sync by hand.
+androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark-macro" }

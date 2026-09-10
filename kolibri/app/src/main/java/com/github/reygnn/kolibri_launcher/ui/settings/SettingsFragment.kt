@@ -1,0 +1,1095 @@
+package com.github.reygnn.kolibri_launcher.ui.settings
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.text.format.DateUtils
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.provider.Settings
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabColorSchemeParams
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.preference.ListPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
+import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
+import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.ui.backup.BackupFragment
+import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesActivity
+import com.github.reygnn.kolibri_launcher.ui.favorites.FavoritesSortFragment
+import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsActivity
+import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
+import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
+import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
+import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
+import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
+import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
+import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
+import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
+import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
+import com.google.android.material.checkbox.MaterialCheckBox
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import timber.log.Timber
+import javax.inject.Inject
+
+/**
+ * CRASH-SAFE VERSION
+ * (includes calendar-permission handling)
+ *
+ * Throwable-audit note: the outer catches that used to wrap every
+ * `findPreference + setOn*Listener` wiring are gone — neither
+ * `findPreference` (returns null on miss) nor `setOn*Listener` on a
+ * safe-call receiver can throw. Inner catches inside listener bodies
+ * stay everywhere because real work happens there (startActivity /
+ * fragment transaction / suspend repo call). Same pattern for the
+ * Flow observers in `observeSettings`: the `?.isChecked = X` setter
+ * inside the block can't throw, but the outer catch around
+ * `.collect { }` can — that's why it stays.
+ *
+ * 2026-05-02 follow-up sweep: listener bodies that only call a sub-method
+ * with its own try/catch (`openSystemWallpaperPicker`,
+ * `showFactoryResetDialog`) or a helper that catches internally
+ * (`DefaultLauncherHelper.requestDefault`) need no additional outer catch.
+ * Listeners with `viewLifecycleOwner` access or direct system-API calls
+ * (`startActivity`, `parentFragmentManager`) keep their inner catch
+ * (lifecycle-race protection).
+ */
+@AndroidEntryPoint
+class SettingsFragment : PreferenceFragmentCompat() {
+
+    private val viewModel: SettingsViewModel by viewModels({ requireActivity() })
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var crashReportConsentController: ConsentController
+    @Inject
+    lateinit var crashReportingHealthMonitor: CrashReportingHealthMonitor
+
+    @Inject
+    lateinit var pipelineBacklogProbe: PipelineBacklogProbe
+
+    // 1. Deklaration für die Preference
+    // Tracked so onDestroyView can dismiss the currently-open dialog
+    // (calendar-permission rationale / factory-reset / forced crash-report
+    // consent) — otherwise a rotation with it open leaks its window.
+    private var currentDialog: AlertDialog? = null
+
+    private var calendarSwitchPreference: SwitchPreferenceCompat? = null
+    private var alarmSwitchPreference: SwitchPreferenceCompat? = null
+    private var autoKeyboardSwitchPreference: SwitchPreferenceCompat? = null
+    private var autoLaunchAppSwitchPreference: SwitchPreferenceCompat? = null
+    private var rotationLockedSwitchPreference: SwitchPreferenceCompat? = null
+
+    // 2. Companion Object für den Berechtigungs-String
+    companion object {
+        private const val CALENDAR_PERMISSION = Manifest.permission.READ_CALENDAR
+    }
+
+    // ActivityResultLauncher for the in-place ROLE_HOME dialog. Result ignored
+    // beyond re-reading state: granted or not, we refresh the preference summary
+    // so it reflects reality without the user leaving the screen.
+    private val roleRequestLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            updateDefaultLauncherStatus()
+        }
+
+    // 3. ActivityResultLauncher für die Berechtigungsanfrage
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                // Nutzer hat zugestimmt! Jetzt die Einstellung speichern.
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setShowCalendarEvent(true)
+                }
+            } else {
+                // Nutzer hat abgelehnt. Zeige Feedback.
+                showToastSafe(R.string.calendar_permission_denied_toast)
+            }
+        }
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        try {
+            // "Ich weiss, dass das schlecht ist, aber die Library lässt mir keine Wahl!"
+
+            // Workaround for an internal issue in the AndroidX Preference library:
+            // setPreferencesFromResource triggers a synchronous disk read on the main
+            // thread. We cannot offload it to a background dispatcher because it also
+            // initializes View objects, which must happen on the main thread. Relax
+            // StrictMode for the duration (DEBUG-only; see withRelaxedStrictMode).
+            withRelaxedStrictMode {
+                setPreferencesFromResource(R.xml.preferences, rootKey)
+            }
+
+            setupPreferenceListeners()
+
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend onCreatePreferences inflation, cannot see CancellationException
+            // setPreferencesFromResource liest XML — echter I/O-Pfad.
+            TimberWrapper.silentError(e, "Error in onCreatePreferences")
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Listener-Wiring selbst wirft nicht — alle Inner-Catches in den
+        // Listener-Bodies machen die echte Defensive.
+        calendarSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_CALENDAR_EVENT)
+        calendarSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+
+                if (shouldEnable) {
+                    handleCalendarPermissionRequest()
+                    // Rückgabe 'false' verhindert das automatische Toggle.
+                    // Der Switch wird erst auf 'true' gesetzt, wenn die
+                    // Berechtigung erteilt wurde (siehe observeSettings).
+                    false
+                } else {
+                    // User möchte Feature deaktivieren -> direkt speichern
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsRepository.setShowCalendarEvent(false)
+                    }
+                    true // Erlaube das Toggle auf 'false'
+                }
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in calendar change listener")
+                false
+            }
+        }
+
+        alarmSwitchPreference = findPreference(AppConstants.PrefKeys.SHOW_ALARM)
+        alarmSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: true
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setShowAlarm(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in alarm change listener")
+                false
+            }
+        }
+
+        autoKeyboardSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_SHOW_KEYBOARD)
+        autoKeyboardSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setAutoShowKeyboard(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in autoKeyboard change listener")
+                false
+            }
+        }
+
+        autoLaunchAppSwitchPreference = findPreference(AppConstants.PrefKeys.AUTO_LAUNCH_APP)
+        autoLaunchAppSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setAutoLaunchApp(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in autoLaunchApp change listener")
+                false
+            }
+        }
+
+        // Rotation Lock
+        rotationLockedSwitchPreference = findPreference(AppConstants.PrefKeys.ROTATION_LOCKED)
+        rotationLockedSwitchPreference?.setOnPreferenceChangeListener { _, newValue ->
+            try {
+                val shouldEnable = newValue as? Boolean ?: false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    settingsRepository.setRotationLocked(shouldEnable)
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend preference listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in rotation lock change listener")
+                false
+            }
+        }
+
+        observeSettings()
+        viewLifecycleOwner.lifecycleScope.launch {
+            updateCrashReportSummary()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // updateDefaultLauncherStatus delegates the system-API read to
+        // DefaultLauncherHelper (fail-closed, catches internally); the
+        // Preference writes here can't throw. An outer catch would be dead.
+        updateDefaultLauncherStatus()
+    }
+
+    private fun setupPreferenceListeners() {
+        // Wallpaper — openSystemWallpaperPicker has its own try/catch + fallback path.
+        findPreference<Preference>(AppConstants.PrefKeys.SYSTEM_WALLPAPER)?.setOnPreferenceClickListener {
+            openSystemWallpaperPicker()
+            true
+        }
+
+        // Edit Favorites
+        findPreference<Preference>(AppConstants.PrefKeys.EDIT_FAVORITES)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireActivity(), OnboardingActivity::class.java).apply {
+                    putExtra(
+                        OnboardingActivity.Companion.EXTRA_LAUNCH_MODE,
+                        LaunchMode.EDIT_FAVORITES.name
+                    )
+                }
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error starting edit favorites")
+                false
+            }
+        }
+
+        // Sort Favorites
+        findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)?.setOnPreferenceClickListener {
+            try {
+                if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
+
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    try {
+                        showSortFavoritesFragment()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing sort favorites")
+                        viewModel.onAppListNotLoaded()
+                    } finally {
+                        if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                    }
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in sort favorites click")
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                false
+            }
+        }
+
+        // Hidden Apps
+        findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)?.setOnPreferenceClickListener {
+            try {
+                if (BuildConfig.DEBUG) EspressoIdlingResource.increment()
+
+                val intent = Intent(requireContext(), HiddenAppsActivity::class.java)
+                startActivity(intent)
+
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error starting hidden apps")
+                if (BuildConfig.DEBUG) EspressoIdlingResource.decrement()
+                false
+            }
+        }
+
+        // Custom App Names
+        findPreference<Preference>(AppConstants.PrefKeys.CUSTOM_APP_NAMES)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireActivity(), CustomNamesActivity::class.java)
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error starting app names activity")
+                false
+            }
+        }
+
+        // Backup & Restore
+        findPreference<Preference>(AppConstants.PrefKeys.BACKUP_RESTORE)?.setOnPreferenceClickListener {
+            try {
+                if (!isAdded || isStateSaved || isDetached) {
+                    Timber.w("Cannot show backup - invalid fragment state")
+                    return@setOnPreferenceClickListener false
+                }
+
+                val fragment = BackupFragment()
+
+                parentFragmentManager.beginTransaction()
+                    .replace(android.R.id.content, fragment)
+                    .addToBackStack(null)
+                    .commitAllowingStateLoss()
+
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend fragment transaction, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error showing backup fragment")
+                false
+            }
+        }
+
+        // Storage cleanup — showStorageCleanupDialog has its own try/catch.
+        findPreference<Preference>(AppConstants.PrefKeys.CLEANUP_STORAGE)?.setOnPreferenceClickListener {
+            showStorageCleanupDialog()
+            true
+        }
+
+        // Factory Reset — showFactoryResetDialog has its own try/catch.
+        findPreference<Preference>(AppConstants.PrefKeys.FACTORY_RESET)?.setOnPreferenceClickListener {
+            showFactoryResetDialog()
+            true
+        }
+
+        // Usage Export
+        findPreference<Preference>(AppConstants.PrefKeys.USAGE_EXPORT)?.setOnPreferenceClickListener {
+            try {
+                if (!isAdded || isStateSaved || isDetached) {
+                    Timber.w("Cannot show usage export - invalid fragment state")
+                    return@setOnPreferenceClickListener false
+                }
+
+                val fragment = UsageExportFragment()
+
+                parentFragmentManager.beginTransaction()
+                    .replace(android.R.id.content, fragment)
+                    .addToBackStack(null)
+                    .commitAllowingStateLoss()
+
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend fragment transaction, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error showing usage export fragment")
+                false
+            }
+        }
+
+        // App Info
+        findPreference<Preference>(AppConstants.PrefKeys.APP_INFO)?.setOnPreferenceClickListener {
+            try {
+                openUrlInCustomTab(
+                    requireContext(),
+                    AppConstants.URL_ABOUT_PAGE
+                )
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error opening app info")
+                false
+            }
+        }
+
+        // Default Launcher — helper prefers the in-place role dialog and falls
+        // back to Home settings; onError surfaces a toast via the ViewModel.
+        findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)?.setOnPreferenceClickListener {
+            DefaultLauncherHelper.requestDefault(
+                activity = requireActivity(),
+                roleLauncher = roleRequestLauncher,
+                onError = { viewModel.onErrorOpeningDefaultLauncherSettings(it) }
+            )
+            true
+        }
+
+        // App Drawer Mode (Auto / Light / Dark)
+        val wallpaperSurfaceModePreference =
+            findPreference<ListPreference>(AppConstants.PrefKeys.APP_DRAWER_MODE)
+        wallpaperSurfaceModePreference?.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue is String) {
+                val mode = try {
+                    WallpaperSurfaceMode.valueOf(newValue)
+                } catch (e: IllegalArgumentException) {
+                    TimberWrapper.silentError(e, "Unknown WallpaperSurfaceMode value: $newValue")
+                    return@setOnPreferenceChangeListener false
+                }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        settingsRepository.setWallpaperSurfaceMode(mode)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error setting WallpaperSurfaceMode")
+                    }
+                }
+            }
+            true
+        }
+
+        // Wallpaper Backdrop (System wallpaper / Black) — what sits behind the
+        // collage. Writes to DataStore (source of truth); MainActivity's
+        // wallpaperBackdropFlow observer drives the actual backdrop colour.
+        val wallpaperBackdropPreference =
+            findPreference<ListPreference>(AppConstants.PrefKeys.WALLPAPER_BACKDROP)
+        wallpaperBackdropPreference?.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue is String) {
+                val backdrop = try {
+                    WallpaperBackdrop.valueOf(newValue)
+                } catch (e: IllegalArgumentException) {
+                    TimberWrapper.silentError(e, "Unknown WallpaperBackdrop value: $newValue")
+                    return@setOnPreferenceChangeListener false
+                }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        settingsRepository.setWallpaperBackdrop(backdrop)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error setting WallpaperBackdrop")
+                    }
+                }
+            }
+            true
+        }
+
+        // Swipe Actions
+        findPreference<Preference>(AppConstants.PrefKeys.SWIPE_ACTIONS)?.setOnPreferenceClickListener {
+            try {
+                val intent = Intent(requireContext(), SwipeActionsActivity::class.java)
+                startActivity(intent)
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error starting swipe actions activity")
+                false
+            }
+        }
+
+        // Crash Reports
+        findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS)?.setOnPreferenceClickListener {
+            try {
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    val activityContext = activity ?: return@launch
+
+                    try {
+                        // Track the forced-consent dialog like the other
+                        // dialogs here so onDestroyView dismisses it — otherwise
+                        // a rotation with it open leaks its window (it is
+                        // setCancelable(false), so it stays up). AUDIT-3 #12.
+                        currentDialog?.dismiss()
+                        currentDialog = ConsentDialog.show(activityContext) { userGaveConsent ->
+                            // Persist (on the app-lifetime scope) + apply to
+                            // ACRA through the controller — one source for the
+                            // sequence both callers used to duplicate
+                            // (AUDIT-10 #12).
+                            crashReportConsentController.applyConsent(userGaveConsent)
+
+                            // Optional: Dem Nutzer Feedback geben
+                            val feedbackMessage = if (userGaveConsent) {
+                                getString(R.string.toast_crash_reports_enabled)
+                            } else {
+                                getString(R.string.toast_crash_reports_disabled)
+                            }
+                            activityContext.showToastSafe(feedbackMessage)
+
+                            // onResult runs on the main thread, so reflect the
+                            // just-made choice directly instead of re-reading
+                            // the store on a separate scope — which could race
+                            // the still-running persist write (AUDIT-10 #1). Fold
+                            // in the in-memory bootstrap-health flag (no I/O) so a
+                            // fresh grant on a broken bootstrap shows BROKEN, not
+                            // a false "enabled".
+                            applyCrashReportSummary(
+                                when {
+                                    !userGaveConsent -> CrashReportingHealthState.NOT_APPLICABLE
+                                    CrashReportingHealth.isBootstrapHealthy -> CrashReportingHealthState.HEALTHY
+                                    else -> CrashReportingHealthState.BROKEN
+                                },
+                            )
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error showing forced consent dialog")
+                    }
+                }
+                true
+            } catch (e: Throwable) {
+                // no suspension point — non-suspend click listener, cannot see CancellationException
+                TimberWrapper.silentError(e, "Error in crash reports preference click")
+                false
+            }
+        }
+
+        // Developer command: the ACRA pipeline-status probe (§8c, G3-C). Reads
+        // the unsent-report backlog OFF the main thread and toasts it — a
+        // growing backlog means the sender/server is dead; an empty backlog
+        // means healthy OR never crashed (deliberately ambiguous; the accepted
+        // limit of the ReportLocator baseline over a positive HTTP send-marker).
+        findPreference<Preference>(AppConstants.PrefKeys.PIPELINE_STATUS)?.setOnPreferenceClickListener {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                val backlog = withContext(Dispatchers.IO) { pipelineBacklogProbe.read() }
+                val activityContext = activity ?: return@launch
+                val message = if (backlog.approved == 0 && backlog.unapproved == 0) {
+                    getString(R.string.toast_pipeline_status_empty)
+                } else {
+                    val oldest = backlog.oldestMillis
+                        ?.let { DateUtils.getRelativeTimeSpanString(it).toString() }
+                        ?: getString(R.string.pipeline_status_oldest_unknown)
+                    getString(
+                        R.string.toast_pipeline_status_backlog,
+                        backlog.approved,
+                        backlog.unapproved,
+                        oldest,
+                    )
+                }
+                activityContext.showToastSafe(message)
+            }
+            true
+        }
+
+        // The three ACRA test-trigger dev commands (throw / silent-error /
+        // warn) are gated behind SHOW_DEV_COMMANDS: present in a debug build
+        // and in a personal release built with `-PdevCommands`, but compiled
+        // out of the public GitHub release (public-safe default = off, see
+        // app/build.gradle.kts). When off, they are removed from the
+        // developer-commands category so the category shows only the harmless
+        // read-only pipeline_status probe wired above.
+        if (BuildConfig.SHOW_DEV_COMMANDS) {
+            // Developer command: the ACRA throw-test shortcut. A throw in a
+            // Preference click handler propagates straight to the global
+            // UncaughtExceptionHandler — which for the throw-test button is exactly
+            // what we WANT (it exercises the real uncaught path).
+            findPreference<Preference>(AppConstants.PrefKeys.THROW_TEST_EXCEPTION)?.setOnPreferenceClickListener {
+                // Toast first so the user sees the warning before the crash.
+                // The Thread + Thread.sleep(800) gives Android time to render
+                // the Toast (~300ms surface) before the throw lands. The throw
+                // runs on a non-Main thread with no CoroutineExceptionHandler
+                // attached, so it travels straight to ACRA's global
+                // UncaughtExceptionHandler — the exact path a real user crash
+                // takes.
+                showToastSafe(R.string.toast_throwing_test_exception, Toast.LENGTH_LONG)
+                Thread {
+                    try {
+                        Thread.sleep(800)
+                    } catch (_: InterruptedException) {
+                        // ignore — the throw below is the point
+                    }
+                    throw RuntimeException(
+                        "ACRA developer-test crash from Settings (version ${BuildConfig.VERSION_NAME})",
+                    )
+                }.start()
+                true
+            }
+
+            // Developer command (§23): fire a silentError → must reach ACRA via
+            // AcraTree with the SILENT_ERROR intent tag. Unlike the throw-test this
+            // does NOT crash (in a RELEASE build silentError only logs + reports —
+            // report by intent), so the tester can then check the ACRA backend for
+            // a `[E/SILENT_ERROR]` carrier while the app stays alive.
+            findPreference<Preference>(AppConstants.PrefKeys.SILENT_ERROR_TEST)?.setOnPreferenceClickListener {
+                showToastSafe(R.string.toast_silent_error_test, Toast.LENGTH_LONG)
+                TimberWrapper.silentError(
+                    RuntimeException("ACRA silent-error test from Settings (version ${BuildConfig.VERSION_NAME})"),
+                    "ACRA silent-error test",
+                )
+                true
+            }
+
+            // Developer command (§23): fire an untagged Timber.w → must NOT reach
+            // ACRA (the report-by-intent invariant). If a report shows up in the
+            // backend for this, the intent gate has regressed. Timber.w never throws,
+            // so the app stays alive.
+            findPreference<Preference>(AppConstants.PrefKeys.WARN_TEST)?.setOnPreferenceClickListener {
+                showToastSafe(R.string.toast_warn_test, Toast.LENGTH_LONG)
+                Timber.w(
+                    RuntimeException(
+                        "ACRA warn test from Settings (version ${BuildConfig.VERSION_NAME}) — should NOT appear in ACRA",
+                    ),
+                    "ACRA warn test — should NOT be reported",
+                )
+                true
+            }
+        } else {
+            // Public GitHub release: strip the three test triggers so they
+            // never render. parent?.removePreference detaches them from the
+            // developer-commands category.
+            listOf(
+                AppConstants.PrefKeys.THROW_TEST_EXCEPTION,
+                AppConstants.PrefKeys.SILENT_ERROR_TEST,
+                AppConstants.PrefKeys.WARN_TEST,
+            ).forEach { key ->
+                findPreference<Preference>(key)?.let { it.parent?.removePreference(it) }
+            }
+        }
+    }
+
+    fun openUrlInCustomTab(context: Context, url: String) {
+        try {
+            val builder = CustomTabsIntent.Builder()
+            val colorSchemeParams = CustomTabColorSchemeParams.Builder()
+                .setToolbarColor(
+                    context.resolveThemeColor(
+                        com.google.android.material.R.attr.colorSurface,
+                        ContextCompat.getColor(context, android.R.color.black),
+                    )
+                )
+                .build()
+            builder.setDefaultColorSchemeParams(colorSchemeParams)
+
+            val customTabsIntent = builder.build()
+            customTabsIntent.launchUrl(context, url.toUri())
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend custom-tab launch, cannot see CancellationException
+            TimberWrapper.silentError(e, "Could not open Custom Tab, falling back to standard browser.")
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                context.startActivity(intent)
+            } catch (fallbackError: Throwable) {
+                // no suspension point — non-suspend fallback browser launch, cannot see CancellationException
+                TimberWrapper.silentError(fallbackError, "Even the fallback browser intent failed.")
+            }
+        }
+    }
+
+    private suspend fun updateCrashReportSummary() {
+        // evaluate() folds consent + the bootstrap-health flag into one verdict, so
+        // the summary is an HONEST health indicator, not the consent-only one (which
+        // would read "enabled" even when the bootstrap gate died — the 2026-08 bug).
+        // No throw for I/O (the repository reports Unavailable as a value); an
+        // UNKNOWN verdict leaves the summary as-is (A2 safe stale).
+        val state = crashReportingHealthMonitor.evaluate()
+        withContext(Dispatchers.Main) {
+            if (state != CrashReportingHealthState.UNKNOWN) applyCrashReportSummary(state)
+        }
+    }
+
+    /**
+     * Sets the crash-report preference summary from a known consent value —
+     * no store read. Must be called on the main thread.
+     */
+    private fun applyCrashReportSummary(state: CrashReportingHealthState) {
+        val preference = findPreference<Preference>(AppConstants.PrefKeys.CRASH_REPORTS) ?: return
+        preference.summary = getString(
+            when (state) {
+                CrashReportingHealthState.HEALTHY -> R.string.crash_report_summary_enabled
+                CrashReportingHealthState.BROKEN -> R.string.crash_report_summary_broken
+                CrashReportingHealthState.NOT_APPLICABLE -> R.string.crash_report_summary_disabled
+                // UNKNOWN never reaches here (caller skips it), but the compiler needs it.
+                CrashReportingHealthState.UNKNOWN -> R.string.crash_report_summary_disabled
+            },
+        )
+    }
+
+    private fun observeSettings() {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Inner-Catches um die einzelnen `?.isChecked = X`-Setter
+                // sind entfernt — Boolean-Property-Writes auf nullable
+                // SwitchPreferenceCompat werfen nicht. Outer-Catches um
+                // die `.collect { }`-Aufrufe bleiben (legitime Flow-
+                // Failure-Pfade).
+
+                // Observer für App-Liste
+                launch {
+                    try {
+                        viewModel.installedApps.collect { apps ->
+                            if (!isAdded || isDetached) return@collect
+
+                            Timber.d("[Fragment] Collected ${apps.size} apps")
+
+                            val sortFavoritesPref =
+                                findPreference<Preference>(AppConstants.PrefKeys.SORT_FAVORITES)
+                            val hiddenAppsPref =
+                                findPreference<Preference>(AppConstants.PrefKeys.HIDDEN_APPS)
+
+                            val isAppListReady = apps.isNotEmpty()
+
+                            sortFavoritesPref?.isEnabled = isAppListReady
+                            hiddenAppsPref?.isEnabled = isAppListReady
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in installed apps collection")
+                    }
+                }
+
+                // Observer für Kalender-Einstellung
+                launch {
+                    try {
+                        settingsRepository.showCalendarEventFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            calendarSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in calendar flow collection")
+                    }
+                }
+
+                // Observer für Alarm-Einstellung
+                launch {
+                    try {
+                        settingsRepository.showAlarmFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            alarmSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in alarm flow collection")
+                    }
+                }
+
+                // Observer for AppDrawer Mode Setting
+                launch {
+                    try {
+                        settingsRepository.wallpaperSurfaceModeFlow.collect { mode ->
+                            if (!isAdded || isDetached) return@collect
+                            findPreference<ListPreference>(AppConstants.PrefKeys.APP_DRAWER_MODE)?.value =
+                                mode.name
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in wallpaperSurfaceMode flow collection")
+                    }
+                }
+
+                // Observer for Wallpaper Backdrop Setting
+                launch {
+                    try {
+                        settingsRepository.wallpaperBackdropFlow.collect { backdrop ->
+                            if (!isAdded || isDetached) return@collect
+                            findPreference<ListPreference>(AppConstants.PrefKeys.WALLPAPER_BACKDROP)?.value =
+                                backdrop.name
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in wallpaperBackdrop flow collection")
+                    }
+                }
+
+                // Observer für show Keyboard Setting
+                launch {
+                    try {
+                        settingsRepository.autoShowKeyboardFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            autoKeyboardSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in autoKeyboard flow collection")
+                    }
+                }
+
+                launch {
+                    try {
+                        settingsRepository.autoLaunchAppFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            autoLaunchAppSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in autoLaunchApp flow collection")
+                    }
+                }
+
+
+
+                // Observer für Rotation Lock Setting
+                launch {
+                    try {
+                        settingsRepository.rotationLockedFlow.collect { isEnabled ->
+                            if (!isAdded || isDetached) return@collect
+                            rotationLockedSwitchPreference?.isChecked = isEnabled
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error in rotation lock flow collection")
+                    }
+                }
+
+
+            }
+        }
+    }
+
+    private suspend fun showSortFavoritesFragment() {
+        // CRASH-SAFE: Check Fragment state
+        if (!isAdded || isStateSaved || isDetached) {
+            Timber.w("Cannot show sort favorites - invalid fragment state")
+            return
+        }
+
+        // viewModel.installedApps.value ist ein StateFlow-Read — wirft nicht.
+        val allApps = viewModel.installedApps.value
+
+        // Favorites + order are read via authoritative FRESH snapshots (never the
+        // hot replay flows) and filtered/sorted in the ViewModel — see
+        // SettingsViewModel.prepareFavoritesForSorting / AUDIT-13. Fragment stays
+        // thin glue: map the outcome to a toast or the sort-dialog transaction.
+        val orderedFavoriteApps =
+            when (val outcome = viewModel.prepareFavoritesForSorting(allApps)) {
+                SettingsViewModel.SortFavoritesOutcome.AppsNotLoaded -> {
+                    viewModel.onAppListNotLoaded()
+                    return
+                }
+                SettingsViewModel.SortFavoritesOutcome.NoFavorites -> {
+                    viewModel.onNoFavoritesToSort()
+                    return
+                }
+                is SettingsViewModel.SortFavoritesOutcome.Ready -> outcome.orderedFavorites
+            }
+
+        // CRASH-SAFE: Check state again before transaction
+        if (!isAdded || isStateSaved || isDetached) {
+            Timber.w("Fragment state changed during async operations")
+            return
+        }
+
+        try {
+            val fragment =
+                FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
+
+            parentFragmentManager.beginTransaction()
+                .replace(android.R.id.content, fragment)
+                .addToBackStack(null)
+                .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Fragment-Transaktionen werfen IllegalStateException unter
+            // Race-Bedingungen mit dem Lifecycle.
+            TimberWrapper.silentError(e, "Error committing fragment transaction")
+            viewModel.onAppListNotLoaded()
+        }
+    }
+
+    private fun openSystemWallpaperPicker() {
+        try {
+            val intent = Intent(Intent.ACTION_SET_WALLPAPER)
+            startActivity(Intent.createChooser(intent, getString(R.string.wallpaper_picker_title)))
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend wallpaper-picker launch, cannot see CancellationException
+            TimberWrapper.silentError(e, "Error opening system wallpaper picker")
+            openWallpaperSettings()
+        }
+    }
+
+    private fun openWallpaperSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+            viewModel.onWallpaperSettingsFallback()
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend wallpaper-settings launch, cannot see CancellationException
+            viewModel.onErrorOpeningWallpaperSettings(e)
+        }
+    }
+
+    private fun updateDefaultLauncherStatus() {
+        // System-API reads are encapsulated in DefaultLauncherHelper (fail-closed).
+        // Property-Writes danach werfen nicht; ein Outer-Catch wäre tot.
+        val setDefaultLauncherPref =
+            findPreference<Preference>(AppConstants.PrefKeys.SET_DEFAULT_LAUNCHER)
+        if (setDefaultLauncherPref == null) {
+            Timber.w("Default launcher preference not found")
+            return
+        }
+
+        if (DefaultLauncherHelper.isDefault(requireContext())) {
+            setDefaultLauncherPref.summary = getString(R.string.default_launcher_is_set)
+            setDefaultLauncherPref.isEnabled = false
+        } else {
+            setDefaultLauncherPref.summary = getString(R.string.set_default_launcher_summary)
+            setDefaultLauncherPref.isEnabled = true
+        }
+    }
+
+    // Die Berechtigungs-Logik
+    // (Diese Funktion war bereits vorhanden und funktioniert jetzt)
+    private fun handleCalendarPermissionRequest() {
+        if (!isAdded) return
+
+        try {
+            when {
+                ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    CALENDAR_PERMISSION
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Berechtigung bereits vorhanden.
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        settingsRepository.setShowCalendarEvent(true)
+                    }
+                }
+
+                shouldShowRequestPermissionRationale(CALENDAR_PERMISSION) -> {
+                    currentDialog?.dismiss()
+                    currentDialog = MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.calendar_permission_title)
+                        .setMessage(R.string.calendar_permission_rationale)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            requestPermissionLauncher.launch(CALENDAR_PERMISSION)
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
+
+                else -> {
+                    // Berechtigung direkt anfordern
+                    requestPermissionLauncher.launch(CALENDAR_PERMISSION)
+                }
+            }
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend permission request, cannot see CancellationException
+            TimberWrapper.silentError(e, "Error handling calendar permission request")
+        }
+    }
+
+    /**
+     * Storage cleanup, dry-run first: computes which keys a cleanup would delete (read-only, deletes
+     * nothing), then routes on the result — nothing to clean → toast; failure → toast; orphans found
+     * → a confirm dialog that LISTS them, whose positive button runs the real deletion via
+     * [SettingsViewModel.onCleanupStorageConfirmed]. So the user always sees exactly what will be
+     * removed before confirming.
+     */
+    private fun showStorageCleanupDialog() {
+        if (!isAdded) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                when (val preview = viewModel.getCleanupPreview()) {
+                    is SettingsViewModel.CleanupPreview.Failed ->
+                        showToastSafe(R.string.cleanup_storage_error)
+                    is SettingsViewModel.CleanupPreview.Loaded ->
+                        if (preview.keyNames.isEmpty()) {
+                            showToastSafe(R.string.cleanup_storage_none)
+                        } else {
+                            showStorageCleanupConfirmDialog(preview.keyNames)
+                        }
+                }
+            } catch (e: CancellationException) {
+                throw e // rethrow per canonical — view teardown must cancel, not report
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Cannot compute storage cleanup preview")
+            }
+        }
+    }
+
+    /**
+     * Confirm dialog listing the [keyNames] a cleanup would remove. Only reached with a non-empty
+     * list. The positive button runs the real deletion.
+     */
+    private fun showStorageCleanupConfirmDialog(keyNames: List<String>) {
+        try {
+            if (!isAdded) return
+
+            val body = getString(R.string.cleanup_storage_preview_message) +
+                "\n\n" + keyNames.joinToString("\n") { "•  $it" }
+
+            currentDialog?.dismiss()
+            currentDialog = MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.cleanup_storage_dialog_title)
+                .setMessage(body)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cleanup_storage_action) { _, _ ->
+                    viewModel.onCleanupStorageConfirmed()
+                }
+                .show()
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend cleanup dialog, cannot see CancellationException
+            TimberWrapper.silentError(e, "Cannot show storage cleanup dialog")
+        }
+    }
+
+    /**
+     * Shows the factory-reset confirmation dialog. On confirm, the reset logic runs in the ViewModel.
+     */
+    private fun showFactoryResetDialog() {
+        try {
+            if (!isAdded) return
+
+            // 1. Inflate das neue Layout
+            val dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_factory_reset, null)
+
+            // 2. Finde die Checkbox
+            val checkBox = dialogView.findViewById<MaterialCheckBox>(
+                R.id.checkbox_include_usage_data
+            )
+
+            currentDialog?.dismiss()
+            currentDialog = MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.factory_reset_dialog_title)
+                // 3. Setze das View statt einer Message
+                .setView(dialogView)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.reset) { _, _ ->
+                    // 4. Lese den Wert der Checkbox aus
+                    val includeUsageData = checkBox.isChecked
+
+                    // 5. Übergebe den Wert an das ViewModel
+                    viewModel.onFactoryResetConfirmed(includeUsageData)
+                }
+                .show()
+        } catch (e: Throwable) {
+            // no suspension point — non-suspend factory-reset dialog, cannot see CancellationException
+            TimberWrapper.silentError(e, "Cannot show factory reset dialog")
+        }
+    }
+
+    override fun onDestroyView() {
+        // Property-Writes (Listener auf null setzen, Field auf null
+        // setzen) — werfen nicht. Frühere try/catch um den Body war
+        // CANT_THROW. super.onDestroyView() bleibt am Ende.
+        calendarSwitchPreference?.onPreferenceChangeListener = null
+        alarmSwitchPreference?.onPreferenceChangeListener = null
+        autoKeyboardSwitchPreference?.onPreferenceChangeListener = null
+        autoLaunchAppSwitchPreference?.onPreferenceChangeListener = null
+        rotationLockedSwitchPreference?.onPreferenceChangeListener = null
+
+        calendarSwitchPreference = null
+        alarmSwitchPreference = null
+        autoKeyboardSwitchPreference = null
+        autoLaunchAppSwitchPreference = null
+        rotationLockedSwitchPreference = null
+
+        currentDialog?.dismiss()
+        currentDialog = null
+
+        super.onDestroyView()
+    }
+}

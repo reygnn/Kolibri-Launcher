@@ -1,0 +1,505 @@
+package com.github.reygnn.kolibri_launcher.data
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
+import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
+import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import io.mockk.every
+import io.mockk.mockk
+import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertFalse
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+@ExperimentalCoroutinesApi
+class SettingsRepositoryImplTest {
+
+    @get:Rule
+    val timberRule = TimberRule()
+
+    private lateinit var fakeDataStore: FakeDataStore
+    private lateinit var settingsManager: SettingsRepositoryImpl
+
+    // mockContext wird nur als Konstruktor-Argument übergeben — kein Stubbing nötig
+    private val context: Context = mockk(relaxed = true)
+
+    private val SORT_ORDER_KEY = stringPreferencesKey("app_drawer_sort_order")
+    private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+    private val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
+    private val SHOW_ALARM = booleanPreferencesKey("show_alarm")
+
+    @Before
+    fun setup() {
+        fakeDataStore = FakeDataStore()
+        settingsManager = SettingsRepositoryImpl(fakeDataStore)
+    }
+
+    // ========== EXISTING TESTS ==========
+
+    @Test
+    fun `sortOrderFlow - when no value is set - returns default value`() = runTest {
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    @Test
+    fun `sortOrderFlow - when a value is set - returns that value`() = runTest {
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
+
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+    }
+
+    @Test
+    fun `sortOrderFlow - when invalid value is stored - returns default value`() = runTest {
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = "INVALID_ENUM_VALUE" }
+
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    @Test
+    fun `setSortOrder - correctly saves the value`() = runTest {
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+
+        val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
+        Assert.assertEquals(SortOrder.ALPHABETICAL.name, savedValue)
+    }
+
+    private val FAVORITES_ALIGNMENT_KEY = stringPreferencesKey("favorites_alignment")
+
+    @Test
+    fun `favoritesAlignmentFlow - when invalid value is stored - returns default`() = runTest {
+        fakeDataStore.edit { it[FAVORITES_ALIGNMENT_KEY] = "INVALID_ALIGNMENT_VALUE" }
+
+        Assert.assertEquals(
+            AppConstants.DEFAULT_FAVORITES_ALIGNMENT,
+            settingsManager.favoritesAlignmentFlow.first(),
+        )
+    }
+
+    @Test
+    fun `setFavoritesAlignment - correctly saves the enum name`() = runTest {
+        settingsManager.setFavoritesAlignment(FavoritesAlignment.CENTER)
+
+        val savedValue = fakeDataStore.data.first()[FAVORITES_ALIGNMENT_KEY]
+        Assert.assertEquals(FavoritesAlignment.CENTER.name, savedValue)
+    }
+
+    @Test
+    fun `onboardingCompletedFlow - when no value is set - returns default false`() = runTest {
+        assertFalse(settingsManager.onboardingCompletedFlow.first())
+    }
+
+    @Test
+    fun `setOnboardingCompleted - correctly saves true`() = runTest {
+        settingsManager.setOnboardingCompleted()
+
+        val savedValue = fakeDataStore.data.first()[ONBOARDING_COMPLETED]
+        assertTrue(savedValue ?: false)
+    }
+
+    @Test
+    fun `flows - emit new values when they are changed`() = runTest {
+        settingsManager.sortOrderFlow.test {
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+
+            settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+
+            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+        }
+    }
+
+    // ========== CRASH-RESISTANCE TESTS ==========
+
+    @Test
+    fun `setSortOrder - when DataStore edit fails - does not crash`() = runTest {
+        fakeDataStore.makeEditFail()
+
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+
+        val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
+        assertTrue(savedValue == null || savedValue != SortOrder.ALPHABETICAL.name)
+    }
+
+    @Test
+    fun `setSortOrder - when CancellationException - propagates it`() = runTest {
+        fakeDataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> {
+            settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        }
+    }
+
+    @Test
+    fun `setOnboardingCompleted - when DataStore edit fails - does not crash`() = runTest {
+        fakeDataStore.makeEditFail()
+
+        settingsManager.setOnboardingCompleted()
+
+        assertFalse(settingsManager.onboardingCompletedFlow.first())
+    }
+
+    @Test
+    fun `setOnboardingCompleted - when CancellationException - propagates it`() = runTest {
+        fakeDataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> {
+            settingsManager.setOnboardingCompleted()
+        }
+    }
+
+    @Test
+    fun `sortOrderFlow - when DataStore read fails - returns default value`() = runTest {
+        fakeDataStore.makeReadFail()
+
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    @Test
+    fun `onboardingCompletedFlow - when DataStore read fails - returns default false`() = runTest {
+        fakeDataStore.makeReadFail()
+
+        assertFalse(settingsManager.onboardingCompletedFlow.first())
+    }
+
+    @Test
+    fun `setSortOrder - called multiple times - all values are saved`() = runTest {
+        settingsManager.sortOrderFlow.test {
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+
+            settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+
+            settingsManager.setSortOrder(SortOrder.TIME_WEIGHTED_USAGE)
+            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+        }
+    }
+
+    @Test
+    fun `multiple flows - all work independently`() = runTest {
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        settingsManager.setOnboardingCompleted()
+
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        assertTrue(settingsManager.onboardingCompletedFlow.first())
+    }
+
+    @Test
+    fun `sortOrderFlow - with corrupted data - returns default`() = runTest {
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = "" }
+
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    @Test
+    fun `sortOrderFlow - with null value - returns default`() = runTest {
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+    }
+
+    // ========== SHOW ALARM TESTS ==========
+
+    @Test
+    fun `showAlarmFlow - when no value is set - returns default false`() = runTest {
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `showAlarmFlow - when value is set to false - returns false`() = runTest {
+        fakeDataStore.edit { it[SHOW_ALARM] = false }
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `showAlarmFlow - when value is set to true - returns true`() = runTest {
+        fakeDataStore.edit { it[SHOW_ALARM] = true }
+        assertTrue(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `setShowAlarm - correctly saves false`() = runTest {
+        settingsManager.setShowAlarm(false)
+        assertFalse(fakeDataStore.data.first()[SHOW_ALARM] ?: true)
+    }
+
+    @Test
+    fun `setShowAlarm - correctly saves true`() = runTest {
+        settingsManager.setShowAlarm(true)
+        assertTrue(fakeDataStore.data.first()[SHOW_ALARM] ?: false)
+    }
+
+    @Test
+    fun `setShowAlarm - when DataStore edit fails - does not crash`() = runTest {
+        fakeDataStore.makeEditFail()
+        settingsManager.setShowAlarm(true)
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `setShowAlarm - when CancellationException - propagates it`() = runTest {
+        fakeDataStore.makeCancellable()
+        assertFailsWith<CancellationException> { settingsManager.setShowAlarm(false) }
+    }
+
+    @Test
+    fun `showAlarmFlow - when DataStore read fails - returns default true`() = runTest {
+        fakeDataStore.makeReadFail()
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `showAlarmFlow - emits new values when changed`() = runTest {
+        settingsManager.showAlarmFlow.test {
+            Assert.assertEquals(false, awaitItem())
+            settingsManager.setShowAlarm(true)
+            Assert.assertEquals(true, awaitItem())
+            settingsManager.setShowAlarm(false)
+            Assert.assertEquals(false, awaitItem())
+        }
+    }
+
+    @Test
+    fun `setShowAlarm - toggling multiple times - works correctly`() = runTest {
+        settingsManager.showAlarmFlow.test {
+            Assert.assertEquals(false, awaitItem())
+            settingsManager.setShowAlarm(true)
+            Assert.assertEquals(true, awaitItem())
+            settingsManager.setShowAlarm(false)
+            Assert.assertEquals(false, awaitItem())
+            settingsManager.setShowAlarm(true)
+            Assert.assertEquals(true, awaitItem())
+        }
+    }
+
+    @Test
+    fun `showAlarmFlow - independent from showCalendarEventFlow`() = runTest {
+        settingsManager.setShowCalendarEvent(true)
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertFalse(settingsManager.showAlarmFlow.first())
+
+        settingsManager.setShowAlarm(true)
+        assertTrue(settingsManager.showAlarmFlow.first())
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+    }
+
+    @Test
+    fun `multiple settings - showAlarm works with other settings`() = runTest {
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        settingsManager.setShowCalendarEvent(true)
+        settingsManager.setShowAlarm(false)
+
+        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    // ========== GESTURE & AUTO TESTS ==========
+
+    @Test
+    fun `autoShowKeyboardFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.autoShowKeyboardFlow.first())
+        settingsManager.setAutoShowKeyboard(true)
+        assertTrue(settingsManager.autoShowKeyboardFlow.first())
+    }
+
+    @Test
+    fun `autoLaunchAppFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.autoLaunchAppFlow.first())
+        settingsManager.setAutoLaunchApp(true)
+        assertTrue(settingsManager.autoLaunchAppFlow.first())
+    }
+
+    // ========== THEME & APPEARANCE TESTS ==========
+
+    @Test
+    fun `textShadowEnabledFlow - defaults to TRUE and updates correctly`() = runTest {
+        assertTrue(settingsManager.textShadowEnabledFlow.first(), "Default should be true")
+        settingsManager.setTextShadowEnabled(false)
+        assertFalse(settingsManager.textShadowEnabledFlow.first())
+    }
+
+    @Test
+    fun `textColorFlow - defaults to 0 and updates correctly`() = runTest {
+        Assert.assertEquals(0, settingsManager.textColorFlow.first())
+        settingsManager.setTextColor(-16777216)
+        Assert.assertEquals(-16777216, settingsManager.textColorFlow.first())
+    }
+
+    @Test
+    fun `isFontBoldStateFlow - updates correctly`() = runTest {
+        settingsManager.setFontBold(true)
+        assertTrue(settingsManager.isFontBoldStateFlow.first())
+        settingsManager.setFontBold(false)
+        assertFalse(settingsManager.isFontBoldStateFlow.first())
+    }
+
+    @Test
+    fun `layoutScales - update correctly`() = runTest {
+        settingsManager.setLayoutScale(1.5f)
+        settingsManager.setVerticalPadding(2.0f)
+        settingsManager.setContentTopMarginScale(0.5f)
+
+        Assert.assertEquals(1.5f, settingsManager.layoutScaleStateFlow.first())
+        Assert.assertEquals(2.0f, settingsManager.verticalPaddingStateFlow.first())
+        Assert.assertEquals(0.5f, settingsManager.contentTopMarginScaleFlow.first())
+    }
+
+    // ========== HOME EVENT TESTS ==========
+
+    @Test
+    fun `showCalendarEventFlow - defaults to false and updates correctly`() = runTest {
+        assertFalse(settingsManager.showCalendarEventFlow.first())
+        settingsManager.setShowCalendarEvent(true)
+        assertTrue(settingsManager.showCalendarEventFlow.first())
+    }
+
+    // ========== PURGE TEST ==========
+
+    @Test
+    fun `purgeRepository - clears all settings keys`() = runTest {
+        settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
+        settingsManager.setShowAlarm(true)
+
+        settingsManager.purgeRepository()
+
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertFalse(settingsManager.showAlarmFlow.first())
+    }
+
+    @Test
+    fun `purgeRepository - clears legacy orphaned keys of removed features`() = runTest {
+        // The double-tap-to-lock, swipe-down-to-notifications and secure-window
+        // features were removed along with their PrefKeys; a pre-removal install
+        // may still carry the persisted keys. purgeRepository must clear them by
+        // literal name so "reset all settings" stays a complete wipe.
+        val legacyKeys = listOf(
+            booleanPreferencesKey("double_tap_to_lock_enabled"),
+            booleanPreferencesKey("swipe_down_to_notifications_enabled"),
+            booleanPreferencesKey("secure_window"),
+        )
+        fakeDataStore.edit { prefs -> legacyKeys.forEach { prefs[it] = true } }
+
+        settingsManager.purgeRepository()
+
+        val remaining = fakeDataStore.data.first()
+        legacyKeys.forEach { key ->
+            assertFalse("Legacy key $key should be cleared by purge", remaining.contains(key))
+        }
+    }
+
+    // ========================================================================
+    // DOOMSDAY TESTS
+    // ========================================================================
+
+    @Test
+    fun `doomsday - corrupted types (ClassCastException) - safe fallback`() = runTest {
+        // Inline mockk statt FakeDataStore, um die Exception zu erzwingen
+        val mockDataStore = mockk<DataStore<Preferences>>()
+        every { mockDataStore.data } returns flow {
+            throw ClassCastException("Expected Boolean but got String")
+        }
+
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+
+        val result = doomsdayManager.showAlarmFlow.first()
+
+        assertFalse("Should fallback to default false on ClassCastException", result)
+    }
+
+    @Test
+    fun `doomsday - unexpected RuntimeException during read - safe fallback`() = runTest {
+        val mockDataStore = mockk<DataStore<Preferences>>()
+        every { mockDataStore.data } returns flow {
+            throw SecurityException("Read permission denied")
+        }
+
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+
+        val result = doomsdayManager.sortOrderFlow.first()
+
+        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
+    }
+
+    @Test
+    fun `doomsday - fatal Error during read is re-thrown, not swallowed`() = runTest {
+        // safeData recovers Exceptions to defaults, but non-Exception Throwables
+        // (fatal Errors like OOM) must propagate — swallowing them and emitting
+        // empty prefs would mask a fatal condition. Guards the AUDIT-7 #1 fix.
+        val mockDataStore = mockk<DataStore<Preferences>>()
+        every { mockDataStore.data } returns flow {
+            throw OutOfMemoryError("simulated OOM during settings read")
+        }
+
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+
+        assertFailsWith<OutOfMemoryError> {
+            doomsdayManager.sortOrderFlow.first()
+        }
+    }
+
+    @Test
+    fun `doomsday - rapid concurrent toggles - consistency check`() = runTest {
+        repeat(100) { i ->
+            settingsManager.setShowAlarm(i % 2 == 0)
+        }
+
+        val finalValue = settingsManager.showAlarmFlow.first()
+        assertFalse("Final state should be false after odd number of toggles", finalValue)
+    }
+
+    // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
+
+    @Test
+    fun `sortOrderFlow - unrelated shared-store write does not re-emit identical value`() = runTest {
+        // sortOrderFlow drives the drawer combine on the hot tap-to-launch path.
+        // distinctUntilChanged (per-flow, NOT in the shared enumFlow helper) must
+        // suppress a re-emission caused by an unrelated write to the shared store.
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
+
+        settingsManager.sortOrderFlow.test {
+            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+
+            val usageKey = longPreferencesKey("usage_count_com.other/App")
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply { set(usageKey, 1L) }
+            }
+            advanceUntilIdle()
+
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `sortOrderFlow - still emits when the sort order actually changes`() = runTest {
+        fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
+
+        settingsManager.sortOrderFlow.test {
+            assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+
+            fakeDataStore.updateData { prefs ->
+                prefs.toMutablePreferences().apply {
+                    set(SORT_ORDER_KEY, SortOrder.TIME_WEIGHTED_USAGE.name)
+                }
+            }
+
+            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+        }
+    }
+
+}

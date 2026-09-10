@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen "charging" indicator — FILL layer. Monochrome hollow line art in ONE
+  colour, tinted at runtime to the adaptive home text colour (OutlinedImageView +
+  HomeFragment.updateAllColors). The #FFFFFFFF here is only a fallback; the colour
+  filter overrides it. Drawn as a stroked (hollow) bolt silhouette to match the
+  line-art style of ic_alarm.xml / ic_calendar.xml rather than a solid glyph.
+
+  Geometry note (keep in sync with ic_bolt_outline.xml, which shares this exact
+  pathData and differs ONLY in strokeWidth):
+  - A <group> scale of 0.8 about the centre (12,12) shrinks the art to ~80 % of the
+    24-viewport, reserving margin so the FATTER stroke of the outline twin can peek
+    outward without the vector clipping it at the viewport edge.
+  - strokeWidth 2.8 renders at ~1.9dp on-screen (2.8 * 0.8(group) * 20/24), where
+    20dp = events_icon_size(28) - 2*events_icon_padding(4); the outline twin uses
+    5.8 (→ ~3.9dp), so its rim peeks (3.9-1.9)/2 = 1.0dp = TEXT_OUTLINE_WIDTH_DP/2,
+    exactly matching the text's centered-stroke outline.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- Lightning bolt silhouette, stroke only (hollow), round joins. -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.8"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M 13 3 L 6 13.5 L 11 13.5 L 10 21 L 18 10.5 L 12.5 10.5 Z" />
+    </group>
+</vector>

@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Kolibri Launcher</string>
+    
+    <!-- Search -->
+    <string name="search_hint">Search apps…</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+
+    <!-- App Actions -->
+
+    <!-- General -->
+    <string name="cancel">Cancel</string>
+
+    <!-- Content Description -->
+    
+    <!-- Accessibility Service -->
+
+    <!-- HomeFragment Error Messages -->
+
+    <!-- Double Tap Actions -->
+    <string name="error_no_calendar_app">No calendar app found</string>
+
+    <!-- App Renaming Strings -->
+    <string name="new_app_name_hint">New app name</string>
+
+    <!-- Favorites Sorting Strings -->
+    <string name="sort_favorites_title">Sort favorites</string>
+    <string name="sort_favorites_subtitle">Drag apps to reorder</string>
+    <string name="sort_alphabetically_button">Sort A-Z</string>
+    <string name="reset_order_button">Reset order</string>
+    <string name="favorites_sorted_alphabetically">Favorites sorted alphabetically</string>
+    <string name="favorites_order_reset">Order reset to original</string>
+    <string name="no_favorites_to_sort">No favorites available to sort</string>
+
+    <!-- General Strings for new features -->
+    <string name="done">Done</string>
+    <string name="rename">Rename</string>
+
+    <!-- Error Messages for Settings -->
+    <string name="error_app_info_open">App info could not be opened</string>
+
+    <!-- Hidden Apps Dialog -->
+    <string name="hidden_apps_title">Hidden Apps</string>
+
+    <!-- App Info -->
+
+    <!-- Sort Favorites -->
+
+    <!-- FavoritesSortFragment Strings -->
+    <string name="favorites_sort_title">Sort favorites</string>
+    <string name="error_saving_order">Error saving order</string>
+
+    <!-- AppDrawerFragment specific error messages -->
+
+    <!-- Rename dialog -->
+    <string name="rename_app_title">Rename %s</string>
+
+    <!-- System Wallpaper Picker -->
+    <string name="wallpaper_picker_title">Choose Wallpaper</string>
+    <string name="wallpaper_settings_fallback">Wallpaper settings opened</string>
+    <string name="error_wallpaper_settings_open">Error opening wallpaper settings</string>
+
+
+    <string name="time_placeholder" translatable="false">12:34</string>
+    <string name="date_placeholder">Loading date…</string>
+    <string name="battery_placeholder" translatable="false">100%</string>
+
+
+
+    <string name="sort_apps">Sort apps</string>
+
+    <string name="app_now_hidden_in_drawer">%1$s is now hidden from the app drawer</string>
+    <string name="app_now_visible_in_drawer">%1$s will now be shown in the app drawer</string>
+
+
+    <!-- Preference Titles & Summaries -->
+    <string name="category_apps_title">Apps</string>
+    <string name="sort_favorites_summary">Change the order of your favorite apps</string>
+    <string name="hidden_apps_summary">Manage your hidden applications</string>
+
+    <string name="category_display_title">Display</string>
+    <string name="change_wallpaper_title">Change Wallpaper</string>
+    <string name="change_wallpaper_summary">Open the system wallpaper picker</string>
+
+    <string name="app_drawer_mode_title">App drawer style</string>
+    <string-array name="app_drawer_mode_entries">
+        <item>Auto (follows wallpaper)</item>
+        <item>Light</item>
+        <item>Dark</item>
+    </string-array>
+    <!-- Persisted enum identifiers (fed to WallpaperSurfaceMode.valueOf); NOT UI
+         prose. translatable="false" keeps them out of values-de/ so a translation
+         can't break persistence. Visible labels live in app_drawer_mode_entries. -->
+    <string-array name="app_drawer_mode_values" translatable="false">
+        <item>AUTO</item>
+        <item>LIGHT</item>
+        <item>DARK</item>
+    </string-array>
+
+    <string name="wallpaper_backdrop_title">Behind the wallpaper</string>
+    <string-array name="wallpaper_backdrop_entries">
+        <item>System wallpaper</item>
+        <item>Black</item>
+    </string-array>
+    <!-- Persisted enum identifiers (fed to WallpaperBackdrop.valueOf); NOT UI
+         prose. translatable="false" keeps them out of values-de/ so a translation
+         can't break persistence. Visible labels live in wallpaper_backdrop_entries. -->
+    <string-array name="wallpaper_backdrop_values" translatable="false">
+        <item>SYSTEM_WALLPAPER</item>
+        <item>BLACK</item>
+    </string-array>
+
+
+    <!-- NEW -->
+    <string name="category_gestures_title">Gestures</string>
+    <string name="recent_apps_title">Recent apps</string>
+    <string name="recent_apps_empty">No recently opened apps yet</string>
+    <string name="events_dialog_title">Upcoming</string>
+    <string name="events_indicator_alarm_content_description">Upcoming alarm</string>
+    <string name="events_indicator_calendar_content_description">Upcoming calendar event</string>
+    <string name="charging_indicator_content_description">Charging</string>
+    <string name="battery_protection_indicator_content_description">Battery protection active</string>
+    <string name="events_fallback_alarm">Alarm</string>
+    <string name="events_fallback_calendar">Event</string>
+    <string name="event_all_day">All day</string>
+
+    <string name="category_system_title">System</string>
+    <string name="app_info_title">App Information</string>
+    <string name="app_info_summary">Launcher settings and permissions</string>
+
+    <string name="welcome_toast_fallback_favorites">Welcome! Choose favorites in app drawer. Until then, we\'ll show suggested apps.</string>
+
+    <string name="usage_data_reset_success">Sorting for %1$s reset</string>
+
+    <string name="set_default_launcher_title">Set Default Launcher</string>
+    <string name="set_default_launcher_summary">Select this app as your default home app</string>
+    <string name="error_default_launcher_settings_open">Error opening launcher settings.</string>
+    <string name="default_launcher_is_set">This launcher is already set as default</string>
+
+    <string name="onboarding_title_welcome">Welcome!</string>
+    <string name="onboarding_subtitle_welcome">Select your favorite apps for the home screen.</string>
+
+    <!-- First-run-only onboarding extras -->
+    <string name="onboarding_set_default_launcher">Set Kolibri as default launcher</string>
+    <string name="onboarding_restore_backup">Restore from backup</string>
+    <string name="onboarding_restore_failed">Restore failed. Please try again.</string>
+    <string name="onboarding_restore_limit_exceeded">This backup has too many favorites to restore.</string>
+    <string name="onboarding_restore_unsupported_version">This backup version isn\'t supported.</string>
+    <string name="onboarding_restore_invalid_format">This file isn\'t a valid backup.</string>
+    <string name="onboarding_default_launcher_set">Kolibri is now your default launcher</string>
+    <string name="onboarding_default_launcher_not_set">Kolibri was not set as default launcher</string>
+    <plurals name="onboarding_restore_missing_apps">
+        <item quantity="one">%d app from the backup isn\'t installed</item>
+        <item quantity="other">%d apps from the backup aren\'t installed</item>
+    </plurals>
+    <string name="onboarding_title_edit_favorites">Edit Favorites</string>
+    <string name="onboarding_subtitle_edit_favorites">Select the apps you want on your home screen.</string>
+
+    <string name="settings_select_favorites_title">Select Favorites</string>
+    <string name="settings_select_favorites_summary">Quickly select all your favorite apps at once</string>
+
+    <string name="hidden_apps_title_screen">Manage Hidden Apps</string>
+    <string name="hidden_apps_subtitle_screen">Select the apps you want to hide from the app drawer.</string>
+
+    <string name="custom_app_names_title">Custom App Names</string>
+    <string name="custom_app_names_summary">Rename apps or remove custom names</string>
+    <string name="rename_hint">Enter new name</string>
+    <string name="error_name_too_long">Name cannot be longer than %d characters</string>
+
+    <!-- For the AppNamesActivity screen -->
+    <string name="custom_app_names_subtitle">Edit or remove your custom app names here.</string>
+    <string name="rename_dialog_title">Rename \"%s\"</string>
+    <string name="save">Save</string>
+
+    <string name="error_loading_hidden_apps">Error loading hidden apps.</string>
+    <string name="error_saving_hidden_apps">Error saving hidden apps.</string>
+    <!-- Generic string for clock, calendar etc. -->
+
+    <string name="error_activity_not_found">Could not find an app to open this.</string>
+	
+	<string name="error_generic">Something went wrong. Please try again.</string>
+	<string name="error_starting_intent">Error starting intent: %1$s</string>
+    <string name="error_fallback_intent_failed">Fallback intent also failed</string>
+    <string name="error_app_not_available">App is no longer available</string>
+    <string name="error_loading_apps">Failed to load apps</string>
+    <string name="error_loading_favorites">Could not load favorites.</string>
+    <string name="onboarding_error_save_failed">Save failed. Please try again.</string>
+
+    <string name="crash_report_dialog_title">Improve App Stability</string>
+    <string name="crash_report_button_accept">Yes, help</string>
+    <string name="crash_report_button_decline">No, thanks</string>
+    
+    
+    
+<string name="crash_report_dialog_message">
+    Help us make the app better!
+    &lt;br>&lt;br>
+    When the app crashes, we can send anonymized technical data:
+    &lt;br>
+    &#8226; Device model and Android version&lt;br>
+    &#8226; App version&lt;br>
+    &#8226; Error log (stack trace)
+    &lt;br>&lt;br>
+    What we &lt;b>DO NOT&lt;/b> collect:
+    &lt;br>
+    &#8226; No personal data&lt;br>
+    &#8226; No location or usage data
+    &lt;br>&lt;br>
+    The data is encrypted and stored on a server in Germany.
+    &lt;br>&lt;br>
+    &lt;b>For more details, please see our &lt;a href="https://docs.kolibri-launcher.ch/privacy.html">Privacy Policy&lt;/a>.&lt;/b>
+</string>
+
+    <string name="customize_title">Customize</string>
+    <string name="customize_colors_and_shadow">Colors &amp; Shadow</string>
+    <string name="more_settings">More Settings</string>
+    <string name="text_shadow">Text Shadow</string>
+    <string name="wallpaper_scrim">Wallpaper dimming</string>
+    <string name="scrim_reset_offer_title">Wallpaper dimming</string>
+    <string name="scrim_reset_offer_message">Wallpaper dimming is still on (%1$d%%). Reset it for the changed wallpaper?</string>
+    <string name="scrim_reset_offer_confirm">Reset</string>
+    <string name="scrim_reset_offer_keep">Keep</string>
+    <string name="text_color">Text Color</string>
+    <string name="color_automatic">Automatic</string>
+
+    <string name="error_launching_app">Unable to open app. Please try again.</string>
+
+    <string name="category_privacy_title">Privacy</string>
+    <string name="crash_report_setting_title">Send crash reports</string>
+    <string name="crash_report_summary_enabled">Enabled. Thank you for helping improve the app!</string>
+    <string name="crash_report_summary_disabled">Disabled. Tap to change your choice.</string>
+    <string name="crash_report_summary_broken">⚠️ Not working — the crash-report bootstrap failed, so reports aren\'t being sent.</string>
+    <string name="crash_report_health_channel_name">Crash-report health</string>
+    <string name="crash_report_health_notif_title">Kolibri: crash reporting inactive</string>
+    <string name="crash_report_health_notif_text">The crash-report bootstrap failed on startup, so crash and ANR reports aren\'t being sent. Check the logcat.</string>
+
+    <string name="toast_crash_reports_enabled">Crash reporting has been enabled. Thank you for your help!</string>
+    <string name="toast_crash_reports_disabled">Crash reporting has been disabled.</string>
+    <string name="toast_crash_report_consent_save_failed">Your choice could not be saved and applies to this session only. Please try again.</string>
+
+    <!-- Developer commands: ACRA crash-report verification shortcuts. Visible
+         in release builds because the maintainer needs them after every refactor
+         that touches the crash pipeline. -->
+    <string name="developer_commands_category_title">Developer Commands</string>
+    <string name="pipeline_status_title">ACRA pipeline status</string>
+    <string name="pipeline_status_summary">Show the unsent crash-report backlog — a growing backlog means the sender/server is dead; empty means healthy or never crashed.</string>
+    <string name="toast_pipeline_status_empty">ACRA backlog empty — sender healthy or never crashed.</string>
+    <string name="toast_pipeline_status_backlog">ACRA backlog: %1$d approved, %2$d unapproved. Oldest: %3$s</string>
+    <string name="pipeline_status_oldest_unknown">unknown</string>
+    <string name="throw_test_exception_title">Throw test exception</string>
+    <string name="throw_test_exception_summary">Deliberately crashes the app to verify ACRA submission end-to-end. Use only when you want to test crash reporting.</string>
+    <string name="toast_throwing_test_exception">Throwing test exception — app will crash now.</string>
+    <string name="silent_error_test_title">Test silent error (should report)</string>
+    <string name="silent_error_test_summary">Fires a silentError (SILENT_ERROR intent tag) — must appear in ACRA via AcraTree. Does not crash the app (report by intent, §23).</string>
+    <string name="toast_silent_error_test">Silent error fired — should appear in ACRA as [E/SILENT_ERROR].</string>
+    <string name="warn_test_title">Test WARN (should NOT report)</string>
+    <string name="warn_test_summary">Fires an untagged Timber.w — must NOT reach ACRA (the report-by-intent invariant, §23). Does not crash the app.</string>
+    <string name="toast_warn_test">Untagged WARN fired — must NOT appear in ACRA.</string>
+
+    <string name="swipe_actions_title_screen">Swipe Actions</string>
+    <string name="swipe_actions_subtitle_screen">Assign apps to left and right swipe</string>
+    <string name="swipe_slot_empty">None</string>
+    <string name="swipe_slot_left_format">Left: %1$s</string>
+    <string name="swipe_slot_right_format">Right: %1$s</string>
+    <string name="error_saving_swipe_actions">Could not save swipe actions</string>
+    
+    <string name="settings_swipe_actions_title">Swipe Actions</string>
+    <string name="settings_swipe_actions_summary">Assign apps to left and right swipe gestures</string>
+    <string name="swipe_actions_selector_label">Assign apps to a slot:</string>
+
+    <string name="backup_summary">Export and restore your settings</string>
+
+<!-- Backup & Restore -->
+<string name="backup_title">Settings Backup &amp; Restore</string>
+<string name="backup_export_success">Backup successfully exported</string>
+<string name="backup_import_success_simple">%1$d apps imported</string>
+<string name="backup_import_success_with_skipped">%1$d apps imported\n%2$d apps skipped (not installed)</string>
+<string name="backup_unsupported_version">Backup version %1$s is not supported</string>
+<string name="backup_limit_exceeded">Too many apps in backup: %1$d (limit: %2$d packages)</string>
+<string name="backup_invalid_format">Invalid backup format</string>
+<string name="backup_missing_apps">Missing apps</string>
+<string name="backup_and_more">and %1$d more</string>
+<plurals name="backup_import_wallpaper_layers_dropped">
+    <item quantity="one">%1$d wallpaper layer could not be restored (image no longer available)</item>
+    <item quantity="other">%1$d wallpaper layers could not be restored (images no longer available)</item>
+</plurals>
+<string name="backup_description">Export your favorites and settings or restore them from a backup.</string>
+<string name="backup_button_export">Export Settings</string>
+<string name="backup_button_import">Restore Settings</string>
+<string name="backup_loading">Loading backup…</string>
+<string name="backup_export_failed">Backup export failed</string>
+<string name="backup_preview_date_unknown">Date unknown</string>
+
+<!-- Import Options Dialog -->
+<string name="import_options_title">Import Options</string>
+<string name="import_options_description">Choose what you want to import:</string>
+<string name="import_option_favorites">Favorites (%1$d apps)</string>
+<string name="import_option_order">Order</string>
+<string name="import_option_hidden_apps">Hidden apps (%1$d apps)</string>
+<string name="import_option_custom_names">Custom names (%1$d apps)</string>
+<string name="backup_preview_date">Backup from %1$s</string>
+<string name="import_button">Import</string>
+<string name="import_no_options_selected">Please select at least one import option</string>
+<string name="import_option_swipe_actions">Swipe actions (%d)</string>
+<string name="import_option_theme">Theme &amp; Colors</string>
+<string name="import_option_wallpaper">Wallpaper</string>
+
+<string name="show_calendar_event_title">Show next calendar event</string>
+<string name="show_calendar_event_summary">Displays the next event on the home screen. Requires calendar permission.</string>
+
+<string name="calendar_permission_title">Calendar permission required</string>
+<string name="calendar_permission_rationale">To show your next event on the home screen, Kolibri needs access to read your calendar. Your data is processed locally and will not be shared.</string>
+<string name="calendar_permission_denied_toast">Calendar permission denied. The widget cannot be displayed.</string>
+    <string name="show_alarm_title">Show alarms</string>
+    <string name="show_alarm_summary">Display next alarm on home screen</string>
+    <string name="import_option_time_events">Time-Based Events (Calendar &amp; Alarm)</string>
+    <string name="backup_import_success_settings_only">Settings successfully imported</string>
+    
+    <string name="cleanup_storage_title">Clean up storage</string>
+    <string name="cleanup_storage_summary">Remove leftover settings entries from removed or moved features</string>
+    <string name="cleanup_storage_dialog_title">Clean up storage?</string>
+    <string name="cleanup_storage_preview_message">The following leftover entries will be removed. Your active settings are not affected:</string>
+    <string name="cleanup_storage_action">Clean up</string>
+    <string name="cleanup_storage_done">Old storage entries removed</string>
+    <string name="cleanup_storage_none">Storage is already clean</string>
+    <string name="cleanup_storage_error">Could not clean up storage</string>
+    <string name="factory_reset_title">Factory Reset</string>
+<string name="factory_reset_summary">Reset all settings and favorites to their defaults</string>
+<string name="factory_reset_dialog_title">Reset app?</string>
+<string name="factory_reset_dialog_message">All your personal settings, favorites, and customizations will be permanently deleted.</string>
+<string name="reset">Reset</string>
+<string name="reset_success">Reset successful</string>
+<string name="reset_failed">Reset failed</string>
+<string name="factory_reset_include_usage_data">Also delete app usage history</string>
+<string name="auto_show_keyboard_title">Auto-show keyboard</string>
+<string name="auto_show_keyboard_summary">Automatically show the keyboard when opening the app drawer</string>
+<string name="import_option_qol">Import Quality-of-Life settings</string>
+<string name="category_qol_title">Quality-of-Life</string>
+<string name="auto_launch_app_title">Auto-launch single result</string>
+<string name="auto_launch_app_summary">Automatically launch an app when it\'s the only search result</string>
+
+    <!-- Advanced Settings Category -->
+    <string name="category_advanced_title">Advanced Settings</string>
+    
+    <string name="import_option_power_user">Power User Settings</string>
+    
+    <string name="customize_layout_title">Layout &amp; Size</string>
+    <string name="layout_text_size">Text Size</string>
+    <string name="layout_vertical_spacing">Line Spacing</string>
+    <string name="layout_bold_text">Bold Text</string>
+    <string name="action_reset">Reset</string>
+    <string name="layout_top_margin">Top offset</string>
+    <string name="layout_favorites_alignment">Favorites alignment</string>
+    <string name="layout_favorites_alignment_start">Left</string>
+    <string name="layout_favorites_alignment_center">Center</string>
+    <string name="layout_favorites_alignment_end">Right</string>
+
+<!-- Usage Export -->
+<string name="usage_export_title">Usage Profile Backup &amp; Restore</string>
+<string name="pref_usage_export_summary">Export &amp; import app usage statistics</string>
+<string name="usage_export_description">Export and import your app usage statistics. This preserves your personalized app sorting even after reinstalling.</string>
+<string name="usage_export_button">Export</string>
+<string name="usage_import_button">Import</string>
+<string name="usage_export_success">Usage data exported</string>
+<string name="usage_export_error">Export failed</string>
+<string name="usage_export_failed">Export failed: %1$s</string>
+<string name="usage_import_success">Imported %1$d apps with %2$d data points</string>
+<string name="usage_import_error">Import failed</string>
+<string name="usage_import_failed">Import failed: %1$s</string>
+<string name="usage_import_invalid_format">Invalid file format</string>
+<string name="usage_import_unsupported_version">Unsupported version: %1$s</string>
+<string name="usage_import_mode_title">Import Mode</string>
+<string name="usage_import_mode_message">Merge combines existing data with imported data. Replace overwrites all existing data.</string>
+<string name="usage_import_merge">Merge</string>
+<string name="usage_import_replace">Replace</string>
+
+<string name="wallpaper_removed">Wallpaper removed</string>
+<string name="wallpaper_edit_mode">Edit wallpaper</string>
+<string name="wallpaper_choose">Choose image</string>
+<string name="wallpaper_remove">Remove wallpaper</string>
+<string name="wallpaper_edit_hint">Pinch to zoom, drag to pan</string>
+<string name="wallpaper_cancel">Cancel</string>
+<string name="wallpaper_snap_toggle">Snap on/off</string>
+<string name="wallpaper_snap_mode_toggle">Toggle snap-mode</string>
+<string name="wallpaper_horizontal_snap_toggle">Horizontal snap on/off</string>
+<string name="wallpaper_vertical_snap_toggle">Vertical snap on/off</string>
+<string name="wallpaper_add_layer">Add layer</string>
+<string name="wallpaper_delete_layer">Delete layer</string>
+<string name="wallpaper_move_layer_up">Move layer forward</string>
+<string name="wallpaper_move_layer_down">Move layer backward</string>
+<string name="wallpaper_original_size">Original size (1:1)</string>
+<string name="wallpaper_remove_confirm">Remove wallpaper and all layers? This cannot be undone.</string>
+<string name="wallpaper_remove_yes">Remove</string>
+<string name="wallpaper_fit_width">Fit to width</string>
+<string name="cd_fab_save_drag">Save wallpaper edits. Drag to move this button.</string>
+<string name="cd_open_commands">More wallpaper-edit controls</string>
+<string name="cd_close_commands">Close controls</string>
+<string name="cd_wallpaper_memory_info">Show memory usage</string>
+<string name="cd_wallpaper_backdrop_toggle">Toggle backdrop: system wallpaper or black</string>
+
+<!-- Wallpaper memory info dialog (opt-in via the ⓘ button in the edit overflow). -->
+<string name="wallpaper_memory_title">Wallpaper memory</string>
+<string name="wallpaper_memory_row">Layer %1$d: %2$s · %3$s  (%4$s)</string>
+<string name="wallpaper_memory_source">%1$d×%2$d, from %3$d×%4$d</string>
+<string name="wallpaper_memory_total">Total: %1$s</string>
+<string name="wallpaper_memory_empty">No wallpaper loaded</string>
+
+<string name="rotation_lock_title">Lock screen rotation</string>
+<string name="rotation_lock_summary">Keep the display in portrait orientation</string>
+
+<!-- Use-case messages (moved from :domain/res/ when :domain switched to pure-Kotlin) -->
+<string name="add_to_favorites">Add to favorites</string>
+<string name="remove_from_favorites">Remove from favorites</string>
+<string name="app_added_to_favorites">Added %s to favorites</string>
+<string name="app_removed_from_favorites">Removed %s from favorites</string>
+<string name="rename_app">Rename app</string>
+<string name="restore_original_name">Restore original name</string>
+<string name="app_info">App info</string>
+<string name="error_app_list_not_loaded">App list is not loaded yet. Please try again in a moment.</string>
+<string name="favorites_limit_reached">Limit reached (max %1$d favorites)</string>
+<string name="unhide_app_in_drawer">Show in app drawer</string>
+<string name="hide_app_from_drawer">Hide from app drawer</string>
+<string name="action_reset_sorting">Reset sorting</string>
+
+</resources>
