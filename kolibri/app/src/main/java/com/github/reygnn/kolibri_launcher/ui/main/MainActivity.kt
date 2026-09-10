@@ -54,9 +54,9 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthMonitor
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthNotifier
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint

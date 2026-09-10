@@ -19,7 +19,7 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryRow
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt

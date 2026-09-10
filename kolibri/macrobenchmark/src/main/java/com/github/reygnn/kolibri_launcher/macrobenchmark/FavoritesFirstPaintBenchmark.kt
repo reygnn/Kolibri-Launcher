@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
  * the favorites frame is enumeration-gated (~150 ms on an A17 in the reference
  * Perfetto trace) while the clock/date/battery content is already on screen. This
  * benchmark turns that one-off Perfetto observation into a repeatable number:
- * [LaunchTrace.Names.FAVORITES_FIRST_PAINT][com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace.Names.FAVORITES_FIRST_PAINT]
+ * [LaunchTrace.Names.FAVORITES_FIRST_PAINT][com.github.reygnn.launcher.common.ui.LaunchTrace.Names.FAVORITES_FIRST_PAINT]
  * (`favorites_first_paint`) is an async span opened at the cold-start Home view
  * creation and closed one frame after the first non-empty favorites paint;
  * [TraceSectionMetric] reads its duration.

@@ -24,7 +24,7 @@ import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

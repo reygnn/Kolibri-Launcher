@@ -17,7 +17,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentUsageExportBinding
 import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException

@@ -146,7 +146,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCa
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache

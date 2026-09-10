@@ -40,7 +40,7 @@ import org.junit.runner.RunWith
  * are fed by one `connectedBenchmarkAndroidTest` run.
  *
  * Alongside those, a [TraceSectionMetric] reports the `cold_start_consent_read`
- * slice ([LaunchTrace.Names.COLD_START_CONSENT_READ][com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace.Names.COLD_START_CONSENT_READ])
+ * slice ([LaunchTrace.Names.COLD_START_CONSENT_READ][com.github.reygnn.launcher.common.ui.LaunchTrace.Names.COLD_START_CONSENT_READ])
  * — the synchronous `runBlocking` DataStore consent read in
  * `CrashReportingBootstrap.onCreate`, the "prime suspect for cold-start latency".
  * This is measurement-only (no `verify…` gate yet): it exists to answer whether the

@@ -18,7 +18,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoDiffCallback
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.OutlinedButton
 import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 

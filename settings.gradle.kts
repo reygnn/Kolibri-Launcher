@@ -31,6 +31,7 @@ rootProject.name = "unity-launcher"
 // Phase 0 (MONOREPO_MERGE_SPEC §6): both codebases mounted as-is under nested
 // module paths, no code/namespace changes yet. Both apps build unchanged.
 include(":core")
+include(":common-ui")
 include(":kolibri:app")
 include(":kolibri:domain")
 include(":kolibri:data")

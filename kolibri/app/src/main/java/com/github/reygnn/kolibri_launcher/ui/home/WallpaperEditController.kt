@@ -17,7 +17,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransit
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import timber.log.Timber
 
 /**

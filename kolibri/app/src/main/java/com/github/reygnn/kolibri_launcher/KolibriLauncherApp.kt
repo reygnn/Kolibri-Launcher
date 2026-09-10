@@ -27,7 +27,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp

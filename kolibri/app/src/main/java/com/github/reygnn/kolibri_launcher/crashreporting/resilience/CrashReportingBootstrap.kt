@@ -13,7 +13,7 @@ import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHe
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
-import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking

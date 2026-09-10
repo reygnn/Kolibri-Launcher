@@ -20,7 +20,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint

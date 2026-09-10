@@ -13,7 +13,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorData
 import com.github.reygnn.kolibri_launcher.ui.util.ErrorEventBus
 import com.github.reygnn.kolibri_launcher.ui.util.Event
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch

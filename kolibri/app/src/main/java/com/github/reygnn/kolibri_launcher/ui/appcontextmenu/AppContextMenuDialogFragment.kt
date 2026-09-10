@@ -30,7 +30,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurface
 import com.github.reygnn.kolibri_launcher.ui.customnames.RenameDecision
 import com.github.reygnn.kolibri_launcher.ui.flow.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.AppInfoParcelable
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.kolibri_launcher.ui.util.toParcelable
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder

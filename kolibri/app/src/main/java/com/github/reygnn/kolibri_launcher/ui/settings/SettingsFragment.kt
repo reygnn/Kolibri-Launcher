@@ -47,8 +47,8 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
 import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
-import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
-import com.github.reygnn.kolibri_launcher.ui.util.withRelaxedStrictMode
+import com.github.reygnn.launcher.common.ui.showToastSafe
+import com.github.reygnn.launcher.common.ui.withRelaxedStrictMode
 import com.google.android.material.checkbox.MaterialCheckBox
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
