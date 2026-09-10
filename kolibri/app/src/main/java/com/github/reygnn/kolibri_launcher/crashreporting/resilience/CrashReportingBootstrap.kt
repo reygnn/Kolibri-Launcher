@@ -5,7 +5,6 @@ import android.os.Handler
 import android.util.Log
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
-import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
@@ -79,17 +78,17 @@ object CrashReportingBootstrap {
      * here NPE'd on every cold start and (because the throw aborted the method)
      * also skipped step 2. Both are why the consent gate moved to [onCreate].
      */
-    fun attachBaseContext(app: Application) {
+    fun attachBaseContext(app: Application, config: AcraConfig) {
         // Traced (cold-start): ACRA config build + init, reflection-heavy.
         LaunchTrace.section(LaunchTrace.Names.COLD_START_ACRA_INIT) {
             app.initAcra {
-                buildConfigClass = BuildConfig::class.java
+                buildConfigClass = config.buildConfigClass
                 reportFormat = StringFormat.JSON
 
                 httpSender {
-                    uri = BuildConfig.ACRA_URL
-                    basicAuthLogin = BuildConfig.ACRA_LOGIN
-                    basicAuthPassword = BuildConfig.ACRA_PASSWORD
+                    uri = config.url
+                    basicAuthLogin = config.login
+                    basicAuthPassword = config.password
                     httpMethod = HttpSender.Method.POST
                     tlsProtocols = listOf(TLS.V1_2, TLS.V1_3)
                 }

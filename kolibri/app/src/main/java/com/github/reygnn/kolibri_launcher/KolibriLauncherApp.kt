@@ -22,6 +22,7 @@ import android.util.Log
 import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.crashreporting.resilience.AcraConfig
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
@@ -100,7 +101,15 @@ class KolibriLauncherApp : Application() {
                 // Traced (cold-start): synchronous, runs before onCreate and
                 // blocks the Main thread; wraps the ACRA-init sub-section.
                 LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
-                    CrashReportingBootstrap.attachBaseContext(this)
+                    CrashReportingBootstrap.attachBaseContext(
+                        this,
+                        AcraConfig(
+                            buildConfigClass = BuildConfig::class.java,
+                            url = BuildConfig.ACRA_URL,
+                            login = BuildConfig.ACRA_LOGIN,
+                            password = BuildConfig.ACRA_PASSWORD,
+                        ),
+                    )
                 }
             } catch (e: Throwable) {
                 // Ultra paranoid: even crash-reporting init must not crash the
