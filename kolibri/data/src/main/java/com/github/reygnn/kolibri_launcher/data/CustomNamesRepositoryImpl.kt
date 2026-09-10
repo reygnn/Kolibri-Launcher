@@ -4,10 +4,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.isEffectivelyBlank
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged

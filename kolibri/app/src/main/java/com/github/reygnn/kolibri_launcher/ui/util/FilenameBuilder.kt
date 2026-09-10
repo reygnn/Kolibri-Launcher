@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

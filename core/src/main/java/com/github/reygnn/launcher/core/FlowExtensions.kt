@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow

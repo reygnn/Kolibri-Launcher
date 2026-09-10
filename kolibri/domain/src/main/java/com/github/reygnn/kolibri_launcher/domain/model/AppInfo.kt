@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import com.github.reygnn.kolibri_launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 
 /**
  * Pure-Kotlin immutable data class for a text-based launcher entry.

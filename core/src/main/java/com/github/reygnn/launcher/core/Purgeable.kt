@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.domain.repository
+package com.github.reygnn.launcher.core
 
 /**
  * Interface for repositories whose persisted state can be wiped.

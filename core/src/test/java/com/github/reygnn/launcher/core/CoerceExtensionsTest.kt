@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

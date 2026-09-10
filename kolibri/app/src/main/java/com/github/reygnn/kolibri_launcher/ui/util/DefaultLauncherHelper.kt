@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 
 /**
  * Single source of truth for the default-launcher (ROLE_HOME) flow, shared by

@@ -12,8 +12,8 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.util.showToastSafe
 import com.github.reygnn.kolibri_launcher.databinding.FragmentFavoritesSortBinding
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo

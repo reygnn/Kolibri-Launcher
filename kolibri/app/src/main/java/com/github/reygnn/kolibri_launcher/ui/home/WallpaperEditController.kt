@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.home
 
 import android.view.View
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition

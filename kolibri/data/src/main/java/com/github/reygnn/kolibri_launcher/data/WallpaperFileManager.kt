@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.data
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

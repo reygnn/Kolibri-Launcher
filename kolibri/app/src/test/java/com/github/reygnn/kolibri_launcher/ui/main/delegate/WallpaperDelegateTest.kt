@@ -12,7 +12,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitm
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
@@ -137,7 +137,7 @@ class WallpaperDelegateTest {
         wallpaperFlattener: WallpaperFlattener = mockk(relaxed = true),
         compositeCache: WallpaperCompositeCache = mockk(relaxed = true),
         bitmapLuminance: com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl = mockk(relaxed = true),
-        compositeLuminanceSignal: com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal = mockk(relaxed = true),
+        compositeLuminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true),
     ) = WallpaperDelegate(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
@@ -366,7 +366,7 @@ class WallpaperDelegateTest {
 
         val cache: WallpaperCompositeCache = mockk(relaxed = true)
         every { cache.get(any()) } returns null // miss -> the warm fires
-        val luminanceSignal: com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
+        val luminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
 
         val delegate = createDelegate(
             observeWallpaperStateUseCase = useCase,

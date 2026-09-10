@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import android.content.Context
 import android.content.Intent
-import com.github.reygnn.kolibri_launcher.core.PackageEvent
+import com.github.reygnn.launcher.core.PackageEvent
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule

@@ -19,9 +19,9 @@ import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
 import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /**
  * Validates a stored usage timestamp for plausibility: strictly positive, not

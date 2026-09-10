@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /**
  * Parses [this] into enum constant [T], returning `null` when the string is

@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 // TIMESTAMP 2025-12-04 05:01
 
-import com.github.reygnn.kolibri_launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import kotlinx.coroutines.flow.Flow

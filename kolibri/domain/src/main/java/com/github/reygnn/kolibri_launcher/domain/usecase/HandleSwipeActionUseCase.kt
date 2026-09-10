@@ -4,7 +4,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.KolibriLog
 import javax.inject.Inject
 
 class HandleSwipeActionUseCase @Inject constructor(

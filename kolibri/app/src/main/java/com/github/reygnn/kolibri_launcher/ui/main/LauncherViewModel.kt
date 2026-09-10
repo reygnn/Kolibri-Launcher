@@ -23,9 +23,9 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
-import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
-import com.github.reygnn.kolibri_launcher.core.IoDispatcher
-import com.github.reygnn.kolibri_launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.CompositeLuminanceSignal
+import com.github.reygnn.launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
@@ -85,7 +85,7 @@ import com.github.reygnn.kolibri_launcher.ui.main.delegate.GestureDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.LayoutDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.ThemingDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.WallpaperDelegate
-import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import dagger.hilt.android.lifecycle.HiltViewModel

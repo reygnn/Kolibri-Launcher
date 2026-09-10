@@ -18,7 +18,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.databinding.DialogColorCustomizationBinding
 import com.github.reygnn.kolibri_launcher.databinding.ItemColorSwatchBinding
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground

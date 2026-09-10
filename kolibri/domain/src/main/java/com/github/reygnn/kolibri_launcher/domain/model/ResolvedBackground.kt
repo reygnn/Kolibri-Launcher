@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import com.github.reygnn.kolibri_launcher.core.ColorMath
+import com.github.reygnn.launcher.core.ColorMath
 
 /**
  * Effective background of a launcher surface — the abstraction every

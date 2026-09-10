@@ -1,9 +1,9 @@
-package com.github.reygnn.kolibri_launcher.di
+package com.github.reygnn.launcher.core
 
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
-import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
-import com.github.reygnn.kolibri_launcher.core.IoDispatcher
-import com.github.reygnn.kolibri_launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.ApplicationScope
+import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.MainDispatcher
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

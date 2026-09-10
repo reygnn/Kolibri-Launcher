@@ -17,7 +17,7 @@ import android.view.animation.DecelerateInterpolator
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryRow
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace
 import kotlin.math.abs

@@ -10,7 +10,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import androidx.annotation.StringRes
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import com.github.reygnn.kolibri_launcher.core.ColorMath
+import com.github.reygnn.launcher.core.ColorMath
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

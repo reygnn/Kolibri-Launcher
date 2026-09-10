@@ -19,7 +19,7 @@ import org.junit.Test
  * Siehe [FavoritesRepositoryContract] für Hintergrund und Konventionen.
  *
  * The [FabPositionRepository] surface is small (one Flow + one suspend
- * setter + the inherited [com.github.reygnn.kolibri_launcher.domain.repository.Purgeable.purgeRepository])
+ * setter + the inherited [com.github.reygnn.launcher.core.Purgeable.purgeRepository])
  * but has one non-obvious invariant worth pinning: when nothing has
  * ever been persisted (fresh install, post-purge), the flow MUST emit
  * [FabPosition.DEFAULT] rather than failing or stalling. Consumers

@@ -14,7 +14,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.text.format.DateFormat
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.ChargeState
 import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent

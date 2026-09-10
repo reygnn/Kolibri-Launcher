@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
 import androidx.core.graphics.ColorUtils
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame

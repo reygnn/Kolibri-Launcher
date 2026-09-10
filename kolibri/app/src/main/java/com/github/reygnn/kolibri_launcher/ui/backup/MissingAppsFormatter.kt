@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.backup
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 
 /**
  * PURE LOGIC - Missing Apps Formatter

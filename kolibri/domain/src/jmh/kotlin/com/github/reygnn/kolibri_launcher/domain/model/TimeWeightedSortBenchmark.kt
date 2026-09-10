@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.timeWeightedUsageScore
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.timeWeightedUsageScore
 import org.openjdk.jmh.annotations.Benchmark
 import org.openjdk.jmh.annotations.BenchmarkMode
 import org.openjdk.jmh.annotations.Fork

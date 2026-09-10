@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
+import com.github.reygnn.launcher.core.Purgeable
+
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment

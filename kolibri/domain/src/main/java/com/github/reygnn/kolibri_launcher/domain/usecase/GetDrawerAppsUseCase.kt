@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.KolibriLog
 import javax.inject.Inject
 import javax.inject.Singleton
 

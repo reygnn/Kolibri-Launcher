@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.di
 
-import com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys
+import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import dagger.Module
 import dagger.Provides

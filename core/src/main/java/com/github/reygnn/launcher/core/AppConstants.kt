@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /**
  * Zentrale Konstanten für die gesamte Anwendung

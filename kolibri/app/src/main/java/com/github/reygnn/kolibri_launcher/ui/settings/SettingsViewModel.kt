@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.ui.settings
 
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -197,7 +197,7 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Removes orphaned settings-store keys (retired features / moved stores). Driven by the
-     * [com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys] keep-list: every key no live
+     * [com.github.reygnn.launcher.core.OwnsSettingsStoreKeys] keep-list: every key no live
      * owner claims is removed, so nothing hand-maintained can go stale. Reports whether anything was
      * cleaned.
      */

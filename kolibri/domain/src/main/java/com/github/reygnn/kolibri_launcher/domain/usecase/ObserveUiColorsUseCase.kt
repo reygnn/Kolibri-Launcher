@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.core.ColorMath
-import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.launcher.core.ColorMath
+import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository

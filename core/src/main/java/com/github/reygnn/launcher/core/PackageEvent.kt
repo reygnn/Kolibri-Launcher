@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /**
  * A package-lifecycle event carried by [AppUpdateSignal] from the

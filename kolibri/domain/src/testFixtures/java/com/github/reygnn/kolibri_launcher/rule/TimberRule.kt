@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.rule
 
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import org.junit.rules.ExternalResource
 
 class TimberRule : ExternalResource() {

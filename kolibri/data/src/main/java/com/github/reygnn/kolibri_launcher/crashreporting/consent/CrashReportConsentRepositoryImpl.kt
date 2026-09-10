@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.crashreporting.consent
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.di.ConsentDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.customnames
 
-import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
+import com.github.reygnn.launcher.core.isEffectivelyBlank
 
 /**
  * Four-way decision for what to do with a rename input from the

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
-import com.github.reygnn.kolibri_launcher.core.ApplicationScope
+import com.github.reygnn.launcher.core.ApplicationScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch

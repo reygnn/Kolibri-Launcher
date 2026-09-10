@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.BuildConfig

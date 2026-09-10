@@ -130,8 +130,8 @@ import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
@@ -155,7 +155,7 @@ import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitm
 import android.graphics.Bitmap
 import android.widget.Toast
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
-import com.github.reygnn.kolibri_launcher.core.CompositeLuminanceSignal
+import com.github.reygnn.launcher.core.CompositeLuminanceSignal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex

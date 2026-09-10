@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.view.View
 import androidx.annotation.VisibleForTesting
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
 import com.github.reygnn.kolibri_launcher.ui.util.LaunchTrace

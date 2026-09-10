@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.usageexport
 
-import com.github.reygnn.kolibri_launcher.core.MainDispatcher
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportUsageToFileUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportUsageFromFileUseCase

@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.core.firstOrDefault
+import com.github.reygnn.launcher.core.firstOrDefault
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import javax.inject.Inject
 

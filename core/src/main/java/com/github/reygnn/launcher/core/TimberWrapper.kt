@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess

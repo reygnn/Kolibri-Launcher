@@ -4,8 +4,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
 // TIMESTAMP 2025-12-07 12:59
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment

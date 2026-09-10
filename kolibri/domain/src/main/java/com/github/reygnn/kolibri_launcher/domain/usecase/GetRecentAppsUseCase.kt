@@ -9,8 +9,8 @@
 
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.core.DefaultDispatcher
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository

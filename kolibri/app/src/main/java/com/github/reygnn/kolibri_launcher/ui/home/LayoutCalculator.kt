@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.core.coerceAtLeastSafe
-import com.github.reygnn.kolibri_launcher.core.coerceInSafe
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.coerceAtLeastSafe
+import com.github.reygnn.launcher.core.coerceInSafe
 
 /**
  * Berechnet Layout-Parameter basierend auf User-Einstellungen.

@@ -6,7 +6,7 @@ package com.github.reygnn.kolibri_launcher.domain.repository
  * nothing reads or writes anymore.
  *
  * Driven by a keep-list, not a retired-list: every live owner declares the settings-store keys it
- * uses via [com.github.reygnn.kolibri_launcher.core.OwnsSettingsStoreKeys], and this deletes every
+ * uses via [com.github.reygnn.launcher.core.OwnsSettingsStoreKeys], and this deletes every
  * settings-store key that NO owner claims (a blacklist-of-unknown). A retired key is cleaned the
  * moment its owner is gone — nothing to hand-maintain. This is GC of dead data, not a data migration
  * (Rule 5): it bridges nothing and runs only when the user asks (never on launch). The inverted

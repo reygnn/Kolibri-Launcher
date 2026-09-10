@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /**
  * Declares the **settings**-DataStore keys a component actively owns (reads/writes).

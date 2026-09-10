@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.core
+package com.github.reygnn.launcher.core
 
 /*
  * Copyright (C) 2025 reygnn (Ulrich Kaufmann)

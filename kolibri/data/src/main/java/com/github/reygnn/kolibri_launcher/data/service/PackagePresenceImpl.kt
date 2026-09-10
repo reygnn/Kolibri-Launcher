@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.data.service
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import com.github.reygnn.kolibri_launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.kolibri_launcher.domain.service.PackagePresence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

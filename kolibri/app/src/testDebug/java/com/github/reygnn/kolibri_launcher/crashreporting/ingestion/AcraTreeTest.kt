@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

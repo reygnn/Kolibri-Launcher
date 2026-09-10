@@ -5,7 +5,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import androidx.fragment.app.DialogFragment
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.TimberWrapper
 
 /**
  * Wires [dragZone] as a drag handle that moves this dialog's window

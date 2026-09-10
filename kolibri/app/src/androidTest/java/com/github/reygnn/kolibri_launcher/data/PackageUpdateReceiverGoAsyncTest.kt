@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.core.AppUpdateSignal
+import com.github.reygnn.launcher.core.AppUpdateSignal
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.rule.TimberRule

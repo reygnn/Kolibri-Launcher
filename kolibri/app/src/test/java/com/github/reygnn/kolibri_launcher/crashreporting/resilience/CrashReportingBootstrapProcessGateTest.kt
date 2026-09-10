@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.resilience
 
 import android.app.Application
-import com.github.reygnn.kolibri_launcher.core.KolibriLog
-import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReport

@@ -4,7 +4,7 @@ import javax.inject.Qualifier
 
 /**
  * Hilt qualifier distinguishing the app-usage `DataStore<Preferences>`
- * (own backing file, [com.github.reygnn.kolibri_launcher.core.AppConstants.USAGE_DATASTORE_NAME])
+ * (own backing file, [com.github.reygnn.launcher.core.AppConstants.USAGE_DATASTORE_NAME])
  * from the unqualified settings `DataStore<Preferences>`. Bound by
  * [DataStoreModule.provideUsageDataStore]; injected into
  * `AppUsageRepositoryImpl` and `UsageExportRepositoryImpl`.

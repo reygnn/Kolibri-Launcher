@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher
 
-import com.github.reygnn.kolibri_launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppConstants
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element

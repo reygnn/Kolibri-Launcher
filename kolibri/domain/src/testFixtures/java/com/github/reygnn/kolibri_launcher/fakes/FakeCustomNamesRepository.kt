@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 // NUR FÜR unitTest !!!
 // TIMESTAMP 2025-12-04 19:22
 
-import com.github.reygnn.kolibri_launcher.core.isEffectivelyBlank
+import com.github.reygnn.launcher.core.isEffectivelyBlank
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
