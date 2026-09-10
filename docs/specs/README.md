@@ -20,6 +20,11 @@ not here.
 - [`DATASTORE_READ_SPEC`](DATASTORE_READ_SPEC.md) — Ein autoritativer Lesepfad pro DataStore-State (Plan + Sigs)
 - [`DEBOUNCE_SPEC`](DEBOUNCE_SPEC.md) — Status: ENTWURF (2026-08-09), Spec-Review-Runde 1 eingearbeitet — Verdikt SOUND
 - [`INSTALLED_APPS_LOAD_SPEC`](INSTALLED_APPS_LOAD_SPEC.md) — Der App-Loader kollabiert Fehler zu leer (Plan + Sigs)
+- [`MULTIUSER_ENUMERATION_SPEC`](MULTIUSER_ENUMERATION_SPEC.md) — Status: ENTWURF v1.1 — strukturierter `ComponentKey` → `LauncherApps.getActivityList` → Work-Profile (A–D, zero-migration). Standalone, kein Nyx-Merge.
+- [`PHASE_A_IMPL_NOTE`](PHASE_A_IMPL_NOTE.md) — Umsetzungs-Notiz Phase A: strukturierten `ComponentKey` additiv einführen (verhaltensgleich).
+- [`PHASE_B_IMPL_NOTE`](PHASE_B_IMPL_NOTE.md) — Umsetzungs-Notiz Phase B: Enumeration auf `LauncherApps.getActivityList` (single-user, kein `loadLabel`-IPC).
+- [`PHASE_C_IMPL_NOTE`](PHASE_C_IMPL_NOTE.md) — Umsetzungs-Notiz Phase C: user-aware Plumbing (Launch/Presence/Package-Events), noch primär-only.
+- [`PHASE_D_IMPL_NOTE`](PHASE_D_IMPL_NOTE.md) — Umsetzungs-Notiz Phase D: Work-Profile einschalten (`@serial`, Reconcile/Paused-Guard, Lifecycle, Text-Marker).
 - [`PERF-BENCHMARK-SETUP`](PERF-BENCHMARK-SETUP.md) — App-start performance: benchmark & setup (A17-only, tooling, gates).
 - [`PERF-RESULTS`](PERF-RESULTS.md) — App-start performance: on-device results (A17) — hop + cold-start TTID.
 - [`REACTIVE_APPLIST_SPEC`](REACTIVE_APPLIST_SPEC.md) — Anzeige rein reaktiv, Enumeration nur bei echter Änderung
