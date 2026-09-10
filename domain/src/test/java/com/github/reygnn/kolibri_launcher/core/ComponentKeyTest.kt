@@ -1,6 +1,8 @@
 package com.github.reygnn.kolibri_launcher.core
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,5 +64,47 @@ class ComponentKeyTest {
     @Test
     fun `multi-slash is accepted, matching unflatten's first-separator rule`() {
         assertTrue(ComponentKey.isValid("pkg/b/c"))
+    }
+
+    // --- flat: the persistence/backup projection (must equal the historical string) ---
+
+    @Test
+    fun `flat is the package and class joined by a single separator`() {
+        val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
+        assertEquals("com.example.alpha/com.example.alpha.MainActivity", key.flat)
+    }
+
+    // --- parse: the inverse of flat (former scattered substringBefore decomposition) ---
+
+    @Test
+    fun `parse splits a well-formed flat string into package and class`() {
+        val key = ComponentKey.parse("com.example.alpha/com.example.alpha.MainActivity")
+        assertEquals(ComponentKey("com.example.alpha", "com.example.alpha.MainActivity"), key)
+    }
+
+    @Test
+    fun `parse round-trips flat`() {
+        val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
+        assertEquals(key, ComponentKey.parse(key.flat))
+    }
+
+    @Test
+    fun `parse rejects a bare package name`() {
+        // The former TODO 15 hole: substringBefore('/') on "com.example" returned
+        // the whole string; parse returns null so a malformed key can't masquerade.
+        assertNull(ComponentKey.parse("com.example"))
+    }
+
+    @Test
+    fun `parse rejects empty, leading-slash and trailing-slash forms`() {
+        assertNull(ComponentKey.parse(""))
+        assertNull(ComponentKey.parse("/com.example.Main"))
+        assertNull(ComponentKey.parse("com.example.alpha/"))
+    }
+
+    @Test
+    fun `parse keeps everything after the first separator as the class`() {
+        // Mirrors isValid's first-separator rule (a real class cannot contain '/').
+        assertEquals(ComponentKey("pkg", "b/c"), ComponentKey.parse("pkg/b/c"))
     }
 }

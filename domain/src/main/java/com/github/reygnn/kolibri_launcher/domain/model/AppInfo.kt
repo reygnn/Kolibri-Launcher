@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.kolibri_launcher.core.ComponentKey
+
 /**
  * Pure-Kotlin immutable data class for a text-based launcher entry.
  *
@@ -58,11 +60,24 @@ data class AppInfo(
      *
      * z.B. "com.android.chrome/com.google.android.apps.chrome.Main"
      */
+    /**
+     * The canonical structured identity of this entry.
+     *
+     * Carries the normalized (long-form) class name, so [key] and [componentName]
+     * never disagree; [ComponentKey.flat] is the single definition of the
+     * flattened wire format and [componentName] is now merely its projection.
+     *
+     * A body `val` (declared before [componentName], so it is initialized first),
+     * which — like [displayNameLower], [normalizedClassName] and [componentName] —
+     * keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
+     */
+    val key: ComponentKey = ComponentKey(packageName, normalizedClassName)
+
     // Precomputed once per instance (body val, so it stays out of
     // equals/hashCode/copy just like displayNameLower) — the former getter
     // recomputed the concat on every read, and componentName is read on
     // essentially every AppInfo (hidden-filter, favorites membership, DiffUtil
     // identity), including twice per AppInfoDiffCallback comparison (AUDIT-14
-    // Nit §212).
-    val componentName: String = "$packageName/$normalizedClassName"
+    // Nit §212). Projection of [key]: byte-for-byte the historical value.
+    val componentName: String = key.flat
 }

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.kolibri_launcher.core.ComponentKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
@@ -142,5 +143,50 @@ class AppInfoTest {
         val b = appInfo("App")
         assertEquals(a, b)
         assertEquals(a.normalizedClassName, b.normalizedClassName)
+    }
+
+    // --- structured key (ComponentKey) + the projection drift anchor ---
+
+    @Test
+    fun `componentName is exactly the flat projection of key`() {
+        // THE drift anchor: componentName must be byte-for-byte key.flat, so the
+        // structured-identity refactor cannot shift the string that every
+        // component-keyed store and DiffUtil identity relies on.
+        val app = appInfo("Camera")
+        assertEquals(app.key.flat, app.componentName)
+        assertEquals("com.example/MainActivity", app.componentName)
+    }
+
+    @Test
+    fun `key carries the normalized long-form class name`() {
+        val shortForm = AppInfo(
+            originalName = "X",
+            displayName = "X",
+            packageName = "com.example",
+            className = ".MainActivity",
+        )
+        // Identity uses the same normalization source as the launcher, so key,
+        // componentName and normalizedClassName never disagree.
+        assertEquals(
+            ComponentKey("com.example", "com.example.MainActivity"),
+            shortForm.key,
+        )
+        assertEquals("com.example/com.example.MainActivity", shortForm.key.flat)
+    }
+
+    @Test
+    fun `key is cached - repeated reads return the same instance`() {
+        val app = appInfo("Camera")
+        assertSame(app.key, app.key)
+    }
+
+    @Test
+    fun `key is excluded from equals`() {
+        // Body val, not a constructor param — like displayNameLower / componentName
+        // it must never affect equals, or Flow distinctUntilChanged would change.
+        val a = appInfo("App")
+        val b = appInfo("App")
+        assertEquals(a, b)
+        assertEquals(a.key, b.key)
     }
 }
