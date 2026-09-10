@@ -52,7 +52,9 @@ class ToggleFavoriteUseCase @Inject constructor(
         // when the component count hit the limit but the package count had not.
         if (!wasFavorite) {
             val packages = favorites.mapTo(HashSet()) { it.substringBefore('/') }
-            val newPackage = app.componentName.substringBefore('/')
+            // app is an AppInfo: take the package straight from its structured key
+            // instead of re-parsing the flattened string it just built.
+            val newPackage = app.key.packageName
             if (newPackage !in packages && packages.size >= currentMaxFavorites) {
                 return Result.Error.LimitReached(currentMaxFavorites)
             }
