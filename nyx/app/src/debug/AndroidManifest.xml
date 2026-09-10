@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Debug-only: make SettingsActivity launchable via adb so the ACRA dev
+         commands are reachable without depending on the dock long-press.
+         Release keeps android:exported="false". -->
+    <application>
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>
