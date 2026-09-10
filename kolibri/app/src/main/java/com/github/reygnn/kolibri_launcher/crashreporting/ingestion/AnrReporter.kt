@@ -70,7 +70,7 @@ class AnrReporter @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
     private val dataStore: DataStore<Preferences>,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : OwnsSettingsStoreKeys {
+) : OwnsSettingsStoreKeys, AnrDrainer {
 
     // AnrReporter is NOT a repository, but it owns a settings-store key (its ANR
     // dedup watermark). It joins the cleanup keep-list so the blacklist cleanup
@@ -87,7 +87,7 @@ class AnrReporter @Inject constructor(
      * (then the loop continues) or to let it propagate (then the loop aborts
      * and unprocessed ANRs are retried next launch).
      */
-    suspend fun reportPendingAnrs(handler: suspend (AnrReport) -> Unit) {
+    override suspend fun reportPendingAnrs(handler: suspend (AnrReport) -> Unit) {
         val pending = newAnrsSinceLastReport()
         for (report in pending) {
             handler(report)

@@ -10,8 +10,8 @@ import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstra
 import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AcraTree
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrDrainer
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrException
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -149,7 +149,7 @@ object CrashReportingBootstrap {
     fun onCreate(
         app: Application,
         scope: CoroutineScope,
-        anrReporter: AnrReporter,
+        anrReporter: AnrDrainer,
         // Seams: default to the real side effects; tests inject the process
         // verdict + recording lambdas so the X2 gate AND each main-process side
         // effect are verifiable without ACRA / a real Timber forest / a real
@@ -203,7 +203,7 @@ object CrashReportingBootstrap {
         startWatchdog()
     }
 
-    private fun reportPendingAnrsAsync(scope: CoroutineScope, anrReporter: AnrReporter) {
+    private fun reportPendingAnrsAsync(scope: CoroutineScope, anrReporter: AnrDrainer) {
         scope.launch {
             try {
                 anrReporter.reportPendingAnrs { report ->
