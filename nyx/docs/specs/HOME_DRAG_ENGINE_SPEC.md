@@ -198,9 +198,10 @@ Alles Kür, nicht Teil des Kern-Umbaus.
 
 **Tests:**
 - (x,y)→`CellPos`-Geometrie — ✅ JVM (`HomeGridGeometryTest`, 8 Fälle).
-- `DragController`-Zustandsmaschine (start → move → drop/cancel) — offen, reine
-  Zustands-Truth-Table, JVM.
-- `findZone`-Priorität + Hit-Test — offen, JVM (Rects als reine Daten).
+- `DragController`-Zustandsmaschine (start → move → drop/cancel) **und**
+  `findZone`-Priorität + Hit-Test — ✅ `DragControllerTest` (9 Fälle, Robolectric
+  nur für `Rect`/`View`). Möglich durch die `DragViewHost`-Abstraktion, gegen die
+  der Controller getestet wird.
 - Instrumentiert nur, was echtes Touch/Fenster-Verhalten braucht (Drop an der
   Oberkante, Touch-Capture über der Statusbar) — value bar, nicht cost bar.
   On-device (A17) manuell verifiziert.
@@ -267,3 +268,10 @@ Alles Kür, nicht Teil des Kern-Umbaus.
   `gridCellAt` (`HomeGridGeometry.kt`) aus `MainActivity.resolveGridCell`
   extrahiert und JVM-getestet (`HomeGridGeometryTest`, 8 Fälle). Kein
   Verhaltenswechsel. Ein eigener `GridDropTarget`-Typ wurde bewusst weggelassen.
+- **v4 (Tests nachgeholt)** — `DragController`-Zustandsmaschine + `findZone`
+  (Priorität, `accepts`-Gate, Enter/Exit, Drop-lässt-View, Cancel-räumt-ab) mit
+  `DragControllerTest` (9 Fälle) gepinnt. Dafür `DragViewHost`-Schnittstelle
+  extrahiert (Dependency-Inversion), gegen die der Controller ohne echte View
+  testbar ist; `DragLayer` implementiert sie. Kein Verhaltenswechsel. Damit sind
+  die §9-Tests bis auf die (bewusst on-device belassenen) Touch/Fenster-Fälle
+  abgedeckt.

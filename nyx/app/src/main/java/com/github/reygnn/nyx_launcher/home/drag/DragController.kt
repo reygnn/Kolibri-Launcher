@@ -13,7 +13,7 @@ import com.github.reygnn.nyx_launcher.home.DragPayload
  *
  * All coordinates are [DragLayer] coordinates.
  */
-class DragController(private val dragLayer: DragLayer) {
+class DragController(private val host: DragViewHost) {
 
     private val zones = ArrayList<DropZone>()
     private val tmp = Rect()
@@ -42,14 +42,14 @@ class DragController(private val dragLayer: DragLayer) {
     fun startDrag(payload: DragPayload, source: View, x: Int, y: Int) {
         if (isDragging) return
         this.payload = payload
-        dragLayer.addDragView(source, x, y)
+        host.addDragView(source, x, y)
         onDragStart?.invoke()
         updateZone(x, y)
     }
 
     fun onMove(x: Int, y: Int) {
         if (!isDragging) return
-        dragLayer.moveDragView(x, y)
+        host.moveDragView(x, y)
         updateZone(x, y)
     }
 
@@ -67,7 +67,7 @@ class DragController(private val dragLayer: DragLayer) {
     fun onCancel() {
         if (!isDragging) return
         endDragState()
-        dragLayer.removeDragView()
+        host.removeDragView()
     }
 
     /** Ends the interactive drag (touch flows normally again) but does not touch

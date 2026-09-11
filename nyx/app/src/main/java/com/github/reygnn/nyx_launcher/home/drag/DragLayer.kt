@@ -28,7 +28,7 @@ class DragLayer @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
-) : FrameLayout(context, attrs, defStyleAttr) {
+) : FrameLayout(context, attrs, defStyleAttr), DragViewHost {
 
     private val gestureCore = GestureDispatchCore(this)
     val dragController = DragController(this)
@@ -75,7 +75,7 @@ class DragLayer @JvmOverloads constructor(
 
     // ---- drag view (called by DragController) ----
 
-    internal fun addDragView(source: View, x: Int, y: Int) {
+    override fun addDragView(source: View, x: Int, y: Int) {
         removeDragView() // clear a leftover from a not-yet-settled previous drop
         dragSource = source
         dragWidth = source.width
@@ -92,7 +92,7 @@ class DragLayer @JvmOverloads constructor(
         moveDragView(x, y)
     }
 
-    internal fun moveDragView(x: Int, y: Int) {
+    override fun moveDragView(x: Int, y: Int) {
         val view = dragView ?: return
         // Centre on the finger using the known source size — the ImageView isn't
         // laid out yet on the first call, so its own width/height would be 0.
@@ -100,7 +100,7 @@ class DragLayer @JvmOverloads constructor(
         view.translationY = (y - dragHeight / 2).toFloat()
     }
 
-    internal fun removeDragView() {
+    override fun removeDragView() {
         dragView?.let(::removeView)
         dragView = null
         dragSource?.visibility = VISIBLE
