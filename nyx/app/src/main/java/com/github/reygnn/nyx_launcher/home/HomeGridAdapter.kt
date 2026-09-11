@@ -62,13 +62,21 @@ class HomeGridAdapter(
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
 
-        // Stretch each cell so the `rows` rows fill the page height down to the
-        // dock (item_home_cell's fixed 84dp would leave dead space below the last
-        // row). Height is known during the layout pass; skip until then.
-        recyclerView?.height?.takeIf { it > 0 }?.let { h ->
-            val cellHeight = h / rows
-            if (holder.itemView.layoutParams.height != cellHeight) {
-                holder.itemView.updateLayoutParams { height = cellHeight }
+        // Fixed cell height (device-consistent), grid bottom-anchored: the rows
+        // sit flush above the dock and any leftover height becomes the page's top
+        // padding (dead space at the top). Keeps the dock-to-bottom-row distance
+        // identical across devices. Height is known during the layout pass.
+        recyclerView?.let { rv ->
+            val h = rv.height
+            if (h > 0) {
+                val cellHeight = homeCellHeightPx(h, rows, rv.resources.displayMetrics.density)
+                val topPad = h - rows * cellHeight
+                if (rv.paddingTop != topPad) {
+                    rv.setPadding(rv.paddingLeft, topPad, rv.paddingRight, rv.paddingBottom)
+                }
+                if (holder.itemView.layoutParams.height != cellHeight) {
+                    holder.itemView.updateLayoutParams { height = cellHeight }
+                }
             }
         }
 
@@ -109,4 +117,21 @@ class HomeGridAdapter(
         val icon: ImageView = view.findViewById(R.id.cell_icon)
         var bindToken: Int = 0
     }
+}
+
+/** Target home-grid cell edge in dp — device-consistent (see [homeCellHeightPx]). */
+internal const val HOME_CELL_TARGET_DP = 110f
+
+/**
+ * Fixed cell height in px for a page [pageHeightPx] high with [rows] rows: the
+ * ~[HOME_CELL_TARGET_DP] target, but never taller than an equal split, so on a
+ * short screen the rows still fit. The leftover (`pageHeightPx − rows·result`)
+ * becomes the page's top padding, bottom-anchoring the grid above the dock.
+ * Shared by [HomeGridAdapter] (rendering) and MainActivity.resolveGridCell (drop
+ * mapping) so both agree on the geometry.
+ */
+internal fun homeCellHeightPx(pageHeightPx: Int, rows: Int, density: Float): Int {
+    if (rows <= 0 || pageHeightPx <= 0) return 0
+    val target = (HOME_CELL_TARGET_DP * density).toInt()
+    return minOf(target, pageHeightPx / rows)
 }
