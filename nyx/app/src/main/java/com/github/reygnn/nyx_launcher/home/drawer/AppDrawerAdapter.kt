@@ -8,24 +8,22 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.home.loadIconGated
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
- * Vertical drawer list: each row is icon + label. Tapping launches the app.
- * Same stale-binding guard as the grid (ICL-INV-9): a per-holder token gates the
- * async icon so a fast scroll never shows the wrong icon.
+ * Drawer grid list (item_app_grid): each item is icon + label. Tap launches;
+ * long-press starts a place-on-home drag. Token-gated async icon (ICL-INV-9) via
+ * the shared [loadIconGated] so a fast scroll never shows the wrong icon.
  */
 class AppDrawerAdapter(
     private val iconLoader: IconLoader,
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
     private val onClick: (LauncherApp) -> Unit,
-    private val onAddToHome: (LauncherApp) -> Unit,
-    private val onItemLongPress: ((view: View, app: LauncherApp) -> Unit)? = null,
-    private val itemLayout: Int = R.layout.item_app_row,
+    private val onItemLongPress: (view: View, app: LauncherApp) -> Unit,
 ) : RecyclerView.Adapter<AppDrawerAdapter.AppHolder>() {
 
     private var apps: List<LauncherApp> = emptyList()
@@ -37,7 +35,7 @@ class AppDrawerAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(itemLayout, parent, false)
+            .inflate(R.layout.item_app_grid, parent, false)
         return AppHolder(view)
     }
 
@@ -47,19 +45,11 @@ class AppDrawerAdapter(
         val app = apps[position]
         holder.label.text = app.customName ?: app.label
         holder.itemView.setOnClickListener { onClick(app) }
-        holder.itemView.setOnLongClickListener {
-            val dragHandler = onItemLongPress
-            if (dragHandler != null) dragHandler(holder.itemView, app) else onAddToHome(app)
-            true
-        }
+        holder.itemView.setOnLongClickListener { onItemLongPress(holder.itemView, app); true }
 
         val token = ++holder.bindToken
-        holder.icon.setImageDrawable(null)
-        scope.launch {
-            val bitmap = runCatching {
-                iconLoader.bitmap(IconRef.System(app.key), iconSizePx)
-            }.getOrNull() ?: return@launch
-            if (holder.bindToken == token) holder.icon.setImageBitmap(bitmap)
+        holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
+            iconLoader.bitmap(IconRef.System(app.key), iconSizePx)
         }
     }
 

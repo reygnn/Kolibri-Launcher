@@ -10,7 +10,6 @@ import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /** Icons of a folder's members. Tap launches; long-press extracts to the home. */
 class FolderMemberAdapter(
@@ -42,10 +41,8 @@ class FolderMemberAdapter(
         holder.icon.setImageDrawable(null)
         holder.itemView.setOnClickListener { onLaunch(key) }
         holder.itemView.setOnLongClickListener { onExtract(key); true }
-        scope.launch {
-            val bitmap = runCatching { iconLoader.bitmap(IconRef.System(key), iconSizePx) }.getOrNull()
-                ?: return@launch
-            if (holder.bindToken == token) holder.icon.setImageBitmap(bitmap)
+        holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
+            iconLoader.bitmap(IconRef.System(key), iconSizePx)
         }
     }
 

@@ -78,9 +78,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
             scope = viewLifecycleOwner.lifecycleScope,
             iconSizePx = (48 * resources.displayMetrics.density).toInt(),
             onClick = { app -> host.launchFromDrawer(app.key) },
-            onAddToHome = { },
             onItemLongPress = { v, app -> host.startDrawerDrag(v, app.key) },
-            itemLayout = R.layout.item_app_grid,
         )
         list.layoutManager = GridLayoutManager(requireContext(), drawerColumns())
         list.adapter = adapter

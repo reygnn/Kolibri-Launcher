@@ -12,7 +12,6 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /** Horizontal dock row of apps/folders. Tap launches/opens; long-press drags. */
 class DockAdapter(
@@ -52,19 +51,15 @@ class DockAdapter(
             is HomeCell.App -> {
                 holder.itemView.setOnClickListener { onLaunch(cell.key) }
                 holder.itemView.setOnLongClickListener { onIconLongPress(holder.itemView, cell.id); true }
-                scope.launch {
-                    val bmp = runCatching { iconLoader.bitmap(IconRef.System(cell.key), iconSizePx) }.getOrNull()
-                        ?: return@launch
-                    if (holder.bindToken == token) holder.icon.setImageBitmap(bmp)
+                holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
+                    iconLoader.bitmap(IconRef.System(cell.key), iconSizePx)
                 }
             }
             is HomeCell.Folder -> {
                 holder.itemView.setOnClickListener { onOpenFolder(cell.id) }
                 holder.itemView.setOnLongClickListener { onIconLongPress(holder.itemView, cell.id); true }
-                scope.launch {
-                    val bmp = runCatching { folderRenderer.render(cell.members, iconSizePx) }.getOrNull()
-                        ?: return@launch
-                    if (holder.bindToken == token) holder.icon.setImageBitmap(bmp)
+                holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
+                    folderRenderer.render(cell.members, iconSizePx)
                 }
             }
         }

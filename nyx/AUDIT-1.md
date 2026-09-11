@@ -73,7 +73,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-08 · HomeGridAdapter.kt:50 — Every home-layout mutation triggers a full notifyDataSetChanged rebind of all grid pages, cells and the dock
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** recyclerview-bind-cost · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** recyclerview-bind-cost · **Status:** ✅ erledigt (B4)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeGridAdapter.kt:50`
 - **Detail:** Verified: HomeGridAdapter.submit() (line 48-51), HomePagerAdapter.submit() (line 33-36) and DockAdapter.submit() (line 30-32) all call notifyDataSetChanged(). MainActivity.renderLayout() (line 231) runs on every emission of viewModel.layout (collected at line 124) and unconditionally calls pagerAdapter?.submit(...) (line 254) and dockAdapter.submit(...) (line 256). Each mutation therefore rebinds every visible cell: onBindViewHolder nulls the ImageView (line 63), sets two fresh click-listener lambdas (94-95), and launches a new coroutine into iconLoader.bitmap (96-100). HomePagerAdapter.onBindViewHolder re-submits each page's cells (line 59), cascading a full grid rebind per page. Icons are memory-cached so fetches are cheap, but per-mutation coroutine fan-out, view teardown, and loss of item animations are avoidable.
 - **Fix-Vorschlag:** Back the cell/dock/page adapters with DiffUtil (ListAdapter or notifyItem* diffing on HomeCell identity) so a single move updates only the affected positions.
@@ -81,7 +81,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-09 · HomeLayoutTransition.kt:21 — Specced silentError fail-loud path for programmer-error inputs is entirely unimplemented; the KDoc claims the use-case fires it but none does
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** spec-invariant · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** spec-invariant · **Status:** ✅ erledigt (B4)
 - **Datei:** `nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/transition/HomeLayoutTransition.kt:21`
 - **Detail:** The transition collapses structurally-impossible inputs to a plain NoOp indistinguishable from a legitimate NoOp: move() unknown id (line 37), app already in target folder (line 91), removeFromFolder non-folder/member-absent (lines 132-133), place() folder-member (line 166), remove() unknown id (line 174), renameFolder non-folder (line 179). The KDoc (lines 21-22) asserts the use-case fires silentError, but grep across nyx shows silentError appears only in this comment and in SettingsActivity.kt:104 -- never in MoveItemUseCase/RemoveFromFolderUseCase/PlaceItemUseCase/RemoveItemUseCase/RenameFolderUseCase. The specs mandate it (MOVE_ITEM_SPEC MIU-INV-2, REMOVE_FROM_FOLDER_SPEC RFF-INV-4, HOME_EDIT_USECASES_SPEC id-unknown/non-folder, ICON_HOME_MODEL_SPEC IHM-INV-7 'silentError, nicht NoOp'). Because the transition returns the same NoOp for a bug as for a real no-op, the use-case cannot distinguish them.
 - **Fix-Vorschlag:** Add a distinct programmer-error signal from the transition branches and fire TimberWrapper.silentError in the use-cases (or at those branches), then reconcile the KDoc with actual behavior.
