@@ -126,8 +126,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private fun setupRemoveBar() {
         homeRoot.setOnDragListener { _, event ->
             when (event.action) {
-                DragEvent.ACTION_DRAG_STARTED -> { removeBar.isVisible = true; true }
-                DragEvent.ACTION_DRAG_ENDED -> { removeBar.isVisible = false; true }
+                // INVISIBLE (not GONE) at rest keeps the band's space reserved, so
+                // showing it on drag start doesn't reflow the grid down.
+                DragEvent.ACTION_DRAG_STARTED -> { removeBar.visibility = View.VISIBLE; true }
+                DragEvent.ACTION_DRAG_ENDED -> { removeBar.visibility = View.INVISIBLE; true }
                 // The home root is the catch-all drop target for the grid: a drop
                 // that misses the dock and the remove bar lands here. Drag events
                 // aren't reliably delivered to the ViewPager2 pages, so a per-page
@@ -146,11 +148,17 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }
         }
         removeBar.setOnDragListener { _, event ->
-            if (event.action == DragEvent.ACTION_DROP) {
-                (event.localState as? DragPayload.Existing)?.let { viewModel.remove(it.id) }
-                true
-            } else {
-                true
+            when (event.action) {
+                // Brighten while the drag is over the bar so the hit is unmistakable.
+                DragEvent.ACTION_DRAG_ENTERED -> { removeBar.setBackgroundColor(REMOVE_BAR_ACTIVE_COLOR); true }
+                DragEvent.ACTION_DRAG_EXITED -> { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR); true }
+                DragEvent.ACTION_DROP -> {
+                    (event.localState as? DragPayload.Existing)?.let { viewModel.remove(it.id) }
+                    removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENDED -> { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR); true }
+                else -> true
             }
         }
     }
@@ -342,3 +350,9 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
 
 /** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
 private const val DRAWER_SLIDE_MS = 180L
+
+/** Remove-bar background at rest — matches @id/remove_bar's XML background. */
+private const val REMOVE_BAR_IDLE_COLOR = 0xCCB00020.toInt()
+
+/** Remove-bar background while a drag hovers it (opaque, brighter red). */
+private const val REMOVE_BAR_ACTIVE_COLOR = 0xFFD50000.toInt()

@@ -13,6 +13,21 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- Reserved remove zone: a fixed top band the grid never enters, so the
+             drop-to-delete target no longer overlaps the top grid row. INVISIBLE
+             at rest (reserves the space, no reflow on drag start), turned VISIBLE
+             + red while a drag is in progress (see MainActivity). -->
+        <TextView
+            android:id="@+id/remove_bar"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center"
+            android:background="#CCB00020"
+            android:text="@string/remove_from_home"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:visibility="invisible" />
+
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/home_pager"
             android:layout_width="match_parent"
@@ -37,19 +52,6 @@
         android:name="com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
-
-    <!-- Shown only during a drag; drop an existing icon here to remove it. -->
-    <TextView
-        android:id="@+id/remove_bar"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_gravity="top"
-        android:gravity="center"
-        android:background="#CCB00020"
-        android:text="@string/remove_from_home"
-        android:textColor="@android:color/white"
-        android:textSize="16sp"
         android:visibility="gone" />
 
 </com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>
