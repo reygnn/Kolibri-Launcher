@@ -6,7 +6,6 @@ import com.github.reygnn.nyx_launcher.home.model.LayoutEdit
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutTransition
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -16,7 +15,11 @@ class RenameFolderUseCase @Inject constructor(
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(folder: ItemId, title: String): LayoutEdit = withContext(dispatcher) {
-        val current = repository.layout().first()
-        HomeLayoutTransition.renameFolder(current, folder, title).also { edit -> edit.layout?.let { repository.save(it) } }
+        var result: LayoutEdit = LayoutEdit.NoOp
+        repository.update { current -> // atomic RMW (A1-03)
+            result = HomeLayoutTransition.renameFolder(current, folder, title)
+            result.layout
+        }
+        result
     }
 }

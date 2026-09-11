@@ -24,4 +24,8 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
         saveCount++
         state.value = layout
     }
+
+    override suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?) {
+        transform(state.value)?.let { save(it) }
+    }
 }

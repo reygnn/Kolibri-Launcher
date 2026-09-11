@@ -9,7 +9,6 @@ import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutTransition
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -28,9 +27,11 @@ class RemoveFromFolderUseCase @Inject constructor(
         member: ComponentKey,
         target: DropTarget,
     ): FolderEditResult = withContext(dispatcher) {
-        val current = repository.layout().first()
-        val result = HomeLayoutTransition.removeFromFolder(current, folder, member, target, idFactory::next)
-        result.layout?.let { repository.save(it) }
+        var result: FolderEditResult = FolderEditResult.NoOp
+        repository.update { current -> // atomic RMW (A1-03)
+            result = HomeLayoutTransition.removeFromFolder(current, folder, member, target, idFactory::next)
+            result.layout
+        }
         result
     }
 }

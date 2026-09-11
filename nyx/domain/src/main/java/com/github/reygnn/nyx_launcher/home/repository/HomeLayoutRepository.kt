@@ -7,9 +7,13 @@ import kotlinx.coroutines.flow.Flow
  * The single data-access seam for the home layout (CLAUDE.md rule 1).
  *
  * [layout] is a cold [Flow] — one authoritative read path, no hot-share
- * parameter (mirrors the big Kolibri's DATASTORE_READ_SPEC posture). Every
- * mutation goes through [save]; there is no partial-update API, because the
- * layout is persisted as one versioned blob (ICON_HOME_MODEL_SPEC §7-E1).
+ * parameter (mirrors the big Kolibri's DATASTORE_READ_SPEC posture). The layout
+ * is persisted as one versioned blob (ICON_HOME_MODEL_SPEC §7-E1).
+ *
+ * Transition-based mutations go through [update] — an ATOMIC read-modify-write,
+ * so a background reconcile and a user edit can't both read the same version and
+ * clobber each other (AUDIT-1 A1-03). [save] is a serialized full replace
+ * (import / seed).
  *
  * Contract + triple: `HomeLayoutRepositoryContract` (abstract),
  * `FakeHomeLayoutRepositoryContractTest`, and — once `:data` lands —
@@ -17,5 +21,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface HomeLayoutRepository {
     fun layout(): Flow<HomeLayout>
+
+    /** Full replace, serialized against [update] and other [save] calls. */
     suspend fun save(layout: HomeLayout)
+
+    /**
+     * Atomic read-modify-write: [transform] receives the current layout and
+     * returns the new one, or null to leave it unchanged (no write). The whole
+     * read → transform → write runs under a single writer lock, so concurrent
+     * mutations serialize instead of racing on a stale read (AUDIT-1 A1-03).
+     */
+    suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?)
 }

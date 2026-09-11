@@ -33,7 +33,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-03 · HomeLayoutRepositoryImpl.kt:32 — Non-atomic read-modify-write on the shared HomeLayout allows lost updates between concurrent writers
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ✅ erledigt (B2)
 - **Datei:** `nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/HomeLayoutRepositoryImpl.kt:32`
 - **Detail:** save() at HomeLayoutRepositoryImpl.kt:32-35 does dataStore.edit { it[KEY] = raw } with raw computed OUTSIDE the transaction; every mutating use case reads repository.layout().first() then repository.save(...). Grep confirms no Mutex and no DataStore updateData anywhere in the use cases. PackageEventCoordinator.kt:40 runs reconcile() on its own independent CoroutineScope(SupervisorJob()+IoDispatcher) at cold start (:68) and every package add/change/remove (:79), while user edits run on viewModelScope->DefaultDispatcher. Two read-modify-write cycles reading the same v0 and both writing -> last writer wins, the other operation silently lost (e.g. a background package-change reconcile reads a just-committed user move as v0 and overwrites it, with no re-trigger to heal).
 - **Fix-Vorschlag:** Serialize all layout mutations through a single Mutex, or use DataStore's transactional updateData so read+transform+write is atomic. Pure transitions return NoOp on no-change, so a compare-and-set retry loop composes cleanly.

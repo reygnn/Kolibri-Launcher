@@ -8,7 +8,6 @@ import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutTransition
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -25,9 +24,11 @@ class MoveItemUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(moving: ItemId, target: DropTarget): MoveResult =
         withContext(dispatcher) {
-            val current = repository.layout().first()
-            val result = HomeLayoutTransition.move(current, moving, target, idFactory::next)
-            result.layout?.let { repository.save(it) } // MIU-INV-3: no save on non-change
+            var result: MoveResult = MoveResult.NoOp
+            repository.update { current -> // atomic RMW (A1-03); MIU-INV-3: null ⇒ no save
+                result = HomeLayoutTransition.move(current, moving, target, idFactory::next)
+                result.layout
+            }
             result
         }
 }

@@ -8,7 +8,6 @@ import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutTransition
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -24,9 +23,11 @@ class PlaceItemUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(app: ComponentKey, target: DropTarget): MoveResult =
         withContext(dispatcher) {
-            val current = repository.layout().first()
-            val result = HomeLayoutTransition.place(current, app, target, idFactory::next)
-            result.layout?.let { repository.save(it) }
+            var result: MoveResult = MoveResult.NoOp
+            repository.update { current -> // atomic RMW (A1-03)
+                result = HomeLayoutTransition.place(current, app, target, idFactory::next)
+                result.layout
+            }
             result
         }
 }

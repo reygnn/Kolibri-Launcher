@@ -9,7 +9,6 @@ import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutReconciler
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -30,14 +29,17 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
             is AppLoadResult.Error -> ReconcileResult.Skipped(load.reason)
             is AppLoadResult.Loaded -> {
                 val installed = load.apps.mapTo(HashSet()) { it.key }
-                val current = layoutRepository.layout().first()
-                when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
-                    ReconcileOutcome.Unchanged -> ReconcileResult.Unchanged
-                    is ReconcileOutcome.Changed -> {
-                        layoutRepository.save(outcome.layout)
-                        ReconcileResult.Reconciled(outcome.report)
+                var result: ReconcileResult = ReconcileResult.Unchanged
+                layoutRepository.update { current -> // atomic RMW (A1-03)
+                    when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
+                        ReconcileOutcome.Unchanged -> null
+                        is ReconcileOutcome.Changed -> {
+                            result = ReconcileResult.Reconciled(outcome.report)
+                            outcome.layout
+                        }
                     }
                 }
+                result
             }
         }
     }

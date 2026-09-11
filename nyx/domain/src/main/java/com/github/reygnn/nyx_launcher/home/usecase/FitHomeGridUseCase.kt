@@ -6,7 +6,6 @@ import com.github.reygnn.nyx_launcher.home.model.RegridOutcome
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutRegridder
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -25,10 +24,11 @@ class FitHomeGridUseCase @Inject constructor(
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(target: GridSpec) = withContext(dispatcher) {
-        val current = repository.layout().first()
-        when (val outcome = HomeLayoutRegridder.fit(current, target)) {
-            RegridOutcome.Unchanged -> Unit
-            is RegridOutcome.Changed -> repository.save(outcome.layout)
+        repository.update { current -> // atomic RMW (A1-03)
+            when (val outcome = HomeLayoutRegridder.fit(current, target)) {
+                RegridOutcome.Unchanged -> null
+                is RegridOutcome.Changed -> outcome.layout
+            }
         }
     }
 }
