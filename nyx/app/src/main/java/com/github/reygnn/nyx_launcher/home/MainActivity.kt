@@ -265,6 +265,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun showDrawer() {
         if (drawerContainer.isVisible) return
+        viewModel.refreshDrawer() // pick up apps installed/removed since last open (A1-04)
         // Slide up from below, over the home (which stays put) — matching
         // Kolibri's drawer transition (translateY 100%→0, 180ms, accel-decel).
         drawerContainer.translationY = drawerSlideDistance()

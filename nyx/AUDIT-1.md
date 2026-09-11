@@ -41,7 +41,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-04 · HomeViewModel.kt:57 — Drawer app list is loaded once in init and never refreshed, contradicting PackageEventCoordinator's 'drawer re-queries on next open' comment
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ✅ erledigt (B3)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeViewModel.kt:57`
 - **Detail:** HomeViewModel.init loads drawerApps exactly once (line 57: _drawerApps.value = getDrawerApps()) from the one-shot suspend GetDrawerAppsUseCase (returns List, not a Flow). There is no refresh method. AppDrawerFragment only collects the StateFlow (line 90) with no re-query trigger on open (onAddToHome is empty; fragment stays added via visibility toggling). PackageEventCoordinator.onPackageAdded (line 51) is a deliberate no-op justified by the comment (line 50) 'the drawer re-queries on next open' -- which no code implements. Since HomeViewModel is activityViewModels()-scoped to the resident launcher activity, the drawer stays stale until process death: newly installed apps never appear, uninstalled apps linger and fail to launch.
 - **Fix-Vorschlag:** Refresh drawerApps on package add/remove (wire PackageEventCoordinator to the ViewModel) or expose an observing Flow from InstalledAppsRepository / re-query on drawer open; fix the PackageEventCoordinator comment to match.

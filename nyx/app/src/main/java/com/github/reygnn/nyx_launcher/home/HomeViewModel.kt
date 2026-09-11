@@ -54,6 +54,15 @@ class HomeViewModel @Inject constructor(
     val drawerApps: StateFlow<List<LauncherApp>> = _drawerApps.asStateFlow()
 
     init {
+        refreshDrawer()
+    }
+
+    /**
+     * Re-query the drawer app list. Called at startup and on every drawer open
+     * (MainActivity.showDrawer), so apps installed/removed while nyx was already
+     * running show up — the list is otherwise loaded once and goes stale (A1-04).
+     */
+    fun refreshDrawer() {
         viewModelScope.launch { _drawerApps.value = getDrawerApps() }
     }
 
