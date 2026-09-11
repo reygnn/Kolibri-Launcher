@@ -1,5 +1,9 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentWriteResult
+import com.github.reygnn.launcher.core.crashreporting.consent.CrashReportConsentRepository
 /**
  * In-memory [CrashReportConsentRepository] test double. Backed by a single
  * [ConsentDecision] (the tri-state source of truth); [setConsent] mirrors the

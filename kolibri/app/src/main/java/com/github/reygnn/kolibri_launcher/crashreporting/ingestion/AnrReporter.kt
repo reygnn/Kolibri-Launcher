@@ -10,13 +10,15 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrDrainer
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Post-mortem ANR reporter built on `ApplicationExitInfo` (API 30+, we ship

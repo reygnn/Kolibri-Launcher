@@ -12,20 +12,20 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
-import com.github.reygnn.nyx_launcher.home.usecase.ExportLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.usecase.ExportLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ImportLayoutUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * Backup / restore of the home layout via the Storage Access Framework. The

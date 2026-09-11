@@ -10,9 +10,12 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
+import java.io.ByteArrayInputStream
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -22,8 +25,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.ByteArrayInputStream
-import kotlin.test.assertFailsWith
 
 /**
  * Pure-JVM test for [AnrReporter]. ApplicationExitInfo is `open` so MockK can

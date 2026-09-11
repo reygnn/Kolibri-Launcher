@@ -2,6 +2,10 @@ package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentWriteResult
+import com.github.reygnn.launcher.core.crashreporting.consent.CrashReportConsentRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

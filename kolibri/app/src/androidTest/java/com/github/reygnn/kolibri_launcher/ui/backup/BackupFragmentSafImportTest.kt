@@ -17,17 +17,19 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import java.io.File
+import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -37,8 +39,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
-import javax.inject.Inject
 
 /**
  * Why instrumented: BackupFragment's import path orchestrates four moving

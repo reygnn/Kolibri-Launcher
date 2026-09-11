@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication

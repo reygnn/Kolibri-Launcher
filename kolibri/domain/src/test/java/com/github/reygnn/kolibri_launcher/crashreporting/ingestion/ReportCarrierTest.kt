@@ -1,13 +1,15 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 
+import com.github.reygnn.launcher.core.crashreporting.ingestion.LoggedThrowable
+import com.github.reygnn.launcher.core.crashreporting.ingestion.buildAcraReportThrowable
+import java.io.IOException
+import java.util.concurrent.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
-import java.util.concurrent.CancellationException
 
 /**
  * Pins the pure log-context carrier used by AcraTree (B4). No Android, no ACRA

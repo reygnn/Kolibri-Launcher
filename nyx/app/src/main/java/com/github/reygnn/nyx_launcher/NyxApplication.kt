@@ -3,16 +3,16 @@ package com.github.reygnn.nyx_launcher
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import com.github.reygnn.kolibri_launcher.crashreporting.resilience.AcraConfig
-import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
 import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
+import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * Nyx application root. `@HiltAndroidApp` triggers Hilt's aggregating codegen and

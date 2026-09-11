@@ -1,7 +1,7 @@
 package com.github.reygnn.nyx_launcher
 
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrDrainer
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReport
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrDrainer
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
 
 /**
  * Nyx has no ANR-watermark store yet (that is AnrReporter's app-specific

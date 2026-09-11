@@ -15,20 +15,20 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import javax.inject.Inject
 
 /**
  * Pins that a slow vertical drag on an overflowing favorites list

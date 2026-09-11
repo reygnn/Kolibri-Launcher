@@ -7,7 +7,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
  * from "the user has no favorites", because the editor pre-selection feeds a
  * subsequent SAVE.
  *
- * The hazard mirrors [com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentReadResult]:
+ * The hazard mirrors [com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult]:
  * collapsing an unreadable store into an empty pre-selection looks harmless, but
  * a `saveFavoriteComponents(<empty>)` from that state would WIPE the user's real
  * favorites (AUDIT-13's deliberately-deferred edge). Keeping [Unavailable]

@@ -1,8 +1,8 @@
 // :feature-crashreporting — shared ACRA + consent pipeline (MONOREPO_MERGE_SPEC
-// §3.5 / §4.2, Phase 3). Android-library consumed by both apps. Experimental:
-// source files keep their kolibri_launcher.crashreporting.* package for now
-// (zero-churn Phase-1a-style move); the neutral rename is a later step. The
-// module NAMESPACE is neutral so its R/BuildConfig do not collide with :app.
+// §3.5 / §4.2, Phase 3). Android-library consumed by both apps. Source files
+// live under the neutral com.github.reygnn.launcher.feature.crashreporting.*
+// package (§5 rename applied; MRG-INV-6). The module NAMESPACE matches, so its
+// R/BuildConfig do not collide with :app.
 //
 // AnrReporter stays per-app (settings-store watermark + @IntoSet keep-list) and
 // implements this module's AnrDrainer; each app supplies AcraConfig + drainer.

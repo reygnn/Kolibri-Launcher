@@ -3,14 +3,15 @@ package com.github.reygnn.kolibri_launcher.ui.settings
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.text.format.DateUtils
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
@@ -26,8 +27,6 @@ import androidx.preference.SwitchPreferenceCompat
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -39,26 +38,27 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsActivity
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportFragment
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentController
-import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealth
-import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthMonitor
-import com.github.reygnn.kolibri_launcher.crashreporting.health.CrashReportingHealthState
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDialog
-import com.github.reygnn.kolibri_launcher.crashreporting.resilience.PipelineBacklogProbe
 import com.github.reygnn.kolibri_launcher.ui.util.DefaultLauncherHelper
 import com.github.reygnn.kolibri_launcher.ui.util.resolveThemeColor
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.common.ui.withRelaxedStrictMode
+import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealth
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthState
+import com.github.reygnn.launcher.feature.crashreporting.resilience.PipelineBacklogProbe
 import com.google.android.material.checkbox.MaterialCheckBox
-import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * CRASH-SAFE VERSION

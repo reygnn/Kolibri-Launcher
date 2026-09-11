@@ -19,26 +19,26 @@ import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
-import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.crashreporting.resilience.AcraConfig
-import com.github.reygnn.kolibri_launcher.crashreporting.resilience.CrashReportingBootstrap
-import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
-import com.github.reygnn.launcher.common.ui.LaunchTrace
+import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
+import com.github.reygnn.launcher.common.ui.LaunchTrace
+import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
+import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * ULTRA CRASH-SAFE Application Class

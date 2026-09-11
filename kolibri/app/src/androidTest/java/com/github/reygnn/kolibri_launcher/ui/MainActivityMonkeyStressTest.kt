@@ -5,23 +5,23 @@ import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentBootstrap
-import com.github.reygnn.kolibri_launcher.crashreporting.consent.ConsentDecision
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.DefaultHomeRoleHelper
 import com.github.reygnn.kolibri_launcher.support.ShellCommand
 import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
+import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import javax.inject.Inject
 
 /**
  * Regression backstop for AUDIT.md §9.11 (Real-Device-Stress).
