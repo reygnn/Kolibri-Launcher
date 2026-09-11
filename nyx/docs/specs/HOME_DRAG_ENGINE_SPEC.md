@@ -186,21 +186,24 @@ Alles Kür, nicht Teil des Kern-Umbaus.
   Phase 2 kombiniert** — kein Bedarf für eine Übergangsphase mit beiden Systemen.
 - **Phase 2 — OS-DnD entfernen.** ✅ **umgesetzt (mit Phase 1).**
   `startDragAndDrop` und die `home_root`/`dock`/`remove_bar`-`OnDragListener`
-  (plus `handleDockDrag`) sind raus. **Abweichung:** die `resolveGridCell`-
-  Geometrie wurde **nicht** in ein separates `GridDropTarget` extrahiert, sondern
-  bleibt (vorerst) in `MainActivity` und wird aus der inline registrierten
-  Grid-`DropZone` aufgerufen — die reine (x,y)→`CellPos`-Extraktion (für
-  JVM-Tests) steht noch aus.
+  (plus `handleDockDrag`) sind raus. Die reine (x,y)→`CellPos`-Geometrie ist in
+  `gridCellAt` (`HomeGridGeometry.kt`) extrahiert und JVM-getestet
+  (`HomeGridGeometryTest`, 8 Fälle); `MainActivity.resolveGridCell` ist nur noch
+  View-Glue (Seiten-View + Offset → lokale Koordinaten → `gridCellAt`).
+  **Bewusste Abweichung:** kein separates `GridDropTarget`-Klasse — die Grid-
+  `DropZone` bleibt ein dünner Inline-Aufruf von `resolveGridCell`; eine eigene
+  Klasse wäre nur Indirektion.
 - **Phase 3 — Kür.** ⏳ **offen.** Lift-Scale beim Aufnehmen, Snap-/Zurück-Flug-
   Animation, Spring-loaded, Edge-Autoscroll, optional Statusbar-Ausblenden.
 
-**Tests (noch offen — Phase 1/2 wurde on-device verifiziert, nicht unit-getestet):**
-- `DragController`-Zustandsmaschine (start → move → drop/cancel) — reine
+**Tests:**
+- (x,y)→`CellPos`-Geometrie — ✅ JVM (`HomeGridGeometryTest`, 8 Fälle).
+- `DragController`-Zustandsmaschine (start → move → drop/cancel) — offen, reine
   Zustands-Truth-Table, JVM.
-- `findZone`-Priorität + Hit-Test — JVM (Rects als reine Daten).
-- (x,y)→`CellPos`-Geometrie — JVM (erst nach Extraktion aus `resolveGridCell`).
+- `findZone`-Priorität + Hit-Test — offen, JVM (Rects als reine Daten).
 - Instrumentiert nur, was echtes Touch/Fenster-Verhalten braucht (Drop an der
   Oberkante, Touch-Capture über der Statusbar) — value bar, nicht cost bar.
+  On-device (A17) manuell verifiziert.
 
 ---
 
@@ -260,3 +263,7 @@ Alles Kür, nicht Teil des Kern-Umbaus.
   Commit-Re-Render halten (sonst Zurückspringen zur alten Zelle beim asynchronen
   Move). Offen: Phase 3 (Kür) und die JVM-Tests (§9) — Phase 1/2 sind
   UI/Touch-lastig und wurden bewusst on-device statt unit-getestet.
+- **v3 (Aufräumen)** — Phase-2-Rest erledigt: die reine Drop-Geometrie ist als
+  `gridCellAt` (`HomeGridGeometry.kt`) aus `MainActivity.resolveGridCell`
+  extrahiert und JVM-getestet (`HomeGridGeometryTest`, 8 Fälle). Kein
+  Verhaltenswechsel. Ein eigener `GridDropTarget`-Typ wurde bewusst weggelassen.

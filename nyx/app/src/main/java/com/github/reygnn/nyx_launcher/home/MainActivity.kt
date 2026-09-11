@@ -31,7 +31,6 @@ import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
-import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
@@ -327,12 +326,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     }
 
     /**
-     * Maps a drop point (in [homeRoot] coordinates) to the grid cell under it on
-     * the current page. Uses the same geometry the grid renders with — fixed cell
-     * height ([homeCellHeightPx]) and the top dead space that bottom-anchors the
-     * grid — rather than a hit-tested child view, so any spot on the home surface
-     * resolves to a real [CellPos]; the pure move/place transition then decides
-     * empty-vs-occupied. Returns null only if the pager isn't laid out yet.
+     * View glue for the grid drop: translates a drop point (in [homeRoot]
+     * coordinates) into the current page's local coordinates, then hands off to
+     * the pure [gridCellAt] geometry. Returns null only if the pager isn't laid
+     * out yet.
      */
     private fun resolveGridCell(rootX: Float, rootY: Float): DropTarget.Cell? {
         val grid = viewModel.layout.value?.grid ?: return null
@@ -340,20 +337,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val page = pager.currentItem
         val pageView = internal.layoutManager?.findViewByPosition(page) as? RecyclerView ?: return null
 
-        val cellHpx = homeCellHeightPx(pageView.height, grid.rows, resources.displayMetrics.density)
-        val cellW = pageView.width.toFloat() / grid.columns
-        if (cellW <= 0f || cellHpx <= 0) return null
-        // Dead space that bottom-anchors the grid (mirrors HomeGridAdapter's padding).
-        val topPad = pageView.height - grid.rows * cellHpx
-
         val rootLoc = IntArray(2).also(homeRoot::getLocationOnScreen)
         val pageLoc = IntArray(2).also(pageView::getLocationOnScreen)
         val localX = rootX - (pageLoc[0] - rootLoc[0])
-        val localY = rootY - (pageLoc[1] - rootLoc[1]) - topPad
+        val localY = rootY - (pageLoc[1] - rootLoc[1])
 
-        val col = (localX / cellW).toInt().coerceIn(0, grid.columns - 1)
-        val row = (localY / cellHpx).toInt().coerceIn(0, grid.rows - 1)
-        return DropTarget.Cell(CellPos(page, col, row))
+        return gridCellAt(page, localX, localY, pageView.width, pageView.height, grid, resources.displayMetrics.density)
+            ?.let { DropTarget.Cell(it) }
     }
 
     private fun applyDrop(payload: DragPayload, target: DropTarget) = when (payload) {
