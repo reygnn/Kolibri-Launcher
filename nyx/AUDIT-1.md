@@ -120,7 +120,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-10 · DragLayer.kt:50 — DragLayer.dispatchTouchEvent (DRG-INV-1 capture + mid-drag gesture gating) is untested.
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ✅ erledigt (B9)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drag/DragLayer.kt:50`
 - **Detail:** Confirmed: dispatchTouchEvent (lines 50-62) holds the regime switch — while dragController.isDragging it consumes the stream (returns true, routes MOVE->onMove, UP->onDrop, CANCEL->onCancel) and never consults gestureCore; while idle it delegates to gestureCore.dispatch. DragControllerTest covers only the controller behind the DragViewHost seam, not the DragLayer switch itself. A refactor that consulted gestureCore mid-drag or dropped the return-true would ship silently. Testability nuance: dragController is an inline non-injectable val, and isDragging only flips via startDrag -> addDragView -> source.drawToBitmap(), which needs a measured/laid-out source View (drawToBitmap throws on a 0-size view). This is achievable under Robolectric but is more involved than simply 'toggling isDragging'.
 - **Fix-Vorschlag:** Add a Robolectric DragLayerTest dispatching DOWN/MOVE/UP/CANCEL in idle and dragging states (driving a laid-out source through startDrag), asserting capture-and-forward while dragging and gesture delegation while idle.
