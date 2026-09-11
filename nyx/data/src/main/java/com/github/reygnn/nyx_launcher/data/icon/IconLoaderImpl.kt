@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -30,6 +31,9 @@ import javax.inject.Inject
  * - ICL-INV-4: request coalescing — one [Deferred] per key.
  * - ICL-INV-3: [evict] clears memory (package index) AND disk (glob).
  * - ICL-INV-8: cached bitmaps are shared; never recycled.
+ * - §5: the disk cache is byte- and age-bounded — a lazy mtime-LRU prune
+ *   ([DiskCachePrune]) runs on the Io dispatcher at init and after writes, so it
+ *   can't grow unbounded across sizes/variants/stale content-hashes (A1-07).
  */
 class IconLoaderImpl @Inject constructor(
     @ApplicationContext context: Context,
@@ -48,11 +52,15 @@ class IconLoaderImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
+    // At most one disk prune runs at a time; writes just re-arm it (§5, A1-07).
+    private val pruneScheduled = AtomicBoolean(false)
+
     @Volatile
     private var monochrome = false
 
     init {
         preferences.monochromeIcons().onEach { monochrome = it }.launchIn(scope)
+        schedulePrune() // cold-start sweep of files accumulated across runs
     }
 
     override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
@@ -115,11 +123,39 @@ class IconLoaderImpl @Inject constructor(
     private suspend fun loadFromDiskOrResolve(key: CacheKey, ref: IconRef, sizePx: Int, monochrome: Boolean): Bitmap {
         val file = File(diskDir, IconCacheKey.fileName(key))
         if (file.exists()) {
-            BitmapFactory.decodeFile(file.absolutePath)?.let { return it }
+            BitmapFactory.decodeFile(file.absolutePath)?.let {
+                // Touch mtime so it tracks access, not creation — keeps the
+                // prune a true LRU (§5). Best-effort.
+                file.setLastModified(System.currentTimeMillis())
+                return it
+            }
         }
         val bitmap = source.load(ref, sizePx, monochrome)
-        runCatching { writeDisk(file, bitmap) } // best-effort
+        runCatching { writeDisk(file, bitmap) }.onSuccess { schedulePrune() } // best-effort
         return bitmap
+    }
+
+    /**
+     * Arm a single lazy disk prune on the Io dispatcher (§5, A1-07). Throttled via
+     * [pruneScheduled] so a burst of writes coalesces into one sweep.
+     */
+    private fun schedulePrune() {
+        if (pruneScheduled.compareAndSet(false, true)) {
+            scope.launch(dispatcher) {
+                try {
+                    pruneDisk()
+                } finally {
+                    pruneScheduled.set(false)
+                }
+            }
+        }
+    }
+
+    private fun pruneDisk() {
+        val files = diskDir.listFiles()?.filter { it.isFile } ?: return
+        val entries = files.map { DiskCachePrune.Entry(it, it.length(), it.lastModified()) }
+        DiskCachePrune.select(entries, System.currentTimeMillis(), DISK_MAX_BYTES, DISK_MAX_AGE_MS)
+            .forEach { it.delete() }
     }
 
     private fun writeDisk(file: File, bitmap: Bitmap) {
@@ -144,6 +180,11 @@ class IconLoaderImpl @Inject constructor(
     }
 
     private companion object {
+        // Disk cache bounds (§5). Composited WEBPs are small; 32 MiB holds a large
+        // multi-size/variant working set, and 30 days drops icons of long-gone apps.
+        const val DISK_MAX_BYTES = 32L * 1024 * 1024
+        const val DISK_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
+
         fun computeBudgetBytes(context: Context): Long {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             val perProcessBytes = am.memoryClass.toLong() * 1024 * 1024

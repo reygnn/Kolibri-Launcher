@@ -96,7 +96,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-07 · IconLoaderImpl.kt:121 — Disk icon cache has no size/age bound or pruning — it only shrinks on evict(pkg)
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** icon-cache · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** icon-cache · **Status:** ✅ erledigt (B8 — reine `DiskCachePrune`-Policy (Byte+Alter, LRU per mtime) + lazy/throttled Prune bei Init und nach Writes; Disk-Hit touched mtime; JVM-Test)
 - **Datei:** `nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/IconLoaderImpl.kt:121`
 - **Detail:** Verified against ICON_LOADER_SPEC §5 line 143: 'Byte-/Alters-beschränkt (LRU per mtime), Pruning lazy im Io-Kontext.' The implementation never prunes by size/age: writeDisk (125-130) writes a WEBP_LOSSLESS file for every (package, sizePx, variant, contentHash) requested via loadFromDiskOrResolve (line 121), and the only deletion path is evict(pkg)'s prefix glob (line 102). No listFiles/mtime/size sweep exists anywhere in the class. Distinct icon sizes (grid, folder-cell, drawer 48dp), the THEMED monochrome variant, and stale content-hash files for never-evicted packages accumulate unbounded until the OS clears cacheDir under storage pressure.
 - **Fix-Vorschlag:** Implement the §5 lazy mtime-LRU prune (cap total bytes / max age on the IO dispatcher after writes) or at minimum a periodic size-bounded sweep.
