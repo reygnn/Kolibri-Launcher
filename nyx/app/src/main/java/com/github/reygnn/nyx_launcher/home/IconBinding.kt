@@ -1,7 +1,13 @@
 package com.github.reygnn.nyx_launcher.home
 
 import android.graphics.Bitmap
+import android.view.View
 import android.widget.ImageView
+import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
+import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.ItemId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -23,5 +29,47 @@ fun ImageView.loadIconGated(
     scope.launch {
         val bitmap = runCatching { produce() }.getOrNull() ?: return@launch
         if (currentToken() == tokenAtBind) setImageBitmap(bitmap)
+    }
+}
+
+/**
+ * Binds a launchable [HomeCell] — an [HomeCell.App] or [HomeCell.Folder] — to a
+ * holder's [itemView] + [icon]: tap/long-press wiring plus the token-gated icon
+ * ([loadIconGated]). The grid and dock adapters had this App/Folder branch
+ * duplicated verbatim (AUDIT-1 A1-06); both now route through here.
+ *
+ * [HomeCell.Empty] is a no-op — the dock never has empties, and the grid clears
+ * its own listeners for empty cells before calling this.
+ */
+fun bindLaunchableCell(
+    itemView: View,
+    icon: ImageView,
+    cell: HomeCell,
+    scope: CoroutineScope,
+    tokenAtBind: Int,
+    currentToken: () -> Int,
+    iconLoader: IconLoader,
+    folderRenderer: FolderIconRenderer,
+    iconSizePx: Int,
+    onLaunch: (ComponentKey) -> Unit,
+    onOpenFolder: (id: ItemId) -> Unit,
+    onIconLongPress: (view: View, id: ItemId) -> Unit,
+) {
+    when (cell) {
+        HomeCell.Empty -> Unit
+        is HomeCell.App -> {
+            itemView.setOnClickListener { onLaunch(cell.key) }
+            itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
+            icon.loadIconGated(scope, tokenAtBind, currentToken) {
+                iconLoader.bitmap(IconRef.System(cell.key), iconSizePx)
+            }
+        }
+        is HomeCell.Folder -> {
+            itemView.setOnClickListener { onOpenFolder(cell.id) }
+            itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
+            icon.loadIconGated(scope, tokenAtBind, currentToken) {
+                folderRenderer.render(cell.members, iconSizePx)
+            }
+        }
     }
 }

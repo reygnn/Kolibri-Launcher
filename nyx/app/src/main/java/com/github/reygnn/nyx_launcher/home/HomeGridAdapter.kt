@@ -10,7 +10,6 @@ import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import kotlinx.coroutines.CoroutineScope
 
@@ -82,27 +81,16 @@ class HomeGridAdapter(
             }
         }
 
-        when (cell) {
-            HomeCell.Empty -> {
-                holder.itemView.setOnClickListener(null)
-                holder.itemView.setOnLongClickListener(null)
-                holder.itemView.isClickable = false
-                holder.itemView.isLongClickable = false
-            }
-            is HomeCell.App -> {
-                holder.itemView.setOnClickListener { onLaunch(cell.key) }
-                holder.itemView.setOnLongClickListener { onIconLongPress(holder.itemView, cell.id); true }
-                holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
-                    iconLoader.bitmap(IconRef.System(cell.key), iconSizePx)
-                }
-            }
-            is HomeCell.Folder -> {
-                holder.itemView.setOnClickListener { onOpenFolder(cell.id) }
-                holder.itemView.setOnLongClickListener { onIconLongPress(holder.itemView, cell.id); true }
-                holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
-                    folderRenderer.render(cell.members, iconSizePx)
-                }
-            }
+        if (cell is HomeCell.Empty) {
+            holder.itemView.setOnClickListener(null)
+            holder.itemView.setOnLongClickListener(null)
+            holder.itemView.isClickable = false
+            holder.itemView.isLongClickable = false
+        } else {
+            bindLaunchableCell(
+                holder.itemView, holder.icon, cell, scope, token, { holder.bindToken },
+                iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress,
+            )
         }
     }
 

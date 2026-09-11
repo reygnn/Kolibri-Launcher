@@ -88,7 +88,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-06 · HomeGridAdapter.kt:86 — Token-gated async icon load (ICL-INV-9) duplicated verbatim across four adapters
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** duplication · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** duplication · **Status:** ✅ erledigt (B7 — Token-Load war schon via B4/A1-09 dedupliziert; jetzt auch der geteilte App/Folder-when-Block über `bindLaunchableCell`)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeGridAdapter.kt:86`
 - **Detail:** Same token-gated load in HomeGridAdapter/DockAdapter/FolderMemberAdapter/AppDrawerAdapter, plus a duplicated App/Folder when-branch between grid and dock adapters.
 - **Fix-Vorschlag:** Extract a shared ImageView.loadIconGated helper (or a base ViewHolder holding bindToken + a bindCell extension) and route all four adapters through it.
