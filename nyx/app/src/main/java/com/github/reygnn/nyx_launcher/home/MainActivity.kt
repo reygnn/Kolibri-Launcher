@@ -304,10 +304,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
      * downstream, so running it on every layout (incl. rotation) is cheap.
      */
     private fun applyDeviceGrid() {
-        val targetPx = HOME_CELL_TARGET_DP * resources.displayMetrics.density
-        if (pager.width <= 0 || pager.height <= 0 || targetPx <= 0f) return
-        val columns = (pager.width / targetPx).toInt().coerceIn(HOME_MIN_COLUMNS, HOME_MAX_COLUMNS)
-        val rows = (pager.height / targetPx).toInt().coerceIn(HOME_MIN_ROWS, HOME_MAX_ROWS)
+        val density = resources.displayMetrics.density
+        val colTargetPx = HOME_COL_TARGET_DP * density
+        val rowTargetPx = HOME_CELL_TARGET_DP * density
+        if (pager.width <= 0 || pager.height <= 0 || colTargetPx <= 0f || rowTargetPx <= 0f) return
+        val columns = (pager.width / colTargetPx).toInt().coerceIn(HOME_MIN_COLUMNS, HOME_MAX_COLUMNS)
+        val rows = (pager.height / rowTargetPx).toInt().coerceIn(HOME_MIN_ROWS, HOME_MAX_ROWS)
         viewModel.applyDeviceGrid(columns, rows)
     }
 

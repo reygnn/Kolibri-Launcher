@@ -37,6 +37,8 @@ class DragLayer @JvmOverloads constructor(
     private var lastY = 0f
     private var dragView: ImageView? = null
     private var dragSource: View? = null
+    private var dragWidth = 0
+    private var dragHeight = 0
 
     var onSwipeUp: (() -> Unit)?
         get() = gestureCore.onSwipeUp
@@ -75,10 +77,12 @@ class DragLayer @JvmOverloads constructor(
 
     internal fun addDragView(source: View, x: Int, y: Int) {
         dragSource = source
+        dragWidth = source.width
+        dragHeight = source.height
         val bitmap = source.drawToBitmap()
         val view = ImageView(context).apply {
             setImageBitmap(bitmap)
-            layoutParams = LayoutParams(source.width, source.height)
+            layoutParams = LayoutParams(dragWidth, dragHeight)
             isClickable = false
         }
         addView(view)
@@ -89,8 +93,10 @@ class DragLayer @JvmOverloads constructor(
 
     internal fun moveDragView(x: Int, y: Int) {
         val view = dragView ?: return
-        view.translationX = (x - view.width / 2).toFloat()
-        view.translationY = (y - view.height / 2).toFloat()
+        // Centre on the finger using the known source size — the ImageView isn't
+        // laid out yet on the first call, so its own width/height would be 0.
+        view.translationX = (x - dragWidth / 2).toFloat()
+        view.translationY = (y - dragHeight / 2).toFloat()
     }
 
     internal fun removeDragView() {

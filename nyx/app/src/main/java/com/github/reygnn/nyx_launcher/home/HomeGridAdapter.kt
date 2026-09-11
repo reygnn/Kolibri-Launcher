@@ -119,8 +119,15 @@ class HomeGridAdapter(
     }
 }
 
-/** Target home-grid cell edge in dp — device-consistent (see [homeCellHeightPx]). */
+/** Target row height in dp — drives the cell height (see [homeCellHeightPx]). */
 internal const val HOME_CELL_TARGET_DP = 110f
+
+/**
+ * Target column width in dp — drives the column count. Smaller than the row
+ * target so a phone gets a few more columns than rows would imply (cell width is
+ * the page width / columns anyway, independent of the row height).
+ */
+internal const val HOME_COL_TARGET_DP = 90f
 
 // Clamp ranges for the device-derived grid (MainActivity.applyDeviceGrid).
 internal const val HOME_MIN_COLUMNS = 3
