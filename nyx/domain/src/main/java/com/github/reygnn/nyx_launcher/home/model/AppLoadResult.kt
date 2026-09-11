@@ -11,5 +11,13 @@ sealed interface AppLoadResult {
     data class Loaded(val apps: List<LauncherApp>) : AppLoadResult
     data class Error(val reason: Reason) : AppLoadResult
 
-    enum class Reason { ENUMERATION_FAILED }
+    enum class Reason {
+        /** The enumeration threw. */
+        ENUMERATION_FAILED,
+
+        /** The enumeration returned zero launchable activities — impossible on a
+         *  real device (there is always >= 1), so a symptom of a failed/partial
+         *  load, treated as Error to keep reconcile fail-closed (RHL-INV-1). */
+        ENUMERATION_EMPTY,
+    }
 }

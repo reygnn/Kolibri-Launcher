@@ -15,7 +15,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-01 · InstalledAppsRepositoryImpl.kt:42 — Fail-closed (RHL-INV-1) defeated: an empty getActivityList result becomes Loaded(emptyList), letting reconcile prune and persist the entire home layout
 
-- **Schwere:** HIGH · **Verdikt:** CONFIRMED · **Kategorie:** spec-invariant · **Status:** ⬜ offen
+- **Schwere:** HIGH · **Verdikt:** CONFIRMED · **Kategorie:** spec-invariant · **Status:** ✅ erledigt (B1)
 - **Datei:** `nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/InstalledAppsRepositoryImpl.kt:42`
 - **Detail:** loadInstalledApps() only maps a THROWN enumeration to AppLoadResult.Error (fold.onFailure at line 43). A non-throwing empty list from getActivityList(null, myUserHandle()) succeeds runCatching and maps to Loaded(emptyList()) at line 42. ReconcileHomeLayoutUseCase (line 29-31) treats any Loaded as authoritative -> installed=emptySet -> HomeLayoutReconciler prunes every app/member (key in installed always false) -> ReconcileOutcome.Changed -> save() persists the emptied layout. PackageEventCoordinator.start()/onChanged run reconcile() on cold start and on every package remove/change. This is exactly the anti-pattern the AppLoadResult KDoc (lines 3-9) and the repo impl KDoc (lines 18-19, 'never a silent empty list (RHL-INV-1)') were written to prevent.
 - **Fix-Vorschlag:** Treat an empty enumeration as AppLoadResult.Error (a real device always exposes >= 1 launchable activity), keeping only a non-empty result as Loaded, to restore the fail-closed guarantee.
@@ -97,7 +97,7 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 ### A1-11 · InstalledAppsRepositoryImpl.kt:29 — InstalledAppsRepositoryImpl untested; RHL-INV-1 error-wrapping path has no coverage.
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ✅ erledigt (B1)
 - **Datei:** `nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/InstalledAppsRepositoryImpl.kt:29`
 - **Detail:** Confirmed: no InstalledAppsRepositoryImplTest exists and there is no InstalledAppsRepository contract (only FakeInstalledAppsRepository). loadInstalledApps (lines 29-45) wraps getActivityList in runCatching{...}.fold(onSuccess=Loaded, onFailure=Error(ENUMERATION_FAILED)) — the exact RHL-INV-1 behavior its KDoc claims. If onFailure were changed to Loaded(emptyList()), reconcile would prune every home item as uninstalled and nothing catches it. Testable via Robolectric with a mocked LauncherApps (the service is obtained in the constructor via context.getSystemService, so the test mocks Context to return a MockK LauncherApps).
 - **Fix-Vorschlag:** Add a Robolectric test: getActivityList throws -> assert AppLoadResult.Error(ENUMERATION_FAILED); returns activities -> assert mapped LauncherApp list.
