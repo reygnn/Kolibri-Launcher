@@ -76,6 +76,7 @@ class DragLayer @JvmOverloads constructor(
     // ---- drag view (called by DragController) ----
 
     internal fun addDragView(source: View, x: Int, y: Int) {
+        removeDragView() // clear a leftover from a not-yet-settled previous drop
         dragSource = source
         dragWidth = source.width
         dragHeight = source.height

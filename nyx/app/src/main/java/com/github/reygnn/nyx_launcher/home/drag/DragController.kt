@@ -25,6 +25,14 @@ class DragController(private val dragLayer: DragLayer) {
     var onDragStart: (() -> Unit)? = null
     var onDragEnd: (() -> Unit)? = null
 
+    /**
+     * Notified after a drop is committed, while the drag view is deliberately
+     * still shown at the drop point. The host clears it once the drop's re-render
+     * lands (or via a fallback), so the icon doesn't flicker back to its old cell
+     * during the async model update. Cancel does NOT fire this (it clears at once).
+     */
+    var onDropSettle: (() -> Unit)? = null
+
     val isDragging: Boolean get() = payload != null
 
     /** Registration order is priority (first containing + accepting zone wins). */
@@ -48,20 +56,26 @@ class DragController(private val dragLayer: DragLayer) {
     fun onDrop(x: Int, y: Int) {
         val p = payload ?: return
         val zone = findZone(p, x, y)
-        finish()
+        endDragState()
+        // Leave the drag view where it was dropped; the host removes it when the
+        // commit's re-render arrives (see onDropSettle), avoiding the old-cell
+        // flicker during the async move/place.
         zone?.onDrop(p, x, y)
+        onDropSettle?.invoke()
     }
 
     fun onCancel() {
         if (!isDragging) return
-        finish()
+        endDragState()
+        dragLayer.removeDragView()
     }
 
-    private fun finish() {
+    /** Ends the interactive drag (touch flows normally again) but does not touch
+     *  the drag view — [onDrop] leaves it for the host to settle. */
+    private fun endDragState() {
         currentZone?.onDragExit()
         currentZone = null
         payload = null
-        dragLayer.removeDragView()
         onDragEnd?.invoke()
     }
 

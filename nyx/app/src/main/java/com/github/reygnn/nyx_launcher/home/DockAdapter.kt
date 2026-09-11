@@ -43,6 +43,9 @@ class DockAdapter(
         val cell = items[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+        // A dragged dock item is hidden during the drag; never leave a reused
+        // holder invisible.
+        holder.itemView.visibility = View.VISIBLE
 
         when (cell) {
             HomeCell.Empty -> Unit // dock has no empties

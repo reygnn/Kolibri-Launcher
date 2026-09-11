@@ -160,6 +160,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             removeBar.visibility = View.INVISIBLE
             removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
         }
+        // The drag view is kept at the drop point until the commit's re-render
+        // clears it (renderLayout). This fallback covers no-op drops (same cell)
+        // and errors, where no re-render arrives.
+        controller.onDropSettle = {
+            homeRoot.postDelayed({
+                if (!homeRoot.dragController.isDragging) homeRoot.removeDragView()
+            }, DRAG_SETTLE_FALLBACK_MS)
+        }
 
         // 1) Remove zone — the top strip, reaching y=0. Existing items only.
         controller.addDropZone(object : DropZone {
@@ -247,6 +255,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         pagerAdapter?.submit((0 until layout.pages).map(layout::pageCells))
         if (currentPage < layout.pages) pager.setCurrentItem(currentPage, false)
         dockAdapter.submit(layout.dockCells())
+        // A drop leaves its drag view in place to bridge the async commit; the
+        // commit's re-render arrives here, so clear it now (idempotent otherwise).
+        // Skip while an actual drag is in flight (an unrelated re-render mid-drag
+        // must not yank the live drag view).
+        if (!homeRoot.dragController.isDragging) homeRoot.removeDragView()
     }
 
     // ---- drawer overlay (AppDrawerFragment.Host) ----
@@ -401,6 +414,9 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
 
 /** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
 private const val DRAWER_SLIDE_MS = 180L
+
+/** Fallback delay to clear a dropped drag view when no commit re-render arrives. */
+private const val DRAG_SETTLE_FALLBACK_MS = 300L
 
 /** Visible content height (below the status-bar inset) of the remove bar, in dp. */
 private const val REMOVE_BAR_CONTENT_DP = 64f

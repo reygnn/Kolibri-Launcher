@@ -61,6 +61,9 @@ class HomeGridAdapter(
         val cell = cells[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+        // A dragged cell is hidden during the drag; make sure a reused holder is
+        // never left invisible (the source may land back in the recycle pool).
+        holder.itemView.visibility = View.VISIBLE
 
         // Fixed cell height (device-consistent), grid bottom-anchored: the rows
         // sit flush above the dock and any leftover height becomes the page's top
