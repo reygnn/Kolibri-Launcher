@@ -21,6 +21,25 @@ Adversarieller Multi-Agent-Review gegen die umgesetzten Fixes (Diff `main..chore
   hätte einen gefüllten Drawer beim Re-Open geleert; zusätzlich Race bei schnellem Re-Open. Fix:
   vorherigen Refresh-Job canceln (neuester gewinnt) + gefüllte Liste nie durch leere überschreiben. ✅
 
+## Fix-Review 2 (B5)
+
+Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx-audit-1`,
+7 Agenten). **Keine neuen Produktions-Bugs** — 6 Funde, alle Test-Lücken bzw. latent. Behoben:
+
+- **Atomarität (A1-03) nicht gepinnt:** die drei `update()`-Contract-Fälle waren strikt sequenziell,
+  d.h. das Entfernen des `writeMutex` blieb grün. Neuer Contract-Fall `concurrent_updates_do_not_lose_writes`
+  (zwei nebenläufige `update{pages+1}` mit `yield()` zwischen Read und Write, `assert == start+2`) → läuft auf
+  Fake **und** Impl; per Mutations-Check verifiziert (Lock entfernt → rot). `FakeHomeLayoutRepository.update`
+  hält jetzt selbst einen `Mutex`, modelliert die Atomarität also mit. ✅
+- **refreshDrawer ohne Coverage (= A1-02):** neuer `HomeViewModelTest` deckt init-Populate, den Empty-Guard
+  (leere Liste überschreibt gefüllte nicht / bleibt leer wenn leer), Cancel-in-flight (neuester gewinnt) und
+  die Dispatch-Forwarding-Methoden ab. ✅
+- **Latenter Deadlock (PLAUSIBLE):** ein Transform, der in `save()`/`update()` zurückruft, würde am
+  nicht-reentranten `writeMutex` verklemmen — kein aktueller Caller tut das. KDoc-Warnung auf der
+  Interface-Methode ergänzt (Transform muss rein sein, darf nicht zurückrufen). ✅
+- **Rest (LOW, akzeptiert):** `update_returning_null_does_not_write` prüft „keine Emission" statt „kein Write"
+  (via StateFlow-Dedup vakuum-sicher genug); ein Write-Counter auf dem Impl wäre invasiv für geringen Nutzen — nicht umgesetzt.
+
 ---
 
 ## 🔴 HIGH
@@ -35,7 +54,7 @@ Adversarieller Multi-Agent-Review gegen die umgesetzten Fixes (Diff `main..chore
 
 ### A1-02 · HomeViewModel.kt:35 — HomeViewModel has no test despite being the app's central StateFlow state holder.
 
-- **Schwere:** HIGH · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ⬜ offen
+- **Schwere:** HIGH · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ✅ erledigt (B5)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeViewModel.kt:35`
 - **Detail:** Confirmed: grep for HomeViewModel across all test sources returns nothing. The class has real, silently-breakable logic: init-block drawer load (viewModelScope.launch { _drawerApps.value = getDrawerApps() }, line 57), layout/monochromeIcons StateFlows via stateIn(WhileSubscribed(5_000), lines 47-51), and six mutation dispatch methods (move/place/extractFromFolder/remove/renameFolder/applyDeviceGrid, lines 60-87) each forwarding args to a use case. All fakes (FakeHomeLayoutRepository, FakePreferencesRepository, FakeInstalledAppsRepository) plus MainDispatcherRule exist in :domain testFixtures, so it is directly JVM/Robolectric-testable with the real use cases. CLAUDE.md explicitly calls state holders the thing 'worth pinning'.
 - **Fix-Vorschlag:** Add HomeViewModelTest with MainDispatcherRule + runTest(rule.dispatcher) + Turbine: assert drawerApps populates on init and each fun forwards the right id/target/title to its use case and layout re-emits.

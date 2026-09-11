@@ -30,6 +30,11 @@ interface HomeLayoutRepository {
      * returns the new one, or null to leave it unchanged (no write). The whole
      * read → transform → write runs under a single writer lock, so concurrent
      * mutations serialize instead of racing on a stale read (AUDIT-1 A1-03).
+     *
+     * [transform] must be pure with respect to this repository: it must NOT call
+     * back into [save] or [update], which would deadlock on the non-reentrant
+     * writer lock. It receives the current layout as its argument — that is the
+     * only read it needs.
      */
     suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?)
 }

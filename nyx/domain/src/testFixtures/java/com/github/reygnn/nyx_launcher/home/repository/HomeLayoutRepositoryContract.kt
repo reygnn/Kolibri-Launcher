@@ -10,7 +10,10 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Rule
 import org.junit.Test
 
@@ -83,6 +86,29 @@ abstract class HomeLayoutRepositoryContract {
             assertThat(awaitItem()).isEqualTo(WITH_APP.copy(pages = WITH_APP.pages + 1))
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    /**
+     * Two concurrent [HomeLayoutRepository.update] calls, each doing a
+     * read-transform-write of `pages`, must not lose a write (A1-03). The
+     * `yield()` inside each transform forces the coroutines to interleave: with a
+     * non-atomic read-modify-write both would read the same start value and the
+     * final result would be `start + 1`. Serializing the whole transform under a
+     * lock is what makes the result `start + 2`. Goes red on any repository whose
+     * `update` does not hold across the transform.
+     */
+    @Test
+    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository(EMPTY)
+        val increment: suspend (HomeLayout) -> HomeLayout = { current ->
+            yield()
+            current.copy(pages = current.pages + 1)
+        }
+        val a = launch { repo.update(increment) }
+        val b = launch { repo.update(increment) }
+        a.join()
+        b.join()
+        assertThat(repo.layout().first().pages).isEqualTo(EMPTY.pages + 2)
     }
 
     private companion object {
