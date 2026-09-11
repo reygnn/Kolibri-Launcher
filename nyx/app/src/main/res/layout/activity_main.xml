@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+<com.github.reygnn.nyx_launcher.home.drag.DragLayer
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/home_root"
     android:layout_width="match_parent"
@@ -59,4 +59,4 @@
         android:textSize="16sp"
         android:visibility="invisible" />
 
-</com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>
+</com.github.reygnn.nyx_launcher.home.drag.DragLayer>

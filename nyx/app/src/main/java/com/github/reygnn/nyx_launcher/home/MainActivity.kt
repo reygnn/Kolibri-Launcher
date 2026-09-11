@@ -3,8 +3,8 @@ package com.github.reygnn.nyx_launcher.home
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Bundle
-import android.view.DragEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
@@ -28,9 +28,10 @@ import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.home.drag.DragLayer
+import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.nyx_launcher.home.model.CellPos
-import com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var iconLoader: IconLoader
     @Inject lateinit var folderRenderer: FolderIconRenderer
 
-    private lateinit var homeRoot: GestureFrameLayout
+    private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
     private lateinit var dock: RecyclerView
     private lateinit var drawerContainer: View
@@ -112,7 +113,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
 
         setupDock()
-        setupRemoveBar()
+        setupDropZones()
         setupGestures()
         // Derive the grid from the real home-grid area once the pager is laid out
         // (a pre-layout metrics estimate mis-counts rows and leaves a big top gap).
@@ -135,7 +136,6 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
         dock.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         dock.adapter = dockAdapter
-        dock.setOnDragListener { _, event -> handleDockDrag(event) }
         // No setOnLongClickListener here: a long-click listener on a RecyclerView
         // never fires (its onTouchEvent handles scrolling and never triggers the
         // View long-press path), and it would mark the dock long-clickable, which
@@ -144,44 +144,61 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // dock icons keep their own long-press (drag) via DockAdapter.
     }
 
-    private fun setupRemoveBar() {
-        homeRoot.setOnDragListener { _, event ->
-            when (event.action) {
-                // INVISIBLE (not GONE) at rest keeps the band's space reserved, so
-                // showing it on drag start doesn't reflow the grid down.
-                DragEvent.ACTION_DRAG_STARTED -> { removeBar.visibility = View.VISIBLE; true }
-                DragEvent.ACTION_DRAG_ENDED -> { removeBar.visibility = View.INVISIBLE; true }
-                // The home root is the catch-all drop target for the grid: a drop
-                // that misses the dock and the remove bar lands here. Drag events
-                // aren't reliably delivered to the ViewPager2 pages, so a per-page
-                // drop listener lost most grid drops. Resolve the target cell
-                // geometrically from the drop point instead, making any spot on the
-                // home surface a valid drop (the cells fill the page down to the
-                // dock, so the drop lands where the finger is).
-                DragEvent.ACTION_DROP -> {
-                    val payload = event.localState as? DragPayload
-                    if (payload != null) {
-                        resolveGridCell(event.x, event.y)?.let { applyDrop(payload, it) }
-                    }
-                    true
-                }
-                else -> true
-            }
+    /**
+     * Register the drop zones with the [DragLayer]'s controller, in priority order
+     * (HOME_DRAG_ENGINE_SPEC §4): remove > dock > grid. The engine keeps the drag
+     * gesture in-app, so the remove zone's hit rect can reach y=0 — a drop at the
+     * very top edge deletes, unlike with OS drag-and-drop.
+     */
+    private fun setupDropZones() {
+        val controller = homeRoot.dragController
+        controller.clearDropZones()
+
+        // The remove bar shows for the whole drag; the remove zone tints it on hover.
+        controller.onDragStart = { removeBar.visibility = View.VISIBLE }
+        controller.onDragEnd = {
+            removeBar.visibility = View.INVISIBLE
+            removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
         }
-        removeBar.setOnDragListener { _, event ->
-            when (event.action) {
-                // Brighten while the drag is over the bar so the hit is unmistakable.
-                DragEvent.ACTION_DRAG_ENTERED -> { removeBar.setBackgroundColor(REMOVE_BAR_ACTIVE_COLOR); true }
-                DragEvent.ACTION_DRAG_EXITED -> { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR); true }
-                DragEvent.ACTION_DROP -> {
-                    (event.localState as? DragPayload.Existing)?.let { viewModel.remove(it.id) }
-                    removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
-                    true
-                }
-                DragEvent.ACTION_DRAG_ENDED -> { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR); true }
-                else -> true
+
+        // 1) Remove zone — the top strip, reaching y=0. Existing items only.
+        controller.addDropZone(object : DropZone {
+            override fun hitRect(out: Rect) = out.set(0, 0, homeRoot.width, removeBar.bottom)
+            override fun accepts(payload: DragPayload) = payload is DragPayload.Existing
+            override fun onDragEnter() { removeBar.setBackgroundColor(REMOVE_BAR_ACTIVE_COLOR) }
+            override fun onDragExit() { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR) }
+            override fun onDrop(payload: DragPayload, x: Int, y: Int) {
+                (payload as? DragPayload.Existing)?.let { viewModel.remove(it.id) }
             }
-        }
+        })
+
+        // 2) Dock zone — slot from the x under the finger (or append at the end).
+        controller.addDropZone(object : DropZone {
+            override fun hitRect(out: Rect) = rectInDragLayer(dock, out)
+            override fun accepts(payload: DragPayload) = true
+            override fun onDrop(payload: DragPayload, x: Int, y: Int) {
+                val bounds = Rect().also { rectInDragLayer(dock, it) }
+                val child = dock.findChildViewUnder((x - bounds.left).toFloat(), (y - bounds.top).toFloat())
+                val slot = child?.let(dock::getChildAdapterPosition)
+                    ?.takeIf { it != RecyclerView.NO_POSITION } ?: dockSize
+                applyDrop(payload, DropTarget.DockSlot(slot))
+            }
+        })
+
+        // 3) Grid zone — the rest of the surface; cell resolved geometrically.
+        controller.addDropZone(object : DropZone {
+            override fun hitRect(out: Rect) = rectInDragLayer(pager, out)
+            override fun accepts(payload: DragPayload) = true
+            override fun onDrop(payload: DragPayload, x: Int, y: Int) {
+                resolveGridCell(x.toFloat(), y.toFloat())?.let { applyDrop(payload, it) }
+            }
+        })
+    }
+
+    /** A descendant view's bounds in [homeRoot] (DragLayer) coordinates. */
+    private fun rectInDragLayer(view: View, out: Rect) {
+        out.set(0, 0, view.width, view.height)
+        homeRoot.offsetDescendantRectToMyCoords(view, out)
     }
 
     private fun setupGestures() {
@@ -276,7 +293,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     // ---- drag ----
 
     private fun startDrag(view: View, payload: DragPayload) {
-        view.startDragAndDrop(null, View.DragShadowBuilder(view), payload, 0)
+        homeRoot.startDrag(payload, view)
     }
 
     /**
@@ -322,17 +339,6 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val col = (localX / cellW).toInt().coerceIn(0, grid.columns - 1)
         val row = (localY / cellHpx).toInt().coerceIn(0, grid.rows - 1)
         return DropTarget.Cell(CellPos(page, col, row))
-    }
-
-    private fun handleDockDrag(event: DragEvent): Boolean = when (event.action) {
-        DragEvent.ACTION_DROP -> {
-            val payload = event.localState as? DragPayload
-            val child = dock.findChildViewUnder(event.x, event.y)
-            val slot = child?.let(dock::getChildAdapterPosition)?.takeIf { it != RecyclerView.NO_POSITION } ?: dockSize
-            if (payload != null) applyDrop(payload, DropTarget.DockSlot(slot))
-            true
-        }
-        else -> true
     }
 
     private fun applyDrop(payload: DragPayload, target: DropTarget) = when (payload) {
