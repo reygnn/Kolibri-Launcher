@@ -37,7 +37,9 @@ class HomeLayoutRepositoryImpl @Inject constructor(
     private companion object {
         val KEY = stringPreferencesKey("home_layout_v1")
 
-        // TODO grid default is a product decision (ICON_HOME_MODEL_SPEC §10).
+        // Cold-start default only: FitHomeGridUseCase re-fits to the device grid
+        // (GridSpecProvider) on start, so these dimensions are just the seed until
+        // then (ICON_HOME_MODEL_SPEC §10).
         val DEFAULT = HomeLayout(
             grid = GridSpec(columns = 4, rows = 6),
             pages = 1,

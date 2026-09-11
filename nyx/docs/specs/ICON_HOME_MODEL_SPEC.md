@@ -361,7 +361,14 @@ Katalog `= "1.11.0"`) serialisieren, unter Key `home_layout_v1` ablegen.
 ## §10 Offene Punkte für Review-Runde 1
 
 1. `GridSpec` fix vs. nutzer-konfigurierbar in v1 (Modell trägt beides; Frage ist die
-   Settings-UI).
+   Settings-UI). — **entschieden (Runde 4): geräteabhängig, nicht fix.** `columns`/`rows`
+   werden aus der Bildschirmgröße ÷ Ziel-Zellkante (~110dp, geclampt Spalten 3–6 /
+   Zeilen 4–8) abgeleitet (`GridSpecProvider`, Impl in `:data` mit `displayMetrics`).
+   Ein Geräte-/Größenwechsel wird beim Kaltstart über die reine Transition
+   `HomeLayoutRegridder` verlustfrei aufgefangen: Items innerhalb der neuen Grenzen
+   behalten ihre Zelle, Off-Grid-Items und Dock-Überlauf (> `columns`) werden row-major
+   in freie Zellen umgepackt (nie verworfen; analog HEU-INV-2), notfalls auf neue Seiten.
+   Idempotent. Eine explizite Nutzer-Konfiguration (Settings-UI) bleibt offen.
 2. Produkt-/Paketname — **entschieden: „Nyx Launcher", `com.github.reygnn.nyx_launcher`**
    (Runde 3). Betrifft nur den Package-Root, nicht das Modell.
 3. Braucht das Dock eigene Invarianten (max. Länge = `columns`?) oder reicht „eine
@@ -385,3 +392,7 @@ Katalog `= "1.11.0"`) serialisieren, unter Key `home_layout_v1` ablegen.
   zugleich `MOVE_ITEM_SPEC` `AddedToFolder` und `REMOVE_FROM_FOLDER_SPEC` §6:
   Duplikat-Add ist unerreichbar → `silentError`, nicht `NoOp`. §10-Punkt (Unizität)
   geschlossen.
+- **v4 (Review-Runde 4)** — §10-Punkt 1 entschieden: Grid ist **geräteabhängig**
+  (`GridSpecProvider` + `HomeLayoutRegridder`, verlustfreies Repack beim Kaltstart).
+  `GridSpec(4,6)` bleibt nur noch Kaltstart-Default, bis das Geräte-Grid greift.
+  Truth-Table-Tests: `HomeLayoutRegridderTest`.

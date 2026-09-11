@@ -1,11 +1,13 @@
 package com.github.reygnn.nyx_launcher.data.di
 
+import com.github.reygnn.nyx_launcher.data.home.GridSpecProviderImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
 import com.github.reygnn.nyx_launcher.data.home.InstalledAppsRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
+import com.github.reygnn.nyx_launcher.home.repository.GridSpecProvider
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
@@ -38,4 +40,8 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindItemIdFactory(impl: UuidItemIdFactory): ItemIdFactory
+
+    @Binds
+    @Singleton
+    abstract fun bindGridSpecProvider(impl: GridSpecProviderImpl): GridSpecProvider
 }

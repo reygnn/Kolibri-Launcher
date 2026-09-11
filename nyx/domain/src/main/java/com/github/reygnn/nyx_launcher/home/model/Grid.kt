@@ -3,8 +3,10 @@ package com.github.reygnn.nyx_launcher.home.model
 /**
  * Grid dimensions of a single home page (e.g. 4×6).
  *
- * Whether this is fixed or user-configurable in v1 is an open product question
- * (ICON_HOME_MODEL_SPEC §10); the model carries both, the Settings UI decides.
+ * Device-derived, not fixed (ICON_HOME_MODEL_SPEC §10): a [GridSpecProvider]
+ * computes columns/rows from the screen size, and [HomeLayoutRegridder] re-fits
+ * the layout onto it at cold start. An explicit user-facing Settings override is
+ * still open.
  */
 data class GridSpec(val columns: Int, val rows: Int)
 
