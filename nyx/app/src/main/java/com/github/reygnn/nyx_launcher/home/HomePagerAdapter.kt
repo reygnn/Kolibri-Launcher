@@ -22,6 +22,7 @@ class HomePagerAdapter(
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
     private val columns: Int,
+    private val rows: Int,
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onStartDrag: (View, ItemId) -> Unit,
@@ -43,7 +44,7 @@ class HomePagerAdapter(
             layoutManager = GridLayoutManager(context, columns)
             clipToPadding = false
         }
-        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, onLaunch, onOpenFolder, onStartDrag)
+        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, onLaunch, onOpenFolder, onStartDrag)
         recycler.adapter = gridAdapter
         return PageHolder(recycler, gridAdapter)
     }

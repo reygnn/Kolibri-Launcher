@@ -129,12 +129,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 DragEvent.ACTION_DRAG_STARTED -> { removeBar.isVisible = true; true }
                 DragEvent.ACTION_DRAG_ENDED -> { removeBar.isVisible = false; true }
                 // The home root is the catch-all drop target for the grid: a drop
-                // that misses the dock and the remove bar lands here. The per-cell
-                // views don't tile the whole pager (a 4×6 block leaves blank space
-                // below the last row) and drag events aren't reliably delivered to
-                // the ViewPager2 pages, so grid drops were silently lost. Resolve
-                // the target cell geometrically from the drop point instead, making
-                // any spot on the home surface a valid drop — empty cells included.
+                // that misses the dock and the remove bar lands here. Drag events
+                // aren't reliably delivered to the ViewPager2 pages, so a per-page
+                // drop listener lost most grid drops. Resolve the target cell
+                // geometrically from the drop point instead, making any spot on the
+                // home surface a valid drop (the cells fill the page down to the
+                // dock, so the drop lands where the finger is).
                 DragEvent.ACTION_DROP -> {
                     val payload = event.localState as? DragPayload
                     if (payload != null) {
@@ -185,6 +185,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 scope = lifecycleScope,
                 iconSizePx = gridIconPx,
                 columns = layout.grid.columns,
+                rows = layout.grid.rows,
                 onLaunch = ::launchApp,
                 onOpenFolder = ::openFolder,
                 onStartDrag = { v, id -> startDrag(v, DragPayload.Existing(id)) },
@@ -245,25 +246,28 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     /**
      * Maps a drop point (in [homeRoot] coordinates) to the grid cell under it on
-     * the current page. Uses cell geometry rather than a hit-tested child view,
-     * so drops over empty cells and the blank area below the last row still
-     * resolve to a real [CellPos]; the pure move/place transition then decides
-     * empty-vs-occupied. Returns null only if the pager isn't laid out yet.
+     * the current page. Uses cell geometry — cell size derived from the page's
+     * own width/height, matching the cells that fill the page (see
+     * HomeGridAdapter) — rather than a hit-tested child view, so any spot on the
+     * home surface resolves to a real [CellPos]; the pure move/place transition
+     * then decides empty-vs-occupied. Returns null only if the pager isn't laid
+     * out yet.
      */
     private fun resolveGridCell(rootX: Float, rootY: Float): DropTarget.Cell? {
         val grid = viewModel.layout.value?.grid ?: return null
         val internal = pager.getChildAt(0) as? RecyclerView ?: return null
         val page = pager.currentItem
         val pageView = internal.layoutManager?.findViewByPosition(page) as? RecyclerView ?: return null
-        if (pageView.width <= 0) return null
+
+        val cellW = pageView.width.toFloat() / grid.columns
+        val cellH = pageView.height.toFloat() / grid.rows
+        if (cellW <= 0f || cellH <= 0f) return null
 
         val rootLoc = IntArray(2).also(homeRoot::getLocationOnScreen)
         val pageLoc = IntArray(2).also(pageView::getLocationOnScreen)
         val localX = rootX - (pageLoc[0] - rootLoc[0])
         val localY = rootY - (pageLoc[1] - rootLoc[1])
 
-        val cellW = pageView.width.toFloat() / grid.columns
-        val cellH = CELL_HEIGHT_DP * resources.displayMetrics.density
         val col = (localX / cellW).toInt().coerceIn(0, grid.columns - 1)
         val row = (localY / cellH).toInt().coerceIn(0, grid.rows - 1)
         return DropTarget.Cell(CellPos(page, col, row))
@@ -338,6 +342,3 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
 
 /** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
 private const val DRAWER_SLIDE_MS = 180L
-
-/** Grid cell height in dp — must match item_home_cell.xml's fixed row height. */
-private const val CELL_HEIGHT_DP = 84f

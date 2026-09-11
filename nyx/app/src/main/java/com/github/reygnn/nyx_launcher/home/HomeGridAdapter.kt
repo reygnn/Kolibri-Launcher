@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
@@ -25,12 +26,24 @@ class HomeGridAdapter(
     private val folderRenderer: FolderIconRenderer,
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
+    private val rows: Int,
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onIconLongPress: (view: View, id: ItemId) -> Unit,
 ) : RecyclerView.Adapter<HomeGridAdapter.CellHolder>() {
 
     private var cells: List<HomeCell> = emptyList()
+
+    /** The page RecyclerView, so cells can stretch to fill its height (see onBind). */
+    private var recyclerView: RecyclerView? = null
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        this.recyclerView = recyclerView
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        this.recyclerView = null
+    }
 
     fun submit(newCells: List<HomeCell>) {
         cells = newCells
@@ -48,6 +61,16 @@ class HomeGridAdapter(
         val cell = cells[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+
+        // Stretch each cell so the `rows` rows fill the page height down to the
+        // dock (item_home_cell's fixed 84dp would leave dead space below the last
+        // row). Height is known during the layout pass; skip until then.
+        recyclerView?.height?.takeIf { it > 0 }?.let { h ->
+            val cellHeight = h / rows
+            if (holder.itemView.layoutParams.height != cellHeight) {
+                holder.itemView.updateLayoutParams { height = cellHeight }
+            }
+        }
 
         when (cell) {
             HomeCell.Empty -> {
