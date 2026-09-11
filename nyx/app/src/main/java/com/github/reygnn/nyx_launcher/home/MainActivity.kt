@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.DragEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.TextView
@@ -15,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -90,6 +92,15 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.home_content)) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(top = bars.top, bottom = bars.bottom)
+            insets
+        }
+
+        // The remove bar is a home_root overlay (not inside the inset content), so
+        // inset it below the status bar itself — otherwise its top half hides
+        // under the bar and the visible target feels smaller than it is.
+        ViewCompat.setOnApplyWindowInsetsListener(removeBar) { v, insets ->
+            val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
+            v.updateLayoutParams<ViewGroup.MarginLayoutParams> { topMargin = top }
             insets
         }
 

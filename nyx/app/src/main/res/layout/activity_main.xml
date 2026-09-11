@@ -13,21 +13,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Reserved remove zone: a fixed top band the grid never enters, so the
-             drop-to-delete target no longer overlaps the top grid row. INVISIBLE
-             at rest (reserves the space, no reflow on drag start), turned VISIBLE
-             + red while a drag is in progress (see MainActivity). -->
-        <TextView
-            android:id="@+id/remove_bar"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:gravity="center"
-            android:background="#CCB00020"
-            android:text="@string/remove_from_home"
-            android:textColor="@android:color/white"
-            android:textSize="16sp"
-            android:visibility="invisible" />
-
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/home_pager"
             android:layout_width="match_parent"
@@ -53,5 +38,23 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
+
+    <!-- Drop-to-delete target: a top overlay shown only during a drag. INVISIBLE
+         at rest (not GONE) so it stays laid out and receives drag events, but
+         being a FrameLayout overlay it reserves no space and never reflows the
+         grid. Status-bar-inset in code (MainActivity). The grid fills the full
+         height beneath it; with the bottom-anchored grid the bar mostly covers
+         the top dead space rather than a live row. -->
+    <TextView
+        android:id="@+id/remove_bar"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="top"
+        android:gravity="center"
+        android:background="#CCB00020"
+        android:text="@string/remove_from_home"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:visibility="invisible" />
 
 </com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>
