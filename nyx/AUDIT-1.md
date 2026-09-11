@@ -9,6 +9,18 @@ Vorgehen laut Maintainer: **High + Medium alle angehen; Low situativ.** Status j
 
 **Übersicht:** 2 High · 10 Medium · 5 Low  (17 gesamt)
 
+
+## Fix-Review (B1–B4)
+
+Adversarieller Multi-Agent-Review gegen die umgesetzten Fixes (Diff `main..chore/nyx-audit-1`,
+6 Agenten). 2 Funde, beide behoben:
+
+- **update() ohne Contract-Test** (zu A1-03): `HomeLayoutRepositoryContract` um drei `update()`-Fälle
+  erweitert (persist / null-kein-Write / transform-sieht-current) → läuft nun auf Fake **und** Impl. ✅
+- **refreshDrawer-Regression** (zu A1-04): eine transiente Enumeration → `emptyList` (via `ENUMERATION_EMPTY`)
+  hätte einen gefüllten Drawer beim Re-Open geleert; zusätzlich Race bei schnellem Re-Open. Fix:
+  vorherigen Refresh-Job canceln (neuester gewinnt) + gefüllte Liste nie durch leere überschreiben. ✅
+
 ---
 
 ## 🔴 HIGH

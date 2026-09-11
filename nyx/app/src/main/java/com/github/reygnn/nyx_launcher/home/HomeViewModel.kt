@@ -18,6 +18,7 @@ import com.github.reygnn.nyx_launcher.home.usecase.RemoveFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RenameFolderUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,8 @@ class HomeViewModel @Inject constructor(
     private val _drawerApps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val drawerApps: StateFlow<List<LauncherApp>> = _drawerApps.asStateFlow()
 
+    private var refreshJob: Job? = null
+
     init {
         refreshDrawer()
     }
@@ -61,9 +64,20 @@ class HomeViewModel @Inject constructor(
      * Re-query the drawer app list. Called at startup and on every drawer open
      * (MainActivity.showDrawer), so apps installed/removed while nyx was already
      * running show up — the list is otherwise loaded once and goes stale (A1-04).
+     *
+     * Cancels any in-flight refresh so the newest query wins (no stale clobber on
+     * rapid re-open), and never overwrites a populated list with an empty one:
+     * after A1-01 an empty result signals a failed enumeration, so a transient
+     * failure on re-open must not blank the drawer.
      */
     fun refreshDrawer() {
-        viewModelScope.launch { _drawerApps.value = getDrawerApps() }
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            val apps = getDrawerApps()
+            if (apps.isNotEmpty() || _drawerApps.value.isEmpty()) {
+                _drawerApps.value = apps
+            }
+        }
     }
 
     fun move(moving: ItemId, target: DropTarget) {

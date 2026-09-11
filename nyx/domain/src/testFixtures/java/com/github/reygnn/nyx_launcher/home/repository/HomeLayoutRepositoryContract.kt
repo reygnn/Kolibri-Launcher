@@ -48,6 +48,43 @@ abstract class HomeLayoutRepositoryContract {
         }
     }
 
+    @Test
+    fun update_persists_the_transformed_layout() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository(EMPTY)
+        repo.layout().test {
+            assertThat(awaitItem()).isEqualTo(EMPTY)
+            repo.update { WITH_APP }
+            assertThat(awaitItem()).isEqualTo(WITH_APP)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository(WITH_APP)
+        repo.layout().test {
+            assertThat(awaitItem()).isEqualTo(WITH_APP)
+            repo.update { null }
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun update_receives_the_current_layout() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository(WITH_APP)
+        var seen: HomeLayout? = null
+        repo.update { current ->
+            seen = current
+            current.copy(pages = current.pages + 1)
+        }
+        assertThat(seen).isEqualTo(WITH_APP)
+        repo.layout().test {
+            assertThat(awaitItem()).isEqualTo(WITH_APP.copy(pages = WITH_APP.pages + 1))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private companion object {
         private val GRID = GridSpec(columns = 4, rows = 6)
         val EMPTY = HomeLayout(GRID, pages = 1, items = emptyList(), dock = emptyList())
