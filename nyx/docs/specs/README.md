@@ -56,7 +56,8 @@ types and invariants. Read top-down:
 - [`HOME_DRAG_ENGINE_SPEC`](HOME_DRAG_ENGINE_SPEC.md) — **UI-/Android-Mechanismus** (nicht
   reine Domäne): eigene touch-getrackte Drag-Engine (Launcher3-Vorbild) als Ersatz für
   OS-Drag-&-Drop, damit die Remove-Zone bis zur Display-Oberkante droppbar wird
-  (`DRG-INV-*`). Domäne bleibt unverändert. Status ENTWURF v1 (kein Code).
+  (`DRG-INV-*`). Domäne bleibt unverändert. Status: **Phasen 1+2 umgesetzt** (Code in
+  `home/drag/`), Phase 3 (Kür) + JVM-Tests offen.
 
 ---
 

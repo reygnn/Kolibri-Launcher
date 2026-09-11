@@ -1,9 +1,10 @@
-# HOME_DRAG_ENGINE_SPEC (ENTWURF)
+# HOME_DRAG_ENGINE_SPEC
 
-Skizze einer eigenen, touch-getrackten Drag-Engine für den internen Home-Drag —
-als Ersatz für das Android-View-Drag-&-Drop (`View.startDragAndDrop`). Vorbild
-ist Launcher3 (`DragController` / `DragLayer` / `DragView`). **Status: Entwurf,
-nicht ratifiziert, nicht umgesetzt.**
+Eigene, touch-getrackte Drag-Engine für den internen Home-Drag — als Ersatz für
+das Android-View-Drag-&-Drop (`View.startDragAndDrop`). Vorbild ist Launcher3
+(`DragController` / `DragLayer` / `DragView`). **Status: Phasen 1+2 umgesetzt (§9),
+Phase 3 (Kür) offen.** Code: `home/drag/` (`DragLayer`, `DragController`,
+`DropZone`) + `MainActivity` (Zonen-Registrierung, `resolveGridCell`).
 
 ---
 
@@ -176,22 +177,28 @@ Alles Kür, nicht Teil des Kern-Umbaus.
 
 ## §9 Migration (phasenweise)
 
-- **Phase 1 — Engine einführen (parallel).** `DragLayer`/`DragController`/
-  `DragView` + `DropTarget`-Interface. RemoveZone, Dock und Grid als
-  `DropTarget`s registrieren. Icon-Long-press ruft `startDrag` (statt
-  `view.startDragAndDrop`).
-- **Phase 2 — OS-DnD entfernen.** `startDragAndDrop` und die
-  `home_root`/`dock`/`remove_bar`-`OnDragListener` löschen; die
-  `resolveGridCell`-Geometrie in ein `GridDropTarget` verschieben (dabei die
-  reine (x,y)→Zelle-Funktion extrahieren, damit JVM-testbar).
-- **Phase 3 — Kür.** Animationen, Spring-loaded, Edge-Autoscroll, optional
-  Statusbar-Ausblenden.
+- **Phase 1 — Engine einführen.** ✅ **umgesetzt.** `DragLayer` (ersetzt das
+  gemeinsame `GestureFrameLayout` als Home-Root und fährt `GestureDispatchCore`
+  weiter, solange kein Drag läuft) + `DragController` + Snapshot-`DragView`.
+  `DropZone`-Interface (so genannt, um vom Domänen-`DropTarget` unterscheidbar zu
+  bleiben); RemoveZone/Dock/Grid als `DropZone`s registriert. Icon-Long-press
+  ruft die Engine. **Anders als skizziert nicht „parallel", sondern gleich mit
+  Phase 2 kombiniert** — kein Bedarf für eine Übergangsphase mit beiden Systemen.
+- **Phase 2 — OS-DnD entfernen.** ✅ **umgesetzt (mit Phase 1).**
+  `startDragAndDrop` und die `home_root`/`dock`/`remove_bar`-`OnDragListener`
+  (plus `handleDockDrag`) sind raus. **Abweichung:** die `resolveGridCell`-
+  Geometrie wurde **nicht** in ein separates `GridDropTarget` extrahiert, sondern
+  bleibt (vorerst) in `MainActivity` und wird aus der inline registrierten
+  Grid-`DropZone` aufgerufen — die reine (x,y)→`CellPos`-Extraktion (für
+  JVM-Tests) steht noch aus.
+- **Phase 3 — Kür.** ⏳ **offen.** Lift-Scale beim Aufnehmen, Snap-/Zurück-Flug-
+  Animation, Spring-loaded, Edge-Autoscroll, optional Statusbar-Ausblenden.
 
-**Tests:**
+**Tests (noch offen — Phase 1/2 wurde on-device verifiziert, nicht unit-getestet):**
 - `DragController`-Zustandsmaschine (start → move → drop/cancel) — reine
   Zustands-Truth-Table, JVM.
-- `findDropTarget`-Priorität + Hit-Test — JVM (Rects als reine Daten).
-- (x,y)→`CellPos`-Geometrie — JVM (extrahiert aus `resolveGridCell`).
+- `findZone`-Priorität + Hit-Test — JVM (Rects als reine Daten).
+- (x,y)→`CellPos`-Geometrie — JVM (erst nach Extraktion aus `resolveGridCell`).
 - Instrumentiert nur, was echtes Touch/Fenster-Verhalten braucht (Drop an der
   Oberkante, Touch-Capture über der Statusbar) — value bar, nicht cost bar.
 
@@ -238,3 +245,12 @@ Alles Kür, nicht Teil des Kern-Umbaus.
   `resolveGridCell` / `setupRemoveBar` / `handleDockDrag`, die
   `home_root`/`dock`/`remove_bar`-`OnDragListener`, `HomePagerAdapter`,
   `DockAdapter`, `AppDrawerFragment` (Drawer-Drag).
+- **v2 (umgesetzt: Phasen 1+2)** — Engine live: `DragLayer` (ersetzt
+  `GestureFrameLayout` als Home-Root), `DragController`, `DropZone` (Remove >
+  Dock > Grid). OS-DnD komplett entfernt. On-device (A17) verifiziert:
+  Remove-Zone bis zur Oberkante droppbar (DRG-INV-1 bestätigt), Grid/Dock/
+  Drawer-Drops, Ordner, Gesten-Koexistenz. Zwei Fixes nach erstem Test: Drag-View
+  mit bekannter Quell-Größe zentrieren (sonst Ecke am Finger); Drag-View bis zum
+  Commit-Re-Render halten (sonst Zurückspringen zur alten Zelle beim asynchronen
+  Move). Offen: Phase 3 (Kür) und die JVM-Tests (§9) — Phase 1/2 sind
+  UI/Touch-lastig und wurden bewusst on-device statt unit-getestet.
