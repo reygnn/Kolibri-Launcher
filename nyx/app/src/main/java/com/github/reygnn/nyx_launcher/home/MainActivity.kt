@@ -6,12 +6,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.DragEvent
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -22,7 +26,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
-import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerAdapter
+import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
 import com.github.reygnn.launcher.core.ComponentKey
@@ -38,15 +42,20 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * The launcher home: a [ViewPager2] of grid pages, a persistent dock, and a
- * drawer panel that overlays the home (swipe up from the dock, or long-press the
- * home). Tapping launches/opens; long-pressing drags. A drag started in the grid/
- * dock carries the item's id (→ move); one started in the drawer carries a
- * [DragPayload.NewApp] (→ place at the drop cell). Dropping on the remove bar
- * removes; dropping a drawer app there is ignored.
+ * The launcher home: a [ViewPager2] of grid pages, a persistent dock, and an
+ * app-drawer overlay ([AppDrawerFragment]) revealed by swipe-up (long-press on
+ * empty home space opens Settings). Tapping launches/opens; long-pressing an
+ * icon drags. A drag started in the grid/dock carries the item's id (→ move);
+ * one started in the drawer carries a [DragPayload.NewApp] (→ place at the drop
+ * cell). Dropping on the remove bar removes; dropping a drawer app there is
+ * ignored.
+ *
+ * Implements [AppDrawerFragment.Host]: the drawer fragment is self-contained but
+ * routes launch, drag and show/hide back here, since those touch intents, drag
+ * payloads and the overlay container that lives in this activity's layout.
  */
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private val viewModel: HomeViewModel by viewModels()
 
@@ -56,12 +65,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var homeRoot: GestureFrameLayout
     private lateinit var pager: ViewPager2
     private lateinit var dock: RecyclerView
-    private lateinit var drawerContainer: GestureFrameLayout
-    private lateinit var drawerPanel: RecyclerView
+    private lateinit var drawerContainer: View
     private lateinit var removeBar: TextView
     private var pagerAdapter: HomePagerAdapter? = null
     private lateinit var dockAdapter: DockAdapter
-    private lateinit var drawerAdapter: AppDrawerAdapter
 
     private var gridIconPx = 0
     private var dockSize = 0
@@ -74,12 +81,19 @@ class MainActivity : AppCompatActivity() {
         pager = findViewById(R.id.home_pager)
         dock = findViewById(R.id.dock)
         drawerContainer = findViewById(R.id.drawer_container)
-        drawerPanel = findViewById(R.id.drawer_panel)
         removeBar = findViewById(R.id.remove_bar)
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
+        // Edge-to-edge: inset the home content past the status/nav bars. The
+        // drawer overlay stays edge-to-edge and covers the bars with its own
+        // dark scrim, so no wallpaper shows through top/bottom while it's open.
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.home_content)) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updatePadding(top = bars.top, bottom = bars.bottom)
+            insets
+        }
+
         setupDock()
-        setupDrawerPanel()
         setupRemoveBar()
         setupGestures()
         onBackPressedDispatcher.addCallback(this) { if (drawerContainer.isVisible) hideDrawer() }
@@ -87,7 +101,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.layout.collect(::renderLayout) }
-                launch { viewModel.drawerApps.collect(drawerAdapter::submit) }
                 launch { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
             }
         }
@@ -108,23 +121,6 @@ class MainActivity : AppCompatActivity() {
         // makes the shared core's hit-test suppress homeRoot.onLongPress over the
         // dock. Empty-dock long-press → Settings is handled by homeRoot.onLongPress;
         // dock icons keep their own long-press (drag) via DockAdapter.
-    }
-
-    private fun setupDrawerPanel() {
-        drawerAdapter = AppDrawerAdapter(
-            iconLoader = iconLoader,
-            scope = lifecycleScope,
-            iconSizePx = gridIconPx,
-            onClick = { app -> launchApp(app.key); hideDrawer() },
-            onAddToHome = { }, // panel uses drag, not add-to-first-free-cell
-            onItemLongPress = { view, app ->
-                startDrag(view, DragPayload.NewApp(app.key))
-                hideDrawer()
-            },
-            itemLayout = R.layout.item_app_grid,
-        )
-        drawerPanel.layoutManager = GridLayoutManager(this, drawerColumns())
-        drawerPanel.adapter = drawerAdapter
     }
 
     private fun setupRemoveBar() {
@@ -159,12 +155,8 @@ class MainActivity : AppCompatActivity() {
         // empty area.
         homeRoot.onLongPress = { openSettings() }
 
-        // A decisive swipe-down anywhere on the drawer dismisses it, surviving
-        // an in-progress list scroll (ACTION_CANCEL is dispatched to the
-        // RecyclerView on trigger). No top exclusion band on the drawer — the
-        // downward swipe is intentional at any y.
-        drawerContainer.topExclusionPx = 0f
-        drawerContainer.onSwipeDown = { hideDrawer() }
+        // The drawer's own swipe-down dismiss lives in AppDrawerFragment (its
+        // root is a GestureFrameLayout), so it isn't wired here.
     }
 
     // ---- rendering ----
@@ -191,20 +183,45 @@ class MainActivity : AppCompatActivity() {
         dockAdapter.submit(layout.dockCells())
     }
 
-    // ---- drawer panel ----
+    // ---- drawer overlay (AppDrawerFragment.Host) ----
 
     private fun showDrawer() {
         if (drawerContainer.isVisible) return
-        drawerContainer.alpha = 0f
+        // Slide up from below, over the home (which stays put) — matching
+        // Kolibri's drawer transition (translateY 100%→0, 180ms, accel-decel).
+        drawerContainer.translationY = drawerSlideDistance()
         drawerContainer.isVisible = true
-        drawerContainer.animate().alpha(1f).setDuration(160).start()
+        drawerContainer.animate()
+            .translationY(0f)
+            .setDuration(DRAWER_SLIDE_MS)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .start()
     }
 
-    private fun hideDrawer() {
+    override fun hideDrawer() {
         if (!drawerContainer.isVisible) return
-        drawerContainer.animate().alpha(0f).setDuration(140).withEndAction {
-            drawerContainer.isVisible = false
-        }.start()
+        drawerContainer.animate()
+            .translationY(drawerSlideDistance())
+            .setDuration(DRAWER_SLIDE_MS)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                drawerContainer.isVisible = false
+                drawerContainer.translationY = 0f
+            }
+            .start()
+    }
+
+    /** Full off-screen travel for the slide; the overlay is full-height. */
+    private fun drawerSlideDistance(): Float = resources.displayMetrics.heightPixels.toFloat()
+
+    override fun launchFromDrawer(key: ComponentKey) {
+        launchApp(key)
+        hideDrawer()
+    }
+
+    override fun startDrawerDrag(view: View, key: ComponentKey) {
+        startDrag(view, DragPayload.NewApp(key))
+        hideDrawer()
     }
 
     // ---- drag ----
@@ -269,11 +286,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun currentColumns(): Int = viewModel.layout.value?.grid?.columns ?: 1
 
-    private fun drawerColumns(): Int {
-        val dp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
-        return (dp / 90f).toInt().coerceIn(3, 6)
-    }
-
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
@@ -290,3 +302,6 @@ class MainActivity : AppCompatActivity() {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
+private const val DRAWER_SLIDE_MS = 180L

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-drawer fragment root. The root is the shared GestureFrameLayout so the
+  drawer owns its own dismiss gesture (a decisive swipe-down → Host.hideDrawer),
+  independent of the home surface — mirroring Kolibri's SwipeDownDismissLayout as
+  the fragment root. clickable/focusable + opaque background so touches don't
+  fall through to the home beneath while the overlay is shown.
+-->
+<com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/app_drawer_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F20B0B12"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/drawer_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false" />
+        <!-- top/bottom padding = system-bar insets + base, applied in code -->
+
+</com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>

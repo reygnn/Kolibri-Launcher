@@ -3,10 +3,12 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/home_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:layout_height="match_parent">
 
+    <!-- Home content is inset from the system bars in code (system-bar padding),
+         so the drawer overlay below can fill edge-to-edge behind the bars. -->
     <LinearLayout
+        android:id="@+id/home_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -27,27 +29,15 @@
 
     </LinearLayout>
 
-    <!-- Drawer: overlays the home, revealed by swipe-up / long-press.
-         A decisive swipe-down anywhere on the panel dismisses it (handled
-         by the GestureFrameLayout container, robust mid-scroll). -->
-    <com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+    <!-- Drawer overlay, revealed by swipe-up / long-press and toggled by
+         visibility (no re-inflate per open). Hosts AppDrawerFragment, whose own
+         root is a GestureFrameLayout owning the swipe-down dismiss. -->
+    <androidx.fragment.app.FragmentContainerView
         android:id="@+id/drawer_container"
+        android:name="com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#F20B0B12"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="gone">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/drawer_panel"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingTop="32dp"
-            android:paddingBottom="32dp" />
-
-    </com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>
+        android:visibility="gone" />
 
     <!-- Shown only during a drag; drop an existing icon here to remove it. -->
     <TextView
