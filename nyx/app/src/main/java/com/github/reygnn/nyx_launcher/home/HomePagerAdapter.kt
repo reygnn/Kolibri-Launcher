@@ -1,6 +1,5 @@
 package com.github.reygnn.nyx_launcher.home
 
-import android.view.DragEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
@@ -26,7 +25,6 @@ class HomePagerAdapter(
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onStartDrag: (View, ItemId) -> Unit,
-    private val onDropOnPage: (page: Int, cellIndex: Int, payload: DragPayload) -> Unit,
 ) : RecyclerView.Adapter<HomePagerAdapter.PageHolder>() {
 
     private var pages: List<List<HomeCell>> = emptyList()
@@ -54,20 +52,9 @@ class HomePagerAdapter(
 
     override fun onBindViewHolder(holder: PageHolder, position: Int) {
         holder.gridAdapter.submit(pages[position])
-
-        holder.recycler.setOnDragListener { _, event ->
-            if (event.action == DragEvent.ACTION_DROP) {
-                val payload = event.localState as? DragPayload
-                val child = holder.recycler.findChildViewUnder(event.x, event.y)
-                val index = child?.let(holder.recycler::getChildAdapterPosition) ?: RecyclerView.NO_POSITION
-                if (payload != null && index != RecyclerView.NO_POSITION) {
-                    onDropOnPage(position, index, payload)
-                }
-                true
-            } else {
-                true
-            }
-        }
+        // No per-page drag listener: grid drops are handled centrally by the home
+        // root (see MainActivity.setupRemoveBar / resolveGridCell), which reliably
+        // receives the drop and maps it to a cell by geometry.
     }
 
     class PageHolder(
