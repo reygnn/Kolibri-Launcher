@@ -98,6 +98,7 @@ configurations.configureEach {
 dependencies {
     implementation(project(":nyx:domain"))
     implementation(project(":nyx:data"))
+    implementation(project(":common-ui"))
     implementation(project(":feature-crashreporting"))
 
     implementation(libs.material)

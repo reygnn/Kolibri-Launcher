@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.util
+package com.github.reygnn.launcher.common.ui.gesture
 
 import kotlin.math.abs
 
@@ -13,17 +13,11 @@ import kotlin.math.abs
  * 2. Minimum distance (pixels)
  * 3. Minimum velocity
  *
- * Thresholds and dominance factor are passed as constructor parameters
- * so multiple call sites can share the algorithm with their own
- * calibration. Two consumers in production:
- *
- *  - [com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout]
- *  - [com.github.reygnn.kolibri_launcher.ui.appdrawer.SwipeDownDismissLayout]
- *
- * Both feed raw deltas-derived velocities (px/ms) from `MotionEvent`
- * and read the same calibration from
- * [com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds]
- * (`scaledTouchSlop * 4`, `1.2f` px/ms, `1.5f` dominance).
+ * Thresholds and dominance factor are constructor parameters so multiple
+ * call sites can share the algorithm with their own calibration; the sole
+ * production consumer is [GestureDispatchCore], which reads its calibration
+ * from [GestureThresholds] (`scaledTouchSlop * 4`, `1.2f` px/ms, `1.5f`
+ * dominance).
  *
  * The analyzer is unit-agnostic: the caller's units must be consistent
  * between input velocities and the `velocityThreshold` parameter.

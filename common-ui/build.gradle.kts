@@ -1,7 +1,9 @@
 // :common-ui — shared, product-neutral Android UI utilities (MONOREPO_MERGE_SPEC
 // §4.1, Phase 2). Android-library consumed by both apps. Starts as the minimal
 // set the :feature-crashreporting extraction needs (ToastSafe, LaunchTrace); the
-// rest of ui.base / ui.util migrates here as further features are shared.
+// rest of ui.base / ui.util migrates here as further features are shared. The
+// shared dispatchTouchEvent gesture stack (GestureDispatchCore + analyzer +
+// GestureFrameLayout) lives in the `gesture` package, consumed by both apps.
 plugins {
     alias(libs.plugins.android.library)
 }
@@ -27,4 +29,6 @@ android {
 dependencies {
     api(project(":core"))
     implementation(libs.androidx.fragment.ktx)
+
+    testImplementation(libs.junit)
 }

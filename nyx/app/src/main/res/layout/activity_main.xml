@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/home_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -26,18 +27,27 @@
 
     </LinearLayout>
 
-    <!-- Drawer panel: overlays the home, revealed by swipe-up / long-press. -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/drawer_panel"
+    <!-- Drawer: overlays the home, revealed by swipe-up / long-press.
+         A decisive swipe-down anywhere on the panel dismisses it (handled
+         by the GestureFrameLayout container, robust mid-scroll). -->
+    <com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+        android:id="@+id/drawer_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#F20B0B12"
         android:clickable="true"
         android:focusable="true"
-        android:clipToPadding="false"
-        android:paddingTop="32dp"
-        android:paddingBottom="32dp"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/drawer_panel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="32dp"
+            android:paddingBottom="32dp" />
+
+    </com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>
 
     <!-- Shown only during a drag; drop an existing icon here to remove it. -->
     <TextView
@@ -52,4 +62,4 @@
         android:textSize="16sp"
         android:visibility="gone" />
 
-</FrameLayout>
+</com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>

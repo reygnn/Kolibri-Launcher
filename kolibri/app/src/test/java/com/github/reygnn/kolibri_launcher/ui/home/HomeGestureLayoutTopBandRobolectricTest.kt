@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 /**
  * Robolectric coverage for the top notification-shade exclusion band in
  * [HomeGestureLayout]: a swipe-DOWN whose ACTION_DOWN lands inside the top band
- * ([com.github.reygnn.kolibri_launcher.ui.util.GestureThresholds.TOP_NOTIFICATION_EXCLUSION_DP])
+ * ([com.github.reygnn.launcher.common.ui.gesture.GestureThresholds.TOP_NOTIFICATION_EXCLUSION_DP])
  * is ceded to the system so the recent-apps gesture no longer collides with the
  * user's notification pull-down; every other direction stays live everywhere.
  *

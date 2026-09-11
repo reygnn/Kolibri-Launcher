@@ -13,8 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 
 /**
  * ViewPager2 adapter: one grid page per item. Each page is its own RecyclerView +
- * [HomeGridAdapter]. A drop on a page reports (page, cellIndex, id); a long-press
- * on empty page area opens the drawer.
+ * [HomeGridAdapter]. A drop on a page reports (page, cellIndex, id). Empty-area
+ * long-press is handled by the shared home gesture layer (see MainActivity), not
+ * here — app icons keep their own long-press for drag.
  */
 class HomePagerAdapter(
     private val iconLoader: IconLoader,
@@ -25,7 +26,6 @@ class HomePagerAdapter(
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onStartDrag: (View, ItemId) -> Unit,
-    private val onOpenDrawer: () -> Unit,
     private val onDropOnPage: (page: Int, cellIndex: Int, payload: DragPayload) -> Unit,
 ) : RecyclerView.Adapter<HomePagerAdapter.PageHolder>() {
 
@@ -55,10 +55,6 @@ class HomePagerAdapter(
     override fun onBindViewHolder(holder: PageHolder, position: Int) {
         holder.gridAdapter.submit(pages[position])
 
-        holder.recycler.setOnLongClickListener {
-            onOpenDrawer()
-            true
-        }
         holder.recycler.setOnDragListener { _, event ->
             if (event.action == DragEvent.ACTION_DROP) {
                 val payload = event.localState as? DragPayload

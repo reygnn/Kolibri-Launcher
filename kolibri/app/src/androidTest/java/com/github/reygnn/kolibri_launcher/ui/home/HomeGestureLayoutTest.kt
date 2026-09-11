@@ -45,7 +45,7 @@ import org.junit.Test
  * configured swipe-app launch) that are not structurally observable
  * from inside the app's view tree without polluting the production
  * API with a test-only callback hook. Direction-discrimination of the
- * underlying [com.github.reygnn.kolibri_launcher.ui.util.SwipeGestureAnalyzer]
+ * underlying [com.github.reygnn.launcher.common.ui.gesture.SwipeGestureAnalyzer]
  * is JVM-tested in `SwipeGestureAnalyzerTest`; what only the real touch pipeline can
  * prove is that fast swipes trigger and slow drags don't, which one
  * direction demonstrates structurally. Real-device validation
