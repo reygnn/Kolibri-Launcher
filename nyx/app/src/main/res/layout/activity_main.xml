@@ -42,9 +42,11 @@
     <!-- Drop-to-delete target: a top overlay shown only during a drag. INVISIBLE
          at rest (not GONE) so it stays laid out and receives drag events, but
          being a FrameLayout overlay it reserves no space and never reflows the
-         grid. Status-bar-inset in code (MainActivity). The grid fills the full
-         height beneath it; with the bottom-anchored grid the bar mostly covers
-         the top dead space rather than a live row. -->
+         grid. Sits at the display's top edge; its height and top padding are set
+         in code (MainActivity) so the red fill covers the status-bar region while
+         the label stays below the status icons. The grid fills the height beneath
+         it; with the bottom-anchored grid the bar covers mostly the top dead space
+         rather than a live row. The 64dp here is just a pre-inset fallback. -->
     <TextView
         android:id="@+id/remove_bar"
         android:layout_width="match_parent"

@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.DragEvent
 import android.view.View
-import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.TextView
@@ -98,12 +97,17 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             insets
         }
 
-        // The remove bar is a home_root overlay (not inside the inset content), so
-        // inset it below the status bar itself — otherwise its top half hides
-        // under the bar and the visible target feels smaller than it is.
+        // The remove bar reaches the very top edge and its red fill covers the
+        // status-bar region while a drag is active: it sits at y=0 (a home_root
+        // overlay), grows to `status-bar inset + content`, and pads its text down
+        // by the inset so the label stays clear of the status icons (which the
+        // system still draws on top). Insetting via height+padding rather than a
+        // top margin is what lets the fill run under the bar.
         ViewCompat.setOnApplyWindowInsetsListener(removeBar) { v, insets ->
             val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
-            v.updateLayoutParams<ViewGroup.MarginLayoutParams> { topMargin = top }
+            val content = (REMOVE_BAR_CONTENT_DP * resources.displayMetrics.density).toInt()
+            v.updateLayoutParams { height = top + content }
+            v.updatePadding(top = top)
             insets
         }
 
@@ -389,6 +393,9 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
 
 /** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
 private const val DRAWER_SLIDE_MS = 180L
+
+/** Visible content height (below the status-bar inset) of the remove bar, in dp. */
+private const val REMOVE_BAR_CONTENT_DP = 64f
 
 /** Remove-bar background at rest — matches @id/remove_bar's XML background. */
 private const val REMOVE_BAR_IDLE_COLOR = 0xCCB00020.toInt()
