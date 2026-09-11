@@ -80,7 +80,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-05 · AppDrawerAdapter.kt:26 — AppDrawerAdapter carries onAddToHome + itemLayout params/branches its only call site never exercises
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** dead-code · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** dead-code · **Status:** ✅ erledigt (bereits mit B4/A1-08: `onAddToHome`+`itemLayout` entfernt, `onItemLongPress` verpflichtend, `item_app_grid` hart, `item_app_row.xml` gelöscht)
 - **Datei:** `nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drawer/AppDrawerAdapter.kt:26`
 - **Detail:** onAddToHome (line 26) is never invoked; the fallback at line 52 is unreachable because onItemLongPress is always non-null. itemLayout default (line 28) is unused and item_app_row.xml is otherwise unreferenced (dead resource).
 - **Fix-Vorschlag:** Make onItemLongPress a required (view, app)->Unit, drop onAddToHome and the else fallback, pass item_app_grid directly, delete item_app_row.xml.
@@ -136,7 +136,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-12 · FitHomeGridUseCase.kt:30 — FitHomeGridUseCase untested despite read-once/save-only-on-change logic run every layout pass.
 
-- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ⬜ offen
+- **Schwere:** MEDIUM · **Verdikt:** CONFIRMED · **Kategorie:** test-coverage · **Status:** ✅ erledigt (B6)
 - **Datei:** `nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/usecase/FitHomeGridUseCase.kt:30`
 - **Detail:** Confirmed: grep in test/testFixtures returns nothing. invoke (lines 27-33) reads layout().first(), delegates to HomeLayoutRegridder.fit, and saves only on RegridOutcome.Changed (no-op on Unchanged). Per its KDoc it runs on every MainActivity layout, so dropping the Unchanged branch would cause a persist storm on every layout/orientation event. HomeLayoutRegridder itself is tested but the use case's save-gating is not. FakeHomeLayoutRepository exposes saveCount (verified) and MoveItemUseCaseTest already has a noop_does_not_save asserting saveCount==0 — the exact pattern to mirror. Pure JVM testable.
 - **Fix-Vorschlag:** Add FitHomeGridUseCaseTest: (a) already-matching grid -> saveCount==0, (b) differing grid -> saves the regridded layout exactly once.
