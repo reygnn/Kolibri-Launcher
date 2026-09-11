@@ -53,6 +53,10 @@ types and invariants. Read top-down:
 - [`HOME_EDIT_USECASES_SPEC`](HOME_EDIT_USECASES_SPEC.md) — die drei kleinen Use-Cases
   (Place / Remove / RenameFolder) gebündelt; einzig `PlaceItem` trägt neue Logik
   (`HEU-INV-1`, Unizitäts-Delegation). Status ENTWURF v1.
+- [`HOME_DRAG_ENGINE_SPEC`](HOME_DRAG_ENGINE_SPEC.md) — **UI-/Android-Mechanismus** (nicht
+  reine Domäne): eigene touch-getrackte Drag-Engine (Launcher3-Vorbild) als Ersatz für
+  OS-Drag-&-Drop, damit die Remove-Zone bis zur Display-Oberkante droppbar wird
+  (`DRG-INV-*`). Domäne bleibt unverändert. Status ENTWURF v1 (kein Code).
 
 ---
 
@@ -68,6 +72,7 @@ Die Specs verweisen quer über Invarianten-IDs. Präfix → Heimat-Spec:
 | `RHL-INV-*` | Reconcile (fail-closed, Idempotenz, Dedup-Präzedenz) | `RECONCILE_HOME_LAYOUT_SPEC` |
 | `ICL-INV-*` | Icon-Loader (Byte-Budget, Kohärenz, Coalescing) | `ICON_LOADER_SPEC` |
 | `HEU-INV-*` | Home-Edit (Place-Unizität, Remove-ohne-Verlust) | `HOME_EDIT_USECASES_SPEC` |
+| `DRG-INV-*` | Drag-Engine (Touch-Capture, Hit-Test-Priorität, Verlustfreiheit) | `HOME_DRAG_ENGINE_SPEC` |
 
 Geerbt aus dem großen Kolibri und hier nur referenziert (nicht neu definiert): die
 `R-INV`-Familie (`RECONCILE_SPEC`, fail-closed Reconcile) und das `AppLoadResult`-

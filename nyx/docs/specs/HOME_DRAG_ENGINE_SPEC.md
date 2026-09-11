@@ -1,0 +1,240 @@
+# HOME_DRAG_ENGINE_SPEC (ENTWURF)
+
+Skizze einer eigenen, touch-getrackten Drag-Engine für den internen Home-Drag —
+als Ersatz für das Android-View-Drag-&-Drop (`View.startDragAndDrop`). Vorbild
+ist Launcher3 (`DragController` / `DragLayer` / `DragView`). **Status: Entwurf,
+nicht ratifiziert, nicht umgesetzt.**
+
+---
+
+## §0 Motivation
+
+Der heutige Drag nutzt das OS-Drag-&-Drop: `view.startDragAndDrop(...)`, plus
+`OnDragListener` auf `home_root` (Grid-Catch-all), `dock` und `remove_bar`. Das
+**OS** führt die Geste und liefert `ACTION_DRAG_LOCATION`/`ACTION_DROP` an das
+**Fenster unter dem Finger**. Daraus folgen die bekannten Grenzen:
+
+- **Statusbar-Fenster klaut die obere Zone.** Die Statusbar ist ein eigenes
+  System-Fenster über der App. Sobald der Finger dort hineinkommt, bekommt die
+  App `ACTION_DRAG_EXITED`, und ein Drop landet nicht in der App. Die
+  Remove-Zone ist deshalb **nicht bis zur Display-Oberkante droppbar** (siehe
+  auch die Edge-to-Edge-Optik: rot bis oben, aber interaktiv nur unter der
+  Statusbar).
+- **Kein Zugriff auf die rohen Move-Koordinaten** über System-/Fremdflächen →
+  keine eigenen Cues (Spring-loaded-Scale, Edge-Autoscroll zwischen Seiten,
+  eigene Lift-/Snap-Animationen).
+- **Drop-Ziel = View-Z-Order + verstreute Listener** statt einer klaren,
+  priorisierten Liste (heute: `home_root`-Catch-all + Geometrie in
+  `resolveGridCell`, dazu Sonder-Listener für Dock und Remove-Bar).
+
+Ziel: eine Engine, die die Geste **nie ans System abgibt**, alle Move/Up-Events
+selbst erhält und Drop-Ziele über **Rechteck-Hit-Test gegen eine priorisierte
+Liste** auflöst — damit ist jeder Punkt droppbar, inkl. der oberen Kante.
+
+---
+
+## §1 Scope
+
+**Im Scope** — der interne Drag:
+- Grid-Icon verschieben (`DragPayload.Existing`).
+- Dock-Icon verschieben.
+- Drawer-App auf die Home legen (`DragPayload.NewApp`).
+- Löschen über die Remove-Zone.
+
+**Nicht im Scope:**
+- Cross-App-Drag (echtes System-DnD zwischen Apps) — bleibt beim OS-Mechanismus,
+  falls je gebraucht.
+- Widgets.
+- **Die Domäne bleibt unangetastet:** `DropTarget`, `HomeLayoutTransition`,
+  `MoveItemUseCase`/`PlaceItemUseCase`/`RemoveItemUseCase`,
+  `HomeLayoutRegridder`. Die Engine liefert am Ende nur `(payload, target)` und
+  ruft dieselben ViewModel-Methoden wie heute. Nur der **UI-Drag-Mechanismus**
+  und die **Drop-Ziel-Auflösung** werden ersetzt.
+
+---
+
+## §2 Komponenten
+
+- **`DragLayer`** — bildschirmfüllende ViewGroup, die die Geste besitzt und die
+  `DragView` zeichnet. Kandidat: `home_root` (bereits `GestureFrameLayout`,
+  bildschirmfüllend) übernimmt die Rolle, oder ein dedizierter Layer *über*
+  allem (auch über Dock und — bei Bedarf — hinter der ausgeblendeten Statusbar).
+- **`DragController`** — Zustandsmaschine: `startDrag(payload, source, touch)`,
+  `onMove(x, y)`, `drop(x, y)`, `cancel()`. Hält die registrierte, geordnete
+  Liste der `DropTarget`s. Kein Android-Framework-DnD.
+- **`DragView`** — das mitgezogene Icon (Bitmap/Shadow des Quell-Views), folgt
+  dem Finger via `translationX/Y`; Lift-Scale/Elevation beim Start.
+- **`DropTarget`** (Interface):
+  - `hitRect(): Rect` — in `DragLayer`-Koordinaten.
+  - `acceptDrop(payload): Boolean`.
+  - `onDragEnter()/onDragExit()` — Highlight.
+  - `onDrop(payload, x, y)`.
+- **`DragSource`** — liefert beim Start das `DragPayload` und den Quell-View
+  (für Shadow + Rück-Animation bei Cancel).
+
+Wiederverwendet: `DragPayload` (`Existing`/`NewApp`), `DropTarget.Cell`/
+`.DockSlot`, die Zell-Geometrie aus `resolveGridCell`.
+
+---
+
+## §3 Touch-Flow
+
+1. **Long-press** auf einem Icon (Grid/Dock/Drawer) ruft `DragController.startDrag`.
+   Der `DragLayer` übernimmt ab hier den Touch
+   (`onInterceptTouchEvent → true`), die `DragView` erscheint unter dem Finger.
+2. Weil der Touch beim `ACTION_DOWN`/Long-press bereits im **App-Fenster**
+   gefangen ist (Touch-Capture), erhält die App **alle** folgenden `MOVE` bis
+   `UP` — auch über Statusbar/Navigationsleiste. **DRG-INV-1.**
+3. `onMove(x, y)`: `DragView` folgt; `findDropTarget(x, y)` bestimmt das Ziel,
+   `onDragEnter/Exit` schalten die Highlights (z. B. Remove-Zone rot-aktiv).
+4. `ACTION_UP` → `drop(x, y)`: getroffenes Ziel `onDrop`, sonst `cancel()` →
+   `DragView` animiert zur Quelle zurück (**DRG-INV-3**, kein Verlust).
+
+---
+
+## §4 Drop-Ziel-Auflösung
+
+`findDropTarget(x, y)` iteriert die Ziele in **Prioritätsreihenfolge** und nimmt
+das erste mit `hitRect.contains(x, y) && acceptDrop(payload)`. **DRG-INV-2** —
+entscheidet der Hit-Test, nicht die View-Z-Order.
+
+Reihenfolge (oben gewinnt):
+1. **RemoveZone** — `hitRect` reicht bis `y = 0` (Oberkante). `acceptDrop` nur
+   für `DragPayload.Existing`.
+2. **Dock** — `hitRect` = Dock-Bereich; Slot aus x-Position (wie heute
+   `handleDockDrag`).
+3. **Grid (aktuelle Seite)** — Rest der Fläche; Zelle aus (x, y) per Geometrie
+   (die heutige `resolveGridCell`-Rechnung als `GridDropTarget`).
+
+Kein Treffer → `cancel()`.
+
+---
+
+## §5 Remove-Zone bis zur Oberkante (der eigentliche Auslöser)
+
+Da die Geste nie ans System geht (**DRG-INV-1**), gehört der obere Bereich —
+auch hinter der Statusbar — zum `DragLayer`. Damit reicht das `hitRect` der
+RemoveZone bis `y = 0`; ein Drop dort löscht zuverlässig, das Highlight bleibt
+bis zur Kante aktiv. Die heutige Beobachtung „Zone endet gefühlt unter der
+Notification-Bar / Icon fällt oben ins Grid zurück" entfällt.
+
+Optik (orthogonal): rot bis oben wie gehabt. Ob die **System-Icons** während des
+Drags ausgeblendet werden (Immersive), ist eine reine Darstellungsfrage und für
+die Funktion **nicht** mehr nötig — der Hit-Test funktioniert unabhängig davon.
+
+---
+
+## §6 Integration mit der Domäne
+
+Beim Drop mappt die Engine `target` auf die bestehenden ViewModel-Aufrufe —
+identisch zu heute:
+
+| Target        | Payload `Existing(id)` | Payload `NewApp(key)` |
+|---------------|------------------------|-----------------------|
+| `Cell`        | `viewModel.move(id, Cell)`   | `viewModel.place(key, Cell)`   |
+| `DockSlot`    | `viewModel.move(id, DockSlot)` | `viewModel.place(key, DockSlot)` |
+| `RemoveZone`  | `viewModel.remove(id)` | (kein `acceptDrop`)   |
+
+`HomeLayoutTransition` + Use Cases bleiben unverändert (**DRG-INV-4**). Die
+reine Move/Place-Logik (Ordner anlegen/hinzufügen/ablehnen) ist weiterhin die
+Wahrheit.
+
+---
+
+## §7 Koexistenz mit der Gesten-Schicht
+
+`GestureFrameLayout`/`GestureDispatchCore` (Swipe-up → Drawer, Long-press auf
+leer → Settings) muss mit dem Drag koexistieren:
+
+- **Long-press auf ein Icon** → `DragController.startDrag` (nicht Settings). Die
+  Icons sind `isLongClickable`; der Gesten-Core unterdrückt seinen eigenen
+  Long-press über solchen Kindern schon heute (Hit-Test in
+  `hasOwnTouchPipelineDescendantAt`).
+- **Long-press auf leere Fläche** → Settings (Gesten-Schicht).
+- **Swipe-up** → Drawer (Gesten-Schicht), solange kein Drag läuft.
+
+Offen: die genaue Touch-Ownership-Übergabe — der `DragLayer` fängt erst **nach**
+dem Long-press-Trigger; bis dahin läuft der Touch durch `GestureDispatchCore`.
+Sauber zu definieren, damit sich Drag-Start und Swipe/Long-press nicht in die
+Quere kommen (Kandidat: der Long-press-Callback des Icons startet den Drag und
+setzt `DragLayer` in den „fangenden" Zustand).
+
+---
+
+## §8 Optional: Animationen / Spring-loaded
+
+Erst mit eigener Engine möglich, weil die App die Frames kontrolliert:
+- **Lift** der `DragView` beim Start (Scale/Elevation).
+- **Snap** zur Zielzelle beim Drop, **Rück-Animation** bei Cancel.
+- **Spring-loaded**: Grid beim Drag leicht herunterskalieren (~0.96) als
+  „Arrange"-Cue (Launcher3).
+- **Edge-Autoscroll**: Drag an den linken/rechten Pager-Rand blättert die Seite.
+
+Alles Kür, nicht Teil des Kern-Umbaus.
+
+---
+
+## §9 Migration (phasenweise)
+
+- **Phase 1 — Engine einführen (parallel).** `DragLayer`/`DragController`/
+  `DragView` + `DropTarget`-Interface. RemoveZone, Dock und Grid als
+  `DropTarget`s registrieren. Icon-Long-press ruft `startDrag` (statt
+  `view.startDragAndDrop`).
+- **Phase 2 — OS-DnD entfernen.** `startDragAndDrop` und die
+  `home_root`/`dock`/`remove_bar`-`OnDragListener` löschen; die
+  `resolveGridCell`-Geometrie in ein `GridDropTarget` verschieben (dabei die
+  reine (x,y)→Zelle-Funktion extrahieren, damit JVM-testbar).
+- **Phase 3 — Kür.** Animationen, Spring-loaded, Edge-Autoscroll, optional
+  Statusbar-Ausblenden.
+
+**Tests:**
+- `DragController`-Zustandsmaschine (start → move → drop/cancel) — reine
+  Zustands-Truth-Table, JVM.
+- `findDropTarget`-Priorität + Hit-Test — JVM (Rects als reine Daten).
+- (x,y)→`CellPos`-Geometrie — JVM (extrahiert aus `resolveGridCell`).
+- Instrumentiert nur, was echtes Touch/Fenster-Verhalten braucht (Drop an der
+  Oberkante, Touch-Capture über der Statusbar) — value bar, nicht cost bar.
+
+---
+
+## §10 Invarianten (Entwurf)
+
+- **DRG-INV-1** — Die Drag-Geste wird nach dem Long-press **nie** an ein
+  System-/Fremdfenster abgegeben (Touch-Capture im App-Fenster). Daraus folgt
+  die Droppbarkeit an der Display-Oberkante.
+- **DRG-INV-2** — Das Drop-Ziel wird durch Rechteck-Hit-Test gegen eine
+  **priorisierte Liste** bestimmt, nicht durch View-Z-Order.
+- **DRG-INV-3** — Verlustfrei: ein Drop ohne Treffer animiert zur Quelle zurück,
+  kein Item geht verloren.
+- **DRG-INV-4** — Die Domänen-Transitionen (`HomeLayoutTransition`, Use Cases,
+  `HomeLayoutRegridder`) bleiben unverändert; die Engine liefert nur
+  `(payload, target)`.
+
+---
+
+## §11 Offene Punkte
+
+1. **DragLayer-Rolle:** übernimmt `home_root` (`GestureFrameLayout`) den Layer,
+   oder ein dedizierter Layer über allem (inkl. Dock)?
+2. **Touch-Ownership** `DragController` ↔ `GestureDispatchCore` beim Long-press
+   (§7) — genaue Übergabe.
+3. **Abbruch-Fälle:** zweiter Finger / Home-Taste / Rotation mitten im Drag →
+   `cancel()` mit Rück-Animation.
+4. **Edge-Autoscroll** zwischen Pager-Seiten — ja/nein, und wie mit ViewPager2
+   (dessen eigenes Touch-Handling ist dann inaktiv, weil der DragLayer fängt).
+5. **Statusbar-Icons** während des Drags ausblenden — reine Optik, separat
+   entscheidbar.
+6. **Aufwand/Nutzen:** lohnt der Umbau nur für die Oberkanten-Droppbarkeit, oder
+   erst zusammen mit der Kür (§8)? (Launcher3 macht es, weil es *alles* davon
+   nutzt.)
+
+---
+
+## Review-Log
+
+- **v1 (ENTWURF)** — Skizze auf Wunsch, als Alternative zum pragmatischen
+  „Statusbar während des Drags ausblenden". Noch nicht ratifiziert; kein Code.
+  Heutige Anker, die der Umbau ersetzt: `MainActivity.startDrag` /
+  `resolveGridCell` / `setupRemoveBar` / `handleDockDrag`, die
+  `home_root`/`dock`/`remove_bar`-`OnDragListener`, `HomePagerAdapter`,
+  `DockAdapter`, `AppDrawerFragment` (Drawer-Drag).
