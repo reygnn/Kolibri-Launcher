@@ -1,8 +1,8 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.RegridOutcome
-import com.github.reygnn.nyx_launcher.home.repository.GridSpecProvider
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutRegridder
 import kotlinx.coroutines.CoroutineDispatcher
@@ -11,19 +11,20 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * Re-fits the persisted layout onto the device-derived grid ([GridSpecProvider])
- * via the pure [HomeLayoutRegridder]: read once → transform → save only on a real
- * change. Runs at cold start (see PackageEventCoordinator) so the grid adapts to
- * the current screen — more rows/columns on a larger device — without losing any
- * placed item.
+ * Re-fits the persisted layout onto a [target] grid via the pure
+ * [HomeLayoutRegridder]: read once → transform → save only on a real change.
+ *
+ * The [target] is derived by the UI from the *actual* home-grid area (see
+ * MainActivity), not a pre-layout metrics estimate — that's the only way the row
+ * count matches the space exactly, so the bottom-anchored grid leaves at most a
+ * sub-cell margin at the top. No item is ever lost (regridder repacks off-grid
+ * items).
  */
 class FitHomeGridUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
-    private val gridProvider: GridSpecProvider,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
-    suspend operator fun invoke() = withContext(dispatcher) {
-        val target = gridProvider.deviceGrid()
+    suspend operator fun invoke(target: GridSpec) = withContext(dispatcher) {
         val current = repository.layout().first()
         when (val outcome = HomeLayoutRegridder.fit(current, target)) {
             RegridOutcome.Unchanged -> Unit

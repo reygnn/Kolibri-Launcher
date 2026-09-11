@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
@@ -107,6 +108,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         setupDock()
         setupRemoveBar()
         setupGestures()
+        // Derive the grid from the real home-grid area once the pager is laid out
+        // (a pre-layout metrics estimate mis-counts rows and leaves a big top gap).
+        pager.doOnLayout { applyDeviceGrid() }
         onBackPressedDispatcher.addCallback(this) { if (drawerContainer.isVisible) hideDrawer() }
 
         lifecycleScope.launch {
@@ -261,6 +265,21 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun startDrag(view: View, payload: DragPayload) {
         view.startDragAndDrop(null, View.DragShadowBuilder(view), payload, 0)
+    }
+
+    /**
+     * Derive columns/rows from the actual pager (home-grid) area and hand them to
+     * the ViewModel to re-fit the layout. Using the measured area — not a
+     * pre-layout metrics estimate — makes the row count exact, so the
+     * bottom-anchored grid leaves at most a sub-cell margin at the top. Idempotent
+     * downstream, so running it on every layout (incl. rotation) is cheap.
+     */
+    private fun applyDeviceGrid() {
+        val targetPx = HOME_CELL_TARGET_DP * resources.displayMetrics.density
+        if (pager.width <= 0 || pager.height <= 0 || targetPx <= 0f) return
+        val columns = (pager.width / targetPx).toInt().coerceIn(HOME_MIN_COLUMNS, HOME_MAX_COLUMNS)
+        val rows = (pager.height / targetPx).toInt().coerceIn(HOME_MIN_ROWS, HOME_MAX_ROWS)
+        viewModel.applyDeviceGrid(columns, rows)
     }
 
     /**

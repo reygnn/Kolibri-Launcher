@@ -6,7 +6,6 @@ import android.os.UserHandle
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,9 +21,9 @@ import javax.inject.Singleton
  *
  * - package removed/changed → [IconLoader.evict] (drop stale icons, ICL-INV-3)
  *   then [ReconcileHomeLayoutUseCase] (prune the layout, fail-closed).
- * - [start] also runs, for cold-start catch-up, one grid re-fit to the current
- *   device ([FitHomeGridUseCase]) followed by one reconcile (changes that
- *   happened, or a device swap, while Nyx wasn't running).
+ * - [start] also runs one reconcile for cold-start catch-up (changes that
+ *   happened while Nyx wasn't running). The device grid is re-fit separately,
+ *   from the real home-grid area, in MainActivity.
  * - [onTrimMemory] forwards to [IconLoader.trim] (ICL-INV-7).
  *
  * Uses [LauncherApps.Callback] — the launcher-idiomatic API — not a manifest
@@ -35,7 +34,6 @@ class PackageEventCoordinator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val iconLoader: IconLoader,
     private val folderRenderer: FolderIconRenderer,
-    private val fitHomeGrid: FitHomeGridUseCase,
     private val reconcile: ReconcileHomeLayoutUseCase,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
@@ -67,10 +65,7 @@ class PackageEventCoordinator @Inject constructor(
 
     fun start() {
         launcherApps.registerCallback(callback)
-        // Cold-start catch-up: adapt the grid to this device first (fitHomeGrid),
-        // then prune the layout against installed apps (reconcile). Sequenced so
-        // the two read-modify-write passes don't race on the layout store.
-        scope.launch { fitHomeGrid(); reconcile() }
+        scope.launch { reconcile() } // cold-start catch-up
     }
 
     fun onTrimMemory(level: Int) {

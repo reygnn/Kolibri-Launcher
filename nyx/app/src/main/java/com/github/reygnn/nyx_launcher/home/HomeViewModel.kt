@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
+import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ObserveHomeLayoutUseCase
@@ -38,6 +40,7 @@ class HomeViewModel @Inject constructor(
     private val removeFromFolder: RemoveFromFolderUseCase,
     private val removeItem: RemoveItemUseCase,
     private val renameFolderUseCase: RenameFolderUseCase,
+    private val fitHomeGrid: FitHomeGridUseCase,
     preferences: PreferencesRepository,
 ) : ViewModel() {
 
@@ -72,5 +75,14 @@ class HomeViewModel @Inject constructor(
 
     fun renameFolder(folder: ItemId, title: String) {
         viewModelScope.launch { renameFolderUseCase(folder, title) }
+    }
+
+    /**
+     * Re-fit the layout onto the device grid the UI measured from the real home
+     * area. Idempotent: a no-op when the grid already matches. Runs on every
+     * MainActivity layout, so a new device or an orientation change is absorbed.
+     */
+    fun applyDeviceGrid(columns: Int, rows: Int) {
+        viewModelScope.launch { fitHomeGrid(GridSpec(columns, rows)) }
     }
 }

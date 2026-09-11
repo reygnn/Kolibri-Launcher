@@ -122,6 +122,12 @@ class HomeGridAdapter(
 /** Target home-grid cell edge in dp — device-consistent (see [homeCellHeightPx]). */
 internal const val HOME_CELL_TARGET_DP = 110f
 
+// Clamp ranges for the device-derived grid (MainActivity.applyDeviceGrid).
+internal const val HOME_MIN_COLUMNS = 3
+internal const val HOME_MAX_COLUMNS = 6
+internal const val HOME_MIN_ROWS = 4
+internal const val HOME_MAX_ROWS = 8
+
 /**
  * Fixed cell height in px for a page [pageHeightPx] high with [rows] rows: the
  * ~[HOME_CELL_TARGET_DP] target, but never taller than an equal split, so on a

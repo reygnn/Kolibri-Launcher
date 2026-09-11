@@ -362,8 +362,10 @@ Katalog `= "1.11.0"`) serialisieren, unter Key `home_layout_v1` ablegen.
 
 1. `GridSpec` fix vs. nutzer-konfigurierbar in v1 (Modell trägt beides; Frage ist die
    Settings-UI). — **entschieden (Runde 4): geräteabhängig, nicht fix.** `columns`/`rows`
-   werden aus der Bildschirmgröße ÷ Ziel-Zellkante (~110dp, geclampt Spalten 3–6 /
-   Zeilen 4–8) abgeleitet (`GridSpecProvider`, Impl in `:data` mit `displayMetrics`).
+   werden aus der **tatsächlichen** Home-Grid-Fläche ÷ Ziel-Zellkante (~110dp, geclampt
+   Spalten 3–6 / Zeilen 4–8) abgeleitet — gemessen in der UI nach Layout
+   (`MainActivity.applyDeviceGrid`), nicht aus einer Pre-Layout-Metrik-Schätzung (die
+   zählte die Zeilen falsch und ließ oben eine große Lücke).
    Ein Geräte-/Größenwechsel wird beim Kaltstart über die reine Transition
    `HomeLayoutRegridder` verlustfrei aufgefangen: Items innerhalb der neuen Grenzen
    behalten ihre Zelle, Off-Grid-Items und Dock-Überlauf (> `columns`) werden row-major
@@ -393,6 +395,7 @@ Katalog `= "1.11.0"`) serialisieren, unter Key `home_layout_v1` ablegen.
   Duplikat-Add ist unerreichbar → `silentError`, nicht `NoOp`. §10-Punkt (Unizität)
   geschlossen.
 - **v4 (Review-Runde 4)** — §10-Punkt 1 entschieden: Grid ist **geräteabhängig**
-  (`GridSpecProvider` + `HomeLayoutRegridder`, verlustfreies Repack beim Kaltstart).
-  `GridSpec(4,6)` bleibt nur noch Kaltstart-Default, bis das Geräte-Grid greift.
-  Truth-Table-Tests: `HomeLayoutRegridderTest`.
+  (`HomeLayoutRegridder`, verlustfreies Repack). `columns`/`rows` kommen aus der real
+  gemessenen Grid-Fläche (`MainActivity.applyDeviceGrid`, nach Layout), nicht aus einer
+  Metrik-Schätzung. `GridSpec(4,6)` bleibt nur noch der Persistenz-Default, bis das
+  Geräte-Grid greift. Truth-Table-Tests: `HomeLayoutRegridderTest`.
