@@ -221,19 +221,25 @@ Alles Kür, nicht Teil des Kern-Umbaus.
 
 ## §11 Offene Punkte
 
-1. **DragLayer-Rolle:** übernimmt `home_root` (`GestureFrameLayout`) den Layer,
-   oder ein dedizierter Layer über allem (inkl. Dock)?
-2. **Touch-Ownership** `DragController` ↔ `GestureDispatchCore` beim Long-press
-   (§7) — genaue Übergabe.
-3. **Abbruch-Fälle:** zweiter Finger / Home-Taste / Rotation mitten im Drag →
-   `cancel()` mit Rück-Animation.
+1. ~~**DragLayer-Rolle:** übernimmt `home_root` (`GestureFrameLayout`) den Layer,
+   oder ein dedizierter Layer über allem?~~ — **gelöst:** `home_root` *ist* der
+   `DragLayer` (ersetzt `GestureFrameLayout`), full-screen inkl. Dock.
+2. ~~**Touch-Ownership** `DragController` ↔ `GestureDispatchCore` beim Long-press~~
+   — **gelöst:** ein `dispatchTouchEvent` — idle → Core (Swipe/Long-press),
+   dragging → Kurzschluss zum `DragController` (+ `ACTION_CANCEL` an die Kinder).
+   Gesten während des Drags implizit aus.
+3. **Abbruch-Fälle** (teilweise): `ACTION_CANCEL` → `onCancel()` räumt sofort
+   sauber ab; Rotation mitten im Drag = Activity-Recreate (Drag verfällt, ok).
+   **Offen:** Rück-Flug-**Animation** (Kür, §8) und explizites **Multi-Touch /
+   Zweiter-Finger**-Handling.
 4. **Edge-Autoscroll** zwischen Pager-Seiten — ja/nein, und wie mit ViewPager2
    (dessen eigenes Touch-Handling ist dann inaktiv, weil der DragLayer fängt).
+   (Kür, §8.)
 5. **Statusbar-Icons** während des Drags ausblenden — reine Optik, separat
    entscheidbar.
-6. **Aufwand/Nutzen:** lohnt der Umbau nur für die Oberkanten-Droppbarkeit, oder
-   erst zusammen mit der Kür (§8)? (Launcher3 macht es, weil es *alles* davon
-   nutzt.)
+6. ~~**Aufwand/Nutzen:** lohnt der Umbau?~~ — **entschieden: ja, umgesetzt**
+   (Phasen 1+2). Die Oberkanten-Droppbarkeit allein hat den Umbau getragen; die
+   Kür (§8) ist die optionale Zugabe.
 
 ---
 
