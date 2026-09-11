@@ -34,6 +34,7 @@ import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
+import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
@@ -71,6 +72,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var drawerContainer: View
     private lateinit var removeBar: TextView
     private var pagerAdapter: HomePagerAdapter? = null
+    private var currentGrid: GridSpec? = null
     private lateinit var dockAdapter: DockAdapter
 
     private var gridIconPx = 0
@@ -201,7 +203,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private fun renderLayout(layout: HomeLayout?) {
         layout ?: return
         dockSize = layout.dock.size
-        if (pagerAdapter == null) {
+        // Rebuild the pager adapter when the grid dimensions change (columns feed
+        // the span count, rows the cell height + bottom padding). applyDeviceGrid
+        // can change them at runtime, and a stale rows would mis-size the padding
+        // and make the page scroll by a row. Cheap: the grid changes at most once
+        // per launch.
+        if (pagerAdapter == null || currentGrid != layout.grid) {
+            currentGrid = layout.grid
             pagerAdapter = HomePagerAdapter(
                 iconLoader = iconLoader,
                 folderRenderer = folderRenderer,

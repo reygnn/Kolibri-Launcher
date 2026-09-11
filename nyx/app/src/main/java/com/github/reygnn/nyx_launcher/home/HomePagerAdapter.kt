@@ -41,7 +41,11 @@ class HomePagerAdapter(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            layoutManager = GridLayoutManager(context, columns)
+            // Fixed grid: it's sized to fit the page exactly (cell height + bottom
+            // anchoring), so it must never scroll vertically.
+            layoutManager = object : GridLayoutManager(context, columns) {
+                override fun canScrollVertically(): Boolean = false
+            }
             clipToPadding = false
         }
         val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, onLaunch, onOpenFolder, onStartDrag)
