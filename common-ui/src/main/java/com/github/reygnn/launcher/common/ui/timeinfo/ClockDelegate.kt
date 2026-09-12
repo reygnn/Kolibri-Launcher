@@ -7,7 +7,7 @@
  * (at your option) any later version.
  */
 
-package com.github.reygnn.kolibri_launcher.ui.main.delegate
+package com.github.reygnn.launcher.common.ui.timeinfo
 
 import android.content.Context
 import android.content.Intent
@@ -15,29 +15,39 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.text.format.DateFormat
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.ChargeState
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Delegate responsible for clock, date, battery, and time-based events.
+ * Delegate responsible for clock, date, battery, and time-based events. Shared by
+ * both launchers (HOME_INFO_ELEMENTS_SPEC §4): it exposes individual StateFlows
+ * that each app combines into its own UiState and binds to its own views — no
+ * layout is shared.
  *
- * Exposes individual StateFlows that the ViewModel combines into HomeUiState.
+ * Product-neutral by construction: it takes a plain [scope] + [mainDispatcher]
+ * and does its own safe-launch (Throwable ⇒ [TimberWrapper.silentError]), instead
+ * of depending on either app's ViewModel delegate infrastructure.
  */
 class ClockDelegate(
     private val context: Context,
     private val observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase,
-    private val scope: DelegateScope
+    private val scope: CoroutineScope,
+    private val mainDispatcher: CoroutineDispatcher,
 ) {
 
     companion object {
@@ -67,6 +77,23 @@ class ClockDelegate(
     private val _timeBasedEvents = MutableStateFlow<List<TimeBasedEvent>>(emptyList())
     val timeBasedEvents: StateFlow<List<TimeBasedEvent>> = _timeBasedEvents.asStateFlow()
 
+    /**
+     * Safe coroutine launch on [mainDispatcher]: rethrows cancellation, reports any
+     * other Throwable via [TimberWrapper.silentError]. Mirrors the apps' delegate
+     * launchSafe minus the toast UX (this shared delegate emits no UI events).
+     */
+    private fun launchSafe(errorMessage: String, block: suspend CoroutineScope.() -> Unit) {
+        scope.launch(mainDispatcher) {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, errorMessage)
+            }
+        }
+    }
+
     // --- Init ---
 
     fun start() {
@@ -77,14 +104,14 @@ class ClockDelegate(
         getInitialBatteryState()
 
         // ASYNC: Minuten-Ticks
-        scope.launchSafe("Error observing system time changes") {
+        launchSafe("Error observing system time changes") {
             observeSystemTimeChanges().collect {
                 updateTimeAndDate()
             }
         }
 
         // ASYNC: Kalender-Events
-        scope.launchSafe("Error observing time-based events") {
+        launchSafe("Error observing time-based events") {
             observeTimeBasedEventsUseCase().collect { events ->
                 _timeBasedEvents.value = events
             }

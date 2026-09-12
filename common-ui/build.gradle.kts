@@ -24,6 +24,13 @@ android {
     kotlin {
         jvmToolchain(21)
     }
+
+    testOptions {
+        // JVM unit tests here mock Context and touch android.* stubs (e.g.
+        // DateFormat.is24HourFormat in ClockDelegateTest); return defaults instead
+        // of throwing "not mocked".
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -31,4 +38,6 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

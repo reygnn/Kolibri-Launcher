@@ -1,15 +1,13 @@
-package com.github.reygnn.kolibri_launcher.ui.main.delegate
+package com.github.reygnn.launcher.common.ui.timeinfo
 
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import com.github.reygnn.launcher.common.ui.MainDispatcherRule
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.timeinfo.ChargeState
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -20,6 +18,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Before
@@ -30,22 +29,17 @@ import org.junit.Test
 class ClockDelegateTest {
 
     @get:Rule
-    val instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
-    @get:Rule
-    val timberRule = TimberRule()
-
-    private val sentEvents = mutableListOf<UiEvent>()
 
     private lateinit var context: Context
     private lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
 
     @Before
     fun setUp() {
-        sentEvents.clear()
+        // ClockDelegate reports caught failures via TimberWrapper.silentError, which
+        // throws in DEBUG; suppress that for the duration of the test (mirrors the
+        // apps' TimberRule) so error-path branches don't crash the test.
+        TimberWrapper.preventCrashForTesting.set(true)
 
         context = mockk {
             every { registerReceiver(any(), any(), any<Int>()) } returns null
@@ -55,18 +49,18 @@ class ClockDelegateTest {
         every { observeTimeBasedEventsUseCase.invoke(any()) } returns emptyFlow()
     }
 
-    private fun createDelegateScope() = DelegateScope(
-        coroutineScope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
-        mainDispatcher = mainDispatcherRule.testDispatcher,
-        eventSender = { event -> sentEvents.add(event) }
-    )
+    @After
+    fun tearDown() {
+        TimberWrapper.preventCrashForTesting.set(false)
+    }
 
     private fun createDelegate(
         observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase = this.observeTimeBasedEventsUseCase
     ) = ClockDelegate(
         context = context,
         observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
-        scope = createDelegateScope()
+        scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
+        mainDispatcher = mainDispatcherRule.testDispatcher,
     )
 
     // ===========================================

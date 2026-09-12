@@ -79,7 +79,7 @@ import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.AppManagementDelegate
-import com.github.reygnn.kolibri_launcher.ui.main.delegate.ClockDelegate
+import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.DelegateScope
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.GestureDelegate
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.LayoutDelegate
@@ -179,7 +179,8 @@ class LauncherViewModel @Inject constructor(
     private val clockDelegate = ClockDelegate(
         context = context,
         observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
-        scope = delegateScope
+        scope = viewModelScope,
+        mainDispatcher = mainDispatcher,
     )
 
     private val appDelegate = AppManagementDelegate(
