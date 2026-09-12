@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hintergrund für die Wallpaper-Edit-Toolbar (wallpaperEditButtons).
+
+  Design-Entscheidungen:
+  - Hohe Deckkraft (#D9 ≈ 85%) statt der früheren 60%: auf hellen Wallpapern
+    bleibt der Kontrast zur Text-/Icon-Farbe erhalten, auf sehr dunklen
+    Wallpapern ist die Pille dennoch als eigenständige Fläche erkennbar
+    (klare Kante, nicht bloß ein Gradient vom Bildinhalt).
+  - Dünne, leicht transparente weiße Kontur: erzeugt auf JEDEM Wallpaper
+    eine wahrnehmbare Abgrenzung — auf dunklen Wallpapern hell-umrahmt,
+    auf hellen Wallpapern gegen die fast-schwarze Füllung kontrastierend.
+  - Gleiche Grund-Optik wie bg_hint_rounded bleibt erhalten (Radius, Form);
+    nur Deckkraft und Kontur sind verstärkt.
+
+  Wird NUR auf dem äußeren Container gesetzt — dadurch:
+    - verschwindet er automatisch mit der Toolbar während Pan/Zoom
+      (dimToolbar() setzt visibility = INVISIBLE am Container)
+    - wandert er automatisch mit beim Top/Bottom-Docking
+      (dockToolbar() ändert nur die LayoutParams des Containers)
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#D9000000" />
+    <stroke
+        android:width="1.5dp"
+        android:color="#33FFFFFF" />
+    <corners android:radius="20dp" />
+</shape>

@@ -58,4 +58,28 @@
     <string name="dev_throw_test_title" translatable="false">Throw test exception</string>
     <string name="dev_silent_error_title" translatable="false">Silent-error test</string>
     <string name="dev_warn_test_title" translatable="false">Warn test (no report)</string>
+
+    <!-- Wallpaper edit (WV5d, copied from Kolibri) -->
+    <string name="cd_open_commands">More wallpaper-edit controls</string>
+    <string name="wallpaper_fit_width">Fit to width</string>
+    <string name="wallpaper_original_size">Original size (1:1)</string>
+    <string name="wallpaper_add_layer">Add layer</string>
+    <string name="wallpaper_cancel">Cancel</string>
+    <string name="cd_fab_save_drag">Save wallpaper edits. Drag to move this button.</string>
+    <string name="wallpaper_snap_toggle">Snap on/off</string>
+    <string name="wallpaper_snap_mode_toggle">Toggle snap-mode</string>
+    <string name="wallpaper_horizontal_snap_toggle">Horizontal snap on/off</string>
+    <string name="wallpaper_vertical_snap_toggle">Vertical snap on/off</string>
+    <string name="wallpaper_delete_layer">Delete layer</string>
+    <string name="wallpaper_move_layer_up">Move layer forward</string>
+    <string name="wallpaper_move_layer_down">Move layer backward</string>
+    <string name="cd_wallpaper_memory_info">Show memory usage</string>
+    <string name="cd_wallpaper_backdrop_toggle">Toggle backdrop: system wallpaper or black</string>
+    <string name="cd_close_commands">Close controls</string>
+    <string name="wallpaper_edit_hint">Pinch to zoom, drag to pan</string>
+    <string name="wallpaper_memory_title">Wallpaper memory</string>
+    <string name="wallpaper_memory_row">Layer %1$d: %2$s · %3$s  (%4$s)</string>
+    <string name="wallpaper_memory_source">%1$d×%2$d, from %3$d×%4$d</string>
+    <string name="wallpaper_memory_total">Total: %1$s</string>
+    <string name="wallpaper_memory_empty">No wallpaper loaded</string>
 </resources>
