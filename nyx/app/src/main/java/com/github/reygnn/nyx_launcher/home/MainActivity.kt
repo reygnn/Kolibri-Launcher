@@ -48,8 +48,10 @@ import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditCoordinator
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -104,6 +106,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var wallpaperRepository: WallpaperRepository
     @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
+    @Inject lateinit var wallpaperFileManager: WallpaperFileManager
+
+    // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
+    // wallpaper state (mirrored from the repo), drives the transactional edit session.
+    private lateinit var wallpaperEditCoordinator: NyxWallpaperEditCoordinator
 
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
@@ -225,6 +232,15 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
         clockDelegate.start()
 
+        wallpaperEditCoordinator = NyxWallpaperEditCoordinator(
+            repository = wallpaperRepository,
+            fileManager = wallpaperFileManager,
+            displaySettings = wallpaperDisplaySettings,
+            scope = lifecycleScope,
+            ioDispatcher = Dispatchers.IO,
+        )
+        wallpaperEditCoordinator.start()
+
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
         // copy and save (the shared repo/file-manager split doesn't self-clean).
         lifecycleScope.launch { wallpaperImageSetter.reclaimOrphans() }
@@ -240,7 +256,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // Wallpaper (WV5): render on every state change (latest-wins — the
                 // collector awaits each bind before the next emission). Scrim +
                 // backdrop react to their own settings flows.
-                launch { wallpaperRepository.wallpaperState.collect { wallpaperBinder.bind(wallpaperView, it) } }
+                launch { wallpaperEditCoordinator.wallpaperState.collect { wallpaperBinder.bind(wallpaperView, it) } }
                 launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { applyScrim(it) } }
                 launch { wallpaperDisplaySettings.wallpaperBackdropFlow.collect { applyBackdrop(it) } }
             }
