@@ -51,10 +51,13 @@ class NyxCustomizationDialog : DialogFragment() {
 
     private val pickWallpaperImage =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            // Dismiss after a pick so the sheet gets out of the way (Kolibri parity).
+            // Set THEN dismiss: dismiss() cancels this fragment's lifecycleScope, so
+            // dismissing before the suspend set completes would abort the save.
             if (uri != null) {
-                lifecycleScope.launch { wallpaperImageSetter.setFromUri(uri) }
-                dismiss()
+                lifecycleScope.launch {
+                    wallpaperImageSetter.setFromUri(uri)
+                    dismiss()
+                }
             }
         }
 
