@@ -9,8 +9,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.every

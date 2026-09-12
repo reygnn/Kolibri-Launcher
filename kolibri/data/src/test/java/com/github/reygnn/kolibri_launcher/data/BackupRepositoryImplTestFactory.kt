@@ -8,7 +8,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 
 /**
  * Test-only factory: builds a fully-wired [BackupRepositoryImpl] from

@@ -277,7 +277,7 @@ class WallpaperFileManager @Inject constructor(
      * versehentlich mitnimmt.
      *
      * @param referencedUris Menge der aktuell referenzierten URIs
-     *     (z.B. [com.github.reygnn.kolibri_launcher.domain.model.WallpaperState.referencedUris]).
+     *     (z.B. [com.github.reygnn.launcher.core.wallpaper.WallpaperState.referencedUris]).
      * @param minAgeMillis Dateien, deren `lastModified()` jünger als dieser
      *     Wert ist, werden NICHT gelöscht. Default: 60 Sekunden.
      */

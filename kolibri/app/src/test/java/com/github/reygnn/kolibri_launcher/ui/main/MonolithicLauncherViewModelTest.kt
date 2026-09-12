@@ -88,7 +88,7 @@ import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase

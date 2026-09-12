@@ -7,8 +7,8 @@ import android.net.Uri
 import androidx.core.graphics.createBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

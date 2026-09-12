@@ -4,8 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository

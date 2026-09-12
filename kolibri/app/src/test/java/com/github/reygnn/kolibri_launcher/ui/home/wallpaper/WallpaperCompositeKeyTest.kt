@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue

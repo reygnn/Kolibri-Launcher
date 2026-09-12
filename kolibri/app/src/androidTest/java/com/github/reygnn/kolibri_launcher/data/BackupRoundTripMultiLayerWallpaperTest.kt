@@ -4,10 +4,10 @@ import android.content.Context
 import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule

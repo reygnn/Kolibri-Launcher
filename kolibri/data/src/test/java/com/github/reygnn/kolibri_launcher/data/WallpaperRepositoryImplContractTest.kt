@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import android.net.Uri
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import io.mockk.every
 import io.mockk.mockk

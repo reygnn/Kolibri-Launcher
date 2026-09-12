@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import javax.inject.Inject
 
 /**

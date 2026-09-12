@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.domain.model
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 
 import com.github.reygnn.launcher.core.AppConstants
 import kotlinx.serialization.Serializable

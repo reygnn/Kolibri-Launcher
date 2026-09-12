@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
 import android.net.Uri
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 
 /**
  * =====================================================================================
@@ -40,7 +40,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
  * would fix the display.
  *
  * **Why IDs Solve It:**
- * Every [com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState] carries
+ * Every [com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState] carries
  * a stable, process-unique ID assigned at creation time. That ID is propagated through
  * to the view-side [com.github.reygnn.kolibri_launcher.ui.home.WallpaperLayer] via
  * the `id` parameter of `ZoomableImageView.addLayer(...)`. By comparing the ordered list
@@ -71,7 +71,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
  * `UpdatePropertiesOnly skips layers without imageUri`.
  *
  * @see com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewDiffTest
- * @see com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState.id
+ * @see com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState.id
  */
 
 /**

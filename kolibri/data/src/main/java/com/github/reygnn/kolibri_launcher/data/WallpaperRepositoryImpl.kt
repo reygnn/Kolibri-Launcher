@@ -10,9 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext

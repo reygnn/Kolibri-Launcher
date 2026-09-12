@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import java.security.MessageDigest
 
 /**

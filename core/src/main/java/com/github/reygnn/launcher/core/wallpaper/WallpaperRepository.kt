@@ -1,8 +1,6 @@
-package com.github.reygnn.kolibri_launcher.domain.repository
+package com.github.reygnn.launcher.core.wallpaper
 
 import com.github.reygnn.launcher.core.Purgeable
-
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import kotlinx.coroutines.flow.Flow
 
 /**

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi

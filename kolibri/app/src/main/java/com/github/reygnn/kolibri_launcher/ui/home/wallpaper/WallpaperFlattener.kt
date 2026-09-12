@@ -9,7 +9,7 @@ import androidx.core.net.toUri
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException

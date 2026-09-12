@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
