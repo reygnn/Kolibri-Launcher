@@ -41,6 +41,39 @@ Offen für C3 (HOME_INFO_ELEMENTS_SPEC §5, eigene UX-Entscheidungen):
 Anker: `MainActivity` (clock_container, clockDelegate), `PreferencesRepository`
 (showAlarm/showCalendarEvent), `TimeEventFormatter` (:core), `SettingsActivity`.
 
+### DataStore-Reads fail-open absichern (nyx-weit) — Robustheit
+
+Nyx' DataStore-gestützte Stores lesen via `dataStore.data.map { … }` **ohne**
+`.catch`-Fallback: eine `IOException` beim Read (Store-Korruption) propagiert in
+den Collector → Crash. Kolibri kapselt das in einem geteilten Safe-Read-Helfer
+(`:common-data` `DataStoreReadFlow.safeReadFlow`, fail-open auf Defaults). Nyx
+sollte einen analogen geteilten Helfer haben (oder `DataStoreReadFlow`
+wiederverwenden) und alle Read-Flows darüber leiten — nicht nur die Wallpaper-
+Stores, sonst driftet es. Aus dem WV5d-Deep-Review zurückgestellt (nyx-weite
+Lücke, eigener Task statt inkonsistenter Teilfix). Niedrige Wahrscheinlichkeit
+(nur bei Store-Korruption), aber ein Crash-Pfad. Anker:
+`PreferencesRepositoryImpl`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore`;
+Referenz `:common-data/…/DataStoreReadFlow.kt`.
+
+### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
+
+Nyx lässt den geteilten `WallpaperCompositeCache` bewusst weg (keine
+drawer→home-Teardown-Naht wie bei Kolibri). Folge: beim Löschen eines Layers
+baut der Binder die verbleibenden Layer neu auf (Re-Decode) → kurzes Flackern,
+auf langsamerer GPU (A17) sichtbar, auf dem Pixel nicht. Kein Korrektheits-
+problem. Falls es stört: den geteilten `WallpaperCompositeCache` (`:common-ui`)
+für Warm-Reattach einhängen. Anker: `MainActivity` Render-Pfad
+(`renderWallpaper`/`wallpaperBinder`), `:common-ui` `WallpaperCompositeCache`.
+
+### Wallpaper-Edit-UI: Dedup gegen `:common-ui`
+
+FAB-Cluster + CommandsPanel + `SnapIconResolver`/`LayerButtonsState` sowie die
+Helfer `ViewFade`/`DialogWindow`/`DialogDrag` sind bewusst **byte-identisch aus
+Kolibri kopiert** (Maintainer-Entscheid WV5d, kein Ressourcen-Merge-Risiko).
+Wenn Kolibri das nächste Mal angefasst wird: in `:common-ui` unifizieren (beide
+Apps teilen dann eine Implementierung). Anker: nyx `home/wallpaperfab/*`,
+`home/wallpaper/{SnapIconResolver,LayerButtonsState}`, `:common-ui`.
+
 ### Grid bei Orientierungswechsel — Design-Frage (Mechanik erledigt)
 
 Das geräteabhängige Home-Grid (ICON_HOME_MODEL_SPEC §10) leitet `columns`/`rows`
