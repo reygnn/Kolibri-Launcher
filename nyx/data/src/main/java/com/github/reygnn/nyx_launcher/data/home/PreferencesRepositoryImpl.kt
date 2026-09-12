@@ -21,7 +21,23 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[MONOCHROME] = enabled }
     }
 
+    override val showAlarmFlow: Flow<Boolean> =
+        dataStore.data.map { it[SHOW_ALARM] ?: false }
+
+    override suspend fun setShowAlarm(enabled: Boolean) {
+        dataStore.edit { it[SHOW_ALARM] = enabled }
+    }
+
+    override val showCalendarEventFlow: Flow<Boolean> =
+        dataStore.data.map { it[SHOW_CALENDAR_EVENT] ?: false }
+
+    override suspend fun setShowCalendarEvent(enabled: Boolean) {
+        dataStore.edit { it[SHOW_CALENDAR_EVENT] = enabled }
+    }
+
     private companion object {
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
+        val SHOW_ALARM = booleanPreferencesKey("show_alarm")
+        val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }
 }

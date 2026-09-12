@@ -48,6 +48,8 @@ android {
 
 dependencies {
     implementation(project(":nyx:domain"))
+    // Shared home-info calendar/alarm reader (HIE Phase C); bound in RepositoryModule.
+    implementation(project(":common-data"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)

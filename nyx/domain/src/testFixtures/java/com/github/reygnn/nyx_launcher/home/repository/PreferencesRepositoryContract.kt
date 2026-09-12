@@ -54,4 +54,38 @@ abstract class PreferencesRepositoryContract {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // --- home-info flags (TimeInfoSettings port) ---
+
+    @Test
+    fun show_alarm_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().showAlarmFlow.first()).isFalse()
+    }
+
+    @Test
+    fun setting_show_alarm_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.setShowAlarm(true)
+        assertThat(repo.showAlarmFlow.first()).isTrue()
+    }
+
+    @Test
+    fun show_calendar_event_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().showCalendarEventFlow.first()).isFalse()
+    }
+
+    @Test
+    fun setting_show_calendar_event_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.setShowCalendarEvent(true)
+        assertThat(repo.showCalendarEventFlow.first()).isTrue()
+    }
+
+    @Test
+    fun home_info_flags_are_independent() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.setShowAlarm(true)
+        assertThat(repo.showAlarmFlow.first()).isTrue()
+        assertThat(repo.showCalendarEventFlow.first()).isFalse() // unaffected
+    }
 }
