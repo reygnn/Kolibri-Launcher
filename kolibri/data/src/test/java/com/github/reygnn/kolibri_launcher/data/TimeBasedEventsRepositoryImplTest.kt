@@ -5,7 +5,7 @@ import android.app.PendingIntent
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

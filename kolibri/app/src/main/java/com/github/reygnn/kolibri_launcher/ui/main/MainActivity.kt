@@ -35,8 +35,8 @@ import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase

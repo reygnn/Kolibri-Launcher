@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.domain.model
+package com.github.reygnn.launcher.core.timeinfo
 
 enum class TimeBasedEventType {
     ALARM,

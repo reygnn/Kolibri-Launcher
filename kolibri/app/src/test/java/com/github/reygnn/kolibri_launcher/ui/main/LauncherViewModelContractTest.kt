@@ -14,8 +14,8 @@ import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEventType
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase

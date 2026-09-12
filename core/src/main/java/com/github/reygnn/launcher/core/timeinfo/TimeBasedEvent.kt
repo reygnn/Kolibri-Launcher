@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.domain.model
+package com.github.reygnn.launcher.core.timeinfo
 
 /**
  * Unified model für zeitbasierte Events (Kalender + Alarme).

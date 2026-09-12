@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui.base
 import android.widget.Toast
 import androidx.annotation.StringRes
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 
 /**
  * Definiert alle einmaligen Events, die ein ViewModel an die UI senden kann.

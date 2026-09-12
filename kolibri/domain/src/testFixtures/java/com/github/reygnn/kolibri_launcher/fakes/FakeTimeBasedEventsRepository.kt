@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 // TIMESTAMP 2025-12-06 09:34
 
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import javax.inject.Inject

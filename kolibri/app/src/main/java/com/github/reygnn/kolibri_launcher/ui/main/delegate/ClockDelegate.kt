@@ -16,8 +16,8 @@ import android.os.BatteryManager
 import android.text.format.DateFormat
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
-import com.github.reygnn.kolibri_launcher.domain.model.ChargeState
-import com.github.reygnn.kolibri_launcher.domain.model.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.ChargeState
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
