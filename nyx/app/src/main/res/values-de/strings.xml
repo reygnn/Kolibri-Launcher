@@ -29,6 +29,7 @@
     <string name="event_all_day">Ganztägig</string>
     <string name="events_dialog_title">Anstehend</string>
     <string name="events_tomorrow_separator">— Morgen —</string>
+    <string name="home_info_no_app">Keine passende App gefunden</string>
     <string name="backup_export_summary">Startbildschirm-Layout in eine Datei sichern</string>
     <string name="backup_import_summary">Startbildschirm-Layout aus einer Datei wiederherstellen</string>
 </resources>

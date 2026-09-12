@@ -3,9 +3,12 @@ package com.github.reygnn.nyx_launcher.home
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.provider.AlarmClock
+import android.provider.CalendarContract
 import android.graphics.Rect
 import android.os.Bundle
 import android.text.format.DateFormat
@@ -14,6 +17,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -124,6 +128,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         clockBattery = findViewById(R.id.clock_battery)
         alarmIndicator = findViewById(R.id.event_alarm_indicator)
         calendarIndicator = findViewById(R.id.event_calendar_indicator)
+        // Home-info tap targets: time → alarms, date → calendar, battery → battery
+        // settings (mirrors Kolibri's intents).
+        clockTime.setOnClickListener { openClockApp() }
+        clockDate.setOnClickListener { openCalendarApp() }
+        clockBattery.setOnClickListener { openBatterySettings() }
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
         clockDelegate = ClockDelegate(
@@ -505,6 +514,34 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(intent) }
             .onFailure { if (it !is ActivityNotFoundException) throw it }
+    }
+
+    // ---- home-info tap targets (mirror Kolibri's intents) ----
+
+    private fun openClockApp() = startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+
+    private fun openCalendarApp() {
+        val uri = CalendarContract.CONTENT_URI.buildUpon()
+            .appendPath("time")
+            .let { ContentUris.appendId(it, System.currentTimeMillis()); it.build() }
+        startActivitySafely(Intent(Intent.ACTION_VIEW).setData(uri))
+    }
+
+    private fun openBatterySettings() =
+        startActivitySafely(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
+
+    /**
+     * Launch an optional system intent; a launcher must never crash on a tap, so a
+     * missing handler (ActivityNotFoundException) or a denied one (SecurityException,
+     * e.g. an OEM alarm activity guarding SHOW_ALARMS) just toasts. Anything else is
+     * a programmer error and propagates.
+     */
+    private fun startActivitySafely(intent: Intent) {
+        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure {
+                if (it !is ActivityNotFoundException && it !is SecurityException) throw it
+                Toast.makeText(this, R.string.home_info_no_app, Toast.LENGTH_SHORT).show()
+            }
     }
 }
 

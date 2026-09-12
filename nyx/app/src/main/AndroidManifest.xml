@@ -4,6 +4,9 @@
     <!-- Home-info calendar events (HIE Phase C3). Requested at runtime when the
          "show calendar events" toggle is enabled; alarms need no permission. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Opening the clock app via ACTION_SHOW_ALARMS (clock tap) needs this on
+         some OEMs (Samsung); normal permission, auto-granted. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!-- Query launchable activities without QUERY_ALL_PACKAGES (Android 11+). -->
     <queries>
