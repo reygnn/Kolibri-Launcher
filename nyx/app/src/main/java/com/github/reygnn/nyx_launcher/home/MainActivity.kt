@@ -473,19 +473,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // it fires even over the ViewPager2 / dock RecyclerViews (which would
         // eat an OnTouchListener-based fling mid-scroll). Horizontal page
         // swipes fall through untouched via the analyzer's axis dominance.
-        homeRoot.onSwipeUp = { showDrawer() }
+        homeRoot.onSwipeUp = { if (!wallpaperEditCoordinator.isEditMode.value) showDrawer() }
 
         // Long-press on empty home space opens the live-preview customization
         // sheet (scrim/dim, monochrome, wallpaper, → full Settings). The shared
         // core's hit-test suppresses this over app icons and dock icons (they
         // keep their own long-press → drag), so it only fires on the wallpaper /
         // empty area.
-        homeRoot.onLongPress = { showCustomizationDialog() }
+        homeRoot.onLongPress = { if (!wallpaperEditCoordinator.isEditMode.value) showCustomizationDialog() }
 
         // Double-tap on empty home space shows the upcoming events (HIE Phase C3,
         // mirrors Kolibri); the two indicators next to the clock just signal that
         // events exist. Suppressed over icons by the shared core's hit-test.
-        homeRoot.onDoubleTap = { showEventsDialog() }
+        homeRoot.onDoubleTap = { if (!wallpaperEditCoordinator.isEditMode.value) showEventsDialog() }
 
         // The drawer's own swipe-down dismiss lives in AppDrawerFragment (its
         // root is a GestureFrameLayout), so it isn't wired here.

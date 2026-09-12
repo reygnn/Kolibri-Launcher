@@ -72,10 +72,20 @@ class NyxWallpaperEditCoordinator(
     private val backdropToggleMutex = Mutex()
     private var lastWrittenBackdrop: WallpaperBackdrop? = null
 
-    /** Mirror the repository's persisted state into the live state (external changes). */
+    /**
+     * Mirror the repository's persisted state into the live state (external
+     * changes). SKIPPED during an edit session: the edit owns [_wallpaperState]
+     * and mutates it optimistically via [applyState], so mirroring repo emissions
+     * mid-session would let a delayed persist round-trip of an EARLIER mutation
+     * (e.g. the pre-flush transform save that precedes a layer delete) clobber the
+     * newer optimistic state — reviving a just-deleted layer or an old wallpaper.
+     * On session end the optimistic state already equals the persisted state.
+     */
     fun start() {
         scope.launch {
-            repository.wallpaperState.collect { state -> _wallpaperState.value = state }
+            repository.wallpaperState.collect { state ->
+                if (!_isEditMode.value) _wallpaperState.value = state
+            }
         }
     }
 

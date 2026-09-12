@@ -51,7 +51,11 @@ class NyxCustomizationDialog : DialogFragment() {
 
     private val pickWallpaperImage =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            uri?.let { picked -> lifecycleScope.launch { wallpaperImageSetter.setFromUri(picked) } }
+            // Dismiss after a pick so the sheet gets out of the way (Kolibri parity).
+            if (uri != null) {
+                lifecycleScope.launch { wallpaperImageSetter.setFromUri(uri) }
+                dismiss()
+            }
         }
 
     override fun onCreateView(

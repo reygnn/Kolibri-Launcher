@@ -185,6 +185,26 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
+    fun `stale repo emission during edit does not clobber optimistic state`() = runTest(mainDispatcherRule.dispatcher) {
+        // Guards #2/#4: a delayed persist round-trip of an earlier mutation (or an
+        // old wallpaper) must not overwrite the live edit state via the mirror.
+        coEvery { fileManager.copyToInternal(any()) } returnsMany listOf(uri("file:///a"), uri("file:///b"))
+        val c = coordinator()
+        advanceUntilIdle()
+        c.onEnterEditMode()
+        c.onAddLayer(uri("content://pick/a")); advanceUntilIdle()
+        c.onAddLayer(uri("content://pick/b")); advanceUntilIdle()
+
+        // Simulate a stale/delayed repository emission arriving mid-session.
+        repoState.value = WallpaperState.single("file:///stale_old")
+        advanceUntilIdle()
+
+        // Ignored while editing — the two added layers stay.
+        assertThat(c.wallpaperState.value.layers.map { it.imageUri })
+            .containsExactly("file:///a", "file:///b").inOrder()
+    }
+
+    @Test
     fun `toggle backdrop flips and persists`() = runTest(mainDispatcherRule.dispatcher) {
         coEvery { displaySettings.wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.SYSTEM_WALLPAPER)
         val c = coordinator()
