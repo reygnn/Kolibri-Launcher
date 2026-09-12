@@ -12,4 +12,9 @@
     <string name="backup_import_done">Layout imported</string>
     <string name="backup_import_failed">Could not read file</string>
     <string name="backup_import_invalid">Invalid backup file</string>
+    <!-- Home-info header placeholders (shown until the ClockDelegate emits). Not
+         UI prose — the clock/battery fill them at runtime. -->
+    <string name="time_placeholder" translatable="false">--:--</string>
+    <string name="date_placeholder" translatable="false">---</string>
+    <string name="battery_placeholder" translatable="false">---%</string>
 </resources>

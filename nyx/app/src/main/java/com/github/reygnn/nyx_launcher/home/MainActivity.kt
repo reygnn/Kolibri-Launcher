@@ -1,8 +1,11 @@
 package com.github.reygnn.nyx_launcher.home
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
@@ -31,7 +34,9 @@ import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
+import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -41,6 +46,7 @@ import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -64,12 +70,27 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     @Inject lateinit var iconLoader: IconLoader
     @Inject lateinit var folderRenderer: FolderIconRenderer
+    @Inject lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
 
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
     private lateinit var dock: RecyclerView
     private lateinit var drawerContainer: View
     private lateinit var removeBar: TextView
+    private lateinit var clockTime: TextView
+    private lateinit var clockDate: TextView
+    private lateinit var clockBattery: TextView
+
+    // Shared home-info delegate (HIE Phase C): clock/date/battery/events StateFlows.
+    private lateinit var clockDelegate: ClockDelegate
+
+    // App-local battery receiver (HIE-INV-3): the running ACTION_BATTERY_CHANGED
+    // stream is bound to onResume/onPause and fed to the shared delegate.
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            clockDelegate.updateBatteryLevelFromIntent(intent)
+        }
+    }
     private var pagerAdapter: HomePagerAdapter? = null
     private var currentGrid: GridSpec? = null
     private lateinit var dockAdapter: DockAdapter
@@ -86,7 +107,17 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         dock = findViewById(R.id.dock)
         drawerContainer = findViewById(R.id.drawer_container)
         removeBar = findViewById(R.id.remove_bar)
+        clockTime = findViewById(R.id.clock_time)
+        clockDate = findViewById(R.id.clock_date)
+        clockBattery = findViewById(R.id.clock_battery)
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
+
+        clockDelegate = ClockDelegate(
+            context = this,
+            observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
+            scope = lifecycleScope,
+            mainDispatcher = Dispatchers.Main,
+        )
 
         // Edge-to-edge: inset the home content past the status/nav bars. The
         // drawer overlay stays edge-to-edge and covers the bars with its own
@@ -119,12 +150,32 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         pager.doOnLayout { applyDeviceGrid() }
         onBackPressedDispatcher.addCallback(this) { if (drawerContainer.isVisible) hideDrawer() }
 
+        clockDelegate.start()
+
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.layout.collect(::renderLayout) }
                 launch { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
+                launch { clockDelegate.timeString.collect { clockTime.text = it } }
+                launch { clockDelegate.dateString.collect { clockDate.text = it } }
+                launch { clockDelegate.batteryString.collect { clockBattery.text = it } }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // HIE-INV-3: the app owns the live battery receiver; the delegate derives.
+        registerReceiver(
+            batteryReceiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            Context.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
+    override fun onPause() {
+        super.onPause()
+        runCatching { unregisterReceiver(batteryReceiver) }
     }
 
     // ---- setup ----
