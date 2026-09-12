@@ -111,10 +111,14 @@ object HomeLayoutTransition {
             return MoveResult.Rejected(MoveResult.Reason.DOCK_FULL) // §7-D3
         }
         return when {
-            index < 0 || index > dockWithoutSource.size ->
+            index < 0 ->
                 MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
             index < dockWithoutSource.size ->
                 MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
+            // index >= dockWithoutSource.size ⇒ append. The UI passes the
+            // source-inclusive dock size when the finger is past the last icon,
+            // so an in-dock source overshoots the exclusive size by one (A1-13);
+            // treat any trailing index as append, not OFF_GRID.
             else ->
                 MoveResult.Moved(layout.removing(moving).copy(dock = dockWithoutSource + source))
         }

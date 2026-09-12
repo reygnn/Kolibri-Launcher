@@ -164,6 +164,19 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isEqualTo(MoveResult.NoOp)
     }
 
+    @Test fun dock_item_dropped_past_last_icon_moves_to_end() {
+        // A1-13: the UI passes the source-inclusive dock size as the slot when the
+        // finger is past the last dock icon; an in-dock source must append (moved
+        // to the end), not be rejected as OFF_GRID.
+        val a = app("a")
+        val b = app("b", "pb")
+        val c = app("c", "pc")
+        val start = layout(dock = listOf(a, b, c))
+        val r = move(start, a.id, DropTarget.DockSlot(3)) // slot == dock.size (past last)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(b.id, c.id, a.id).inOrder()
+    }
+
     @Test fun dock_item_to_grid_moves_out_of_dock() {
         val a = app("a")
         val start = layout(dock = listOf(a))
