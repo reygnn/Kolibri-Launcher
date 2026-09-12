@@ -26,6 +26,9 @@
     <string name="calendar_permission_title">Kalenderzugriff</string>
     <string name="calendar_permission_rationale">Nyx braucht Kalenderzugriff, um deinen nächsten Termin auf dem Startbildschirm anzuzeigen.</string>
     <string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert</string>
+    <string name="event_all_day">Ganztägig</string>
+    <string name="events_dialog_title">Anstehend</string>
+    <string name="events_tomorrow_separator">— Morgen —</string>
     <string name="backup_export_summary">Startbildschirm-Layout in eine Datei sichern</string>
     <string name="backup_import_summary">Startbildschirm-Layout aus einer Datei wiederherstellen</string>
 </resources>

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Rect
 import android.os.Bundle
+import android.text.format.DateFormat
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
@@ -37,6 +38,9 @@ import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -48,6 +52,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 /**
@@ -80,9 +86,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var clockTime: TextView
     private lateinit var clockDate: TextView
     private lateinit var clockBattery: TextView
+    private lateinit var clockEvents: TextView
 
     // Shared home-info delegate (HIE Phase C): clock/date/battery/events StateFlows.
     private lateinit var clockDelegate: ClockDelegate
+    private val timeEventFormatter = TimeEventFormatter()
+    private var currentEvents: List<TimeBasedEvent> = emptyList()
 
     // App-local battery receiver (HIE-INV-3): the running ACTION_BATTERY_CHANGED
     // stream is bound to onResume/onPause and fed to the shared delegate.
@@ -110,6 +119,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
         clockBattery = findViewById(R.id.clock_battery)
+        clockEvents = findViewById(R.id.clock_events)
+        clockEvents.setOnClickListener { showEventsDialog() }
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
         clockDelegate = ClockDelegate(
@@ -159,8 +170,49 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 launch { clockDelegate.timeString.collect { clockTime.text = it } }
                 launch { clockDelegate.dateString.collect { clockDate.text = it } }
                 launch { clockDelegate.batteryString.collect { clockBattery.text = it } }
+                launch { clockDelegate.timeBasedEvents.collect(::renderEvents) }
             }
         }
+    }
+
+    /** Show the next event as a compact indicator; hide the row when there is none. */
+    private fun renderEvents(events: List<TimeBasedEvent>) {
+        currentEvents = events
+        val next = events.firstOrNull()
+        if (next == null) {
+            clockEvents.visibility = View.GONE
+            return
+        }
+        val label = timeEventFormatter.formatEventRow(
+            next,
+            is24Hour = DateFormat.is24HourFormat(this),
+            allDayLabel = getString(R.string.event_all_day),
+        )
+        clockEvents.text = if (events.size > 1) "$label  (+${events.size - 1})" else label
+        clockEvents.visibility = View.VISIBLE
+    }
+
+    /** All upcoming events, grouped today/tomorrow via the shared formatter. */
+    private fun showEventsDialog() {
+        val events = currentEvents
+        if (events.isEmpty()) return
+        val is24Hour = DateFormat.is24HourFormat(this)
+        val allDay = getString(R.string.event_all_day)
+        val zone = ZoneId.systemDefault()
+        val text = timeEventFormatter.buildEventRows(events, LocalDate.now(zone), zone)
+            .joinToString("\n") { row ->
+                when (row) {
+                    is TimeEventFormatter.EventRow.Item ->
+                        timeEventFormatter.formatEventRow(row.event, is24Hour, allDay)
+                    TimeEventFormatter.EventRow.TomorrowSeparator ->
+                        getString(R.string.events_tomorrow_separator)
+                }
+            }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.events_dialog_title)
+            .setMessage(text)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     override fun onResume() {
