@@ -146,7 +146,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-13 · HomeLayoutTransition.kt:114 — Dragging an existing dock item and dropping past the last dock icon is rejected as OFF_GRID
 
-- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ⬜ offen
+- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** correctness · **Status:** ✅ erledigt (B10)
 - **Datei:** `nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/transition/HomeLayoutTransition.kt:114`
 - **Detail:** MainActivity.kt:187-191 sets slot=dockSize (=layout.dock.size, set at :233, includes the still-persisted dragged item) when the finger misses any dock child (trailing empty area). In moveToDock (HomeLayoutTransition.kt:109-120) dockWithoutSource excludes the source, so for an already-in-dock source its size is dockSize-1; the guard index > dockWithoutSource.size at line 114 becomes dockSize > dockSize-1 -> true -> Rejected(OFF_GRID). The same slot=dockSize correctly appends a grid-origin item (dockWithoutSource = full dock, dockSize > dockSize is false). So the 'drag a dock icon to the end of the dock' gesture is silently a no-op; paths are inconsistent. Lossless.
 - **Fix-Vorschlag:** In the dock zone onDrop clamp the append index for an in-dock source (treat slot >= dockWithoutSource.size as append), or have moveToDock treat index == source-inclusive dock size as append rather than OFF_GRID.
@@ -154,7 +154,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-14 · MoveItemUseCase.kt:26 — Five edit use-cases repeat the identical read-transform-save-on-change IO shell
 
-- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** duplication · **Status:** ⬜ offen
+- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** duplication · **Status:** ✅ erledigt (B11 — `runLayoutEdit` + Supertyp `LayoutEditResult`)
 - **Datei:** `nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/usecase/MoveItemUseCase.kt:26`
 - **Detail:** All five use-cases share the same read-once/transform/save-only-on-change/dispatcher-hop body, differing only in which transition they call.
 - **Fix-Vorschlag:** Add a shared inline runLayoutEdit(dispatcher){ current -> R } helper and reduce each use-case body to a single transition call.
@@ -162,7 +162,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-15 · IconLoaderImpl.kt:137 — removeFromIndex scans the entire package index per evicted key instead of using the key's package
 
-- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** icon-cache · **Status:** ⬜ offen
+- **Schwere:** LOW · **Verdikt:** CONFIRMED · **Kategorie:** icon-cache · **Status:** ✅ erledigt (B12 — Reverse-Map `keyToPackage`, O(1)-Removal; korrektes Paket per Lookup, nicht aus dem ref)
 - **Datei:** `nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/IconLoaderImpl.kt:137`
 - **Detail:** Verified: removeFromIndex (137-144) iterates over every packageIndex entry and every CacheKey in each entry's set per evicted key. Called per-key from the bitmap() eviction loop (86-89) and from trim() (108-111), all under the lock monitor — O(evicted × totalKeys). Total keys is bounded by the memory byte-budget (4-64MB) so realistically tens-to-hundreds of entries, making this minor. NOTE: the finding's suggestion to use pkgOf(ref) is partly wrong — an insertion for one package can evict LRU keys belonging to OTHER packages, so pkgOf(ref) is not the evicted key's package. The valid fix is a reverse CacheKey->pkg map or resolving the package from the key's encoded prefix.
 - **Fix-Vorschlag:** Maintain a reverse CacheKey->pkg lookup (or parse the package from the key prefix) so eviction removes from exactly one packageIndex set instead of scanning the whole index.
@@ -170,7 +170,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-16 · FakePreferencesRepository.kt:1 — PreferencesRepository/InstalledAppsRepository lack the shared contract-test triple HomeLayoutRepository has.
 
-- **Schwere:** LOW · **Verdikt:** PLAUSIBLE · **Kategorie:** test-coverage · **Status:** ⬜ offen
+- **Schwere:** LOW · **Verdikt:** PLAUSIBLE · **Kategorie:** test-coverage · **Status:** ✅ erledigt (B13 — Triple für PreferencesRepository; InstalledAppsRepository bewusst ohne JVM-Contract, siehe Interface-KDoc + A1-11)
 - **Datei:** `nyx/domain/src/testFixtures/java/com/github/reygnn/nyx_launcher/home/repository/FakePreferencesRepository.kt:1`
 - **Detail:** Facts confirmed: HomeLayoutRepository has the full triple (HomeLayoutRepositoryContract abstract + FakeHomeLayoutRepositoryContractTest + HomeLayoutRepositoryImplContractTest), pinning Fake and impl to the same behavior. PreferencesRepository has only FakePreferencesRepository + a plain PreferencesRepositoryImplTest (not a contract extension, verified — it constructs PreferencesRepositoryImpl(FakeDataStore()) directly), so the Fake is never checked against the same assertions as the impl. InstalledAppsRepository has only a Fake, no impl test at all. Whether these repos are *meant* to follow the triple pattern is debatable — the reviewer itself hedges, and it is plausibly intentional that only the serialization/DataStore-backed HomeLayoutRepository got the full contract while a single-boolean flow got a simpler test. More of a convention observation than a definite defect.
 - **Fix-Vorschlag:** If following the HomeLayoutRepository pattern, extract PreferencesRepositoryContract (and InstalledAppsRepositoryContract) run against both Fake and impl.
@@ -178,7 +178,7 @@ Zweiter adversarieller Multi-Agent-Review gegen die Fixes (Diff `main..chore/nyx
 
 ### A1-17 · HomeLayout.kt:45 — PlacedItem.span is threaded through model/DTO/mappers/regridder but never set non-default
 
-- **Schwere:** LOW · **Verdikt:** PLAUSIBLE · **Kategorie:** unused-abstraction · **Status:** ⬜ offen
+- **Schwere:** LOW · **Verdikt:** PLAUSIBLE · **Kategorie:** unused-abstraction · **Status:** ✅ erledigt (B14 — als reservierte v2-Widget-Forward-Compat dokumentiert; `Span` trug die Notiz schon, jetzt auch `PlacedItem.span`. Nicht entfernt: `ICON_HOME_MODEL_SPEC` treibt das persistierte Format)
 - **Datei:** `nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/model/HomeLayout.kt:45`
 - **Detail:** span defaults to Span() and no path constructs a non-default span; the concept spreads across model, DTO (spanW/spanH), mappers, and the regridder relocation queue for a multi-cell feature that doesn't exist yet.
 - **Fix-Vorschlag:** If multi-cell items aren't imminent, drop span from the domain model + regridder (keep only DTO defaults for forward-compat) or flag it as reserved; if imminent, no change needed.
