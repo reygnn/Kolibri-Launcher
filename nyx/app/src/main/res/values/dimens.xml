@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-info spacings/sizes, matched to Kolibri's fragment_home.xml so the
+     clock + event indicators read the same across both launchers. -->
+<resources>
+    <dimen name="spacing_medium">8dp</dimen>
+    <dimen name="spacing_small">4dp</dimen>
+    <dimen name="spacing_xlarge">48dp</dimen>
+    <dimen name="text_size_time">60sp</dimen>
+    <dimen name="text_size_secondary_info">18sp</dimen>
+    <dimen name="events_icon_size">28dp</dimen>
+    <dimen name="events_icon_padding">4dp</dimen>
+</resources>

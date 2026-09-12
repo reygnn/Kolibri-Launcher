@@ -22,16 +22,16 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center_horizontal"
-            android:paddingTop="24dp"
-            android:paddingBottom="8dp">
+            android:paddingTop="@dimen/spacing_xlarge"
+            android:paddingBottom="@dimen/spacing_medium">
 
-            <!-- Time with the two event indicators next to it (HIE Phase C3, mirrors
-                 Kolibri): the alarm icon shows when a next alarm exists, the calendar
-                 icon when a next calendar event exists. INVISIBLE (not GONE) so each
-                 holds a fixed slot next to the clock. Signals only — a double-tap on
-                 the home opens the full events dialog. -->
+            <!-- Clock row: the time plus the two passive event indicators stacked
+                 next to it (HIE Phase C3, mirrors Kolibri's fragment_home.xml —
+                 alarm on top, calendar below, spacing_medium past the time). Each
+                 icon shows only when an upcoming event of its type exists; INVISIBLE
+                 (not GONE) so it holds a fixed slot and the clock never shifts.
+                 Signals only — a double-tap on the home opens the full list. -->
             <LinearLayout
-                android:id="@+id/event_indicators"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
@@ -41,32 +41,43 @@
                     android:id="@+id/clock_time"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-light"
                     android:text="@string/time_placeholder"
                     android:textColor="@android:color/white"
-                    android:textSize="48sp" />
+                    android:textSize="@dimen/text_size_time" />
 
-                <ImageView
-                    android:id="@+id/event_alarm_indicator"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_marginStart="10dp"
-                    android:contentDescription="@string/show_alarm_title"
-                    android:src="@drawable/ic_alarm"
-                    android:visibility="invisible" />
+                <LinearLayout
+                    android:id="@+id/event_indicators"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/spacing_medium"
+                    android:orientation="vertical"
+                    android:gravity="center">
 
-                <ImageView
-                    android:id="@+id/event_calendar_indicator"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_marginStart="6dp"
-                    android:contentDescription="@string/show_calendar_event_title"
-                    android:src="@drawable/ic_event"
-                    android:visibility="invisible" />
+                    <ImageView
+                        android:id="@+id/event_alarm_indicator"
+                        android:layout_width="@dimen/events_icon_size"
+                        android:layout_height="@dimen/events_icon_size"
+                        android:padding="@dimen/events_icon_padding"
+                        android:contentDescription="@string/show_alarm_title"
+                        android:src="@drawable/ic_alarm"
+                        android:visibility="invisible" />
+
+                    <ImageView
+                        android:id="@+id/event_calendar_indicator"
+                        android:layout_width="@dimen/events_icon_size"
+                        android:layout_height="@dimen/events_icon_size"
+                        android:padding="@dimen/events_icon_padding"
+                        android:contentDescription="@string/show_calendar_event_title"
+                        android:src="@drawable/ic_event"
+                        android:visibility="invisible" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_small"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
@@ -76,16 +87,16 @@
                     android:layout_height="wrap_content"
                     android:text="@string/date_placeholder"
                     android:textColor="@android:color/white"
-                    android:textSize="16sp" />
+                    android:textSize="@dimen/text_size_secondary_info" />
 
                 <TextView
                     android:id="@+id/clock_battery"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="@dimen/spacing_medium"
                     android:text="@string/battery_placeholder"
                     android:textColor="@android:color/white"
-                    android:textSize="16sp" />
+                    android:textSize="@dimen/text_size_secondary_info" />
             </LinearLayout>
         </LinearLayout>
 
