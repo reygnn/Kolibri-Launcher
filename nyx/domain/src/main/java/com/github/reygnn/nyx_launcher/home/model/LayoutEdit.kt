@@ -5,8 +5,8 @@ package com.github.reygnn.nyx_launcher.home.model
  * the layout or don't. See HOME_EDIT_USECASES_SPEC §1. [layout] is `null` ⇔ no
  * change ⇒ the use-case skips the save.
  */
-sealed interface LayoutEdit {
-    val layout: HomeLayout?
+sealed interface LayoutEdit : LayoutEditResult {
+    override val layout: HomeLayout?
 
     data class Changed(override val layout: HomeLayout) : LayoutEdit
 

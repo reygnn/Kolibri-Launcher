@@ -4,8 +4,8 @@ package com.github.reygnn.nyx_launcher.home.model
  * Outcome of extracting a member from a folder. See REMOVE_FROM_FOLDER_SPEC §1.
  * Reuses [MoveResult.Reason]. [layout] is `null` ⇔ no change.
  */
-sealed interface FolderEditResult {
-    val layout: HomeLayout?
+sealed interface FolderEditResult : LayoutEditResult {
+    override val layout: HomeLayout?
 
     /** Folder had >= 3 members → it shrinks; the extracted app lands at target. */
     data class Extracted(override val layout: HomeLayout, val app: ItemId) : FolderEditResult

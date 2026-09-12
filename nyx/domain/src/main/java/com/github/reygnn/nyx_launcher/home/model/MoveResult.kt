@@ -8,8 +8,8 @@ package com.github.reygnn.nyx_launcher.home.model
  * [layout] is `null` exactly when the state did not change ([NoOp], [Rejected]),
  * which is the use-case's signal to skip the DataStore write.
  */
-sealed interface MoveResult {
-    val layout: HomeLayout?
+sealed interface MoveResult : LayoutEditResult {
+    override val layout: HomeLayout?
 
     /** Item relocated to the target (also the outcome of a fresh placement). */
     data class Moved(override val layout: HomeLayout) : MoveResult
