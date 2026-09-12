@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -29,7 +29,7 @@ import java.io.IOException
  * `ClassCastException`s and other read `RuntimeException`s — see its "doomsday"
  * tests), so it does not route through here.
  */
-internal fun DataStore<Preferences>.safeReadFlow(errorMessage: String): Flow<Preferences> =
+fun DataStore<Preferences>.safeReadFlow(errorMessage: String): Flow<Preferences> =
     data.catch { e ->
         if (e is IOException) {
             TimberWrapper.silentError(e, errorMessage)
@@ -62,7 +62,7 @@ internal fun DataStore<Preferences>.safeReadFlow(errorMessage: String): Flow<Pre
  * programmer error, so it must not throw in DEBUG (DSR-INV-3). [safeReadFlow]
  * stays for the out-of-scope repos that append their own `.map { }`.
  */
-internal fun <T> DataStore<Preferences>.readFlowFailOpen(
+fun <T> DataStore<Preferences>.readFlowFailOpen(
     errorMessage: String,
     transform: suspend (Preferences) -> T,
 ): Flow<T> =
@@ -92,7 +92,7 @@ internal fun <T> DataStore<Preferences>.readFlowFailOpen(
  * DEBUG (DSR-INV-3). [CancellationException] is rethrown first, before the
  * IOException arm, so cooperative cancellation always propagates (DSR-INV-5).
  */
-internal suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
+suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
     errorMessage: String,
     transform: suspend (Preferences) -> T,
 ): T =
@@ -118,6 +118,6 @@ internal suspend fun <T> DataStore<Preferences>.snapshotFailOpen(
  * (DSR-INV-5). Contrast [snapshotFailOpen] (Anzeige / backup) which recovers
  * IOException to the empty default.
  */
-internal suspend fun <T> DataStore<Preferences>.snapshotFailClosed(
+suspend fun <T> DataStore<Preferences>.snapshotFailClosed(
     transform: suspend (Preferences) -> T,
 ): T = transform(data.first())

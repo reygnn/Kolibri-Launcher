@@ -39,7 +39,12 @@ dependencies {
     api(project(":core"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.timber)
+    // NOTE: org.json is provided by the Android platform (android.jar) at compile
+    // AND runtime — do NOT add libs.json as an implementation dep (bundling a second
+    // copy breaks R8; see kolibri :data). WallpaperRepositoryImpl uses org.json.*.
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

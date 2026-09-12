@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data.wallpaper
 
 import android.content.Context
 import android.net.Uri

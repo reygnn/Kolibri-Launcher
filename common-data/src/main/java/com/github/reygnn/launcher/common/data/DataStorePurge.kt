@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
@@ -28,7 +28,7 @@ import kotlinx.coroutines.CancellationException
  * Introduced for AUDIT.md §8.7 to consolidate the six purgeRepository
  * implementations that share this exact body.
  */
-internal suspend fun DataStore<Preferences>.safePurge(
+suspend fun DataStore<Preferences>.safePurge(
     repoName: String,
     block: suspend (MutablePreferences) -> Unit
 ) {

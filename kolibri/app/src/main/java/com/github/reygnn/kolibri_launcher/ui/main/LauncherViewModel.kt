@@ -20,7 +20,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.core.CompositeLuminanceSignal

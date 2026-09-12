@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.util
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract

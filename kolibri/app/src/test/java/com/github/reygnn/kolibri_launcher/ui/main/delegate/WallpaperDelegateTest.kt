@@ -1,11 +1,12 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
 import android.content.Context
 import android.net.Uri
-import com.github.reygnn.kolibri_launcher.data.WallpaperFileManager
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import android.graphics.Bitmap
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap

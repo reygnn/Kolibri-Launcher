@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
+import com.github.reygnn.launcher.common.data.safeReadFlow
 
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 

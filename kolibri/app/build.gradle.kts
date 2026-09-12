@@ -265,6 +265,10 @@ dependencies {
     // Project modules
     implementation(project(":kolibri:domain"))
     implementation(project(":kolibri:data"))
+    // Shared wallpaper persistence (WallpaperFileManager/RepositoryImpl) is injected
+    // directly into LauncherViewModel/WallpaperDelegate, so :app needs :common-data
+    // on its own classpath (kolibri:data depends on it via non-transitive implementation).
+    implementation(project(":common-data"))
 
 
     // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,

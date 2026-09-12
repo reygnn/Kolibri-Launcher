@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 /**
  * ============================================================================

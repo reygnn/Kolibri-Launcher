@@ -246,7 +246,7 @@ cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
   "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/timeinfo/TimeBasedEventsRepositoryImpl.kt" # shared to :common-data (HIE Phase B)
   "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/FlowCollection.kt" # moved to :common-ui in the monorepo merge; still the highest-blast-radius collector
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/DataStoreMaintenanceRepositoryImpl.kt"
@@ -456,8 +456,8 @@ oom_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperFileManager.kt"
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt"
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
 )
@@ -574,7 +574,7 @@ owner_marker='override fun ownedExactKeys|override fun ownedKeyPrefixes'
 
 # (a) per-owner completeness — over every structural owner.
 owner_files=$(grep -rlE "$owner_marker" \
-  "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" 2>/dev/null || true)
+  "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" "$repo_root/../common-data/src/main/java" 2>/dev/null || true)
 
 if [ -z "$owner_files" ]; then
   report "Settings-store keep-list — no OwnsSettingsStoreKeys owner found (interface renamed / override methods gone?)" "expected at least one owner overriding $owner_marker"
@@ -613,7 +613,7 @@ while IFS= read -r kt; do
 " ;;
     esac
   fi
-done < <(find "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" -name '*.kt')
+done < <(find "$repo_root/app/src/main/java" "$repo_root/data/src/main/java" "$repo_root/../common-data/src/main/java" -name '*.kt')
 
 if [ -n "$straggler_hits" ]; then
   report "Settings-store keep-list — unclassified DataStore-key writer (implement OwnsSettingsStoreKeys + register its keys, or add it to the non-settings writers list if it targets the usage/consent store)" "${straggler_hits%$'\n'}"

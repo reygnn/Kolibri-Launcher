@@ -16,7 +16,7 @@ import com.github.reygnn.kolibri_launcher.data.ShortcutRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.SwipeActionsRepositoryImpl
 import com.github.reygnn.launcher.common.data.timeinfo.TimeBasedEventsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.UsageExportRepositoryImpl
-import com.github.reygnn.kolibri_launcher.data.WallpaperRepositoryImpl
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.service.ComponentLabelResolverImpl
 import com.github.reygnn.kolibri_launcher.data.service.PackagePresenceImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
