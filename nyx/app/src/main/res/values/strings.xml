@@ -34,6 +34,11 @@
     <string name="wallpaper_set_toast">Wallpaper set</string>
     <string name="wallpaper_set_failed_toast">Could not set wallpaper</string>
     <string name="wallpaper_cleared_toast">Wallpaper removed</string>
+
+    <!-- Live-preview customization sheet -->
+    <string name="customize_title">Customize</string>
+    <string name="customize_scrim_label">Wallpaper dim</string>
+    <string name="customize_all_settings">All settings</string>
     <string name="show_calendar_event_title">Show calendar events</string>
     <string name="show_calendar_event_summary">Show the next calendar event on the home screen</string>
     <string name="show_alarm_title">Show next alarm</string>

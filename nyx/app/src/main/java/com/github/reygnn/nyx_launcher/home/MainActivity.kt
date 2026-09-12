@@ -417,11 +417,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // swipes fall through untouched via the analyzer's axis dominance.
         homeRoot.onSwipeUp = { showDrawer() }
 
-        // Long-press on empty home space opens Settings. The shared core's
-        // hit-test suppresses this over app icons and dock icons (they keep
-        // their own long-press → drag), so it only fires on the wallpaper /
+        // Long-press on empty home space opens the live-preview customization
+        // sheet (scrim/dim, monochrome, wallpaper, → full Settings). The shared
+        // core's hit-test suppresses this over app icons and dock icons (they
+        // keep their own long-press → drag), so it only fires on the wallpaper /
         // empty area.
-        homeRoot.onLongPress = { openSettings() }
+        homeRoot.onLongPress = { showCustomizationDialog() }
 
         // Double-tap on empty home space shows the upcoming events (HIE Phase C3,
         // mirrors Kolibri); the two indicators next to the clock just signal that
@@ -594,6 +595,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    private fun showCustomizationDialog() {
+        NyxCustomizationDialog().show(supportFragmentManager, NyxCustomizationDialog.TAG)
     }
 
     private fun launchApp(key: ComponentKey) {
