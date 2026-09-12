@@ -17,4 +17,18 @@
     <string name="time_placeholder" translatable="false">--:--</string>
     <string name="date_placeholder" translatable="false">---</string>
     <string name="battery_placeholder" translatable="false">---%</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="category_display_title">Display</string>
+    <string name="category_backup_title">Backup &amp; restore</string>
+    <string name="monochrome_icons_summary">Render app icons in monochrome</string>
+    <string name="backup_export_summary">Save the home layout to a file</string>
+    <string name="backup_import_summary">Restore the home layout from a file</string>
+    <!-- Developer (ACRA) — debug / -PdevCommands only, not shown publicly -->
+    <string name="dev_commands_category_title" translatable="false">Developer — ACRA</string>
+    <string name="dev_grant_consent_title" translatable="false">Grant consent + enable</string>
+    <string name="dev_throw_test_title" translatable="false">Throw test exception</string>
+    <string name="dev_silent_error_title" translatable="false">Silent-error test</string>
+    <string name="dev_warn_test_title" translatable="false">Warn test (no report)</string>
 </resources>

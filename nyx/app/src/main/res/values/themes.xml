@@ -12,4 +12,8 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <!-- Settings is a normal opaque Material 3 screen (with ActionBar), unlike the
+         transparent wallpaper-showing home theme — mirrors Kolibri's settings look. -->
+    <style name="Theme.Nyx.Settings" parent="Theme.Material3.DayNight" />
+
 </resources>

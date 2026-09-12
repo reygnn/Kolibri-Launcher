@@ -36,7 +36,8 @@
         <activity
             android:name=".settings.SettingsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Nyx" />
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.Nyx.Settings" />
     </application>
 
 </manifest>

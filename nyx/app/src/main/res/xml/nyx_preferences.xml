@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/category_display_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="monochrome_icons"
+            android:title="@string/monochrome_icons"
+            android:summary="@string/monochrome_icons_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_backup_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="export_layout"
+            android:title="@string/backup_export"
+            android:summary="@string/backup_export_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="import_layout"
+            android:title="@string/backup_import"
+            android:summary="@string/backup_import_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <!-- ACRA dev commands: hidden at runtime unless BuildConfig.SHOW_DEV_COMMANDS
+         (debug, or a personal -PdevCommands release). Mirrors Kolibri. -->
+    <PreferenceCategory
+        android:key="dev_commands"
+        android:title="@string/dev_commands_category_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="dev_grant_consent"
+            android:title="@string/dev_grant_consent_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="dev_throw_test"
+            android:title="@string/dev_throw_test_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="dev_silent_error"
+            android:title="@string/dev_silent_error_title"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="dev_warn_test"
+            android:title="@string/dev_warn_test_title"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

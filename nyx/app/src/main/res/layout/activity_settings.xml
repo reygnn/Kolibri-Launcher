@@ -1,98 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Settings hosts a PreferenceFragmentCompat; the ActionBar (title + up) comes
+     from Theme.Nyx.Settings. Mirrors Kolibri's settings structure. -->
+<androidx.fragment.app.FragmentContainerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_container"
+    android:name="com.github.reygnn.nyx_launcher.settings.SettingsFragment"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:background="#EE101010"
-    android:padding="24dp"
-    android:fitsSystemWindows="true">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/settings_backup_title"
-        android:textColor="@android:color/white"
-        android:textSize="20sp"
-        android:layout_marginBottom="24dp" />
-
-    <LinearLayout
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="20dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/monochrome_icons"
-            android:textColor="@android:color/white"
-            android:textSize="15sp" />
-
-        <Switch
-            android:id="@+id/monochrome_switch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/export_button"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="@string/backup_export" />
-
-    <Button
-        android:id="@+id/import_button"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:text="@string/backup_import" />
-
-    <!-- ACRA dev commands (gated by BuildConfig.SHOW_DEV_COMMANDS at runtime) -->
-    <LinearLayout
-        android:id="@+id/dev_commands_section"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:layout_marginTop="24dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Developer — ACRA"
-            android:textColor="#FF8888"
-            android:textSize="13sp"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/dev_grant_consent"
-            android:layout_width="220dp"
-            android:layout_height="wrap_content"
-            android:text="ACRA: grant consent" />
-
-        <Button
-            android:id="@+id/dev_throw_test"
-            android:layout_width="220dp"
-            android:layout_height="wrap_content"
-            android:text="ACRA: throw test exception" />
-
-        <Button
-            android:id="@+id/dev_silent_error"
-            android:layout_width="220dp"
-            android:layout_height="wrap_content"
-            android:text="ACRA: silent-error test" />
-
-        <Button
-            android:id="@+id/dev_warn_test"
-            android:layout_width="220dp"
-            android:layout_height="wrap_content"
-            android:text="ACRA: warn test (no report)" />
-
-    </LinearLayout>
-
-</LinearLayout>
+    android:fitsSystemWindows="true" />
