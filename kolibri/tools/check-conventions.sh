@@ -245,7 +245,7 @@ cancel_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/TimeBasedEventsRepositoryImpl.kt"
-  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/flow/FlowCollection.kt"
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/FlowCollection.kt" # moved to :common-ui in the monorepo merge; still the highest-blast-radius collector
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/WallpaperRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt"

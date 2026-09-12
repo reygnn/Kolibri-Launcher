@@ -428,7 +428,7 @@ configurations.all {
 tasks.register<Exec>("checkConventions") {
     group = "verification"
     description = "Runs the project-convention linter (CLAUDE.md rules)."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/check-conventions.sh")
     // AUDIT-13 stale-replay gate rides along with the main convention gate so the
     // single CI step (`./gradlew checkConventions`) enforces it. It is a separate
@@ -447,7 +447,7 @@ tasks.register<Exec>("checkConventions") {
 tasks.register<Exec>("checkRule13") {
     group = "verification"
     description = "Runs the Rule 13 (German comments) linter against the git diff."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/check-rule13-german-comments.sh")
 }
 
@@ -460,7 +460,7 @@ tasks.register<Exec>("checkRule13") {
 tasks.register<Exec>("scanCancelCandidates") {
     group = "verification"
     description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/scan-cancel-candidates.sh")
 }
 
@@ -479,7 +479,7 @@ tasks.register<Exec>("scanCancelCandidates") {
 tasks.register<Exec>("checkStaleReplayRead") {
     group = "verification"
     description = "Verifies hot-flow point-reads in the stale_files whitelist carry a marker (AUDIT-13)."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/check-stale-replay-read.sh")
 }
 
@@ -493,7 +493,7 @@ tasks.register<Exec>("checkStaleReplayRead") {
 tasks.register<Exec>("scanStaleReplayRead") {
     group = "verification"
     description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/scan-stale-replay-candidates.sh")
 }
 
@@ -505,7 +505,7 @@ tasks.register<Exec>("scanStaleReplayRead") {
 tasks.register<Exec>("scanOomCandidates") {
     group = "verification"
     description = "Lists non-whitelisted files whose Exception catches may belong in oom_files (report-only)."
-    workingDir = rootDir
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "tools/scan-oom-candidates.sh")
 }
 
