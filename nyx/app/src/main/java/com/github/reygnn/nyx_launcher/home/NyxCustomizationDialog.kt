@@ -51,12 +51,14 @@ class NyxCustomizationDialog : DialogFragment() {
 
     private val pickWallpaperImage =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            // Set THEN dismiss: dismiss() cancels this fragment's lifecycleScope, so
-            // dismissing before the suspend set completes would abort the save.
+            // Persist on the ACTIVITY scope (survives this dialog's dismiss), then
+            // dismiss. Using the fragment scope would abort the save if the sheet is
+            // dismissed externally (tap-outside/back) mid-copy. (The activity isn't
+            // recreated on rotation — broad configChanges — so this is robust.)
             if (uri != null) {
-                lifecycleScope.launch {
+                requireActivity().lifecycleScope.launch {
                     wallpaperImageSetter.setFromUri(uri)
-                    dismiss()
+                    if (isAdded) dismiss()
                 }
             }
         }
@@ -113,7 +115,12 @@ class NyxCustomizationDialog : DialogFragment() {
             )
         }
         view.findViewById<MaterialButton>(R.id.btn_clear_wallpaper).setOnClickListener {
-            lifecycleScope.launch { wallpaperImageSetter.clear() }
+            // Activity scope + dismiss after (like choose): the sheet closes so its
+            // Edit entry can't linger stale over a now-empty wallpaper.
+            requireActivity().lifecycleScope.launch {
+                wallpaperImageSetter.clear()
+                if (isAdded) dismiss()
+            }
         }
         val host = activity as? MainActivity
         view.findViewById<MaterialButton>(R.id.btn_edit_wallpaper).apply {

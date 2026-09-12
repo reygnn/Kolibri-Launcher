@@ -321,6 +321,18 @@ class NyxWallpaperEditController(
 
     // ---- layer UI updates ----
 
+    /**
+     * Re-syncs the edit toolbar (indicator + layer buttons) after an async view
+     * rebuild finishes — wired to the binder's onRebuildComplete. Without this, the
+     * CommandsPanel stays stale after an Add/Delete until the next layer tap
+     * (mirrors Kolibri's HomeFragment.updateWallpaper edit-mode refresh). No-op
+     * outside edit mode (both callees guard on the inflated overlay).
+     */
+    fun onWallpaperRebuilt() {
+        updateLayerIndicator()
+        applyLayerButtonsState()
+    }
+
     fun updateLayerIndicator() {
         overlayRoot ?: return
         val count = wallpaperView.layerCount

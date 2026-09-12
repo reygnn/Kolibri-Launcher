@@ -289,29 +289,49 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // backdrop react to their own settings flows.
                 launch {
                     wallpaperEditCoordinator.wallpaperState.collect {
-                        wallpaperBinder.bind(wallpaperView, it, preferredActiveLayerId = wallpaperEditCoordinator.consumePendingFocusLayerId())
+                        wallpaperBinder.bind(
+                            wallpaperView,
+                            it,
+                            preferredActiveLayerId = wallpaperEditCoordinator.consumePendingFocusLayerId(),
+                            // Re-sync the edit toolbar after an async rebuild (add/delete),
+                            // else the layer indicator + buttons stay stale until a tap.
+                            onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
+                        )
                     }
                 }
-                launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { applyScrim(it) } }
+                launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { currentScrimAlpha = it; applyScrim() } }
                 launch {
                     wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
                         applyBackdrop(it)
                         wallpaperEditController.applyBackdrop(it)
                     }
                 }
-                launch { wallpaperEditCoordinator.isEditMode.collect { wallpaperEditController.applyEditMode(it) } }
+                launch {
+                    wallpaperEditCoordinator.isEditMode.collect {
+                        wallpaperEditController.applyEditMode(it)
+                        // Suppress the scrim during edit so the user adjusts against the
+                        // wallpaper's true appearance (ScrimRender honours isEditMode).
+                        applyScrim()
+                    }
+                }
                 launch { fabPositionStore.fabPositionFlow.collect { wallpaperEditController.applyFabPosition(it) } }
             }
         }
     }
 
+    /** Last scrim alpha from settings; applyScrim() combines it with the edit flag. */
+    private var currentScrimAlpha = 0f
+
     /**
      * Applies the user-controlled dim overlay above the wallpaper. The color
-     * (alpha baked in) comes from the shared [ScrimRender]; null → no scrim.
-     * Edit mode (WV5d) is not wired yet, so [isEditMode] is always false.
+     * (alpha baked in) comes from the shared [ScrimRender]; null → no scrim. During
+     * edit mode ScrimRender returns null so the wallpaper shows its true appearance.
      */
-    private fun applyScrim(alpha: Float) {
-        val color = ScrimRender.colorOrNull(alpha = alpha, isEditMode = false)
+    private fun applyScrim() {
+        val color = ScrimRender.colorOrNull(
+            alpha = currentScrimAlpha,
+            isEditMode = wallpaperEditCoordinator.isEditMode.value,
+        )
         if (color == null) {
             wallpaperScrim.visibility = View.GONE
         } else {
