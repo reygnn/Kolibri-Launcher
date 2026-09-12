@@ -40,6 +40,7 @@ import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
@@ -48,6 +49,7 @@ import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -66,6 +68,7 @@ import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,6 +103,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     // mirroring the ClockDelegate pattern.
     @Inject lateinit var wallpaperRepository: WallpaperRepository
     @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
+    @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
@@ -119,8 +123,21 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     // thread; a single job at a time avoids overlapping rebuilds of the view.
     private val wallpaperBinder by lazy {
         WallpaperViewBinder(bitmapLoader = { uri: Uri ->
+            // BitmapLoader contract: return null on failure, let only cancellation
+            // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
+            // openInputStream can throw FileNotFoundException/SecurityException and
+            // decode can OOM (Throwable). Without this guard the throw would escape
+            // bind() → the unguarded collect/launch → crash the HOME activity
+            // (mirrors Kolibri's loadBitmapFromUri).
             withContext(Dispatchers.IO) {
-                decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+                try {
+                    decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
+                    null
+                }
             }
         })
     }
@@ -207,6 +224,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         onBackPressedDispatcher.addCallback(this) { if (drawerContainer.isVisible) hideDrawer() }
 
         clockDelegate.start()
+
+        // One-shot on startup: reclaim wallpaper files stranded by a crash between
+        // copy and save (the shared repo/file-manager split doesn't self-clean).
+        lifecycleScope.launch { wallpaperImageSetter.reclaimOrphans() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
