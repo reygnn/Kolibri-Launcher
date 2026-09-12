@@ -6,7 +6,7 @@
     android:layout_height="match_parent">
 
     <!-- Layer 0: Custom Wallpaper (unterster Layer) -->
-    <com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+    <com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
         android:id="@+id/wallpaperView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -1,6 +1,5 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.common.ui.wallpaper
 
-import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
 
 /**
  * Pure state-machine description of the wallpaper edit-mode enter / exit

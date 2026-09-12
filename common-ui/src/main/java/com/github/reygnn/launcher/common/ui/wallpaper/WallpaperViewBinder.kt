@@ -1,10 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
-import com.github.reygnn.launcher.common.ui.wallpaper.RebuildPlan
-import com.github.reygnn.launcher.common.ui.wallpaper.LayerPropertyUpdate
-import com.github.reygnn.launcher.common.ui.wallpaper.LayerLoadSpec
-import com.github.reygnn.launcher.common.ui.wallpaper.ViewLayerSnapshot
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewDiff
-import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
+package com.github.reygnn.launcher.common.ui.wallpaper
 import com.github.reygnn.launcher.core.wallpaper.resolveCaptureSampleSize
 import com.github.reygnn.launcher.core.wallpaper.compensateScaleForSampleSize
 
@@ -14,7 +8,6 @@ import android.view.View
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -521,7 +514,7 @@ class WallpaperViewBinder(
          * view-free so it can be unit-tested directly.
          */
         @VisibleForTesting
-        internal fun remapUpdatesToAddedLayers(
+        fun remapUpdatesToAddedLayers(
             plannedLayers: List<LayerLoadSpec>,
             updates: List<LayerPropertyUpdate>,
             addedLayerIds: List<String>,

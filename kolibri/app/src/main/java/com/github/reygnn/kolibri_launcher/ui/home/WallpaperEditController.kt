@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
 import android.view.View
 import com.github.reygnn.kolibri_launcher.R
@@ -12,8 +13,8 @@ import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryReport
 import com.github.reygnn.launcher.core.wallpaper.formatMegabytes
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditState
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditTransition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel

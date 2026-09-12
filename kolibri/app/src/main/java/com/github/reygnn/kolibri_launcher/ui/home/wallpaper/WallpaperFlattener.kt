@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
 
@@ -12,7 +13,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

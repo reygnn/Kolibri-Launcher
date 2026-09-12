@@ -42,7 +42,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperViewBinder
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap

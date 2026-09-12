@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.RebuildPlan
 import com.github.reygnn.launcher.common.ui.wallpaper.LayerPropertyUpdate
 import com.github.reygnn.launcher.common.ui.wallpaper.ViewLayerSnapshot

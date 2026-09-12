@@ -42,7 +42,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperState
  * **Why IDs Solve It:**
  * Every [com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState] carries
  * a stable, process-unique ID assigned at creation time. That ID is propagated through
- * to the view-side [com.github.reygnn.kolibri_launcher.ui.home.WallpaperLayer] via
+ * to the view-side [WallpaperLayer] via
  * the `id` parameter of `ZoomableImageView.addLayer(...)`. By comparing the ordered list
  * of view IDs against the ordered list of target IDs, we detect any substitution,
  * reordering, insertion, or removal — regardless of whether the count changes.

@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
 import android.graphics.Bitmap
 import android.graphics.Color

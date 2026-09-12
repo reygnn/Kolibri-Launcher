@@ -37,6 +37,14 @@ dependencies {
     api(project(":core"))
     implementation(libs.androidx.fragment.ktx)
 
+    // appcompat: ZoomableImageView extends AppCompatImageView. material is NOT
+    // pulled here (the FAB/edit-toolbar Views stay in kolibri); the
+    // material-before-appcompat force() rule lives in each :app that has both.
+    implementation(libs.androidx.appcompat)
+    // coroutines-android: WallpaperViewBinder's parallel-decode (async/awaitAll/
+    // Semaphore) + Main dispatcher for view mutation.
+    implementation(libs.kotlinx.coroutines.android)
+
     // hilt-core (annotations only) for @Inject/@Singleton on shared components
     // like WallpaperCompositeCache; the component graph is aggregated in each
     // :app via the hilt-android plugin (same pattern as :core).

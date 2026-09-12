@@ -238,7 +238,7 @@ fi
 # `tools/check-cancellation-rethrow-test.sh` (manual rerun, not a CI gate).
 # ─────────────────────────────────────────────────────────────────────────────
 cancel_files=(
-  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/wallpaper/WallpaperViewBinder.kt"
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/WallpaperViewBinder.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/InstalledAppsRepositoryImpl.kt"
@@ -452,7 +452,7 @@ fi
 # tools/check-exception-breadth.awk.
 # ─────────────────────────────────────────────────────────────────────────────
 oom_files=(
-  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/ZoomableImageView.kt"
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/ZoomableImageView.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"

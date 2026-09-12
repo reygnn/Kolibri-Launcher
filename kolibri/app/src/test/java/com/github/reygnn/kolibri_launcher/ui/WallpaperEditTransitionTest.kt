@@ -1,9 +1,9 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditState
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditTransition
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test

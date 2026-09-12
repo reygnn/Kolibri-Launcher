@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 
 import android.graphics.Bitmap
@@ -7,7 +8,7 @@ import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.home.ZoomableImageView
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
