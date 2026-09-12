@@ -1,10 +1,13 @@
 package com.github.reygnn.nyx_launcher.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -12,6 +15,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.BuildConfig
@@ -43,6 +47,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var consentController: ConsentController
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
+    private var calendarSwitch: SwitchPreferenceCompat? = null
+    private var alarmSwitch: SwitchPreferenceCompat? = null
+
+    // Calendar events are permission-gated (HIE-INV-6): the toggle only flips on
+    // once READ_CALENDAR is granted (the flow observer then checks it).
+    private val requestCalendarPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                lifecycleScope.launch { preferences.setShowCalendarEvent(true) }
+            } else {
+                toast(getString(R.string.calendar_permission_denied_toast))
+            }
+        }
 
     private val createDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -65,6 +82,29 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
+        alarmSwitch = findPreference<SwitchPreferenceCompat>("show_alarm")?.apply {
+            isPersistent = false
+            setOnPreferenceChangeListener { _, newValue ->
+                lifecycleScope.launch { preferences.setShowAlarm(newValue as Boolean) }
+                true
+            }
+        }
+
+        calendarSwitch = findPreference<SwitchPreferenceCompat>("show_calendar_event")?.apply {
+            isPersistent = false
+            setOnPreferenceChangeListener { _, newValue ->
+                if (newValue as Boolean) {
+                    // Don't flip the switch yet — flip it only once permission is
+                    // granted (the flow observer sets isChecked after the write).
+                    handleCalendarPermissionRequest()
+                    false
+                } else {
+                    lifecycleScope.launch { preferences.setShowCalendarEvent(false) }
+                    true
+                }
+            }
+        }
+
         findPreference<Preference>("export_layout")?.setOnPreferenceClickListener {
             createDocument.launch("nyx-layout.json")
             true
@@ -81,10 +121,48 @@ class SettingsFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                preferences.monochromeIcons().collect { enabled ->
-                    if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                launch {
+                    preferences.monochromeIcons().collect { enabled ->
+                        if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                    }
+                }
+                launch {
+                    preferences.showAlarmFlow.collect { enabled ->
+                        if (alarmSwitch?.isChecked != enabled) alarmSwitch?.isChecked = enabled
+                    }
+                }
+                launch {
+                    preferences.showCalendarEventFlow.collect { enabled ->
+                        if (calendarSwitch?.isChecked != enabled) calendarSwitch?.isChecked = enabled
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * Enabling the calendar toggle needs READ_CALENDAR: if already granted, persist
+     * true; if a rationale is due, explain then request; otherwise request directly.
+     * The switch itself flips on only via the [preferences.showCalendarEventFlow]
+     * observer after the write (HIE-INV-6).
+     */
+    private fun handleCalendarPermissionRequest() {
+        when {
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) ==
+                PackageManager.PERMISSION_GRANTED -> {
+                lifecycleScope.launch { preferences.setShowCalendarEvent(true) }
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR) -> {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.calendar_permission_title)
+                    .setMessage(R.string.calendar_permission_rationale)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            else -> requestCalendarPermission.launch(Manifest.permission.READ_CALENDAR)
         }
     }
 

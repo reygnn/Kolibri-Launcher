@@ -23,6 +23,14 @@
     <string name="category_display_title">Display</string>
     <string name="category_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons_summary">Render app icons in monochrome</string>
+    <string name="category_homeinfo_title">Home info</string>
+    <string name="show_calendar_event_title">Show calendar events</string>
+    <string name="show_calendar_event_summary">Show the next calendar event on the home screen</string>
+    <string name="show_alarm_title">Show next alarm</string>
+    <string name="show_alarm_summary">Show the next alarm on the home screen</string>
+    <string name="calendar_permission_title">Calendar access</string>
+    <string name="calendar_permission_rationale">Nyx needs calendar access to show your next event on the home screen.</string>
+    <string name="calendar_permission_denied_toast">Calendar permission denied</string>
     <string name="backup_export_summary">Save the home layout to a file</string>
     <string name="backup_import_summary">Restore the home layout from a file</string>
     <!-- Developer (ACRA) — debug / -PdevCommands only, not shown publicly -->

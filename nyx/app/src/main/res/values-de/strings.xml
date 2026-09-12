@@ -18,6 +18,14 @@
     <string name="category_display_title">Anzeige</string>
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
+    <string name="category_homeinfo_title">Startbildschirm-Info</string>
+    <string name="show_calendar_event_title">Kalender-Termine anzeigen</string>
+    <string name="show_calendar_event_summary">Nächsten Kalendertermin auf dem Startbildschirm anzeigen</string>
+    <string name="show_alarm_title">Nächsten Wecker anzeigen</string>
+    <string name="show_alarm_summary">Nächsten Wecker auf dem Startbildschirm anzeigen</string>
+    <string name="calendar_permission_title">Kalenderzugriff</string>
+    <string name="calendar_permission_rationale">Nyx braucht Kalenderzugriff, um deinen nächsten Termin auf dem Startbildschirm anzuzeigen.</string>
+    <string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert</string>
     <string name="backup_export_summary">Startbildschirm-Layout in eine Datei sichern</string>
     <string name="backup_import_summary">Startbildschirm-Layout aus einer Datei wiederherstellen</string>
 </resources>

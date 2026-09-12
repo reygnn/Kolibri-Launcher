@@ -15,6 +15,25 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/category_homeinfo_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="show_calendar_event"
+            android:title="@string/show_calendar_event_title"
+            android:summary="@string/show_calendar_event_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="show_alarm"
+            android:title="@string/show_alarm_title"
+            android:summary="@string/show_alarm_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/category_backup_title"
         app:iconSpaceReserved="false">
 

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Home-info calendar events (HIE Phase C3). Requested at runtime when the
+         "show calendar events" toggle is enabled; alarms need no permission. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!-- Query launchable activities without QUERY_ALL_PACKAGES (Android 11+). -->
     <queries>
         <intent>
