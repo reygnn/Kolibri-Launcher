@@ -87,6 +87,9 @@ tasks.withType<JavaCompile>().configureEach {
 
 dependencies {
     implementation(project(":kolibri:domain"))
+    // Shared home-info calendar/alarm reader (HIE Phase B); bound to the :core
+    // TimeBasedEventsRepository port in RepositoryModule.
+    implementation(project(":common-data"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)

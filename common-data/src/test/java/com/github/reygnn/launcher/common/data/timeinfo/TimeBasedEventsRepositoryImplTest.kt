@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data.timeinfo
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -6,8 +6,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
+import com.github.reygnn.launcher.common.data.TimberRule
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -34,7 +34,7 @@ class TimeBasedEventsRepositoryImplTest {
     @MockK
     private lateinit var context: Context
     @MockK
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var settingsRepository: TimeInfoSettings
     @MockK
     private lateinit var alarmManager: AlarmManager
     @MockK

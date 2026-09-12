@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data.timeinfo
 
 import android.Manifest
 import android.app.AlarmManager
@@ -12,7 +12,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.timeinfo.CalendarEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -34,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class TimeBasedEventsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: TimeInfoSettings
 ) : TimeBasedEventsRepository {
 
     companion object {
