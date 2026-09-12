@@ -1696,3 +1696,23 @@ ist der 90dp-Fixwert bewusst akzeptiert (Normalfall passt).
 
 ---
 
+## 25. (Exploration, aus nyx-Session 2026-09-12) Wallpaper auf Activity-Level hosten → Composite-Cache rückbaubar
+
+Der Monorepo-Merge mit `nyx` hat eine architektonische Erkenntnis geliefert:
+Kolibri hostet die Wallpaper-Render-Surface im **Fragment** (`HomeFragment`),
+das bei drawer→home zerstört+neu gebaut wird — und **diese Teardown-Lücke**
+erzwingt den `WallpaperCompositeCache` + `refillCache` + den Anti-Flash-Backdrop.
+`nyx` hostet dasselbe Wallpaper in einer **persistenten Activity-View** und
+braucht keine dieser Mechaniken (live verifiziert: kein Re-Decode beim Resume,
+kein Cache, kein Flash). Ein Umzug der Surface auf Activity-Level (dorthin, wo
+`wallpaper_backdrop` schon sitzt) würde den ganzen Cache-/Warm-/Anti-Flash-Apparat
+überflüssig machen.
+
+**Groß, riskant, an verifiziertem Code — reiner Eleganz-/Wartbarkeits-Gewinn,
+kein Bugfix.** Caveat: der `WallpaperFlattener`-Nutzen (N Layer → 1 Textur) ist
+teils per-Frame-GPU-Last, nicht nur Teardown — vor dem Rückbau messen.
+
+Volle Analyse, Anker, Risiken, Trigger:
+`docs/specs/WALLPAPER_ACTIVITY_HOSTING_EXPLORATION.md`.
+
+---
