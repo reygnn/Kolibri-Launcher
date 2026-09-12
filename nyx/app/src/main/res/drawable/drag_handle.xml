@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small rounded pill (centered) used as the customization sheet's drag grabber.
+     The layer's `gravity=center` keeps the 32x4dp pill visually small while the
+     host View provides a larger touch target. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="center">
+        <shape android:shape="rectangle">
+            <corners android:radius="2dp" />
+            <solid android:color="?attr/colorOutline" />
+            <size
+                android:width="32dp"
+                android:height="4dp" />
+        </shape>
+    </item>
+</layer-list>

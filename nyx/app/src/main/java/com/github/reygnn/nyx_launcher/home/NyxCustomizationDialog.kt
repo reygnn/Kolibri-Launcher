@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.launcher.common.ui.configureLivePreviewWindow
+import com.github.reygnn.launcher.common.ui.enableDialogDrag
 import com.github.reygnn.launcher.common.ui.fadeTo
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -71,6 +72,10 @@ class NyxCustomizationDialog : DialogFragment() {
         val card = view.findViewById<View>(R.id.card_root)
         val scrimSlider = view.findViewById<Slider>(R.id.slider_scrim)
         val monochromeSwitch = view.findViewById<MaterialSwitch>(R.id.switch_monochrome)
+
+        // Drag handle moves the whole sheet up/down so it can be shifted off a
+        // spot the user wants to see (Kolibri parity).
+        enableDialogDrag(view.findViewById(R.id.drag_handle), card)
 
         // Scrim: write on drag, fade the card away while tracking so the home dims live.
         scrimSlider.addOnChangeListener { _, value, fromUser ->

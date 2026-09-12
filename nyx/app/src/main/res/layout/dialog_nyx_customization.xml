@@ -16,8 +16,17 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingHorizontal="24dp"
-        android:paddingTop="20dp"
+        android:paddingTop="8dp"
         android:paddingBottom="16dp">
+
+        <!-- Drag handle: touch to move the whole sheet up/down (enableDialogDrag). -->
+        <View
+            android:id="@+id/drag_handle"
+            android:layout_width="48dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/drag_handle" />
 
         <TextView
             android:layout_width="wrap_content"
