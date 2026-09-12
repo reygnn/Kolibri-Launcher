@@ -58,7 +58,7 @@ class NyxCustomizationDialog : DialogFragment() {
             if (uri != null) {
                 requireActivity().lifecycleScope.launch {
                     wallpaperImageSetter.setFromUri(uri)
-                    if (isAdded) dismiss()
+                    if (isAdded) dismissAllowingStateLoss()
                 }
             }
         }
@@ -119,7 +119,7 @@ class NyxCustomizationDialog : DialogFragment() {
             // Edit entry can't linger stale over a now-empty wallpaper.
             requireActivity().lifecycleScope.launch {
                 wallpaperImageSetter.clear()
-                if (isAdded) dismiss()
+                if (isAdded) dismissAllowingStateLoss()
             }
         }
         val host = activity as? MainActivity
