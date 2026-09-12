@@ -247,9 +247,28 @@ Render-Logik geteilt (✅).
   + `WallpaperCompositeCache` + `BoundedBitmapDecoder` + `WallpaperFlattener` +
   `RebuildPlan` → `:common-ui`; Kolibri implementiert `WallpaperHost` über sein
   bestehendes `wallpaperContainer`. Verhalten unverändert.
+  > **UMGESETZT (Abweichung, `aae6317`):** nur das reine, WV4-entkoppelte Trio
+  > `BoundedBitmapDecoder` (+ `DecodedWallpaperBitmap`) + `WallpaperCompositeCache` +
+  > `RebuildPlan` wanderte. `WallpaperViewBinder` + `WallpaperFlattener` hängen im
+  > Code durchgängig an `ZoomableImageView` (Signaturen, Konstruktion, `R.style`),
+  > das laut Spec erst in WV4 zieht — `:common-ui` kann nicht auf `kolibri:app`
+  > zeigen, also gingen sie mit WV4. Der `WallpaperHost`-Port wurde **nicht** hier
+  > eingeführt: er hätte in WV3/WV4 keinen Konsumenten (der Binder referenziert
+  > `ZoomableImageView` direkt, beide im selben Modul) — er kommt in WV5, wenn nyx
+  > seinen Container stellt.
 - **WV4 — View + Edit.** `ZoomableImageView`, `WallpaperLayer`,
   `WallpaperEditController`, `WallpaperEditTransition`, FAB-Cluster, `WallpaperDelegate`
   → `:common-ui`, neutraler Namespace. Kolibri zeigt drauf, alte Kopien weg.
+  > **UMGESETZT (Abweichung, `6093ad6`; Maintainer-Wahl „nur Render-Kern"):** nur der
+  > Render-View-Kern `ZoomableImageView` + `WallpaperLayer` + `WallpaperViewBinder` +
+  > `WallpaperEditTransition` wanderte (+ WV3-Nachzügler). Geblieben in kolibri, weil
+  > glue-gebunden: `WallpaperEditController` (FragmentHomeBinding, LauncherViewModel,
+  > MaterialAlertDialogBuilder, FabPosition, `R.*`), `WallpaperDelegate` (9
+  > `domain.usecase.*` + `UiEvent` + `DelegateScope` + `BuildConfig` — vom View
+  > entkoppelt, aber domain-glue-gebunden; **revidiert** ggü. §9-Entscheid), FAB-Cluster
+  > (5 Dateien + Layouts/Ressourcen), `WallpaperFlattener` (`R.style.AppTheme`, nur
+  > kolibri-Konsument). `:common-ui` += appcompat + coroutines-android. Live auf A17
+  > verifiziert (2-Layer-Custom-Wallpaper + Scrim).
 - **WV5 — nyx dockt an.** nyx implementiert `WallpaperHost` (Container als unterster
   DragLayer-Layer + Scrim), bindet `WallpaperDisplaySettings` über seinen Store
   (inkl. **Backdrop-Schalter** transparent/opak in den Settings), Backdrop-Fenster-
@@ -288,3 +307,4 @@ Render-Logik geteilt (✅).
 | Runde | Datum | Reviewer | Ergebnis |
 |---|---|---|---|
 | 1 | 2026-09-12 | Maintainer | Entscheide gesetzt (§9): Backdrop = User-Wahl (transparent auch mit custom Wallpaper, WSS-INV-6 korrigiert); `WallpaperHost`=Interface; `WallpaperDelegate`→`:common-ui`; nyx-Edit v1 reduziert; nyx-Bildwahl via `READ_MEDIA_IMAGES` |
+| 2 | 2026-09-12 | Umsetzung WV1–WV4 | Phasen-Re-Scopes aus der Code-Realität (§8 UMGESETZT-Notizen): WV3 = nur reines Binder-Trio; `WallpaperViewBinder`/`WallpaperFlattener` → WV4 (an `ZoomableImageView` gekettet); WV4 = nur Render-View-Kern. `WallpaperHost`-Port auf WV5 verschoben (kein Konsument vor nyx). **§9-Entscheid revidiert:** `WallpaperDelegate` bleibt vorerst in kolibri (an 9 `domain.usecase.*` + `UiEvent` + `DelegateScope` gebunden — ein Move kaskadiert diese Glue-Schicht; separat neu zu entscheiden). WV4 live auf A17 verifiziert. |
