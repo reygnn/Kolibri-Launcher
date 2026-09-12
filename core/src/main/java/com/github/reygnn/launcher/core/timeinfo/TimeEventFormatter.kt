@@ -1,7 +1,5 @@
-package com.github.reygnn.kolibri_launcher.ui.home
+package com.github.reygnn.launcher.core.timeinfo
 
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate

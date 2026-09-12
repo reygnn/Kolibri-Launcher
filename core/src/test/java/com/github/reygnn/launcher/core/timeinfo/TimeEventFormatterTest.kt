@@ -1,12 +1,8 @@
-package com.github.reygnn.kolibri_launcher.ui.home
+package com.github.reygnn.launcher.core.timeinfo
 
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
@@ -17,8 +13,6 @@ import java.util.TimeZone
 
 class TimeEventFormatterTest {
 
-    @get:Rule
-    val timberRule = TimberRule()
 
     private val formatter = TimeEventFormatter()
 
