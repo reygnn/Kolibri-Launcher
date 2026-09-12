@@ -2,23 +2,25 @@ package com.github.reygnn.kolibri_launcher.ui.settings
 
 import android.os.Bundle
 import android.view.MenuItem
-import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.core.TimberWrapper
+import com.github.reygnn.kolibri_launcher.databinding.ActivitySettingsBinding
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.AndroidEntryPoint
-import timber.log.Timber
 
 @AndroidEntryPoint
 class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
 
     override val viewModel: SettingsViewModel by viewModels()
+
+    // CRASH-SAFE: Nullable binding with cleanup in onDestroy.
+    private var _binding: ActivitySettingsBinding? = null
+    private val binding get() = _binding ?: throw IllegalStateException("Binding accessed after onDestroy")
 
     private var backPressedCallback: OnBackPressedCallback? = null
 
@@ -26,7 +28,14 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
          super.onCreate(savedInstanceState)
 
         try {
-            setContentView(R.layout.activity_settings)
+            // Edge-to-edge, consistent with the sibling activities; the
+            // explicit MaterialToolbar replaces the decor ActionBar so content
+            // is never hidden behind the bar. fitsSystemWindows on the layout
+            // root insets the toolbar below the status bar.
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            _binding = ActivitySettingsBinding.inflate(layoutInflater)
+            setContentView(binding.root)
 
             setupUI()
             setupBackPressHandling()
@@ -39,6 +48,8 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             // throw RuntimeException("ACRA Test Crash")
 
         } catch (e: Throwable) {
+            // no suspension point — non-suspend onCreate body, cannot see
+            // CancellationException.
             TimberWrapper.silentError(e, "Fatal error in onCreate")
             finish() // Graceful exit
         }
@@ -49,7 +60,10 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
             // CRASH-SAFE: Cleanup
             backPressedCallback?.remove()
             backPressedCallback = null
+            _binding = null
         } catch (e: Throwable) {
+            // no suspension point — non-suspend onDestroy teardown, cannot see
+            // CancellationException.
             TimberWrapper.silentError(e, "Error in onDestroy")
         } finally {
             super.onDestroy()
@@ -57,28 +71,11 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
     }
 
     private fun setupUI() {
+        setSupportActionBar(binding.settingsToolbar)
         // CRASH-SAFE: ActionBar kann null sein
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             title = getString(R.string.settings_title)
-        } ?: run {
-            Timber.w("ActionBar is null, skipping toolbar setup")
-        }
-
-        // CRASH-SAFE: Safe findViewById mit null check
-        findViewById<View>(android.R.id.content)?.let { contentView ->
-            ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.setPadding(
-                    systemBars.left,
-                    systemBars.top,
-                    systemBars.right,
-                    systemBars.bottom
-                )
-                insets
-            }
-        } ?: run {
-            Timber.w("Content view not found")
         }
     }
 
@@ -114,7 +111,7 @@ class SettingsActivity : BaseActivity<UiEvent, SettingsViewModel>() {
         try {
             supportFragmentManager.beginTransaction()
                 .replace(
-                    android.R.id.content,
+                    R.id.settings_container,
                     SettingsFragment(),
                     AppConstants.FRAGMENT_SETTINGS
                 )
