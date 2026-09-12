@@ -5,6 +5,32 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- WV5: wallpaper layer — the lowest z-child of the DragLayer, drawn under
+         home_content. Non-interactive at rest (edit-mode gating comes later), so
+         the drag/gesture engine is unaffected. Its own background is the backdrop
+         (transparent → system wallpaper shows through the transparent window;
+         BLACK → opaque), driven from WallpaperDisplaySettings in MainActivity. -->
+    <FrameLayout
+        android:id="@+id/wallpaper_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+            android:id="@+id/wallpaper_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="matrix"
+            android:visibility="gone" />
+
+        <!-- Scrim: alpha baked into the background color (view alpha stays 1 → no
+             offscreen saveLayer). Decision from the shared ScrimRender. -->
+        <View
+            android:id="@+id/wallpaper_scrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
+
     <!-- Home content is inset from the system bars in code (system-bar padding),
          so the drawer overlay below can fill edge-to-edge behind the bars. -->
     <LinearLayout

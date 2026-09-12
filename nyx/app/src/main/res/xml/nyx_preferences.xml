@@ -15,6 +15,23 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/category_wallpaper_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="choose_wallpaper"
+            android:title="@string/wallpaper_choose_title"
+            android:summary="@string/wallpaper_choose_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="clear_wallpaper"
+            android:title="@string/wallpaper_clear_title"
+            android:summary="@string/wallpaper_clear_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/category_homeinfo_title"
         app:iconSpaceReserved="false">
 

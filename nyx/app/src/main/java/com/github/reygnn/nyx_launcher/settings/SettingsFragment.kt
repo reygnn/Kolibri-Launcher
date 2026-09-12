@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -20,6 +21,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.usecase.ExportLayoutUseCase
@@ -45,6 +47,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var importLayout: ImportLayoutUseCase
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var consentController: ConsentController
+    @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
     private var calendarSwitch: SwitchPreferenceCompat? = null
@@ -59,6 +62,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
             } else {
                 toast(getString(R.string.calendar_permission_denied_toast))
             }
+        }
+
+    // Wallpaper image pick (WV5 v1): Android's permissionless photo picker,
+    // single image. The multi-image gallery path (READ_MEDIA_IMAGES) comes with
+    // the reduced edit mode (WV5d).
+    private val pickWallpaperImage =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { setWallpaperFromUri(it) }
         }
 
     private val createDocument =
@@ -103,6 +114,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     true
                 }
             }
+        }
+
+        findPreference<Preference>("choose_wallpaper")?.setOnPreferenceClickListener {
+            pickWallpaperImage.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+            true
+        }
+        findPreference<Preference>("clear_wallpaper")?.setOnPreferenceClickListener {
+            lifecycleScope.launch {
+                wallpaperImageSetter.clear()
+                toast(getString(R.string.wallpaper_cleared_toast))
+            }
+            true
         }
 
         findPreference<Preference>("export_layout")?.setOnPreferenceClickListener {
@@ -226,6 +251,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
             ImportResult.InvalidData -> toast(getString(R.string.backup_import_invalid))
         }
+    }
+
+    private fun setWallpaperFromUri(uri: Uri) = lifecycleScope.launch {
+        val ok = wallpaperImageSetter.setFromUri(uri)
+        toast(getString(if (ok) R.string.wallpaper_set_toast else R.string.wallpaper_set_failed_toast))
+        if (ok) requireActivity().finish() // back to home, which re-renders from the saved state
     }
 
     private fun toast(text: String) = Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()

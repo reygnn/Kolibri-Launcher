@@ -9,7 +9,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.View
@@ -41,7 +44,14 @@ import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.wallpaper.ScrimRender
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
@@ -58,6 +68,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -84,6 +95,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var folderRenderer: FolderIconRenderer
     @Inject lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
 
+    // Wallpaper (WV5): state source + narrow display-settings port. The render
+    // machinery (binder, view) is held here directly — Nyx has no home ViewModel,
+    // mirroring the ClockDelegate pattern.
+    @Inject lateinit var wallpaperRepository: WallpaperRepository
+    @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
+
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
     private lateinit var dock: RecyclerView
@@ -94,6 +111,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var clockBattery: TextView
     private lateinit var alarmIndicator: ImageView
     private lateinit var calendarIndicator: ImageView
+    private lateinit var wallpaperContainer: View
+    private lateinit var wallpaperView: ZoomableImageView
+    private lateinit var wallpaperScrim: View
+
+    // Serial, latest-wins wallpaper render. The binder decodes off the main
+    // thread; a single job at a time avoids overlapping rebuilds of the view.
+    private val wallpaperBinder by lazy {
+        WallpaperViewBinder(bitmapLoader = { uri: Uri ->
+            withContext(Dispatchers.IO) {
+                decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+            }
+        })
+    }
 
     // Shared home-info delegate (HIE Phase C): clock/date/battery/events StateFlows.
     private lateinit var clockDelegate: ClockDelegate
@@ -128,6 +158,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         clockBattery = findViewById(R.id.clock_battery)
         alarmIndicator = findViewById(R.id.event_alarm_indicator)
         calendarIndicator = findViewById(R.id.event_calendar_indicator)
+        wallpaperContainer = findViewById(R.id.wallpaper_container)
+        wallpaperView = findViewById(R.id.wallpaper_view)
+        wallpaperScrim = findViewById(R.id.wallpaper_scrim)
         // Home-info tap targets: time → alarms, date → calendar, battery → battery
         // settings (mirrors Kolibri's intents).
         clockTime.setOnClickListener { openClockApp() }
@@ -183,8 +216,43 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 launch { clockDelegate.dateString.collect { clockDate.text = it } }
                 launch { clockDelegate.batteryString.collect { clockBattery.text = it } }
                 launch { clockDelegate.timeBasedEvents.collect(::updateEventsIndicator) }
+                // Wallpaper (WV5): render on every state change (latest-wins — the
+                // collector awaits each bind before the next emission). Scrim +
+                // backdrop react to their own settings flows.
+                launch { wallpaperRepository.wallpaperState.collect { wallpaperBinder.bind(wallpaperView, it) } }
+                launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { applyScrim(it) } }
+                launch { wallpaperDisplaySettings.wallpaperBackdropFlow.collect { applyBackdrop(it) } }
             }
         }
+    }
+
+    /**
+     * Applies the user-controlled dim overlay above the wallpaper. The color
+     * (alpha baked in) comes from the shared [ScrimRender]; null → no scrim.
+     * Edit mode (WV5d) is not wired yet, so [isEditMode] is always false.
+     */
+    private fun applyScrim(alpha: Float) {
+        val color = ScrimRender.colorOrNull(alpha = alpha, isEditMode = false)
+        if (color == null) {
+            wallpaperScrim.visibility = View.GONE
+        } else {
+            wallpaperScrim.setBackgroundColor(color)
+            wallpaperScrim.visibility = View.VISIBLE
+        }
+    }
+
+    /**
+     * Applies the backdrop (WSS-INV-6, a user choice) as the wallpaper container's
+     * own background — behind the custom layers. SYSTEM_WALLPAPER → transparent, so
+     * the live system wallpaper shows through the transparent window (collages can
+     * build on it); BLACK → opaque black.
+     */
+    private fun applyBackdrop(backdrop: WallpaperBackdrop) {
+        val color = when (backdrop) {
+            WallpaperBackdrop.SYSTEM_WALLPAPER -> Color.TRANSPARENT
+            WallpaperBackdrop.BLACK -> Color.BLACK
+        }
+        wallpaperContainer.background = ColorDrawable(color)
     }
 
     /**

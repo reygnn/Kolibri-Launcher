@@ -24,6 +24,16 @@
     <string name="category_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons_summary">Render app icons in monochrome</string>
     <string name="category_homeinfo_title">Home info</string>
+
+    <!-- Wallpaper (WV5) -->
+    <string name="category_wallpaper_title">Wallpaper</string>
+    <string name="wallpaper_choose_title">Choose wallpaper</string>
+    <string name="wallpaper_choose_summary">Pick an image for the home screen</string>
+    <string name="wallpaper_clear_title">Remove wallpaper</string>
+    <string name="wallpaper_clear_summary">Show the system wallpaper again</string>
+    <string name="wallpaper_set_toast">Wallpaper set</string>
+    <string name="wallpaper_set_failed_toast">Could not set wallpaper</string>
+    <string name="wallpaper_cleared_toast">Wallpaper removed</string>
     <string name="show_calendar_event_title">Show calendar events</string>
     <string name="show_calendar_event_summary">Show the next calendar event on the home screen</string>
     <string name="show_alarm_title">Show next alarm</string>

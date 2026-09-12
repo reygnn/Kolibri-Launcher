@@ -19,6 +19,16 @@
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
     <string name="category_homeinfo_title">Startbildschirm-Info</string>
+
+    <!-- Wallpaper (WV5) -->
+    <string name="category_wallpaper_title">Hintergrund</string>
+    <string name="wallpaper_choose_title">Hintergrund wählen</string>
+    <string name="wallpaper_choose_summary">Ein Bild für den Startbildschirm auswählen</string>
+    <string name="wallpaper_clear_title">Hintergrund entfernen</string>
+    <string name="wallpaper_clear_summary">Wieder das System-Hintergrundbild zeigen</string>
+    <string name="wallpaper_set_toast">Hintergrund gesetzt</string>
+    <string name="wallpaper_set_failed_toast">Hintergrund konnte nicht gesetzt werden</string>
+    <string name="wallpaper_cleared_toast">Hintergrund entfernt</string>
     <string name="show_calendar_event_title">Kalender-Termine anzeigen</string>
     <string name="show_calendar_event_summary">Nächsten Kalendertermin auf dem Startbildschirm anzeigen</string>
     <string name="show_alarm_title">Nächsten Wecker anzeigen</string>
