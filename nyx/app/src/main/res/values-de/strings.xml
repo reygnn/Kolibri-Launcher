@@ -33,6 +33,7 @@
     <!-- Live-preview customization sheet -->
     <string name="customize_title">Anpassen</string>
     <string name="customize_scrim_label">Hintergrund abdunkeln</string>
+    <string name="customize_edit_wallpaper">Hintergrund bearbeiten</string>
     <string name="customize_all_settings">Alle Einstellungen</string>
     <string name="show_calendar_event_title">Kalender-Termine anzeigen</string>
     <string name="show_calendar_event_summary">Nächsten Kalendertermin auf dem Startbildschirm anzeigen</string>

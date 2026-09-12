@@ -22,6 +22,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -40,7 +41,9 @@ import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
+import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
@@ -107,10 +110,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
+    @Inject lateinit var fabPositionStore: NyxFabPositionStore
 
     // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
     // wallpaper state (mirrored from the repo), drives the transactional edit session.
     private lateinit var wallpaperEditCoordinator: NyxWallpaperEditCoordinator
+    private lateinit var wallpaperEditController: NyxWallpaperEditController
+
+    // Layer-add image picker (edit mode). GetContent grants a transient read;
+    // the coordinator copies the image to internal storage immediately.
+    private val layerPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { wallpaperEditCoordinator.onAddLayer(it) }
+        }
 
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
@@ -228,7 +240,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // Derive the grid from the real home-grid area once the pager is laid out
         // (a pre-layout metrics estimate mis-counts rows and leaves a big top gap).
         pager.doOnLayout { applyDeviceGrid() }
-        onBackPressedDispatcher.addCallback(this) { if (drawerContainer.isVisible) hideDrawer() }
+        onBackPressedDispatcher.addCallback(this) {
+            // Edit mode → commit (exit); else close the drawer; else stay on home.
+            if (wallpaperEditCoordinator.isEditMode.value) {
+                wallpaperEditCoordinator.onCommitEditMode()
+            } else if (drawerContainer.isVisible) {
+                hideDrawer()
+            }
+        }
 
         clockDelegate.start()
 
@@ -240,6 +259,18 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             ioDispatcher = Dispatchers.IO,
         )
         wallpaperEditCoordinator.start()
+
+        wallpaperEditController = NyxWallpaperEditController(
+            stub = findViewById(R.id.wallpaperEditOverlayStub),
+            wallpaperView = wallpaperView,
+            dimTarget = findViewById(R.id.home_content),
+            coordinator = wallpaperEditCoordinator,
+            onFabPositionChanged = { pos -> lifecycleScope.launch { fabPositionStore.saveFabPosition(pos) } },
+            launchLayerPicker = { layerPickerLauncher.launch("image/*") },
+            rerenderWallpaper = {
+                lifecycleScope.launch { wallpaperBinder.bind(wallpaperView, wallpaperEditCoordinator.wallpaperState.value) }
+            },
+        )
 
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
         // copy and save (the shared repo/file-manager split doesn't self-clean).
@@ -256,9 +287,20 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // Wallpaper (WV5): render on every state change (latest-wins — the
                 // collector awaits each bind before the next emission). Scrim +
                 // backdrop react to their own settings flows.
-                launch { wallpaperEditCoordinator.wallpaperState.collect { wallpaperBinder.bind(wallpaperView, it) } }
+                launch {
+                    wallpaperEditCoordinator.wallpaperState.collect {
+                        wallpaperBinder.bind(wallpaperView, it, preferredActiveLayerId = wallpaperEditCoordinator.consumePendingFocusLayerId())
+                    }
+                }
                 launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { applyScrim(it) } }
-                launch { wallpaperDisplaySettings.wallpaperBackdropFlow.collect { applyBackdrop(it) } }
+                launch {
+                    wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
+                        applyBackdrop(it)
+                        wallpaperEditController.applyBackdrop(it)
+                    }
+                }
+                launch { wallpaperEditCoordinator.isEditMode.collect { wallpaperEditController.applyEditMode(it) } }
+                launch { fabPositionStore.fabPositionFlow.collect { wallpaperEditController.applyFabPosition(it) } }
             }
         }
     }
@@ -615,6 +657,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun showCustomizationDialog() {
         NyxCustomizationDialog().show(supportFragmentManager, NyxCustomizationDialog.TAG)
+    }
+
+    /** True when a wallpaper is set (the customization sheet gates its Edit entry on this). */
+    fun hasWallpaper(): Boolean = wallpaperEditCoordinator.wallpaperState.value.hasWallpaper
+
+    /** Enters wallpaper edit mode (called from the customization sheet's Edit entry). */
+    fun enterWallpaperEditMode() {
+        if (hasWallpaper()) wallpaperEditCoordinator.onEnterEditMode()
     }
 
     private fun launchApp(key: ComponentKey) {

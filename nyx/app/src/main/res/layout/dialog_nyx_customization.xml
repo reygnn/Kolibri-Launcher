@@ -86,6 +86,15 @@
                 android:text="@string/wallpaper_clear_title" />
         </LinearLayout>
 
+        <!-- Enter wallpaper edit mode (only when a wallpaper is set) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_edit_wallpaper"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/customize_edit_wallpaper" />
+
         <!-- Hand-off to full settings -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_all_settings"

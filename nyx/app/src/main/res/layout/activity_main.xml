@@ -172,4 +172,15 @@
         android:textSize="16sp"
         android:visibility="invisible" />
 
+    <!-- Wallpaper edit overlay (WV5d): inflated lazily on first edit-mode entry
+         (NyxWallpaperEditController), topmost so its FAB cluster + commands panel
+         are tappable and its full-screen touch interceptor can forward pinch/pan
+         to the wallpaper view. GONE (uninflated) at rest, no cold-start cost. -->
+    <ViewStub
+        android:id="@+id/wallpaperEditOverlayStub"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout="@layout/view_wallpaper_edit_overlay"
+        android:inflatedId="@+id/wallpaperEditOverlay" />
+
 </com.github.reygnn.nyx_launcher.home.drag.DragLayer>

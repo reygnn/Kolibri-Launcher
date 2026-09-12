@@ -108,6 +108,15 @@ class NyxCustomizationDialog : DialogFragment() {
         view.findViewById<MaterialButton>(R.id.btn_clear_wallpaper).setOnClickListener {
             lifecycleScope.launch { wallpaperImageSetter.clear() }
         }
+        val host = activity as? MainActivity
+        view.findViewById<MaterialButton>(R.id.btn_edit_wallpaper).apply {
+            // Editing needs a wallpaper to edit; hide the entry when none is set.
+            visibility = if (host?.hasWallpaper() == true) View.VISIBLE else View.GONE
+            setOnClickListener {
+                host?.enterWallpaperEditMode()
+                dismiss()
+            }
+        }
         view.findViewById<MaterialButton>(R.id.btn_all_settings).setOnClickListener {
             startActivity(Intent(requireContext(), SettingsActivity::class.java))
             dismiss()
