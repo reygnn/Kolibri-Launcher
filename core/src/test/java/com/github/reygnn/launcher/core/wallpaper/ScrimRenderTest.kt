@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home
+package com.github.reygnn.launcher.core.wallpaper
 
 import com.github.reygnn.launcher.core.AppConstants
 import org.junit.Assert.assertEquals

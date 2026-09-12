@@ -1,8 +1,5 @@
-package com.github.reygnn.kolibri_launcher.ui
+package com.github.reygnn.launcher.core.wallpaper
 
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -14,9 +11,6 @@ import org.junit.Test
  * [ContextMenuResultTest], [WallpaperEditTransitionTest].
  */
 class WallpaperSaveActionTest {
-
-    @get:Rule
-    val timberRule = TimberRule()
 
     private val sampleAllTransforms = listOf(
         LayerTransform(1.5f, 10f, 20f, 1),

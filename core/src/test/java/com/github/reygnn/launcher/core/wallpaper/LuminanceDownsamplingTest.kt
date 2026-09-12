@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data.wallpaper
+package com.github.reygnn.launcher.core.wallpaper
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

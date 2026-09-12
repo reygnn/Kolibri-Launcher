@@ -3,7 +3,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
+import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager

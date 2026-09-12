@@ -29,7 +29,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import com.github.reygnn.launcher.common.ui.collectOnStarted
-import com.github.reygnn.kolibri_launcher.ui.home.ScrimRender
+import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject

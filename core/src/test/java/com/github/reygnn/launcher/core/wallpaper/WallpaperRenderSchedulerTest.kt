@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.core.wallpaper
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay

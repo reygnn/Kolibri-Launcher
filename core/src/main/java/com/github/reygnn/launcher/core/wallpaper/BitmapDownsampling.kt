@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Pure downsampling math for wallpaper bitmap loading — kept out of the

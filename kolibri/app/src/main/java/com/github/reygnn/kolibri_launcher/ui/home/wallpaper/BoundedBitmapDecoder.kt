@@ -1,4 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.core.wallpaper.MAX_WALLPAPER_TEXTURE_SIDE
+import com.github.reygnn.launcher.core.wallpaper.calculateWallpaperInSampleSize
+import com.github.reygnn.launcher.core.wallpaper.RENDER_WALLPAPER_PIXELS
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

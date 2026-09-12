@@ -18,7 +18,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withMatrix
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryRow
+import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryRow
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import kotlin.math.abs
 import kotlin.math.max

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Three-way decision for "what to save when wallpaper edit mode commits or

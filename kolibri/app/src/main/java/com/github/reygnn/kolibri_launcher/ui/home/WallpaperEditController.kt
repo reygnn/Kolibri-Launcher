@@ -8,13 +8,13 @@ import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBi
 import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.LayerTransform
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperMemoryReport
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.formatMegabytes
+import com.github.reygnn.launcher.core.wallpaper.LayerTransform
+import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryReport
+import com.github.reygnn.launcher.core.wallpaper.formatMegabytes
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperEditTransition
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperSaveAction
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSaveAction
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.launcher.common.ui.LaunchTrace

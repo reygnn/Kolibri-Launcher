@@ -1,4 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.core.wallpaper.resolveCaptureSampleSize
+import com.github.reygnn.launcher.core.wallpaper.compensateScaleForSampleSize
 
 import android.graphics.Bitmap
 import android.net.Uri

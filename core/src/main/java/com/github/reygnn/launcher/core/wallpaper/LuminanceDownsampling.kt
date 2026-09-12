@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data.wallpaper
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Pure downsampling math for the luminance-classification decode (AUDIT-19 F3),
@@ -19,7 +19,7 @@ package com.github.reygnn.kolibri_launcher.data.wallpaper
  * the 32×32 sample grid (so the downscaled median stays stable) yet far below any
  * real photo, so the decode allocation is bounded to well under a megabyte.
  */
-internal const val LUMINANCE_DECODE_MAX_PIXELS = 256 * 256
+const val LUMINANCE_DECODE_MAX_PIXELS = 256 * 256
 
 /**
  * The `inSampleSize` (a power of two, per `BitmapFactory` semantics) that brings a
@@ -28,7 +28,7 @@ internal const val LUMINANCE_DECODE_MAX_PIXELS = 256 * 256
  * caller then decodes at full size, which is correct for those cases (a
  * bounds-decode that failed reports -1, and a small image needs no downsample).
  */
-internal fun luminanceInSampleSize(
+fun luminanceInSampleSize(
     srcWidth: Int,
     srcHeight: Int,
     maxPixels: Int = LUMINANCE_DECODE_MAX_PIXELS,
