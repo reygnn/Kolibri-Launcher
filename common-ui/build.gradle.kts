@@ -45,10 +45,11 @@ dependencies {
     // Semaphore) + Main dispatcher for view mutation.
     implementation(libs.kotlinx.coroutines.android)
 
-    // hilt-core (annotations only) for @Inject/@Singleton on shared components
-    // like WallpaperCompositeCache; the component graph is aggregated in each
-    // :app via the hilt-android plugin (same pattern as :core).
-    implementation(libs.hilt.core)
+    // hilt-android for the @Inject/@Singleton + @ApplicationContext annotations on
+    // shared components (WallpaperCompositeCache, WallpaperFlattener). The component
+    // graph + codegen run in each :app (which applies the hilt plugin) — :common-ui
+    // only needs the annotations on its compile classpath, not the plugin/ksp.
+    implementation(libs.hilt.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

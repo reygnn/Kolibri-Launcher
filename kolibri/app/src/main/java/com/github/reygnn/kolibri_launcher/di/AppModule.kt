@@ -9,6 +9,8 @@ import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
 import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattenTheme
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,6 +39,11 @@ object AppModule {
     fun provideWallpaperManager(@ApplicationContext context: Context): WallpaperManager {
         return WallpaperManager.getInstance(context)
     }
+
+    // Theme for the shared WallpaperFlattener's off-screen AppCompat view.
+    @Provides
+    @WallpaperFlattenTheme
+    fun provideWallpaperFlattenTheme(): Int = R.style.AppTheme
 
     /**
      * The app-launch seam. Behind an interface so tests can supply a fake that

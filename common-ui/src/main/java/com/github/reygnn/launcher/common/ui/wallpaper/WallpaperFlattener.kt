@@ -1,7 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
-import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
-import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
+package com.github.reygnn.launcher.common.ui.wallpaper
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -9,11 +6,9 @@ import android.net.Uri
 import android.view.ContextThemeWrapper
 import android.view.View
 import androidx.core.net.toUri
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,7 +29,7 @@ import javax.inject.Inject
  * (`ARGB_8888`) bitmaps, because `composeToBitmap` composes on a software `Canvas`
  * that cannot draw the HARDWARE bitmaps the live display uses.
  *
- * Returns a SOFTWARE bitmap — the caller (`WallpaperDelegate.warmComposite`) samples its
+ * Returns a SOFTWARE bitmap — the caller (the caller's warm step) samples its
  * luminance, copies it to HARDWARE for the cache, and recycles this software temp — or `null`
  * if [state] has fewer than two layers, the size is invalid, or the flatten was partial
  * (all-or-nothing, §3: any per-layer decode failure yields `null` so no incomplete composite
@@ -43,6 +38,7 @@ import javax.inject.Inject
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
+    @param:WallpaperFlattenTheme private val themeResId: Int,
 ) {
     /**
      * The off-screen [ZoomableImageView] used for flattening is an AppCompat
@@ -51,12 +47,12 @@ class WallpaperFlattener @Inject constructor(
      * used with a Theme.AppCompat theme"), which logs an error and, on some
      * platform versions, spams `Invalid resource ID 0x00000000` per unresolved
      * tint attribute. The live view avoids this by inflating under the activity
-     * theme; here we give the detached view the same [R.style.AppTheme]
+     * theme; here we give the detached view the app-supplied [themeResId]
      * (Material3 → AppCompat descendant) explicitly. Theme-only — it does not
      * affect the composited pixels (the view just draws bitmaps via its matrix).
      */
     private val themedContext: Context by lazy {
-        ContextThemeWrapper(context, R.style.AppTheme)
+        ContextThemeWrapper(context, themeResId)
     }
     /**
      * Flattens [state]'s layers into one software bitmap at [width]x[height]
@@ -117,7 +113,7 @@ class WallpaperFlattener @Inject constructor(
      * HARDWARE decode of a single-layer wallpaper image for the display cache (AUDIT-20 F15).
      * Unlike [flatten] — which composes SOFTWARE layers the caller copies to HARDWARE — a lone
      * image needs no compositing: it is decoded straight to HARDWARE, matching the render side's
-     * config ([com.github.reygnn.kolibri_launcher.ui.home.HomeFragment] `loadBitmapFromUri`) so the
+     * config (the render side's `loadBitmapFromUri`) so the
      * entry is a drop-in cache hit, and the render positions it via the ImageView matrix. Returns
      * null on decode failure; the caller then skips caching and the render path re-decodes on the
      * next miss.

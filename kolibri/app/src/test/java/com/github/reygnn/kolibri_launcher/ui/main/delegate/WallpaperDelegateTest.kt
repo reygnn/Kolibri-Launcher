@@ -11,7 +11,7 @@ import android.graphics.Bitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop

@@ -149,7 +149,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.core.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
