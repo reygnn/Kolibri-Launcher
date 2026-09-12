@@ -7,6 +7,18 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Offen
 
+### BaseActivity / BaseViewModel aus Kolibri übernehmen (Robustheit)
+
+Nyx hat kein gemeinsames Coroutine-Crash-Netz. Kolibris `BaseActivity`/
+`BaseViewModel` bündeln `launchSafe`/`executeSafe` (CoroutineExceptionHandler,
+Cancellation-Rethrow-Disziplin) + einen Fehler-Toast-Bus (`ErrorEventBus`/
+`UiEvent`), sodass ein Throwable in einer Coroutine geloggt/getoastet statt zum
+Crash wird. Kein Muss (der HIE-Uhr-Crash kam aus einem synchronen onClick und ist
+defensiv via `startActivitySafely` gelöst), aber ein sinnvoller Reife-Schritt.
+Eigener Architektur-Port — die Klassen hängen an Kolibris Crash-Infra-
+Konventionen (Rule 9/11). Anker (Kolibri): `ui/base/BaseActivity.kt`,
+`ui/base/BaseViewModel.kt`, `common/ui/ErrorEventBus.kt`.
+
 ### HIE Phase C3 — Event-Indikator (Kalender/Alarm) in Nyx
 
 Phase A/B/C1/C2 sind durch: das Home-Info-Subsystem ist geteilt (`:core.timeinfo`,
