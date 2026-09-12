@@ -1,4 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 
 /**
  * Default values for settings whose type is a domain model enum.

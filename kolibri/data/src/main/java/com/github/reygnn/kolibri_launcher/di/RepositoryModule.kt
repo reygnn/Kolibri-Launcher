@@ -34,6 +34,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
@@ -64,6 +65,11 @@ abstract class RepositoryModule {
     // (HIE-INV-2); Kolibri's SettingsRepository implements it (in :core.timeinfo).
     @Binds
     abstract fun bindTimeInfoSettings(repo: SettingsRepository): TimeInfoSettings
+
+    // The shared wallpaper render layer depends only on the narrow
+    // WallpaperDisplaySettings port (WSS-INV-4); SettingsRepository implements it.
+    @Binds
+    abstract fun bindWallpaperDisplaySettings(repo: SettingsRepository): WallpaperDisplaySettings
 
     @Binds
     @Singleton

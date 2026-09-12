@@ -1,8 +1,8 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -17,7 +17,7 @@ import javax.inject.Inject
  * classifier entirely.
  */
 class ResolveWallpaperSurfaceUseCase @Inject constructor(
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: WallpaperDisplaySettings,
     private val classifyWallpaperUseCase: ClassifyWallpaperUseCase,
 ) {
     operator fun invoke(): Flow<LuminanceClassification> =

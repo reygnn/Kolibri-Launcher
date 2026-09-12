@@ -23,7 +23,7 @@ import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.kolibri_launcher.data.PackageUpdateReceiver
-import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.kolibri_launcher.ui.util.ToastErrorTree
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.core.KolibriLog

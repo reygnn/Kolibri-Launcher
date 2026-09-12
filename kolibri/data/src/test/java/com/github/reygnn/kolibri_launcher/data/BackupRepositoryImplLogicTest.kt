@@ -8,11 +8,11 @@ import android.content.ContentResolver
 import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.fakes.*
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat

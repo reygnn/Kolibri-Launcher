@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import javax.inject.Inject
 
 /**
@@ -9,7 +9,7 @@ import javax.inject.Inject
  * colors & shadow dialog), not with layout scaling.
  */
 class SetWallpaperScrimAlphaUseCase @Inject constructor(
-    private val repository: SettingsRepository
+    private val repository: WallpaperDisplaySettings
 ) {
     suspend operator fun invoke(alpha: Float) = repository.setWallpaperScrimAlpha(alpha)
 }

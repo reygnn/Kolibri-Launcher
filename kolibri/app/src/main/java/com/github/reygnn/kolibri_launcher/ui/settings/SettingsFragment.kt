@@ -27,8 +27,8 @@ import androidx.preference.SwitchPreferenceCompat
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.EspressoIdlingResource
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.ui.backup.BackupFragment
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesActivity

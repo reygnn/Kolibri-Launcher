@@ -14,7 +14,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase

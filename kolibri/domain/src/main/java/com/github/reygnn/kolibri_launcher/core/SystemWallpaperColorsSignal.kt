@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.core
 
-import com.github.reygnn.kolibri_launcher.domain.model.DomainWallpaperColors
+import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

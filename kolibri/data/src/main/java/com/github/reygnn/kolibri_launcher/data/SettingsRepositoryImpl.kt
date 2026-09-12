@@ -16,8 +16,8 @@ import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.launcher.core.toEnumOrNull
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.coerceInSafe
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository

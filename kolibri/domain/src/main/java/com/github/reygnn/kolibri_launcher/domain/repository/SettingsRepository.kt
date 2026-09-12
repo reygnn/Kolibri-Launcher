@@ -3,14 +3,15 @@ package com.github.reygnn.kolibri_launcher.domain.repository
 import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
+import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.flow.Flow
 
 // Das ist der Vertrag. Er sagt nur, WAS getan werden kann, nicht WIE.
-interface SettingsRepository : Purgeable, TimeInfoSettings {
+interface SettingsRepository : Purgeable, TimeInfoSettings, WallpaperDisplaySettings {
     val sortOrderFlow: Flow<SortOrder>
 
     suspend fun setSortOrder(sortOrder: SortOrder)
@@ -27,8 +28,8 @@ interface SettingsRepository : Purgeable, TimeInfoSettings {
     val layoutScaleStateFlow: Flow<Float>
     suspend fun setLayoutScale(scale: Float)
 
-    val wallpaperScrimAlphaStateFlow: Flow<Float>
-    suspend fun setWallpaperScrimAlpha(alpha: Float)
+    override val wallpaperScrimAlphaStateFlow: Flow<Float>
+    override suspend fun setWallpaperScrimAlpha(alpha: Float)
 
     val verticalPaddingStateFlow: Flow<Float>
     suspend fun setVerticalPadding(scale: Float)
@@ -39,11 +40,11 @@ interface SettingsRepository : Purgeable, TimeInfoSettings {
     val favoritesAlignmentFlow: Flow<FavoritesAlignment>
     suspend fun setFavoritesAlignment(alignment: FavoritesAlignment)
 
-    val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode>
-    suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode)
+    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode>
+    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode)
 
-    val wallpaperBackdropFlow: Flow<WallpaperBackdrop>
-    suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop)
+    override val wallpaperBackdropFlow: Flow<WallpaperBackdrop>
+    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop)
 
 
     override val showCalendarEventFlow: Flow<Boolean>
