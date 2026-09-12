@@ -37,6 +37,11 @@ dependencies {
     api(project(":core"))
     implementation(libs.androidx.fragment.ktx)
 
+    // hilt-core (annotations only) for @Inject/@Singleton on shared components
+    // like WallpaperCompositeCache; the component graph is aggregated in each
+    // :app via the hilt-android plugin (same pattern as :core).
+    implementation(libs.hilt.core)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -150,9 +150,9 @@ import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.core.wallpaper.WallpaperCompositeKey
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
+import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import android.graphics.Bitmap
 import android.widget.Toast
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl

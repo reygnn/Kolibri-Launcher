@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.common.ui.wallpaper
 import com.github.reygnn.launcher.core.wallpaper.MAX_WALLPAPER_TEXTURE_SIDE
 import com.github.reygnn.launcher.core.wallpaper.calculateWallpaperInSampleSize
 import com.github.reygnn.launcher.core.wallpaper.RENDER_WALLPAPER_PIXELS

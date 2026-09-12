@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.common.ui.wallpaper
 
 import android.graphics.Bitmap
 import io.mockk.every

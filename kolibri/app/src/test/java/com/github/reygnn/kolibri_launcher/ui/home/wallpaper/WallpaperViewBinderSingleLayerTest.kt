@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable

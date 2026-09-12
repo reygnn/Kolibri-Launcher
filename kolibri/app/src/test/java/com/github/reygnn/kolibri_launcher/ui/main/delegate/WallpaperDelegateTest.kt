@@ -8,8 +8,8 @@ import android.content.Context
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import android.graphics.Bitmap
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState

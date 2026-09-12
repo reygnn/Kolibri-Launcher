@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaper
+package com.github.reygnn.launcher.common.ui.wallpaper
 
 import android.net.Uri
 import androidx.core.net.toUri
