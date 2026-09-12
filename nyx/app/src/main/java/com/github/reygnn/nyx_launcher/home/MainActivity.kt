@@ -12,6 +12,7 @@ import android.text.format.DateFormat
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
@@ -39,6 +40,7 @@ import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
@@ -86,7 +88,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var clockTime: TextView
     private lateinit var clockDate: TextView
     private lateinit var clockBattery: TextView
-    private lateinit var clockEvents: TextView
+    private lateinit var alarmIndicator: ImageView
+    private lateinit var calendarIndicator: ImageView
 
     // Shared home-info delegate (HIE Phase C): clock/date/battery/events StateFlows.
     private lateinit var clockDelegate: ClockDelegate
@@ -119,8 +122,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
         clockBattery = findViewById(R.id.clock_battery)
-        clockEvents = findViewById(R.id.clock_events)
-        clockEvents.setOnClickListener { showEventsDialog() }
+        alarmIndicator = findViewById(R.id.event_alarm_indicator)
+        calendarIndicator = findViewById(R.id.event_calendar_indicator)
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
         clockDelegate = ClockDelegate(
@@ -170,26 +173,23 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 launch { clockDelegate.timeString.collect { clockTime.text = it } }
                 launch { clockDelegate.dateString.collect { clockDate.text = it } }
                 launch { clockDelegate.batteryString.collect { clockBattery.text = it } }
-                launch { clockDelegate.timeBasedEvents.collect(::renderEvents) }
+                launch { clockDelegate.timeBasedEvents.collect(::updateEventsIndicator) }
             }
         }
     }
 
-    /** Show the next event as a compact indicator; hide the row when there is none. */
-    private fun renderEvents(events: List<TimeBasedEvent>) {
+    /**
+     * Toggle the two subtle indicators next to the clock (mirrors Kolibri): the
+     * alarm icon when a next alarm exists, the calendar icon when a next event
+     * exists. INVISIBLE (not GONE) so each keeps its slot. Signals only — a
+     * double-tap on the home opens the full list.
+     */
+    private fun updateEventsIndicator(events: List<TimeBasedEvent>) {
         currentEvents = events
-        val next = events.firstOrNull()
-        if (next == null) {
-            clockEvents.visibility = View.GONE
-            return
-        }
-        val label = timeEventFormatter.formatEventRow(
-            next,
-            is24Hour = DateFormat.is24HourFormat(this),
-            allDayLabel = getString(R.string.event_all_day),
-        )
-        clockEvents.text = if (events.size > 1) "$label  (+${events.size - 1})" else label
-        clockEvents.visibility = View.VISIBLE
+        val hasAlarm = events.any { it.type == TimeBasedEventType.ALARM }
+        val hasCalendar = events.any { it.type == TimeBasedEventType.CALENDAR }
+        alarmIndicator.visibility = if (hasAlarm) View.VISIBLE else View.INVISIBLE
+        calendarIndicator.visibility = if (hasCalendar) View.VISIBLE else View.INVISIBLE
     }
 
     /** All upcoming events, grouped today/tomorrow via the shared formatter. */
@@ -324,6 +324,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // their own long-press → drag), so it only fires on the wallpaper /
         // empty area.
         homeRoot.onLongPress = { openSettings() }
+
+        // Double-tap on empty home space shows the upcoming events (HIE Phase C3,
+        // mirrors Kolibri); the two indicators next to the clock just signal that
+        // events exist. Suppressed over icons by the shared core's hit-test.
+        homeRoot.onDoubleTap = { showEventsDialog() }
 
         // The drawer's own swipe-down dismiss lives in AppDrawerFragment (its
         // root is a GestureFrameLayout), so it isn't wired here.

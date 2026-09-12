@@ -25,13 +25,44 @@
             android:paddingTop="24dp"
             android:paddingBottom="8dp">
 
-            <TextView
-                android:id="@+id/clock_time"
+            <!-- Time with the two event indicators next to it (HIE Phase C3, mirrors
+                 Kolibri): the alarm icon shows when a next alarm exists, the calendar
+                 icon when a next calendar event exists. INVISIBLE (not GONE) so each
+                 holds a fixed slot next to the clock. Signals only — a double-tap on
+                 the home opens the full events dialog. -->
+            <LinearLayout
+                android:id="@+id/event_indicators"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/time_placeholder"
-                android:textColor="@android:color/white"
-                android:textSize="48sp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/clock_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/time_placeholder"
+                    android:textColor="@android:color/white"
+                    android:textSize="48sp" />
+
+                <ImageView
+                    android:id="@+id/event_alarm_indicator"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="10dp"
+                    android:contentDescription="@string/show_alarm_title"
+                    android:src="@drawable/ic_alarm"
+                    android:visibility="invisible" />
+
+                <ImageView
+                    android:id="@+id/event_calendar_indicator"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@string/show_calendar_event_title"
+                    android:src="@drawable/ic_event"
+                    android:visibility="invisible" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -56,18 +87,6 @@
                     android:textColor="@android:color/white"
                     android:textSize="16sp" />
             </LinearLayout>
-
-            <!-- Next calendar/alarm event (HIE Phase C3). GONE when there are none;
-                 tap opens the full events dialog. -->
-            <TextView
-                android:id="@+id/clock_events"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:padding="4dp"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:visibility="gone" />
         </LinearLayout>
 
         <androidx.viewpager2.widget.ViewPager2

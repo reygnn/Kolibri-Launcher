@@ -46,6 +46,9 @@ class DragLayer @JvmOverloads constructor(
     var onLongPress: (() -> Unit)?
         get() = gestureCore.onLongPress
         set(value) { gestureCore.onLongPress = value }
+    var onDoubleTap: (() -> Unit)?
+        get() = gestureCore.onDoubleTap
+        set(value) { gestureCore.onDoubleTap = value }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         lastX = ev.x
