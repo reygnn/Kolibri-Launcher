@@ -52,13 +52,16 @@ import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditCoordinator
+import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
@@ -161,6 +164,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         })
     }
 
+    // Single-slot latest-wins render: BOTH the state collector and rerenderWallpaper
+    // go through this, so a Cancel (which fires a state emission AND rerenderWallpaper)
+    // can never run two concurrent binds that would duplicate layers (mirrors Kolibri).
+    private val wallpaperRenderScheduler = WallpaperRenderScheduler()
+
     // Shared home-info delegate (HIE Phase C): clock/date/battery/events StateFlows.
     private lateinit var clockDelegate: ClockDelegate
     private val timeEventFormatter = TimeEventFormatter()
@@ -243,7 +251,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         onBackPressedDispatcher.addCallback(this) {
             // Edit mode → commit (exit); else close the drawer; else stay on home.
             if (wallpaperEditCoordinator.isEditMode.value) {
-                wallpaperEditCoordinator.onCommitEditMode()
+                // Flush live transforms then commit (same as the Save FAB) — a bare
+                // commit would drop the active layer's unsaved pan/zoom.
+                wallpaperEditController.commitEdit()
             } else if (drawerContainer.isVisible) {
                 hideDrawer()
             }
@@ -265,11 +275,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             wallpaperView = wallpaperView,
             dimTarget = findViewById(R.id.home_content),
             coordinator = wallpaperEditCoordinator,
-            onFabPositionChanged = { pos -> lifecycleScope.launch { fabPositionStore.saveFabPosition(pos) } },
+            onFabPositionChanged = { pos -> lifecycleScope.launchSafe("Error saving FAB position") { fabPositionStore.saveFabPosition(pos) } },
             launchLayerPicker = { layerPickerLauncher.launch("image/*") },
-            rerenderWallpaper = {
-                lifecycleScope.launch { wallpaperBinder.bind(wallpaperView, wallpaperEditCoordinator.wallpaperState.value) }
-            },
+            rerenderWallpaper = { renderWallpaper(wallpaperEditCoordinator.wallpaperState.value) },
         )
 
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
@@ -288,16 +296,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // collector awaits each bind before the next emission). Scrim +
                 // backdrop react to their own settings flows.
                 launch {
-                    wallpaperEditCoordinator.wallpaperState.collect {
-                        wallpaperBinder.bind(
-                            wallpaperView,
-                            it,
-                            preferredActiveLayerId = wallpaperEditCoordinator.consumePendingFocusLayerId(),
-                            // Re-sync the edit toolbar after an async rebuild (add/delete),
-                            // else the layer indicator + buttons stay stale until a tap.
-                            onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
-                        )
-                    }
+                    wallpaperEditCoordinator.wallpaperState.collect { renderWallpaper(it) }
                 }
                 launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { currentScrimAlpha = it; applyScrim() } }
                 launch {
@@ -309,6 +308,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 launch {
                     wallpaperEditCoordinator.isEditMode.collect {
                         wallpaperEditController.applyEditMode(it)
+                        // Bypass home gesture detection while editing so pinch/pan reach
+                        // the wallpaper view instead of being stolen by the gesture core.
+                        homeRoot.gesturesEnabled = !it
                         // Suppress the scrim during edit so the user adjusts against the
                         // wallpaper's true appearance (ScrimRender honours isEditMode).
                         applyScrim()
@@ -316,6 +318,24 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 }
                 launch { fabPositionStore.fabPositionFlow.collect { wallpaperEditController.applyFabPosition(it) } }
             }
+        }
+    }
+
+    /**
+     * Single entry point to render a wallpaper [state] onto the view. Routed through
+     * [wallpaperRenderScheduler] (latest-wins, cancels the previous in-flight bind) so
+     * the state collector and rerenderWallpaper can never run two concurrent binds.
+     * Consumes the one-shot focus hint and re-syncs the edit toolbar after a rebuild.
+     */
+    private fun renderWallpaper(state: WallpaperState) {
+        val focusId = wallpaperEditCoordinator.consumePendingFocusLayerId()
+        wallpaperRenderScheduler.render(lifecycleScope) {
+            wallpaperBinder.bind(
+                wallpaperView,
+                state,
+                preferredActiveLayerId = focusId,
+                onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
+            )
         }
     }
 

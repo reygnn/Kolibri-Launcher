@@ -50,9 +50,19 @@ class DragLayer @JvmOverloads constructor(
         get() = gestureCore.onDoubleTap
         set(value) { gestureCore.onDoubleTap = value }
 
+    /**
+     * When false, the home gesture detection (swipe-up / long-press / double-tap) is
+     * bypassed entirely and touches dispatch normally to children. Set false during
+     * wallpaper edit mode so pinch/pan reaches the wallpaper view instead of being
+     * detected + consumed by the gesture core (guarding only the callback bodies
+     * isn't enough — the core still intercepts the stream).
+     */
+    var gesturesEnabled: Boolean = true
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         lastX = ev.x
         lastY = ev.y
+        if (!gesturesEnabled) return super.dispatchTouchEvent(ev)
         if (dragController.isDragging) {
             when (ev.actionMasked) {
                 MotionEvent.ACTION_MOVE -> dragController.onMove(ev.x.toInt(), ev.y.toInt())

@@ -6,6 +6,7 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.DialogFragment
@@ -20,6 +21,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -56,8 +58,11 @@ class NyxCustomizationDialog : DialogFragment() {
             // dismissed externally (tap-outside/back) mid-copy. (The activity isn't
             // recreated on rotation — broad configChanges — so this is robust.)
             if (uri != null) {
-                requireActivity().lifecycleScope.launch {
-                    wallpaperImageSetter.setFromUri(uri)
+                requireActivity().lifecycleScope.launchSafe("Error setting wallpaper") {
+                    val ok = wallpaperImageSetter.setFromUri(uri)
+                    if (!ok) activity?.let {
+                        Toast.makeText(it, R.string.wallpaper_set_failed_toast, Toast.LENGTH_SHORT).show()
+                    }
                     if (isAdded) dismissAllowingStateLoss()
                 }
             }
@@ -89,7 +94,7 @@ class NyxCustomizationDialog : DialogFragment() {
         // Scrim: write on drag, fade the card away while tracking so the home dims live.
         scrimSlider.addOnChangeListener { _, value, fromUser ->
             if (fromUser) {
-                lifecycleScope.launch { wallpaperDisplaySettings.setWallpaperScrimAlpha(value) }
+                lifecycleScope.launchSafe("Error saving scrim alpha") { wallpaperDisplaySettings.setWallpaperScrimAlpha(value) }
             }
         }
         scrimSlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
@@ -105,7 +110,7 @@ class NyxCustomizationDialog : DialogFragment() {
 
         monochromeSwitch.setOnCheckedChangeListener { button, isChecked ->
             if (button.isPressed) {
-                lifecycleScope.launch { preferences.setMonochromeIcons(isChecked) }
+                lifecycleScope.launchSafe("Error saving monochrome") { preferences.setMonochromeIcons(isChecked) }
             }
         }
 
@@ -117,7 +122,7 @@ class NyxCustomizationDialog : DialogFragment() {
         view.findViewById<MaterialButton>(R.id.btn_clear_wallpaper).setOnClickListener {
             // Activity scope + dismiss after (like choose): the sheet closes so its
             // Edit entry can't linger stale over a now-empty wallpaper.
-            requireActivity().lifecycleScope.launch {
+            requireActivity().lifecycleScope.launchSafe("Error clearing wallpaper") {
                 wallpaperImageSetter.clear()
                 if (isAdded) dismissAllowingStateLoss()
             }

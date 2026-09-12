@@ -83,4 +83,5 @@
     <string name="wallpaper_memory_source">%1$d×%2$d, from %3$d×%4$d</string>
     <string name="wallpaper_memory_total">Total: %1$s</string>
     <string name="wallpaper_memory_empty">No wallpaper loaded</string>
+    <string name="wallpaper_layer_indicator">Layer %1$d/%2$d</string>
 </resources>

@@ -41,7 +41,10 @@ class NyxWallpaperImageSetter @Inject constructor(
         val newUri = internalUri.toString()
         val previous = referencedUris()
         repository.saveWallpaperState(WallpaperState.single(newUri))
-        previous.filter { it != newUri }.forEach { fileManager.deleteFile(it) }
+        // deleteFile is blocking disk I/O — hop off the main thread.
+        withContext(Dispatchers.IO) {
+            previous.filter { it != newUri }.forEach { fileManager.deleteFile(it) }
+        }
         return true
     }
 
@@ -49,7 +52,7 @@ class NyxWallpaperImageSetter @Inject constructor(
     suspend fun clear() {
         val previous = referencedUris()
         repository.clearWallpaper()
-        previous.forEach { fileManager.deleteFile(it) }
+        withContext(Dispatchers.IO) { previous.forEach { fileManager.deleteFile(it) } }
     }
 
     /**

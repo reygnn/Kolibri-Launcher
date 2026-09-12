@@ -72,4 +72,5 @@
     <string name="wallpaper_memory_source">%1$d×%2$d, aus %3$d×%4$d</string>
     <string name="wallpaper_memory_total">Gesamt: %1$s</string>
     <string name="wallpaper_memory_empty">Kein Wallpaper geladen</string>
+    <string name="wallpaper_layer_indicator">Ebene %1$d/%2$d</string>
 </resources>

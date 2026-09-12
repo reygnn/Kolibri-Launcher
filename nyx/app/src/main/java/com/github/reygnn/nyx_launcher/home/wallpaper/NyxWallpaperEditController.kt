@@ -52,6 +52,7 @@ class NyxWallpaperEditController(
 
     private var pendingFabPosition: FabPosition? = null
     private var pendingBackdrop: WallpaperBackdrop? = null
+    private var inEditMode = false
 
     private val fabCluster: SpeedDialFabCluster get() = requireNotNull(fabClusterView)
     private val commandsPanel: CommandsPanel get() = requireNotNull(commandsPanelView)
@@ -114,6 +115,7 @@ class NyxWallpaperEditController(
     // ---- transitions ----
 
     fun applyEditMode(isEditMode: Boolean) {
+        inEditMode = isEditMode
         try {
             val target = WallpaperEditTransition.targetState(WallpaperEditTransition.forMode(isEditMode))
             if (isEditMode) {
@@ -136,17 +138,7 @@ class NyxWallpaperEditController(
     private fun wireEditModeListeners() {
         touchInterceptor.setOnTouchListener { _, event -> wallpaperView.onTouchEvent(event) }
 
-        fabCluster.setOnSaveClicked {
-            val state = coordinator.wallpaperState.value
-            val action = WallpaperSaveAction.decide(
-                isMultiLayer = state.layerCount >= 2,
-                hasWallpaper = state.hasWallpaper,
-                allLayerTransforms = readAllLayerTransforms(),
-                singleTransform = readSingleTransform(),
-            )
-            dispatchSaveAction(action)
-            coordinator.onCommitEditMode()
-        }
+        fabCluster.setOnSaveClicked { commitEdit() }
         fabCluster.setOnCancelClicked {
             coordinator.onCancelEditMode()
             rerenderWallpaper()
@@ -223,6 +215,23 @@ class NyxWallpaperEditController(
             updateLayerIndicator()
             applyLayerButtonsState()
         }
+    }
+
+    /**
+     * Commits the edit session: flushes the live view transforms into state (so
+     * pan/zoom aren't lost on rebuild), then commits. Used by the Save FAB AND the
+     * back-press exit — both must flush, else back-press would drop unsaved transforms.
+     */
+    fun commitEdit() {
+        val state = coordinator.wallpaperState.value
+        val action = WallpaperSaveAction.decide(
+            isMultiLayer = state.layerCount >= 2,
+            hasWallpaper = state.hasWallpaper,
+            allLayerTransforms = readAllLayerTransforms(),
+            singleTransform = readSingleTransform(),
+        )
+        dispatchSaveAction(action)
+        coordinator.onCommitEditMode()
     }
 
     private fun clearEditModeListeners() {
@@ -329,6 +338,7 @@ class NyxWallpaperEditController(
      * outside edit mode (both callees guard on the inflated overlay).
      */
     fun onWallpaperRebuilt() {
+        if (!inEditMode) return
         updateLayerIndicator()
         applyLayerButtonsState()
     }
@@ -338,7 +348,10 @@ class NyxWallpaperEditController(
         val count = wallpaperView.layerCount
         val active = wallpaperView.activeLayerIndex
         if (count > 0) {
-            commandsPanel.setLayerIndicator("Layer ${active + 1}/$count", visible = true)
+            commandsPanel.setLayerIndicator(
+                commandsPanel.context.getString(R.string.wallpaper_layer_indicator, active + 1, count),
+                visible = true,
+            )
         } else {
             commandsPanel.setLayerIndicator(null, visible = false)
         }
