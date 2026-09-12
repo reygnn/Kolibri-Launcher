@@ -6,7 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import io.mockk.coEvery

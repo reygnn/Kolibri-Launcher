@@ -458,7 +458,7 @@ oom_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt"
   "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
-  "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
 )
 oom_awk="$script_dir/check-exception-breadth.awk"

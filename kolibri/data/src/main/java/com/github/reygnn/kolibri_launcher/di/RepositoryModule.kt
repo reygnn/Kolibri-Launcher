@@ -20,7 +20,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.service.ComponentLabelResolverImpl
 import com.github.reygnn.kolibri_launcher.data.service.PackagePresenceImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -39,7 +39,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBitmapLuminance
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver

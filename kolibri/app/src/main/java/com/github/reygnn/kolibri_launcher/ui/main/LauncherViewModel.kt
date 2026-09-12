@@ -22,7 +22,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.WallpaperCompositeCache
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.MainDispatcher

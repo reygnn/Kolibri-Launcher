@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.domain.repository
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Computes the median WCAG luminance of a Kolibri-internal wallpaper

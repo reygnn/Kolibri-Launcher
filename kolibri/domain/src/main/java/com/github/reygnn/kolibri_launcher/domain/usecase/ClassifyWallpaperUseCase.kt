@@ -5,7 +5,7 @@ import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
+import com.github.reygnn.launcher.core.wallpaper.WallpaperBitmapLuminance
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged

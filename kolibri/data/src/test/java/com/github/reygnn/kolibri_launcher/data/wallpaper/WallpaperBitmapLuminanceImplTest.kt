@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data.wallpaper
 
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap

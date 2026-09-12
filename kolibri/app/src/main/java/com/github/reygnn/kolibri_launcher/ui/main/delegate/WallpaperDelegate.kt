@@ -155,7 +155,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperCompositeKey
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaper.DecodedWallpaperBitmap
 import android.graphics.Bitmap
 import android.widget.Toast
-import com.github.reygnn.kolibri_launcher.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.core.CompositeLuminanceSignal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
