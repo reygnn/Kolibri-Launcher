@@ -1,10 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Settings hosts a PreferenceFragmentCompat; the ActionBar (title + up) comes
-     from Theme.Nyx.Settings. Mirrors Kolibri's settings structure. -->
-<androidx.fragment.app.FragmentContainerView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/settings_container"
-    android:name="com.github.reygnn.nyx_launcher.settings.SettingsFragment"
+<!-- Settings: an explicit MaterialToolbar over a PreferenceFragmentCompat, rather
+     than the decor ActionBar (which overlaps the content under Android 15+
+     edge-to-edge). fitsSystemWindows on the root insets the whole thing below the
+     status bar so the first row is never hidden behind the bar. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true" />
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="true">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/settings_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:title="@string/settings_title" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/settings_container"
+        android:name="com.github.reygnn.nyx_launcher.settings.SettingsFragment"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

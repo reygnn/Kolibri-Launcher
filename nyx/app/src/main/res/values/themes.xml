@@ -13,7 +13,11 @@
     </style>
 
     <!-- Settings is a normal opaque Material 3 screen (with ActionBar), unlike the
-         transparent wallpaper-showing home theme — mirrors Kolibri's settings look. -->
-    <style name="Theme.Nyx.Settings" parent="Theme.Material3.DayNight" />
+         transparent wallpaper-showing home theme — mirrors Kolibri's settings look.
+         preferenceTheme is required by androidx.preference: without it the row uses a
+         mismatched layout where title and summary overlap. -->
+    <style name="Theme.Nyx.Settings" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
 
 </resources>
