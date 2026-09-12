@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
+
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent

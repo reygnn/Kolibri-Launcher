@@ -12,7 +12,7 @@ import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber

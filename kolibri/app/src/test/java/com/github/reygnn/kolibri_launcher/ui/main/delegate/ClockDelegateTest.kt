@@ -6,7 +6,7 @@ import android.os.BatteryManager
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.github.reygnn.launcher.core.timeinfo.ChargeState
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent

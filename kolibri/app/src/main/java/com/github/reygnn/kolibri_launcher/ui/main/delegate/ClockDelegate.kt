@@ -15,7 +15,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.text.format.DateFormat
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.ChargeState
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import kotlinx.coroutines.channels.awaitClose

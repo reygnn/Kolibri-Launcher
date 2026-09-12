@@ -29,7 +29,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveTimeBasedEventsUseCase
+import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase

@@ -33,9 +33,10 @@ import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRe
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
@@ -58,6 +59,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    // The home-info subsystem depends only on the narrow TimeInfoSettings port
+    // (HIE-INV-2); Kolibri's SettingsRepository implements it (in :core.timeinfo).
+    @Binds
+    abstract fun bindTimeInfoSettings(repo: SettingsRepository): TimeInfoSettings
 
     @Binds
     @Singleton

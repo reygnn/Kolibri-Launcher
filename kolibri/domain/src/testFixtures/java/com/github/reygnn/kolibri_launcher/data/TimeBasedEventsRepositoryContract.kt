@@ -15,7 +15,7 @@ package com.github.reygnn.kolibri_launcher.data
  *
  * STATUS:
  *   12 von 14 Repository-Fakes haben einen Contract-Test (siehe `*Contract.kt`
- *   in diesem Package). [com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository]
+ *   in diesem Package). [com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository]
  *   gehört NICHT dazu — und das ist eine bewusste Entscheidung, kein Versehen.
  *
  * DAS INTERFACE:

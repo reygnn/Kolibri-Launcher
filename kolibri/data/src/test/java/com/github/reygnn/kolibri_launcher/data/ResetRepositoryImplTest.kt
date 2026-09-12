@@ -9,7 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations

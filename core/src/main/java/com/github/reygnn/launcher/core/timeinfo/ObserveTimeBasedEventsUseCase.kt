@@ -1,9 +1,6 @@
-package com.github.reygnn.kolibri_launcher.domain.usecase
+package com.github.reygnn.launcher.core.timeinfo
 
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
-import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +12,7 @@ import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
 class ObserveTimeBasedEventsUseCase @Inject constructor(
-    private val settingsRepository: SettingsRepository,
+    private val settings: TimeInfoSettings,
     private val timeBasedEventsRepository: TimeBasedEventsRepository
 ) {
     private val refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
@@ -47,8 +44,8 @@ class ObserveTimeBasedEventsUseCase @Inject constructor(
         // calendar/alarm provider IPC. Dedupe each input individually — deduping the
         // combined Pair would swallow refreshTrigger-only re-emissions.
         return combine(
-            settingsRepository.showAlarmFlow.distinctUntilChanged(),
-            settingsRepository.showCalendarEventFlow.distinctUntilChanged(),
+            settings.showAlarmFlow.distinctUntilChanged(),
+            settings.showCalendarEventFlow.distinctUntilChanged(),
             refreshTrigger
         ) { showAlarm, showCalendar, _ ->
             // 2. Erzeuge ein Paar (Pair) aus den Ergebnissen

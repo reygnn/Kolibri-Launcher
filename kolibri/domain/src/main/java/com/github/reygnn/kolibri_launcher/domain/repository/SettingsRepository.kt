@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.launcher.core.Purgeable
+import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.WallpaperSurfaceMode
@@ -9,7 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import kotlinx.coroutines.flow.Flow
 
 // Das ist der Vertrag. Er sagt nur, WAS getan werden kann, nicht WIE.
-interface SettingsRepository : Purgeable {
+interface SettingsRepository : Purgeable, TimeInfoSettings {
     val sortOrderFlow: Flow<SortOrder>
 
     suspend fun setSortOrder(sortOrder: SortOrder)
@@ -45,10 +46,10 @@ interface SettingsRepository : Purgeable {
     suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop)
 
 
-    val showCalendarEventFlow: Flow<Boolean>
+    override val showCalendarEventFlow: Flow<Boolean>
     suspend fun setShowCalendarEvent(isEnabled: Boolean)
 
-    val showAlarmFlow: Flow<Boolean>
+    override val showAlarmFlow: Flow<Boolean>
     suspend fun setShowAlarm(isEnabled: Boolean)
 
     val autoShowKeyboardFlow: Flow<Boolean>

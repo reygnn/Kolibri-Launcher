@@ -4,7 +4,7 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.Purgeable
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 

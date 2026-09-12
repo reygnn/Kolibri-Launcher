@@ -13,7 +13,7 @@ import com.github.reygnn.launcher.core.timeinfo.CalendarEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository
+import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Implementierung des [com.github.reygnn.kolibri_launcher.domain.repository.TimeBasedEventsRepository].
+ * Implementierung des [com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository].
  *
  * SAFETY FIRST:
  * Wir verwenden hier KEIN runCatching, damit CancellationExceptions (Coroutine Abbruch)
