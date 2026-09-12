@@ -48,6 +48,11 @@ class IconLoaderImpl @Inject constructor(
     private val lock = Any()
     private val memory = HashMap<CacheKey, Bitmap>()
     private val packageIndex = HashMap<String, MutableSet<CacheKey>>()
+    // Reverse of [packageIndex] so an LRU eviction removes from exactly one set
+    // instead of scanning the whole index (A1-15). An evicted key may belong to a
+    // different package than the insertion that triggered it, so its package must
+    // be looked up, not derived from the inserting ref.
+    private val keyToPackage = HashMap<CacheKey, String>()
     private val inFlight = HashMap<CacheKey, Deferred<Bitmap>>()
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -90,7 +95,9 @@ class IconLoaderImpl @Inject constructor(
 
         synchronized(lock) {
             memory[key] = bitmap
-            packageIndex.getOrPut(pkgOf(ref)) { mutableSetOf() }.add(key)
+            val pkg = pkgOf(ref)
+            packageIndex.getOrPut(pkg) { mutableSetOf() }.add(key)
+            keyToPackage[key] = pkg
             budget.touch(key, bitmap.allocationByteCount).forEach { evicted ->
                 memory.remove(evicted)
                 removeFromIndex(evicted)
@@ -103,7 +110,7 @@ class IconLoaderImpl @Inject constructor(
         synchronized(lock) {
             val keys = packageIndex.remove(pkg).orEmpty()
             budget.forget(keys)
-            keys.forEach { memory.remove(it) }
+            keys.forEach { memory.remove(it); keyToPackage.remove(it) }
         }
         val prefix = IconCacheKey.packagePrefix(pkg)
         scope.launch(dispatcher) {
@@ -171,12 +178,10 @@ class IconLoaderImpl @Inject constructor(
     }
 
     private fun removeFromIndex(key: CacheKey) {
-        val iterator = packageIndex.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            entry.value.remove(key)
-            if (entry.value.isEmpty()) iterator.remove()
-        }
+        val pkg = keyToPackage.remove(key) ?: return
+        val set = packageIndex[pkg] ?: return
+        set.remove(key)
+        if (set.isEmpty()) packageIndex.remove(pkg)
     }
 
     private companion object {

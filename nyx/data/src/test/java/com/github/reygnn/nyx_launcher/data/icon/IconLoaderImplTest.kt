@@ -58,4 +58,16 @@ class IconLoaderImplTest {
 
         assertThat(source.calls).isEqualTo(2)
     }
+
+    @Test
+    fun evict_clears_memory_index_and_forces_a_reload() = runTest(mainDispatcherRule.dispatcher) {
+        val source = FakeSource()
+        val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, FakePreferencesRepository())
+
+        loader.bitmap(ref("com.foo"), 64) // 1st resolve, indexed under com.foo
+        loader.evict("com.foo")           // must drop it from memory + index (A1-15)
+        loader.bitmap(ref("com.foo"), 64) // re-resolves instead of a memory hit
+
+        assertThat(source.calls).isEqualTo(2)
+    }
 }
