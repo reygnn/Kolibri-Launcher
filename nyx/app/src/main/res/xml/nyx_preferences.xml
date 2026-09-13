@@ -81,11 +81,6 @@
         app:iconSpaceReserved="false">
 
         <Preference
-            android:key="dev_grant_consent"
-            android:title="@string/dev_grant_consent_title"
-            app:iconSpaceReserved="false" />
-
-        <Preference
             android:key="dev_throw_test"
             android:title="@string/dev_throw_test_title"
             app:iconSpaceReserved="false" />

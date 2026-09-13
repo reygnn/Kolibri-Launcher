@@ -18,7 +18,6 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
@@ -51,7 +50,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
     @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
     @Inject lateinit var preferences: PreferencesRepository
-    @Inject lateinit var consentController: ConsentController
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
@@ -210,11 +208,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         if (!BuildConfig.SHOW_DEV_COMMANDS) {
             category?.isVisible = false
             return
-        }
-        findPreference<Preference>("dev_grant_consent")?.setOnPreferenceClickListener {
-            consentController.applyConsent(true)
-            toast("ACRA consent granted + enabled")
-            true
         }
         findPreference<Preference>("dev_throw_test")?.setOnPreferenceClickListener {
             throw RuntimeException("ACRA throw test from Nyx settings (v${BuildConfig.VERSION_NAME})")

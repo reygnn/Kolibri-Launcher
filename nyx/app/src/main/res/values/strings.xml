@@ -66,7 +66,6 @@
     <string name="backup_import_summary">Restore layout, settings and wallpaper from a file</string>
     <!-- Developer (ACRA) — debug / -PdevCommands only, not shown publicly -->
     <string name="dev_commands_category_title" translatable="false">Developer — ACRA</string>
-    <string name="dev_grant_consent_title" translatable="false">Grant consent + enable</string>
     <string name="dev_throw_test_title" translatable="false">Throw test exception</string>
     <string name="dev_silent_error_title" translatable="false">Silent-error test</string>
     <string name="dev_warn_test_title" translatable="false">Warn test (no report)</string>
