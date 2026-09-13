@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetDefaultFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
@@ -50,6 +51,7 @@ class OnboardingViewModelTest {
     // UseCases als Mocks (relaxed = true entspricht in etwa dem alten lenient-Verhalten)
     private val onboardingAppsUseCase: GetOnboardingAppsUseCase = mockk(relaxed = true)
     private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase = mockk(relaxed = true)
+    private val getDefaultFavoriteComponentsUseCase: GetDefaultFavoriteComponentsUseCase = mockk(relaxed = true)
     private val completeOnboardingUseCase: CompleteOnboardingUseCase = mockk(relaxed = true)
     private val importBackupUseCase: ImportBackupUseCase = mockk(relaxed = true)
     private val markOnboardingCompletedUseCase: MarkOnboardingCompletedUseCase = mockk(relaxed = true)
@@ -65,12 +67,16 @@ class OnboardingViewModelTest {
     fun setup() {
         // Default behavior für Apps Flow (Property-Zugriff → every, kein coEvery)
         every { onboardingAppsUseCase.onboardingAppsFlow } returns flowOf(testApps)
+        // Default: no system-default apps resolved → INITIAL_SETUP starts empty, as
+        // before this feature. Tests that exercise the pre-selection override this.
+        coEvery { getDefaultFavoriteComponentsUseCase(any()) } returns emptyList()
     }
 
     private fun setupViewModel() {
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
+            getDefaultFavoriteComponentsUseCase,
             completeOnboardingUseCase,
             importBackupUseCase,
             markOnboardingCompletedUseCase,
@@ -555,6 +561,7 @@ class OnboardingViewModelTest {
         viewModel = OnboardingViewModel(
             onboardingAppsUseCase,
             getFavoriteComponentsUseCase,
+            getDefaultFavoriteComponentsUseCase,
             completeOnboardingUseCase,
             importBackupUseCase,
             markOnboardingCompletedUseCase,
@@ -1038,7 +1045,8 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `loadInitialData - in INITIAL_SETUP mode - starts with empty selection`() = runTest {
+    fun `loadInitialData - in INITIAL_SETUP mode - starts with empty selection when no defaults resolve`() = runTest {
+        // Default stub returns emptyList → nothing pre-selected.
         setupViewModel()
         viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
         viewModel.loadInitialData()
@@ -1047,6 +1055,27 @@ class OnboardingViewModelTest {
         val uiState = viewModel.uiState.value
         assertTrue(uiState.selectedApps.isEmpty())
         assertTrue(uiState.selectableApps.all { !it.isSelected })
+    }
+
+    @Test
+    fun `loadInitialData - in INITIAL_SETUP mode - pre-selects resolved default apps`() = runTest {
+        // The system-default resolver returns two of the installed apps → they must be
+        // pre-selected (checked in the list AND in the selected set), the rest not.
+        coEvery { getDefaultFavoriteComponentsUseCase(any()) } returns
+            listOf(app1.componentName, app3.componentName)
+
+        setupViewModel()
+        viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+        viewModel.loadInitialData()
+        advanceUntilIdle()
+
+        val uiState = viewModel.uiState.value
+        assertEquals(2, uiState.selectedApps.size)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        // Resolution is fed the installed-apps list.
+        coVerify { getDefaultFavoriteComponentsUseCase(testApps) }
     }
 
     @Test

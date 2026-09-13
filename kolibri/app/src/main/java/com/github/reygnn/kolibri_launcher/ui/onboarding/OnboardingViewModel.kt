@@ -21,6 +21,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.CompleteOnboardingUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.GetDefaultFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
@@ -40,6 +42,7 @@ import javax.inject.Inject
 class OnboardingViewModel @Inject constructor(
     private val onboardingAppsUseCase: GetOnboardingAppsUseCase,
     private val getFavoriteComponentsUseCase: GetFavoriteComponentsUseCase,
+    private val getDefaultFavoriteComponentsUseCase: GetDefaultFavoriteComponentsUseCase,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val importBackupUseCase: ImportBackupUseCase,
     private val markOnboardingCompletedUseCase: MarkOnboardingCompletedUseCase,
@@ -136,11 +139,18 @@ class OnboardingViewModel @Inject constructor(
         launchSafe {
             try {
                 when (launchMode) {
-                    LaunchMode.INITIAL_SETUP ->
-                        // First run: an empty selection is legitimate; the save-gate
-                        // exempts INITIAL_SETUP, so preselectState stays NotLoaded and
-                        // is never consulted for this mode.
-                        selectedComponents.value = emptySet()
+                    LaunchMode.INITIAL_SETUP -> {
+                        // First run: pre-select the user's common default apps (phone,
+                        // SMS, email, browser, camera) so the home screen isn't empty to
+                        // start with. Resolved from the real system defaults and matched
+                        // against the installed apps; any unresolved default is simply
+                        // omitted (no dummy entries). An empty result stays legitimate:
+                        // the save-gate exempts INITIAL_SETUP, so preselectState stays
+                        // NotLoaded and is never consulted for this mode.
+                        val availableApps = onboardingAppsUseCase.onboardingAppsFlow.first()
+                        selectedComponents.value =
+                            getDefaultFavoriteComponentsUseCase(availableApps).toSet()
+                    }
 
                     LaunchMode.EDIT_FAVORITES ->
                         when (val read = getFavoriteComponentsUseCase()) {

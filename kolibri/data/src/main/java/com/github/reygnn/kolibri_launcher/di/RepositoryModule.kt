@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.di
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.BackupRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepositoryImpl
+import com.github.reygnn.kolibri_launcher.data.DefaultAppsRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FabPositionRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepositoryImpl
@@ -24,6 +25,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminance
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
+import com.github.reygnn.kolibri_launcher.domain.repository.DefaultAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -100,6 +102,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCustomNamesRepository(impl: CustomNamesRepositoryImpl): CustomNamesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDefaultAppsRepository(impl: DefaultAppsRepositoryImpl): DefaultAppsRepository
 
     @Binds
     @Singleton
