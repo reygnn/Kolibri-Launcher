@@ -29,3 +29,14 @@ fun HomeLayout.pageCells(page: Int): List<HomeCell> {
 
 /** Flat cell list for the dock (no empties). */
 fun HomeLayout.dockCells(): List<HomeCell> = dock.map { it.toCell() }
+
+/**
+ * How many pages the pager renders: the occupied pages plus exactly one empty
+ * trailing "landing" page as a standing drop target (HOME_CURATION_SPEC §10), i.e.
+ * `highest-occupied-page + 2`, or 1 when the grid is empty. Interior empty pages
+ * are implicitly included (they're below the highest occupied page). This is a
+ * pure rendering affordance — the landing page is only persisted once something is
+ * dropped on it (the append-on-drop transition), so the repository stays faithful.
+ */
+fun HomeLayout.renderedPageCount(): Int =
+    items.maxOfOrNull { it.pos.page }?.let { it + 2 } ?: 1

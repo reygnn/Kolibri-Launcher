@@ -25,6 +25,9 @@ class DragController(private val host: DragViewHost) {
     var onDragStart: (() -> Unit)? = null
     var onDragEnd: (() -> Unit)? = null
 
+    /** Notified on every drag move (DragLayer coords) — e.g. for pager edge-advance. */
+    var onDragMove: ((x: Int, y: Int) -> Unit)? = null
+
     /**
      * Notified after a drop is committed, while the drag view is deliberately
      * still shown at the drop point. The host clears it once the drop's re-render
@@ -51,6 +54,7 @@ class DragController(private val host: DragViewHost) {
         if (!isDragging) return
         host.moveDragView(x, y)
         updateZone(x, y)
+        onDragMove?.invoke(x, y)
     }
 
     fun onDrop(x: Int, y: Int) {

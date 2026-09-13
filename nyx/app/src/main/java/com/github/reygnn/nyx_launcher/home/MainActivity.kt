@@ -480,7 +480,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         controller.onDragEnd = {
             removeBar.visibility = View.INVISIBLE
             removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
+            cancelEdgeAdvance()
         }
+        // Hold a drag at the left/right pager edge to page across grids (incl. the
+        // empty landing page), so an app can be carried to another page.
+        controller.onDragMove = { x, _ -> onDragEdge(x) }
         // The drag view is kept at the drop point until the commit's re-render
         // clears it (renderLayout). This fallback covers no-op drops (same cell)
         // and errors, where no re-render arrives.
@@ -588,8 +592,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             ).also { pager.adapter = it }
         }
         val currentPage = pager.currentItem
-        pagerAdapter?.submit((0 until layout.pages).map(layout::pageCells))
-        if (currentPage < layout.pages) pager.setCurrentItem(currentPage, false)
+        // Render the occupied pages plus one empty landing page (see renderedPageCount).
+        val renderedPages = layout.renderedPageCount()
+        pagerAdapter?.submit((0 until renderedPages).map(layout::pageCells))
+        if (currentPage < renderedPages) pager.setCurrentItem(currentPage, false)
         dockAdapter.submit(layout.dockCells())
         // A drop leaves its drag view in place to bridge the async commit; the
         // commit's re-render arrives here, so clear it now (idempotent otherwise).
@@ -710,6 +716,54 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         is DragPayload.NewApp -> viewModel.place(payload.key, target)
     }
 
+    // ---- pager edge auto-advance during a drag ----
+
+    private var lastDragX = 0
+    private var edgeAdvanceScheduled = false
+
+    // Fires after a dwell at the edge: flip one page toward the edge, then re-arm
+    // while the finger is still held there (continuous paging).
+    private val edgeAdvanceRunnable = object : Runnable {
+        override fun run() {
+            edgeAdvanceScheduled = false
+            if (!homeRoot.dragController.isDragging) return
+            val dir = edgeDirection(lastDragX)
+            if (dir == 0) return
+            val maxPage = (viewModel.layout.value?.renderedPageCount() ?: 1) - 1
+            val target = (pager.currentItem + dir).coerceIn(0, maxPage)
+            if (target != pager.currentItem) pager.setCurrentItem(target, true)
+            scheduleEdgeAdvance() // keep paging while held at the edge
+        }
+    }
+
+    /** -1 near the left pager edge, +1 near the right, 0 otherwise. */
+    private fun edgeDirection(x: Int): Int {
+        val rect = Rect().also { rectInDragLayer(pager, it) }
+        val edge = (EDGE_ADVANCE_DP * resources.displayMetrics.density).toInt()
+        return when {
+            x <= rect.left + edge -> -1
+            x >= rect.right - edge -> 1
+            else -> 0
+        }
+    }
+
+    private fun onDragEdge(x: Int) {
+        lastDragX = x
+        if (edgeDirection(x) != 0) scheduleEdgeAdvance() else cancelEdgeAdvance()
+    }
+
+    private fun scheduleEdgeAdvance() {
+        if (edgeAdvanceScheduled) return
+        edgeAdvanceScheduled = true
+        homeRoot.postDelayed(edgeAdvanceRunnable, EDGE_ADVANCE_DWELL_MS)
+    }
+
+    private fun cancelEdgeAdvance() {
+        if (!edgeAdvanceScheduled) return
+        homeRoot.removeCallbacks(edgeAdvanceRunnable)
+        edgeAdvanceScheduled = false
+    }
+
     // ---- folder sheet ----
 
     private fun openFolder(folderId: ItemId) {
@@ -800,6 +854,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/** Width of the left/right pager edge zone (dp) that triggers drag page-advance. */
+private const val EDGE_ADVANCE_DP = 36f
+
+/** Dwell at the pager edge before advancing one page (and between repeats), in ms. */
+private const val EDGE_ADVANCE_DWELL_MS = 500L
 
 /** Dock icon slot width in dp (matches item_dock_icon.xml), for centering math. */
 private const val DOCK_ITEM_DP = 72f
