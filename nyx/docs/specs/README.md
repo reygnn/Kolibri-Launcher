@@ -99,6 +99,30 @@ Fehler-Envelope (`INSTALLED_APPS_LOAD_SPEC`, „a caught failure stays a failure
 
 ---
 
+## Bewusste Abweichungen von Launcher3
+
+Zwei Grid-Verhalten sind bewusste Modell-Entscheidungen *gegen* Launcher3, nicht
+verfehltes Launcher3-Verhalten (festgehalten 2026-09-13 beim Härten der Grid-Edgecase-
+Tests, gegengeprüft mit unabhängigen Reviews). Notiert, damit sie später nicht
+versehentlich als Bug „korrigiert" werden.
+
+- **Kompaktierung statt Loch-Erhalt.** Nyx hält den Grid row-major gepackt: ein Drop
+  „hinter die letzte Zelle" (`GridInsert`, `index == columns*rows`) landet in der ersten
+  freien Zelle in Lesereihenfolge — inklusive eines *früheren* Innen-Lochs, nicht am
+  visuellen Ende. Launcher3 hält Löcher (free placement) und platziert per Drop-Position
+  mit Push-Reorder; nur sein *Auto-Placement* (`findSpaceForItem`) füllt die erste freie
+  Zelle. Der Reorder-*Shift* selbst ist Launcher3-Vorbild (`HOME_DRAG_ENGINE_SPEC`), die
+  Kompaktierung ist die Abweichung. Bezug: `MOVE_ITEM_SPEC`, `IHM-INV-3`.
+- **App-Unizität statt Duplikate.** Nyx erzwingt `IHM-INV-7` (jede App höchstens einmal
+  über home ∪ dock ∪ folders). „Add to home" einer App, die bereits *top-level* im Dock
+  oder Grid liegt ⇒ `move` des vorhandenen Items (kein Duplikat); einer App, die *Mitglied
+  eines Folders* ist (Grid **oder** Dock) ⇒ `NoOp` — keine Extraktion, das ist die
+  separate `REMOVE_FROM_FOLDER`-Geste. Launcher3 kennt keine cross-layout Unizität und
+  legt schlicht eine weitere Kopie an; die Frage „NoOp vs. extrahieren-und-verschieben"
+  stellt sich dort gar nicht. Bezug: `HEU-INV-1`, `IHM-INV-7`.
+
+---
+
 ## Offene Querschnitt-Punkte
 
 Zentral geführt in `ICON_HOME_MODEL_SPEC` §10; hier der Überblick:
