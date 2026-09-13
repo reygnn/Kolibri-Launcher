@@ -9,6 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
+import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -84,6 +85,39 @@ class HomeLayoutTransitionMoveTest {
         val fOut = out.items.first { it.item.id == f.id }.item as HomeItem.Folder
         assertThat(fOut.members).containsExactly(ck("pb"), ck("pc"), ck("pa")).inOrder()
         assertThat(out.items.any { it.item.id == a.id }).isFalse()
+    }
+
+    @Test fun dock_app_dropped_onto_a_grid_app_creates_a_folder() {
+        // Folder creation where the DRAGGED source lives in the dock, not the grid: the
+        // removing() step must pull it out of the dock, and the new folder lands on the
+        // target's cell (target key first, then the dragged dock app). The other
+        // folder-creation tests all drag a grid source, so this pins the dock-source path.
+        val d = app("d", "pd")
+        val b = app("b", "pb")
+        val start = layout(items = listOf(placed(b, 0, 1, 0)), dock = listOf(d))
+        val r = move(start, d.id, DropTarget.Cell(CellPos(0, 1, 0))) // dock app d onto grid app b
+        assertThat(r).isInstanceOf(MoveResult.FolderCreated::class.java)
+        val out = r.layout!!
+        assertThat(out.dock).isEmpty() // d pulled out of the dock
+        val placedFolder = out.items.single()
+        assertThat(placedFolder.pos).isEqualTo(CellPos(0, 1, 0))
+        val f = placedFolder.item as HomeItem.Folder
+        assertThat(f.members).containsExactly(ck("pb"), ck("pd")).inOrder() // target, then dragged
+    }
+
+    @Test fun dock_app_dropped_onto_a_grid_folder_is_added_and_leaves_the_dock() {
+        // Add-to-folder with a dock source: d is appended to the grid folder and vacates
+        // the dock. Mirrors dock_app_dropped_onto_a_grid_app_creates_a_folder for the
+        // folder-target branch of moveToCell.
+        val f = folder("f", ck("pb"), ck("pc"))
+        val d = app("d", "pd")
+        val start = layout(items = listOf(placed(f, 0, 1, 0)), dock = listOf(d))
+        val r = move(start, d.id, DropTarget.Cell(CellPos(0, 1, 0)))
+        assertThat(r).isInstanceOf(MoveResult.AddedToFolder::class.java)
+        val out = r.layout!!
+        assertThat(out.dock).isEmpty()
+        val fOut = out.items.first { it.item.id == f.id }.item as HomeItem.Folder
+        assertThat(fOut.members).containsExactly(ck("pb"), ck("pc"), ck("pd")).inOrder()
     }
 
     @Test fun folder_to_empty_cell_moves() {
@@ -189,6 +223,20 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
         val expected = dockItems.drop(1).map { it.id } + dockItems.first().id
         assertThat(r.layout!!.dock.map { it.id }).containsExactlyElementsIn(expected).inOrder()
+    }
+
+    @Test fun reorder_within_an_over_capacity_dock_is_rejected_as_full() {
+        // Documents current behaviour (NOT necessarily desirable): a dock OVER capacity
+        // (size > columns) can't even be reordered. Excluding the source still leaves
+        // `columns` icons, so the capacity guard (HomeLayoutTransition.kt:220) fires
+        // DOCK_FULL. This over-capacity state is only transient — the regridder re-homes
+        // dock overflow onto the grid against the real device grid before the user
+        // normally interacts — so the block is largely theoretical. Pinned so that a
+        // future change to allow reordering an over-full dock is a conscious decision.
+        val overCap = (0..grid.columns).map { app("d$it", "pd$it") } // columns + 1 icons
+        val start = layout(dock = overCap)
+        val r = move(start, overCap.first().id, DropTarget.DockSlot(grid.columns))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.DOCK_FULL))
     }
 
     @Test fun dock_item_to_own_slot_is_noop() {
@@ -419,6 +467,32 @@ class HomeLayoutTransitionMoveTest {
         assertThat(out.items.first { it.item.id == ItemId("g0") }.pos).isEqualTo(CellPos(1, 0, 0))
     }
 
+    @Test fun overflow_lands_in_a_partially_full_next_pages_hole_without_adding_a_page() {
+        // The realistic middle case between the two extremes above: page 0 full, page 1
+        // exists but holds only li0 & li1 (a hole from li2 on). Inserting Z into the
+        // MIDDLE of full page 0 spills the last occupant (f23), which must drop into page
+        // 1's FIRST hole (li2) — not a fresh page, and pages stays 2.
+        val page0 = (0 until 24).map { app("f$it", "pf$it") }
+        val page1 = listOf(app("g0", "pg0"), app("g1", "pg1"))
+        val z = app("z", "pz")
+        val start = layout(
+            items = page0.mapIndexed { li, it -> placed(it, 0, li % 4, li / 4) } +
+                page1.mapIndexed { li, it -> placed(it, 1, li % 4, li / 4) },
+            dock = listOf(z),
+            pages = 2,
+        )
+        val r = move(start, z.id, DropTarget.GridInsert(0, 10))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2) // the existing hole absorbed the overflow
+        val byId = out.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("z")]).isEqualTo(CellPos(0, 2, 2)) // li10 = x2,y2
+        assertThat(byId[ItemId("f23")]).isEqualTo(CellPos(1, 2, 0)) // spilled into page 1's hole li2
+        assertThat(byId[ItemId("g0")]).isEqualTo(CellPos(1, 0, 0)) // page 1 existing icons untouched
+        assertThat(byId[ItemId("g1")]).isEqualTo(CellPos(1, 1, 0))
+        assertThat(out.dock).isEmpty()
+    }
+
     @Test fun grid_insert_onto_a_brand_new_trailing_page_appends_a_page() {
         // page == pages with a small in-range index: the append branch adds a page and
         // lands at that page's first free cell (not a rejection).
@@ -515,6 +589,27 @@ class HomeLayoutTransitionMoveTest {
             dock = listOf(z),
         )
         val r = move(start, z.id, DropTarget.GridInsert(HomeLayout.MAX_PAGES - 1, 0))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun add_to_home_onto_a_full_home_is_rejected() {
+        // Coupling regression for MainActivity.addToHome (line 1087): firstFreeCell() is
+        // uncapped and, on a home with all MAX_PAGES pages full, returns
+        // CellPos(MAX_PAGES, 0, 0) — an off-cap page. Feeding that straight into a move
+        // (as addToHome does via place → moveToCell) MUST be rejected as OFF_GRID, so
+        // "add to home" silently no-ops on a full home instead of landing on a page the
+        // pager never renders. A 1x1 grid makes MAX_PAGES items fill everything.
+        val tiny = GridSpec(columns = 1, rows = 1)
+        val occupants = (0 until HomeLayout.MAX_PAGES).map { app("f$it", "pf$it") }
+        val full = HomeLayout(
+            tiny,
+            pages = HomeLayout.MAX_PAGES,
+            items = occupants.mapIndexed { p, it -> PlacedItem(it, CellPos(p, 0, 0)) },
+            dock = emptyList(),
+        )
+        val landing = full.firstFreeCell()
+        assertThat(landing).isEqualTo(CellPos(HomeLayout.MAX_PAGES, 0, 0)) // uncapped, off-cap page
+        val r = HomeLayoutTransition.move(full, ItemId("f0"), DropTarget.Cell(landing), newId::next)
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 

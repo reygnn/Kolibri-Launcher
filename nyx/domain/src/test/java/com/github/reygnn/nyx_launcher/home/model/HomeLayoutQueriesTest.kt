@@ -63,4 +63,16 @@ class HomeLayoutQueriesTest {
         // returns CellPos(0, 0, 0), the start of a first page.
         assertThat(layout(pages = 0).firstFreeCell()).isEqualTo(CellPos(0, 0, 0))
     }
+
+    @Test fun all_max_pages_full_returns_an_off_cap_trailing_page() {
+        // Every one of the MAX_PAGES pages is full. firstFreeCell is deliberately
+        // UNCAPPED: it returns CellPos(MAX_PAGES, 0, 0), a page index past the cap,
+        // rather than signalling "no room". Safety rests entirely on the caller
+        // (place/move) rejecting that off-cap cell — pinned as a coupling regression in
+        // HomeLayoutTransitionMoveTest.add_to_home_onto_a_full_home_is_rejected. This
+        // fixes the previous ceiling at pages == 2 (all_pages_full_returns_a_fresh_trailing_page).
+        val items = (0 until HomeLayout.MAX_PAGES).flatMap { p -> (0 until 24).map { at(it, page = p) } }
+        val full = layout(items = items, pages = HomeLayout.MAX_PAGES)
+        assertThat(full.firstFreeCell()).isEqualTo(CellPos(HomeLayout.MAX_PAGES, 0, 0))
+    }
 }
