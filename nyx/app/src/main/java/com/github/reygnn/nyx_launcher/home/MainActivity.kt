@@ -78,6 +78,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemId
+import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -892,6 +893,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
         is DragPayload.NewApp -> buildList {
             val pkg = payload.key.packageName
+            add(ContextMenuItem(getString(R.string.menu_add_to_home)) { addToHome(payload.key) })
             add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
             if (!isSystemApp(pkg)) add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
         }
@@ -902,6 +904,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         if (!contextMenuOverlay.isVisible) return
         contextMenuOverlay.isVisible = false
         contextMenuCard.removeAllViews()
+    }
+
+    /** "Add to home" (drawer menu): place the app at the first free cell, close the drawer. */
+    private fun addToHome(key: ComponentKey) {
+        val cell = viewModel.layout.value?.firstFreeCell() ?: return
+        viewModel.place(key, DropTarget.Cell(cell))
+        if (drawerContainer.isVisible) hideDrawer()
     }
 
     // Intent construction mirrors Kolibri's app-info action (Uri.fromParts +

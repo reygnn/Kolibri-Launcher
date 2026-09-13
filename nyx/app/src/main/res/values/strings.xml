@@ -19,6 +19,7 @@
     <string name="factory_reset_confirm">Reset</string>
     <string name="factory_reset_done">Reset complete</string>
     <string name="factory_reset_failed">Reset failed</string>
+    <string name="menu_add_to_home">Add to home</string>
     <string name="menu_app_info">App info</string>
     <string name="menu_remove_from_home">Remove from home</string>
     <string name="menu_uninstall">Uninstall</string>
