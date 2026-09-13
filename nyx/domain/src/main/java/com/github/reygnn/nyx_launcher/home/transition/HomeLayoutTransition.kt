@@ -76,15 +76,17 @@ object HomeLayoutTransition {
     ): MoveResult {
         val cols = layout.grid.columns
         val cells = cols * layout.grid.rows
-        if (page < 0 || page > layout.pages || index < 0 || index > cells) {
+        if (page < 0 || page > layout.pages || page >= HomeLayout.MAX_PAGES || index < 0 || index > cells) {
             return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
         }
         val base = layout.removing(moving)
 
         // Past the last cell, or a brand-new trailing page → append at the first
-        // free cell from this page on (adds a trailing page if all are full).
+        // free cell from this page on (adds a trailing page if all are full). A home
+        // already at the page cap with no free cell is genuinely full → reject.
         if (index >= cells || page >= base.pages) {
             val pos = firstFreeCellFrom(base, page.coerceAtMost(base.pages))
+            if (pos.page >= HomeLayout.MAX_PAGES) return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
             val pages = if (pos.page >= base.pages) pos.page + 1 else base.pages
             return resultOf(layout, base.copy(pages = pages, items = base.items + PlacedItem(source, pos)))
         }
@@ -144,6 +146,9 @@ object HomeLayoutTransition {
         var pages = base.pages
         overflow?.let {
             val pos = firstFreeCellFrom(base.copy(items = items), page + 1)
+            // Nowhere within the cap for the spilled occupant → the home is full; reject
+            // the whole insert rather than drop the app or exceed the page cap.
+            if (pos.page >= HomeLayout.MAX_PAGES) return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
             if (pos.page >= pages) pages = pos.page + 1
             items = items + it.copy(pos = pos)
         }
@@ -339,7 +344,9 @@ object HomeLayoutTransition {
     /** OFF_GRID reason for a cell, or null if in bounds ([0,pages] allows append). */
     private fun offGridReason(layout: HomeLayout, pos: CellPos): MoveResult.Reason? {
         val g = layout.grid
-        val onGrid = pos.page in 0..layout.pages &&
+        // The landing page (index == pages) is a valid target UNLESS it would exceed
+        // the page cap, so clamp the upper bound to MAX_PAGES - 1.
+        val onGrid = pos.page in 0..minOf(layout.pages, HomeLayout.MAX_PAGES - 1) &&
             pos.x in 0 until g.columns &&
             pos.y in 0 until g.rows
         return if (onGrid) null else MoveResult.Reason.OFF_GRID

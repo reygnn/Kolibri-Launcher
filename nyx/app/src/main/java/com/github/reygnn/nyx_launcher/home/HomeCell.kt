@@ -37,6 +37,10 @@ fun HomeLayout.dockCells(): List<HomeCell> = dock.map { it.toCell() }
  * are implicitly included (they're below the highest occupied page). This is a
  * pure rendering affordance — the landing page is only persisted once something is
  * dropped on it (the append-on-drop transition), so the repository stays faithful.
+ *
+ * Capped at [HomeLayout.MAX_PAGES]: once the home is full of pages no empty landing
+ * page is offered, so the user can't drag onto a page beyond the cap (the transitions
+ * would reject it anyway) and the page-dot indicator never overflows.
  */
 fun HomeLayout.renderedPageCount(): Int =
-    items.maxOfOrNull { it.pos.page }?.let { it + 2 } ?: 1
+    items.maxOfOrNull { it.pos.page }?.let { minOf(it + 2, HomeLayout.MAX_PAGES) } ?: 1

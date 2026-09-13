@@ -75,4 +75,16 @@ data class HomeLayout(
     val pages: Int,
     val items: List<PlacedItem>,
     val dock: List<HomeItem>,
-)
+) {
+    companion object {
+        /**
+         * Hard cap on home pages (valid page indices are `0 until MAX_PAGES`). The
+         * transitions refuse to create a page beyond it, so the layout — and the
+         * fixed-width page-dot indicator that renders one dot per occupied page —
+         * can never grow unbounded. 9 pages is a classic launcher maximum (9 × grid
+         * cells is already far more home slots than any real setup needs); the value
+         * is a deliberate product limit, not a device-derived one.
+         */
+        const val MAX_PAGES = 9
+    }
+}

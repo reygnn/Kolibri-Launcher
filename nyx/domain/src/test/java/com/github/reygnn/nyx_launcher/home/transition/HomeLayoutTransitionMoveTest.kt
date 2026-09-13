@@ -471,6 +471,53 @@ class HomeLayoutTransitionMoveTest {
         assertThat(fOut.members.last()).isEqualTo(ck("pa"))
     }
 
+    // ---- Page cap (HomeLayout.MAX_PAGES) ----
+
+    @Test fun dropping_onto_a_cell_beyond_the_page_cap_is_rejected() {
+        // A layout already at the cap has no landing page beyond it: a Cell drop onto
+        // page index == MAX_PAGES is off-grid.
+        val a = app("a")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), pages = HomeLayout.MAX_PAGES)
+        val r = move(start, a.id, DropTarget.Cell(CellPos(HomeLayout.MAX_PAGES, 0, 0)))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun dropping_onto_the_last_page_within_the_cap_still_creates_it() {
+        // Boundary just under the cap: pages == MAX_PAGES - 1, dropping on the landing
+        // page (index == MAX_PAGES - 1) legitimately creates the final allowed page.
+        val a = app("a")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), pages = HomeLayout.MAX_PAGES - 1)
+        val r = move(start, a.id, DropTarget.Cell(CellPos(HomeLayout.MAX_PAGES - 1, 0, 0)))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(HomeLayout.MAX_PAGES)
+        assertThat(out.items.single().pos).isEqualTo(CellPos(HomeLayout.MAX_PAGES - 1, 0, 0))
+    }
+
+    @Test fun grid_insert_onto_a_page_beyond_the_cap_is_rejected() {
+        val a = app("a")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), pages = HomeLayout.MAX_PAGES)
+        val r = move(start, a.id, DropTarget.GridInsert(HomeLayout.MAX_PAGES, 0))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun overflow_at_the_page_cap_is_rejected_not_a_tenth_page() {
+        // 1x1 grid = one cell per page; fill all MAX_PAGES pages, then a reorder-insert
+        // whose spilled occupant has nowhere within the cap → the whole move is rejected
+        // (no app dropped, no page beyond the cap created).
+        val tinyGrid = GridSpec(columns = 1, rows = 1)
+        val occupants = (0 until HomeLayout.MAX_PAGES).map { app("f$it", "pf$it") }
+        val z = app("z", "pz")
+        val start = HomeLayout(
+            tinyGrid,
+            pages = HomeLayout.MAX_PAGES,
+            items = occupants.mapIndexed { p, it -> PlacedItem(it, CellPos(p, 0, 0)) },
+            dock = listOf(z),
+        )
+        val r = move(start, z.id, DropTarget.GridInsert(HomeLayout.MAX_PAGES - 1, 0))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
     // ---- Programmer-error precondition (§MIU-INV-2) ----
 
     @Test fun unknown_moving_id_is_noop() {
