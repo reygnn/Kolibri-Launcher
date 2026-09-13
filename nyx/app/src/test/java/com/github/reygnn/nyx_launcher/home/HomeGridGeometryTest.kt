@@ -161,6 +161,15 @@ class HomeGridGeometryTest {
         assertThat(drop(80f, 60f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0))) // fx == 0.8
     }
 
+    @Test fun a_drop_in_the_top_dead_space_still_classifies_against_row_0() {
+        // gridCellAt clamps a point above the grid content (localY < topPad = 50) to row 0
+        // (point_in_top_dead_space_clamps_to_row_0). This pins that the CLASSIFIER agrees:
+        // a centre-x drop up there lands ON row-0's cell, an edge-x drop reorders at its
+        // index — the dead space never yields null or a negative row.
+        assertThat(drop(50f, 0f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0))) // col 0 centre
+        assertThat(drop(95f, 0f)).isEqualTo(DropTarget.GridInsert(0, 1)) // col 0 right edge → after
+    }
+
     @Test fun degenerate_rows_make_the_classifier_null_too() {
         // Symmetry with the columns==0 guard: a non-positive row count also yields null.
         assertThat(gridDropAt(0, 50f, 50f, 400, 600, GridSpec(columns = 4, rows = 0), 1f)).isNull()

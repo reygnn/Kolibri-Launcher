@@ -423,6 +423,23 @@ class HomeLayoutTransitionMoveTest {
         assertThat(out.dock).isEmpty()
     }
 
+    @Test fun gridinsert_past_the_last_cell_lands_in_an_earlier_interior_hole() {
+        // The append branch (index >= cells) delegates to firstFreeCellFrom, which fills the
+        // first ROW-MAJOR hole from this page on — so a drop "past the last cell" of a page
+        // that has an interior gap lands IN that gap, not visually at the end.
+        // gridinsert_past_the_last_cell_appends_at_first_free only has a hole at the natural
+        // next slot; this pins the interior-hole case (a@li0, hole@li1, c@li2).
+        val a = app("a"); val c = app("c", "pc"); val b = app("b", "pb")
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(c, 0, 2, 0)), dock = listOf(b))
+        val r = move(start, b.id, DropTarget.GridInsert(0, grid.columns * grid.rows)) // index == cells
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(a.id)
+        assertThat(out.idAtLi(1)).isEqualTo(b.id) // filled the interior hole, not appended after c
+        assertThat(out.idAtLi(2)).isEqualTo(c.id)
+        assertThat(out.dock).isEmpty()
+    }
+
     @Test fun insert_at_own_position_is_a_noop() {
         val a = app("a")
         val start = layout(items = listOf(placed(a, 0, 0, 0)))

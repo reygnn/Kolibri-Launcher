@@ -178,6 +178,22 @@ class HomeLayoutRegridderTest {
         assertThat(out.layout.items).hasSize(4) // nothing lost
     }
 
+    @Test fun off_grid_items_relocate_in_page_order_across_pages() {
+        // The off-grid queue is sorted by (page, y, x), but every other multi-off-grid test
+        // keeps its off-grid items on page 0, so the PAGE key of the sort is never exercised.
+        // Two off-grid items on different pages, listed page-1-FIRST, must still relocate in
+        // page order: the page-0 item takes the earlier free cell. Without the page sort the
+        // input order would place the page-1 item first, so this discriminates the key.
+        val onPage1 = placed(app("b", "pb"), 1, 5, 0) // x=5 off-grid under 4 cols, page 1
+        val onPage0 = placed(app("a", "pa"), 0, 5, 0) // x=5 off-grid under 4 cols, page 0
+        val start = layout(GridSpec(6, 8), items = listOf(onPage1, onPage0), pages = 2) // page-1 first
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        val byId = out.layout.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("a")]).isEqualTo(CellPos(0, 0, 0)) // page-0 item placed first
+        assertThat(byId[ItemId("b")]).isEqualTo(CellPos(0, 1, 0)) // page-1 item second
+        assertThat(out.layout.pages).isEqualTo(1) // both landed on page 0
+    }
+
     @Test fun a_relocated_off_grid_items_span_is_preserved() {
         // The regridder promises "Span is preserved" for relocated off-grid grid items
         // (HomeLayoutRegridder.kt:59). v1 never sets a span > 1×1, so this guards the v2
