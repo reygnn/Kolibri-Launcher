@@ -194,7 +194,6 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var dockAdapter: DockAdapter
 
     private var gridIconPx = 0
-    private var dockSize = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -502,16 +501,25 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }
         })
 
-        // 2) Dock zone — slot from the x under the finger (or append at the end).
+        // 2) Dock zone — insert index from the finger x: the number of icons whose
+        // center is left of the finger. So a drop on an icon's left half inserts
+        // before it (index 0 at the far left), the right half after it, and past
+        // the last icon appends. The dragged icon's own (hidden) view is skipped so
+        // its old slot doesn't shift the count during a reorder.
         controller.addDropZone(object : DropZone {
             override fun hitRect(out: Rect) = rectInDragLayer(dock, out)
             override fun accepts(payload: DragPayload) = true
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
                 val bounds = Rect().also { rectInDragLayer(dock, it) }
-                val child = dock.findChildViewUnder((x - bounds.left).toFloat(), (y - bounds.top).toFloat())
-                val slot = child?.let(dock::getChildAdapterPosition)
-                    ?.takeIf { it != RecyclerView.NO_POSITION } ?: dockSize
-                applyDrop(payload, DropTarget.DockSlot(slot))
+                val localX = (x - bounds.left).toFloat()
+                var index = 0
+                for (i in 0 until dock.childCount) {
+                    val child = dock.getChildAt(i)
+                    if (child.visibility != View.VISIBLE) continue // the icon being dragged
+                    if (dock.getChildAdapterPosition(child) == RecyclerView.NO_POSITION) continue
+                    if (child.left + child.width / 2f < localX) index++
+                }
+                applyDrop(payload, DropTarget.DockSlot(index))
             }
         })
 
@@ -559,7 +567,6 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun renderLayout(layout: HomeLayout?) {
         layout ?: return
-        dockSize = layout.dock.size
         // Rebuild the pager adapter when the grid dimensions change (columns feed
         // the span count, rows the cell height + bottom padding). applyDeviceGrid
         // can change them at runtime, and a stale rows would mis-size the padding

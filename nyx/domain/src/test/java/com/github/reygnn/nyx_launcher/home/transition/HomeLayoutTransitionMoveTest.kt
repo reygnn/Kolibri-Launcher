@@ -149,12 +149,46 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.DOCK_FULL))
     }
 
-    @Test fun occupied_dock_slot_is_rejected() {
+    @Test fun drop_before_a_dock_icon_inserts_there() {
         val a = app("a")
         val x = app("x", "px")
         val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(x))
-        val r = move(start, a.id, DropTarget.DockSlot(0)) // slot 0 is occupied by x
-        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE))
+        val r = move(start, a.id, DropTarget.DockSlot(0)) // insert before x, not a folder
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.dock.map { it.id }).containsExactly(a.id, x.id).inOrder()
+        assertThat(out.items).isEmpty()
+    }
+
+    @Test fun drop_between_two_dock_icons_inserts_between() {
+        val a = app("a")
+        val x = app("x", "px")
+        val y = app("y", "py")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(x, y))
+        val r = move(start, a.id, DropTarget.DockSlot(1)) // between x and y
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(x.id, a.id, y.id).inOrder()
+    }
+
+    @Test fun dock_reorder_moves_icon_to_a_middle_index() {
+        val a = app("a")
+        val b = app("b", "pb")
+        val c = app("c", "pc")
+        val start = layout(dock = listOf(a, b, c))
+        // Move a to index 1 (exclusive of a): dockWithoutSource=[b,c], insert at 1 → [b,a,c].
+        val r = move(start, a.id, DropTarget.DockSlot(1))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(b.id, a.id, c.id).inOrder()
+    }
+
+    @Test fun reorder_within_a_full_dock_is_allowed() {
+        // A full dock still reorders — excluding the source frees a slot (not DOCK_FULL).
+        val dockItems = (0 until grid.columns).map { app("d$it", "pd$it") }
+        val start = layout(dock = dockItems)
+        val r = move(start, dockItems.first().id, DropTarget.DockSlot(grid.columns))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val expected = dockItems.drop(1).map { it.id } + dockItems.first().id
+        assertThat(r.layout!!.dock.map { it.id }).containsExactlyElementsIn(expected).inOrder()
     }
 
     @Test fun dock_item_to_own_slot_is_noop() {

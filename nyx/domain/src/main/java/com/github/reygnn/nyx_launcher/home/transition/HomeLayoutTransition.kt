@@ -103,25 +103,23 @@ object HomeLayoutTransition {
         moving: ItemId,
         index: Int,
     ): MoveResult {
-        val currentDockIndex = layout.dock.indexOfFirst { it.id == moving }
-        if (currentDockIndex >= 0 && currentDockIndex == index) return MoveResult.NoOp
+        if (index < 0) return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
 
+        // The dock is a flat ordered list: a drop INSERTS at [index], shifting the
+        // rest right — it never "lands on" an occupied slot (§7-D3). [index] is
+        // exclusive of the source (the UI counts only the other icons left of the
+        // finger), so it is already relative to dockWithoutSource; clamp for the
+        // past-the-end append case.
         val dockWithoutSource = layout.dock.filterNot { it.id == moving }
+        // Capacity is per grid columns; a reorder within the dock never grows it
+        // (source is excluded), so only an incoming item can hit the cap.
         if (dockWithoutSource.size >= layout.grid.columns) {
-            return MoveResult.Rejected(MoveResult.Reason.DOCK_FULL) // §7-D3
+            return MoveResult.Rejected(MoveResult.Reason.DOCK_FULL)
         }
-        return when {
-            index < 0 ->
-                MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
-            index < dockWithoutSource.size ->
-                MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
-            // index >= dockWithoutSource.size ⇒ append. The UI passes the
-            // source-inclusive dock size when the finger is past the last icon,
-            // so an in-dock source overshoots the exclusive size by one (A1-13);
-            // treat any trailing index as append, not OFF_GRID.
-            else ->
-                MoveResult.Moved(layout.removing(moving).copy(dock = dockWithoutSource + source))
-        }
+        val insertIdx = index.coerceAtMost(dockWithoutSource.size)
+        val newDock = dockWithoutSource.toMutableList().apply { add(insertIdx, source) }
+        if (newDock == layout.dock) return MoveResult.NoOp // reorder to the same spot
+        return MoveResult.Moved(layout.removing(moving).copy(dock = newDock))
     }
 
     // =================== removeFromFolder (REMOVE_FROM_FOLDER_SPEC) ==========
@@ -229,10 +227,12 @@ object HomeLayoutTransition {
         when (target) {
             is DropTarget.Cell -> offGridReason(layout, target.pos)
                 ?: if (layout.items.any { it.pos == target.pos }) MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE else null
+            // A dock drop inserts at [index], shifting the rest right — any in-range
+            // index is a valid landing spot; only a full dock or an out-of-range
+            // index is rejected.
             is DropTarget.DockSlot -> when {
                 layout.dock.size >= layout.grid.columns -> MoveResult.Reason.DOCK_FULL
                 target.index < 0 || target.index > layout.dock.size -> MoveResult.Reason.OFF_GRID
-                target.index < layout.dock.size -> MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE
                 else -> null
             }
         }
@@ -244,7 +244,10 @@ object HomeLayoutTransition {
                 val pages = if (target.pos.page == layout.pages) layout.pages + 1 else layout.pages
                 layout.copy(pages = pages, items = layout.items + PlacedItem(item, target.pos))
             }
-            is DropTarget.DockSlot -> layout.copy(dock = layout.dock + item) // validated as append
+            is DropTarget.DockSlot -> {
+                val idx = target.index.coerceIn(0, layout.dock.size)
+                layout.copy(dock = layout.dock.toMutableList().apply { add(idx, item) })
+            }
         }
 
     /** Adds [item] at a deterministic [placement] (a dissolved folder's old spot). */
