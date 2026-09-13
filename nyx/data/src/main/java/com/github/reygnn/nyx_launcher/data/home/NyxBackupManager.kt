@@ -15,6 +15,7 @@ import com.github.reygnn.nyx_launcher.home.model.FabPosition
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -102,6 +103,8 @@ class NyxBackupManager @Inject constructor(
                     }
                 }
                 true
+            } catch (e: CancellationException) {
+                throw e // cooperative cancellation must propagate, never become `false`
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Nyx backup export failed")
                 false
@@ -140,6 +143,8 @@ class NyxBackupManager @Inject constructor(
                 if (options.importWallpaper) restoreWallpaper(backup.wallpaperLayers, extracted)
 
                 ImportResult.Success
+            } catch (e: CancellationException) {
+                throw e // cooperative cancellation must propagate, never become InvalidData
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Nyx backup import failed")
                 ImportResult.InvalidData

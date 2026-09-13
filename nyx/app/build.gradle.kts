@@ -155,9 +155,12 @@ dependencies {
 
 // --- ACRA ProGuard mapping upload (mirrors Kolibri) ---
 // After a release build, POST build/outputs/mapping/release/mapping.txt to the ACRA
-// server (Acrarium) so obfuscated crash stacks deobfuscate. No-op when minify is off
-// (no mapping) or the script/secrets are missing. Credentials come from the shared
-// root secrets.properties via acra-scripts/load_secrets.sh.
+// server (Acrarium) so obfuscated crash stacks deobfuscate. Best-effort: a no-op when
+// minify is off (no mapping) or the script is missing, and NON-FATAL on any upload
+// failure — missing secrets (fresh clone / CI), offline, or ACRA down must never fail
+// the release build, since the deliverable AAB is already produced by the time this
+// finalizer runs. Credentials come from the shared root secrets.properties via
+// acra-scripts/load_secrets.sh; re-run `./gradlew uploadProguardMapping` once available.
 tasks.register("uploadProguardMapping") {
     group = "acra"
     description = "Upload the release ProGuard mapping to the ACRA server"
@@ -180,7 +183,14 @@ tasks.register("uploadProguardMapping") {
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
             .waitFor()
-        if (exit != 0) throw GradleException("Mapping upload failed (exit $exit)")
+        // Non-fatal by contract: the AAB is already built. A missing secrets.properties,
+        // an offline machine or an ACRA outage must not flip the release build to FAILED.
+        if (exit != 0) {
+            logger.warn(
+                "uploadProguardMapping: upload failed (exit $exit) — release output is unaffected; " +
+                    "re-run ./gradlew uploadProguardMapping once ACRA/secrets are reachable.",
+            )
+        }
     }
 }
 

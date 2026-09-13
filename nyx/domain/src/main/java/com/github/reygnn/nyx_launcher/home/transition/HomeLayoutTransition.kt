@@ -56,13 +56,16 @@ object HomeLayoutTransition {
     }
 
     /**
-     * Reorder-insert on the grid: put [source] at reading-order [index] on [page]
-     * and shift the occupant there — and the following ones — one cell forward,
-     * stopping at the first gap that absorbs the shift (Launcher3-style). If the
-     * page is dense from [index] to its end, the last occupant spills onto the next
-     * page's first free cell (adding a page only when needed). An empty target cell
-     * is a plain place with no shift; [index] == columns*rows appends. No item is
-     * ever dropped or foldered — foldering is the [DropTarget.Cell] centre path.
+     * Reorder-insert on the grid: put [source] at reading-order [index] on [page] and
+     * shift to open that cell (Launcher3-style). The shift walks to the nearest gap: a
+     * gap AFTER [index] pushes the block `[index, gap)` one cell forward; if the tail is
+     * dense but a gap exists BEFORE [index] (e.g. the cell the source itself just
+     * vacated), the block `(gap, index]` slides one cell back instead — so a reorder on a
+     * page that still has any free cell never spills onto a new page. Only a genuinely
+     * full page (no gap on either side) overflows its last occupant onto the next page's
+     * first free cell (adding a page only when needed). An empty target cell is a plain
+     * place with no shift; [index] == columns*rows appends. No item is ever dropped or
+     * foldered — foldering is the [DropTarget.Cell] centre path.
      */
     private fun insertOnGrid(
         layout: HomeLayout,
@@ -94,16 +97,41 @@ object HomeLayoutTransition {
             return resultOf(layout, base.copy(items = base.items + PlacedItem(source, cellOf(page, index, cols))))
         }
 
-        // The shift block is [index, gap-1]; `gap` is the first empty cell after it.
-        var gap = index + 1
-        while (gap < cells && occupied[gap] != null) gap++
+        // Nearest gap: prefer a forward gap (shift the block [index, fwdGap) one cell
+        // up), else fall back to a backward gap (shift (backGap, index] one cell down).
+        // A reorder that frees the source's own cell provides such a backward gap, so a
+        // page reordered within itself never needs a new page.
+        var fwdGap = index + 1
+        while (fwdGap < cells && occupied[fwdGap] != null) fwdGap++
+        var backGap = index - 1
+        while (backGap >= 0 && occupied[backGap] != null) backGap--
 
+        if (fwdGap < cells || backGap >= 0) {
+            val shiftRange: IntRange
+            val delta: Int
+            if (fwdGap < cells) {
+                shiftRange = index until fwdGap; delta = 1
+            } else {
+                shiftRange = (backGap + 1)..index; delta = -1
+            }
+            val shifted = ArrayList<PlacedItem>(pageItems.size + 1)
+            for (p in pageItems) {
+                val li = p.pos.y * cols + p.pos.x
+                shifted.add(if (li in shiftRange) p.copy(pos = cellOf(page, li + delta, cols)) else p)
+            }
+            shifted.add(PlacedItem(source, cellOf(page, index, cols)))
+            val items = base.items.filterNot { it.pos.page == page } + shifted
+            return resultOf(layout, base.copy(items = items))
+        }
+
+        // Genuinely full page (no gap either side): forward-shift and spill the
+        // last-cell occupant onto the next page's first free cell.
         val newPageItems = ArrayList<PlacedItem>(pageItems.size + 1)
         var overflow: PlacedItem? = null
         for (p in pageItems) {
             val li = p.pos.y * cols + p.pos.x
-            if (li < index || li >= gap) {
-                newPageItems.add(p) // before the insert point, or past the gap — unchanged
+            if (li < index) {
+                newPageItems.add(p) // before the insert point — unchanged
             } else {
                 val to = li + 1
                 if (to < cells) newPageItems.add(p.copy(pos = cellOf(page, to, cols)))

@@ -879,20 +879,31 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private class ContextMenuItem(val label: String, val icon: Drawable? = null, val action: () -> Unit)
 
+    /**
+     * Bumped on every show and dismiss. The shortcut-load coroutine captures the value
+     * at launch and re-checks it before mutating the shared card, so a stale load (its
+     * cross-process getShortcuts still in flight after the menu was dismissed and
+     * re-shown for a DIFFERENT item) no longer prepends the wrong app's shortcuts onto —
+     * and re-anchors — the current menu.
+     */
+    private var contextMenuGeneration = 0
+
     private fun showContextMenu(payload: DragPayload, source: View) {
         val standard = buildContextMenuItems(payload)
         val pkg = payloadPackage(payload)
         if (standard.isEmpty() && pkg == null) return
+        val generation = ++contextMenuGeneration
         contextMenuCard.removeAllViews()
         standard.forEach(::addMenuRow)
         contextMenuOverlay.isVisible = true
         positionContextMenu(source)
         // Load the app's shortcuts OFF the main thread (getShortcuts + icon decode are
-        // cross-process), then prepend them Pixel-style; skip if the menu was dismissed.
+        // cross-process), then prepend them Pixel-style; skip if the menu was dismissed
+        // or already replaced by another item's menu (stale generation).
         pkg ?: return
         lifecycleScope.launch {
             val shortcuts = withContext(Dispatchers.Default) { appShortcuts(pkg) }
-            if (!contextMenuOverlay.isVisible || shortcuts.isEmpty()) return@launch
+            if (generation != contextMenuGeneration || !contextMenuOverlay.isVisible || shortcuts.isEmpty()) return@launch
             val header = shortcuts.map(::makeMenuRow) + makeMenuDivider()
             header.forEachIndexed { i, view -> contextMenuCard.addView(view, i) }
             positionContextMenu(source) // height grew — re-anchor
@@ -1015,6 +1026,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun dismissContextMenu() {
         if (!contextMenuOverlay.isVisible) return
+        contextMenuGeneration++ // invalidate any in-flight shortcut-load coroutine
         contextMenuOverlay.isVisible = false
         contextMenuCard.removeAllViews()
     }

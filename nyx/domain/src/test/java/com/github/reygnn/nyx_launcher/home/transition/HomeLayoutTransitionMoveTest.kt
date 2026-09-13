@@ -268,18 +268,78 @@ class HomeLayoutTransitionMoveTest {
         assertThat(out.dock).isEmpty()
     }
 
-    @Test fun insert_into_a_dense_tail_overflows_to_a_new_page() {
+    @Test fun insert_at_a_dense_tail_shifts_back_into_the_preceding_gap() {
         val x = app("x", "px")
         val y = app("y", "py")
-        // Only li23 (last cell) occupied; Y from the dock inserted there.
+        // Only li23 (last cell) occupied; Y from the dock inserted there. The tail is
+        // dense (nothing after li23) but li22 is free → X slides back, no new page.
         val start = layout(items = listOf(placed(x, 0, 3, 5)), dock = listOf(y))
         val r = move(start, y.id, DropTarget.GridInsert(0, 23))
         assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
         val out = r.layout!!
-        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.pages).isEqualTo(1) // no phantom page
+        assertThat(out.idAtLi(22)).isEqualTo(x.id) // X shifted back one cell
         assertThat(out.idAtLi(23)).isEqualTo(y.id)
-        val overflowed = out.items.first { it.item.id == x.id }
-        assertThat(overflowed.pos).isEqualTo(CellPos(1, 0, 0)) // spilled to page 1
+    }
+
+    @Test fun insert_on_a_completely_full_page_overflows_last_occupant_to_next_page() {
+        // Every cell 0..23 on page 0 occupied; Z comes from the dock, inserted at li23.
+        val occupants = (0 until 24).map { app("f$it", "pf$it") }
+        val z = app("z", "pz")
+        val start = layout(
+            items = occupants.mapIndexed { li, it -> placed(it, 0, li % 4, li / 4) },
+            dock = listOf(z),
+        )
+        val r = move(start, z.id, DropTarget.GridInsert(0, 23))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.idAtLi(23)).isEqualTo(z.id)
+        // The former li23 occupant spills to page 1's first cell.
+        assertThat(out.items.first { it.item.id == ItemId("f23") }.pos).isEqualTo(CellPos(1, 0, 0))
+        assertThat(out.dock).isEmpty()
+    }
+
+    @Test fun forward_reorder_on_a_full_page_shifts_back_without_a_phantom_page() {
+        // Regression for the review finding: full page, drag the first icon (li0) to the
+        // last slot (li23). Removing the source frees li0, so the run li1..li23 slides
+        // back into li0..li22 and the source lands at li23 — no overflow, no hole.
+        val items = (0 until 24).map { app("g$it", "pg$it") }
+        val start = layout(items = items.mapIndexed { li, it -> placed(it, 0, li % 4, li / 4) })
+        val r = move(start, ItemId("g0"), DropTarget.GridInsert(0, 23))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(1) // no phantom page
+        assertThat(out.items).hasSize(24) // count preserved, nothing dropped
+        assertThat(out.idAtLi(0)).isEqualTo(ItemId("g1")) // g1..g23 slid back one cell
+        assertThat(out.idAtLi(22)).isEqualTo(ItemId("g23"))
+        assertThat(out.idAtLi(23)).isEqualTo(ItemId("g0")) // dragged item now last
+    }
+
+    @Test fun gridinsert_off_grid_targets_are_rejected() {
+        val a = app("a")
+        val start = layout(items = listOf(placed(a, 0, 0, 0))) // pages = 1, cells = 24
+        for (t in listOf(
+            DropTarget.GridInsert(page = 5, index = 0), // page > pages
+            DropTarget.GridInsert(page = 0, index = -1), // negative index
+            DropTarget.GridInsert(page = 0, index = 25), // index > cells
+        )) {
+            val r = move(start, a.id, t)
+            assertThat(r).isInstanceOf(MoveResult.Rejected::class.java)
+            assertThat((r as MoveResult.Rejected).reason).isEqualTo(MoveResult.Reason.OFF_GRID)
+        }
+    }
+
+    @Test fun gridinsert_past_the_last_cell_appends_at_first_free() {
+        val a = app("a"); val b = app("b", "pb")
+        // b from the dock, index == cells (24) → append branch → first free cell (li1).
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(b))
+        val r = move(start, b.id, DropTarget.GridInsert(0, 24))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(a.id)
+        assertThat(out.idAtLi(1)).isEqualTo(b.id) // appended at the first free cell
+        assertThat(out.dock).isEmpty()
     }
 
     @Test fun insert_at_own_position_is_a_noop() {
