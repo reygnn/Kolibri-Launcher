@@ -575,11 +575,31 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         pagerAdapter?.submit((0 until layout.pages).map(layout::pageCells))
         if (currentPage < layout.pages) pager.setCurrentItem(currentPage, false)
         dockAdapter.submit(layout.dockCells())
+        centerDock(layout.dock.size)
         // A drop leaves its drag view in place to bridge the async commit; the
         // commit's re-render arrives here, so clear it now (idempotent otherwise).
         // Skip while an actual drag is in flight (an unrelated re-render mid-drag
         // must not yank the live drag view).
         if (!homeRoot.dragController.isDragging) homeRoot.removeDragView()
+    }
+
+    /**
+     * Centers the dock icons as a group via symmetric padding, instead of the
+     * LinearLayoutManager's left-packing. One icon lands dead-center; an odd count
+     * puts one exactly in the middle; an even count straddles it — the balanced,
+     * "premium" look. The dock View stays match_parent so its whole width remains a
+     * drop target (a drop over the padding hits no child → append). Clamped to a
+     * base padding so a full dock never loses its edge inset.
+     */
+    private fun centerDock(itemCount: Int) {
+        dock.doOnLayout {
+            val density = resources.displayMetrics.density
+            val itemPx = (DOCK_ITEM_DP * density).toInt()
+            val basePx = (DOCK_MIN_PADDING_DP * density).toInt()
+            val content = itemCount * itemPx
+            val pad = ((dock.width - content) / 2).coerceAtLeast(basePx)
+            dock.setPaddingRelative(pad, dock.paddingTop, pad, dock.paddingBottom)
+        }
     }
 
     // ---- drawer overlay (AppDrawerFragment.Host) ----
@@ -763,6 +783,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/** Dock icon slot width in dp (matches item_dock_icon.xml), for centering math. */
+private const val DOCK_ITEM_DP = 72f
+
+/** Minimum horizontal dock padding in dp (matches activity_main.xml). */
+private const val DOCK_MIN_PADDING_DP = 12f
 
 /** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
 private const val DRAWER_SLIDE_MS = 180L
