@@ -112,6 +112,20 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         assertThat(out.items.any { (it.item as? HomeItem.App)?.key == ck("pb") }).isTrue()
     }
 
+    @Test fun extract_via_grid_insert_onto_an_occupied_cell_is_rejected() {
+        // The GridInsert extract path treats an in-range insert index as a plain placement
+        // at its cell (no reorder shift); an OCCUPIED cell is rejected. occupied_target_is_
+        // rejected covers a Cell target — this pins emptyTargetReason's GridInsert branch
+        // (HomeLayoutTransition.kt:366-369) for an in-range, occupied index.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val other = PlacedItem(app("o", "po"), CellPos(0, 2, 0)) // li2 occupied
+        val start = layout(items = listOf(f, other))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.GridInsert(0, 2), seq("x")::next,
+        )
+        assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE))
+    }
+
     @Test fun extract_into_a_free_dock_slot_lands_the_app_in_the_dock() {
         // The rejection path (full dock) is covered above; this pins the SUCCESS path —
         // a member extracted into a non-full dock at a valid index.
@@ -148,6 +162,34 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val survivor = out.items.first { it.pos == CellPos(0, 2, 3) }
         assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
         assertThat(survivor.item.id).isEqualTo(ItemId("survivor"))
+    }
+
+    @Test fun extract_onto_a_brand_new_trailing_page_adds_the_page() {
+        // placeNewAtTarget's Cell branch adds a page when the extract lands on the landing
+        // page (pos.page == pages) (HomeLayoutTransition.kt:384). The folder sits on page 0;
+        // the extracted member is dropped onto page 1 (== pages), which must be created.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val start = layout(items = listOf(f), pages = 1)
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(1, 0, 0)), seq("extracted")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.items.first { it.pos == CellPos(1, 0, 0) }.item.id).isEqualTo(ItemId("extracted"))
+    }
+
+    @Test fun extract_into_an_out_of_range_dock_slot_is_rejected() {
+        // emptyTargetReason's DockSlot branch rejects an index past the dock size
+        // (HomeLayoutTransition.kt:375), mirroring the move-side dock_index guard — the
+        // total function rejects rather than crashing on MutableList.add(idx, …). The dock
+        // is NOT full, so this isolates the out-of-range term from the DOCK_FULL one.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val start = layout(items = listOf(f), dock = listOf(app("x", "px"))) // dock.size = 1 (< 4)
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.DockSlot(2), seq("x")::next, // 2 > dock.size (1)
+        )
+        assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
     @Test fun member_not_in_folder_is_noop() {

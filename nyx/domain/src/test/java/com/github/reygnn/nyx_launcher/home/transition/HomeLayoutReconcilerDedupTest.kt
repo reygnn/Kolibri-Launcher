@@ -44,6 +44,16 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(out.layout.items.map { it.item.id }).containsExactly(ItemId("early")) // (0,0) wins
     }
 
+    @Test fun duplicate_apps_within_the_dock_keep_the_earlier_slot() {
+        // Pass 2a dedups top-level apps WITHIN the dock by slot order (line 61): two dock
+        // apps sharing a key keep the earlier slot, the later duplicate is dropped. The other
+        // dedup tests pit dock vs grid; this pins the intra-dock !seen.add branch.
+        val start = layout(dock = listOf(app("first", "pa"), app("second", "pa")))
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("first")) // earlier slot wins
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+    }
+
     @Test fun member_duplicating_a_top_level_app_is_dropped() {
         // pa is top-level (grid) AND a folder member → member dropped (Grid > Folder).
         val start = layout(

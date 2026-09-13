@@ -79,6 +79,32 @@ class HomeLayoutTransitionEditTest {
         assertThat(r).isEqualTo(MoveResult.NoOp) // uniqueness: no duplicate
     }
 
+    @Test fun place_app_already_in_the_dock_moves_it_out_without_duplicating() {
+        // topLevelIdOf checks the dock too (HomeLayoutTransition.kt:318): placing an app
+        // that already lives in the DOCK moves the existing item, never creates a second.
+        // place_already_placed_app_moves_it_without_duplicating covers the grid source; this
+        // pins the dock branch (the fresh id "unused" must not appear).
+        val d = app("d", "pd")
+        val start = layout(dock = listOf(d))
+        val r = HomeLayoutTransition.place(start, ck("pd"), DropTarget.Cell(CellPos(0, 1, 1)), seq("unused")::next)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.dock).isEmpty() // moved out of the dock
+        assertThat(out.items.single().item.id).isEqualTo(d.id) // same id, not a fresh one
+        assertThat(out.items.single().pos).isEqualTo(CellPos(0, 1, 1))
+    }
+
+    @Test fun place_app_that_is_a_member_of_a_dock_folder_is_noop() {
+        // isFolderMember checks dock folders too (HomeLayoutTransition.kt:322): placing an
+        // app already inside a folder that sits in the DOCK is a uniqueness no-op. The
+        // grid-folder case is place_app_that_is_a_folder_member_is_noop; this pins the
+        // dock-folder branch.
+        val f = folder("f", ck("pa"), ck("pb"))
+        val start = layout(dock = listOf(f))
+        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("unused")::next)
+        assertThat(r).isEqualTo(MoveResult.NoOp)
+    }
+
     @Test fun place_new_app_via_grid_insert_reorders_the_occupant() {
         // A fresh drawer app dragged into a reorder gap (GridInsert), not onto a cell.
         // The occupant at the index shifts into the following gap; the fresh app lands there.

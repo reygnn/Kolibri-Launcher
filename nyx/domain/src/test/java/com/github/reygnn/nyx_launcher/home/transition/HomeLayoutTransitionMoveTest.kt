@@ -161,6 +161,14 @@ class HomeLayoutTransitionMoveTest {
             .isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
         assertThat(move(start, a.id, DropTarget.Cell(CellPos(5, 0, 0)))) // page > pages
             .isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+        // Negative coordinates (defensive/total-function contract): offGridReason's lower
+        // bounds must reject too, not just the over-bounds cases above.
+        assertThat(move(start, a.id, DropTarget.Cell(CellPos(0, -1, 0)))) // negative x
+            .isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+        assertThat(move(start, a.id, DropTarget.Cell(CellPos(0, 0, -1)))) // negative y
+            .isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+        assertThat(move(start, a.id, DropTarget.Cell(CellPos(-1, 0, 0)))) // negative page
+            .isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
     // ---- Dock targets (§3.2) ----
@@ -402,6 +410,7 @@ class HomeLayoutTransitionMoveTest {
         val start = layout(items = listOf(placed(a, 0, 0, 0))) // pages = 1, cells = 24
         for (t in listOf(
             DropTarget.GridInsert(page = 5, index = 0), // page > pages
+            DropTarget.GridInsert(page = -1, index = 0), // negative page
             DropTarget.GridInsert(page = 0, index = -1), // negative index
             DropTarget.GridInsert(page = 0, index = 25), // index > cells
         )) {
@@ -617,6 +626,25 @@ class HomeLayoutTransitionMoveTest {
             dock = listOf(z),
         )
         val r = move(start, z.id, DropTarget.GridInsert(HomeLayout.MAX_PAGES - 1, 0))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun grid_insert_append_onto_a_completely_full_home_is_rejected() {
+        // The APPEND branch (index >= cells) rejects when firstFreeCellFrom finds no cell
+        // within the page cap — distinct from overflow_at_the_page_cap_is_rejected, which
+        // exercises the shift/overflow branch (HomeLayoutTransition.kt:151). 1x1 grid, all
+        // MAX_PAGES pages full, GridInsert past the last cell → OFF_GRID (line 89).
+        val tiny = GridSpec(columns = 1, rows = 1)
+        val occupants = (0 until HomeLayout.MAX_PAGES).map { app("f$it", "pf$it") }
+        val z = app("z", "pz")
+        val start = HomeLayout(
+            tiny,
+            pages = HomeLayout.MAX_PAGES,
+            items = occupants.mapIndexed { p, it -> PlacedItem(it, CellPos(p, 0, 0)) },
+            dock = listOf(z),
+        )
+        // index == cells (1) → append branch; page in range but every page is full.
+        val r = HomeLayoutTransition.move(start, z.id, DropTarget.GridInsert(HomeLayout.MAX_PAGES - 1, 1), newId::next)
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
