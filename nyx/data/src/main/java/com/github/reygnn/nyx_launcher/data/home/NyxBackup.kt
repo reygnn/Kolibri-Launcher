@@ -33,6 +33,13 @@ data class NyxBackup(
  * Nyx's DataStore preferences in backup form. All nullable: a null means "not in the
  * backup" and the import leaves the current value untouched (skip-on-null).
  */
+/** Selective-import toggles (not persisted — a runtime choice from the restore UI). */
+data class NyxBackupOptions(
+    val importLayout: Boolean = true,
+    val importSettings: Boolean = true,
+    val importWallpaper: Boolean = true,
+)
+
 @Serializable
 data class NyxBackupPrefs(
     val monochromeIcons: Boolean? = null,
