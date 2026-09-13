@@ -10,25 +10,8 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > **Launcher3/Pixel-Scope-Entscheid (2026-09-13):** Widgets (AppWidgetHost),
 > Predicted-Apps-Row, Folder-Auto-Naming/Preview-Animationen, Wallpaper-Parallax
 > und Widget-Picker sind **out of scope — won't build.** Nyx bleibt ein schlanker,
-> kuratierter Grid-Launcher, kein Launcher3-Klon. Aus der Paritäts-Lücke bleiben
-> nur die zwei folgenden Punkte als bewusst gewählte Kandidaten.
-
-### Page-Indicator / Scroll-Dots (Multi-Page-Feedback)
-
-Nyx hat Multi-Page-Home (Drag-Edge-Advance), aber **keine visuelle Rückmeldung,
-auf welcher Seite man ist** und wie viele es gibt. Kleiner Zusatz, klarer UX-Gewinn.
-
-Design-Notiz, die vor der Umsetzung geklärt werden muss: die **Landing-Page ist
-render-computed, nicht persistiert** (`renderedPageCount()` = höchste belegte
-Seite + 2; siehe HOME_CURATION_SPEC §10). Der Indikator darf deshalb **nicht
-stumpf `renderedPageCount()` Dots zeichnen** — sonst zeigt er dauerhaft eine leere
-Trailing-Seite an. Entweder nur belegte Seiten punkten (Landing-Dot erst beim
-Betreten einblenden), oder den Landing-Dot dezent/„+"-artig markieren. Bottom-
-anchored Grid + zentriertes Dock beachten: Indikator sitzt sinnvollerweise
-zwischen Grid-Unterkante und Dock.
-
-Anker: `MainActivity` Render-Pfad (`renderLayout`, `HomeLayout.renderedPageCount`),
-`home/drag/DragLayer.kt` (Page-Advance/aktuelle Seite), `res/layout/activity_main.xml`.
+> kuratierter Grid-Launcher, kein Launcher3-Klon. Aus der Paritäts-Lücke ist der
+> Page-Indicator inzwischen umgesetzt; offen bleibt nur der folgende Kandidat.
 
 ### Notification-Dots (nur Punkt, keine Zahlen)
 

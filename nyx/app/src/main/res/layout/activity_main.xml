@@ -132,6 +132,19 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
+        <!-- Home page indicator: one dot per OCCUPIED page (the render-computed empty
+             landing page gets none), current highlighted. Populated in code; GONE while
+             the home is a single page. Sits between the grid and the dock. -->
+        <LinearLayout
+            android:id="@+id/page_indicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone" />
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/dock"
             android:layout_width="match_parent"

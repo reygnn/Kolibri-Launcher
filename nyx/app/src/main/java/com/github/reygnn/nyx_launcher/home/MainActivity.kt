@@ -148,6 +148,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private lateinit var homeRoot: DragLayer
     private lateinit var pager: ViewPager2
+    private lateinit var pageIndicator: LinearLayout
     private lateinit var dock: RecyclerView
     private lateinit var drawerContainer: View
     private lateinit var removeBar: TextView
@@ -223,6 +224,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
         homeRoot = findViewById(R.id.home_root)
         pager = findViewById(R.id.home_pager)
+        pageIndicator = findViewById(R.id.page_indicator)
+        pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                viewModel.layout.value?.let(::updatePageIndicator)
+            }
+        })
         dock = findViewById(R.id.dock)
         drawerContainer = findViewById(R.id.drawer_container)
         removeBar = findViewById(R.id.remove_bar)
@@ -651,12 +658,51 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val renderedPages = layout.renderedPageCount()
         pagerAdapter?.submit((0 until renderedPages).map(layout::pageCells))
         if (currentPage < renderedPages) pager.setCurrentItem(currentPage, false)
+        updatePageIndicator(layout)
         dockAdapter.submit(layout.dockCells())
         // A drop leaves its drag view in place to bridge the async commit; the
         // commit's re-render arrives here, so clear it now (idempotent otherwise).
         // Skip while an actual drag is in flight (an unrelated re-render mid-drag
         // must not yank the live drag view).
         if (!homeRoot.dragController.isDragging) homeRoot.removeDragView()
+    }
+
+    /**
+     * One indicator dot per OCCUPIED page (the render-computed empty landing page — see
+     * [renderedPageCount] — deliberately gets none, so a fresh home never shows a phantom
+     * trailing dot). Hidden while the home is a single page. The current page's dot is
+     * brightened + slightly enlarged; on the landing page the last content dot stays lit.
+     */
+    private fun updatePageIndicator(layout: HomeLayout) {
+        val occupied = layout.items.maxOfOrNull { it.pos.page + 1 } ?: 0
+        if (occupied < 2) {
+            pageIndicator.isVisible = false
+            pageIndicator.removeAllViews()
+            return
+        }
+        if (pageIndicator.childCount != occupied) {
+            pageIndicator.removeAllViews()
+            val size = (6 * resources.displayMetrics.density).toInt()
+            val margin = (4 * resources.displayMetrics.density).toInt()
+            repeat(occupied) {
+                val dot = View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                        marginStart = margin; marginEnd = margin
+                    }
+                    background = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, R.drawable.page_dot)
+                }
+                pageIndicator.addView(dot)
+            }
+        }
+        val active = pager.currentItem.coerceIn(0, occupied - 1)
+        for (i in 0 until pageIndicator.childCount) {
+            val dot = pageIndicator.getChildAt(i)
+            dot.alpha = if (i == active) 1f else 0.35f
+            val scale = if (i == active) 1.2f else 1f
+            dot.scaleX = scale
+            dot.scaleY = scale
+        }
+        pageIndicator.isVisible = true
     }
 
     /**
