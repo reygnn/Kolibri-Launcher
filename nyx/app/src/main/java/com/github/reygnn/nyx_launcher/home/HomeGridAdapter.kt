@@ -109,11 +109,15 @@ class HomeGridAdapter(
 internal const val HOME_CELL_TARGET_DP = 110f
 
 /**
- * Target column width in dp — drives the column count. Smaller than the row
- * target so a phone gets a few more columns than rows would imply (cell width is
- * the page width / columns anyway, independent of the row height).
+ * Target column width in dp — drives the column count (columns = page width /
+ * this). Sized so a phone gets 5 columns: at 90dp the 48dp icon filled only ~0.5
+ * of the 96dp cell (measured against One UI Home's ~0.63), leaving visible dead
+ * space and capping the dock — which holds `columns` — at 4. 72dp yields 5
+ * columns on both reference phones (1080px @ 450dpi → 5.33; @ 420dpi → 5.71),
+ * a 76.8dp cell and a ~0.63 icon/cell fill, and a 5-slot dock. Independent of the
+ * row height.
  */
-internal const val HOME_COL_TARGET_DP = 90f
+internal const val HOME_COL_TARGET_DP = 72f
 
 // Clamp ranges for the device-derived grid (MainActivity.applyDeviceGrid).
 internal const val HOME_MIN_COLUMNS = 3
