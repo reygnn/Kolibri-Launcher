@@ -221,6 +221,28 @@ class HomeLayoutTransitionMoveTest {
         assertThat(out.items.single().item.id).isEqualTo(a.id)
     }
 
+    @Test fun dock_index_past_the_source_inclusive_size_is_rejected() {
+        // The UI never counts more slots than the (source-inclusive) dock size, so an
+        // index beyond it is out of range — reject as OFF_GRID rather than silently
+        // clamp-and-append (which would mask a bug and misplace the icon).
+        val a = app("a")
+        val x = app("x", "px")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(x)) // dock.size = 1
+        val r = move(start, a.id, DropTarget.DockSlot(2)) // 2 > dock.size (1)
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun dock_grid_source_appends_at_exactly_dock_size() {
+        // Boundary just below the rejection: a grid source dropped at index == dock.size
+        // is the legitimate append and must succeed.
+        val a = app("a")
+        val x = app("x", "px")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(x)) // dock.size = 1
+        val r = move(start, a.id, DropTarget.DockSlot(1)) // == dock.size → append
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(x.id, a.id).inOrder()
+    }
+
     // ---- Grid reorder-insert (DropTarget.GridInsert) — Launcher3-style shift ----
 
     // grid is 4×6 = 24 cells; li = y*4 + x.
@@ -347,6 +369,106 @@ class HomeLayoutTransitionMoveTest {
         val start = layout(items = listOf(placed(a, 0, 0, 0)))
         val r = move(start, a.id, DropTarget.GridInsert(0, 0))
         assertThat(r).isEqualTo(MoveResult.NoOp)
+    }
+
+    @Test fun insert_into_the_middle_of_a_full_page_block_shifts_and_overflows_the_last() {
+        // Every cell 0..23 on page 0 occupied; insert Z (from the dock) at li10 — NOT the
+        // last cell, so the whole tail [li10..li23] must block-shift +1 and only the last
+        // occupant (f23) spills to the next page. The existing full-page test drops at
+        // li23 where the shift loop moves nothing; this exercises the real block shift.
+        val occupants = (0 until 24).map { app("f$it", "pf$it") }
+        val z = app("z", "pz")
+        val start = layout(
+            items = occupants.mapIndexed { li, it -> placed(it, 0, li % 4, li / 4) },
+            dock = listOf(z),
+        )
+        val r = move(start, z.id, DropTarget.GridInsert(0, 10))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.items).hasSize(25) // 24 occupants + Z, nothing lost
+        assertThat(out.idAtLi(9)).isEqualTo(ItemId("f9")) // before insert point — unchanged
+        assertThat(out.idAtLi(10)).isEqualTo(z.id) // Z inserted
+        assertThat(out.idAtLi(11)).isEqualTo(ItemId("f10")) // f10 shifted up one
+        assertThat(out.idAtLi(23)).isEqualTo(ItemId("f22")) // f22 shifted into the last cell
+        // f23, the former last occupant, spills to page 1's first cell.
+        assertThat(out.items.first { it.item.id == ItemId("f23") }.pos).isEqualTo(CellPos(1, 0, 0))
+        assertThat(out.dock).isEmpty()
+    }
+
+    @Test fun overflow_skips_a_full_next_page_and_lands_on_a_fresh_page() {
+        // Page 0 AND page 1 both full; insert Z at li23 of page 0. The overflow occupant
+        // can't fit on page 1 (full) → firstFreeCellFrom must scan past it and add page 2.
+        val page0 = (0 until 24).map { app("f$it", "pf$it") }
+        val page1 = (0 until 24).map { app("g$it", "pg$it") }
+        val z = app("z", "pz")
+        val start = layout(
+            items = page0.mapIndexed { li, it -> placed(it, 0, li % 4, li / 4) } +
+                page1.mapIndexed { li, it -> placed(it, 1, li % 4, li / 4) },
+            dock = listOf(z),
+            pages = 2,
+        )
+        val r = move(start, z.id, DropTarget.GridInsert(0, 23))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(3)
+        assertThat(out.idAtLi(23)).isEqualTo(z.id) // Z at page 0 li23
+        // The former li23 occupant (f23) skips the full page 1 and lands on page 2.
+        assertThat(out.items.first { it.item.id == ItemId("f23") }.pos).isEqualTo(CellPos(2, 0, 0))
+        // Page 1 is untouched.
+        assertThat(out.items.first { it.item.id == ItemId("g0") }.pos).isEqualTo(CellPos(1, 0, 0))
+    }
+
+    @Test fun grid_insert_onto_a_brand_new_trailing_page_appends_a_page() {
+        // page == pages with a small in-range index: the append branch adds a page and
+        // lands at that page's first free cell (not a rejection).
+        val a = app("a")
+        val b = app("b", "pb")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(b), pages = 1)
+        val r = move(start, b.id, DropTarget.GridInsert(page = 1, index = 0)) // page == pages
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.items.first { it.item.id == b.id }.pos).isEqualTo(CellPos(1, 0, 0))
+        assertThat(out.dock).isEmpty()
+    }
+
+    @Test fun move_to_a_cell_on_another_existing_page() {
+        // Cross-page move: source on page 0, target an empty cell on an existing page 1.
+        val a = app("a")
+        val b = app("b", "pb")
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(b, 1, 0, 0)), pages = 2)
+        val r = move(start, a.id, DropTarget.Cell(CellPos(1, 1, 1)))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2) // no new page — page 1 already existed
+        assertThat(out.items.first { it.item.id == a.id }.pos).isEqualTo(CellPos(1, 1, 1))
+        assertThat(out.items.first { it.item.id == b.id }.pos).isEqualTo(CellPos(1, 0, 0))
+    }
+
+    @Test fun app_dropped_onto_a_folder_that_already_contains_it_is_a_noop() {
+        // IHM-INV-7 guard (line 190): a top-level app whose key is already a member of
+        // the target folder must NOT be appended again — it collapses to NoOp.
+        val f = folder("f", ck("pa"), ck("pb"))
+        val a = app("a", "pa") // same key pa as a folder member
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(f, 0, 1, 0)))
+        val r = move(start, a.id, DropTarget.Cell(CellPos(0, 1, 0)))
+        assertThat(r).isEqualTo(MoveResult.NoOp)
+    }
+
+    @Test fun a_folder_grows_past_the_grid_capacity_and_is_never_rejected() {
+        // Design decision (mirrors modern Launcher3's paged folders, NOT the old
+        // reject-on-full cap): folders are uncapped so no app is ever lost. A folder
+        // already larger than a whole page still accepts one more member.
+        val members = (0 until 30).map { ck("m$it") } // 30 > 24 cells/page
+        val big = folder("big", *members.toTypedArray())
+        val a = app("a", "pa")
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(big, 0, 1, 0)))
+        val r = move(start, a.id, DropTarget.Cell(CellPos(0, 1, 0)))
+        assertThat(r).isInstanceOf(MoveResult.AddedToFolder::class.java)
+        val fOut = r.layout!!.items.first { it.item.id == big.id }.item as HomeItem.Folder
+        assertThat(fOut.members).hasSize(31)
+        assertThat(fOut.members.last()).isEqualTo(ck("pa"))
     }
 
     // ---- Programmer-error precondition (§MIU-INV-2) ----

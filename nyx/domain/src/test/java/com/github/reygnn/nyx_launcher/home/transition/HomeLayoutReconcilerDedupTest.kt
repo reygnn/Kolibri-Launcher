@@ -73,6 +73,39 @@ class HomeLayoutReconcilerDedupTest {
         assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
     }
 
+    @Test fun a_key_shared_by_two_grid_folders_survives_in_the_lower_positioned_one() {
+        // Two grid folders both list pa; the earlier one (page,y,x order) keeps it, the
+        // later one drops it. Both stay folders (>=2 survivors), so no dissolve masks it.
+        val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"), ck("pe"))
+        val start = layout(
+            items = listOf(
+                placed(folder("f1", ck("pa"), ck("pb"), ck("pc")), 0, 0, 0),
+                placed(folder("f2", ck("pa"), ck("pd"), ck("pe")), 0, 1, 0),
+            ),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next) as ReconcileOutcome.Changed
+        val f1 = out.layout.items.first { it.item.id == ItemId("f1") }.item as HomeItem.Folder
+        val f2 = out.layout.items.first { it.item.id == ItemId("f2") }.item as HomeItem.Folder
+        assertThat(f1.members).containsExactly(ck("pa"), ck("pb"), ck("pc")).inOrder() // keeps pa
+        assertThat(f2.members).containsExactly(ck("pd"), ck("pe")).inOrder() // pa dropped
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+    }
+
+    @Test fun a_key_shared_by_a_dock_folder_and_a_grid_folder_survives_in_the_dock_folder() {
+        // Dedup pass 2c runs dock folders before grid folders → the dock folder wins pa.
+        val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"))
+        val start = layout(
+            items = listOf(placed(folder("fg", ck("pa"), ck("pc"), ck("pd")), 0, 0, 0)),
+            dock = listOf(folder("fd", ck("pa"), ck("pb"))),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next) as ReconcileOutcome.Changed
+        val fd = out.layout.dock.first { it.id == ItemId("fd") } as HomeItem.Folder
+        val fg = out.layout.items.first { it.item.id == ItemId("fg") }.item as HomeItem.Folder
+        assertThat(fd.members).containsExactly(ck("pa"), ck("pb")).inOrder() // dock folder keeps pa
+        assertThat(fg.members).containsExactly(ck("pc"), ck("pd")).inOrder() // pa dropped from grid folder
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+    }
+
     @Test fun dedup_is_idempotent() {
         val start = layout(
             items = listOf(placed(app("g", "pa"), 0, 0, 0)),

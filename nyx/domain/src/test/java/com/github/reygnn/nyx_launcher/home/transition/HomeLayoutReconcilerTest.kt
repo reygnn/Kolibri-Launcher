@@ -88,6 +88,43 @@ class HomeLayoutReconcilerTest {
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
+    @Test fun dock_folder_dissolving_to_one_member_stays_an_app_in_the_dock() {
+        // repair() is type-agnostic and runs on the dock too: a dock folder pruned to a
+        // single surviving member dissolves into a plain app that stays in the dock.
+        val start = layout(dock = listOf(folder("f", ck("pa"), ck("pb"))))
+        val out = HomeLayoutReconciler.reconcile(start, setOf(ck("pa")), ids("survivor")::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.dock).hasSize(1)
+        val survivor = out.layout.dock.single() as HomeItem.App
+        assertThat(survivor.key).isEqualTo(ck("pa"))
+        assertThat(survivor.id).isEqualTo(ItemId("survivor"))
+        assertThat(out.layout.items).isEmpty()
+        assertThat(out.report.dissolvedFolders).isEqualTo(1)
+        assertThat(out.report.prunedApps).isEqualTo(1) // pb
+    }
+
+    @Test fun dock_folder_losing_all_members_is_removed_from_the_dock() {
+        val start = layout(dock = listOf(folder("f", ck("pa"), ck("pb")), app("keep", "pk")))
+        val out = HomeLayoutReconciler.reconcile(start, setOf(ck("pk")), ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("keep"))
+        assertThat(out.report.removedEmptyFolders).isEqualTo(1)
+        assertThat(out.report.prunedApps).isEqualTo(2) // pa + pb
+    }
+
+    @Test fun pruning_every_item_clamps_the_page_count_to_one() {
+        // All grid items reference uninstalled packages → usedPages becomes 0, and the
+        // maxOf(1, ...) guard keeps the layout at one page (a launcher must always have
+        // at least one home page), never zero. See Reconciler.kt:113.
+        val start = layout(
+            items = listOf(placed(app("a", "pa"), 0, 0, 0), placed(app("b", "pb"), 1, 0, 0)),
+            pages = 3,
+        )
+        val out = HomeLayoutReconciler.reconcile(start, emptySet(), ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.items).isEmpty()
+        assertThat(out.layout.pages).isEqualTo(1)
+        assertThat(out.report.prunedApps).isEqualTo(2)
+        assertThat(out.report.trimmedPages).isEqualTo(2) // 3 → 1
+    }
+
     @Test fun reconcile_is_idempotent() {
         val start = layout(
             items = listOf(placed(folder("f", ck("pa"), ck("pb")), 0, 0, 0), placed(app("x", "px"), 0, 1, 0)),

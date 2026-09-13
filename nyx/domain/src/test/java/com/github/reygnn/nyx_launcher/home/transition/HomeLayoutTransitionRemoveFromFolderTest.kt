@@ -112,6 +112,44 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         assertThat(out.items.any { (it.item as? HomeItem.App)?.key == ck("pb") }).isTrue()
     }
 
+    @Test fun extract_into_a_free_dock_slot_lands_the_app_in_the_dock() {
+        // The rejection path (full dock) is covered above; this pins the SUCCESS path —
+        // a member extracted into a non-full dock at a valid index.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val x = app("x", "px")
+        val start = layout(items = listOf(f), dock = listOf(x)) // dock has room (1 < 4)
+        val ids = seq("extracted")
+        val r = HomeLayoutTransition.removeFromFolder(start, ItemId("f"), ck("pb"), DropTarget.DockSlot(0), ids::next)
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        val out = r.layout!!
+        // pb inserted at dock index 0, ahead of x.
+        assertThat(out.dock.map { (it as HomeItem.App).key }).containsExactly(ck("pb"), ck("px")).inOrder()
+        assertThat(out.dock.first().id).isEqualTo(ItemId("extracted"))
+        // Folder shrank but survives (still 2 members).
+        val fOut = out.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
+        assertThat(fOut.members).containsExactly(ck("pa"), ck("pc")).inOrder()
+    }
+
+    @Test fun dissolve_into_a_free_dock_slot_puts_extracted_in_dock_and_survivor_on_grid() {
+        // Two-member folder + a DockSlot target: extracted app lands in the dock, the
+        // survivor is promoted to the folder's old grid cell.
+        val f = folder("f", ck("pa"), ck("pb"), page = 0, x = 2, y = 3)
+        val x = app("x", "px")
+        val start = layout(items = listOf(f), dock = listOf(x))
+        val ids = seq("extracted", "survivor")
+        val r = HomeLayoutTransition.removeFromFolder(start, ItemId("f"), ck("pa"), DropTarget.DockSlot(1), ids::next)
+        assertThat(r).isInstanceOf(FolderEditResult.FolderDissolved::class.java)
+        val out = r.layout!!
+        assertThat(out.items.any { it.item.id == ItemId("f") }).isFalse()
+        // extracted (pa) appended into the dock at index 1.
+        assertThat(out.dock.map { (it as HomeItem.App).key }).containsExactly(ck("px"), ck("pa")).inOrder()
+        assertThat(out.dock.last().id).isEqualTo(ItemId("extracted"))
+        // survivor (pb) at the folder's former cell.
+        val survivor = out.items.first { it.pos == CellPos(0, 2, 3) }
+        assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
+        assertThat(survivor.item.id).isEqualTo(ItemId("survivor"))
+    }
+
     @Test fun member_not_in_folder_is_noop() {
         val f = folder("f", ck("pa"), ck("pb"), page = 0, x = 0, y = 0)
         val start = layout(items = listOf(f))

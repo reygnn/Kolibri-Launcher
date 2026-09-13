@@ -79,6 +79,39 @@ class HomeLayoutTransitionEditTest {
         assertThat(r).isEqualTo(MoveResult.NoOp) // uniqueness: no duplicate
     }
 
+    @Test fun place_new_app_via_grid_insert_reorders_the_occupant() {
+        // A fresh drawer app dragged into a reorder gap (GridInsert), not onto a cell.
+        // The occupant at the index shifts into the following gap; the fresh app lands there.
+        val a = app("a", "pa")
+        val b = app("b", "pb")
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(b, 0, 1, 0)))
+        val r = HomeLayoutTransition.place(start, ck("pc"), DropTarget.GridInsert(0, 1), seq("new")::next)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        val fresh = out.items.first { (it.item as? HomeItem.App)?.key == ck("pc") }
+        assertThat(fresh.item.id).isEqualTo(ItemId("new"))
+        assertThat(fresh.pos).isEqualTo(CellPos(0, 1, 0)) // inserted at li1
+        assertThat(out.items.first { it.item.id == b.id }.pos).isEqualTo(CellPos(0, 2, 0)) // b shifted
+        assertThat(out.items).hasSize(3)
+    }
+
+    @Test fun place_new_app_into_an_empty_dock_slot() {
+        val start = layout()
+        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.DockSlot(0), seq("new")::next)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.dock.map { it.id }).containsExactly(ItemId("new"))
+        assertThat((out.dock.single() as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(out.items).isEmpty()
+    }
+
+    @Test fun place_new_app_into_a_full_dock_is_rejected() {
+        val fullDock = (0 until grid.columns).map { app("d$it", "pd$it") }
+        val start = layout(dock = fullDock)
+        val r = HomeLayoutTransition.place(start, ck("pnew"), DropTarget.DockSlot(grid.columns), seq("new")::next)
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.DOCK_FULL))
+    }
+
     // ---- remove ----
 
     @Test fun remove_app_frees_its_cell() {

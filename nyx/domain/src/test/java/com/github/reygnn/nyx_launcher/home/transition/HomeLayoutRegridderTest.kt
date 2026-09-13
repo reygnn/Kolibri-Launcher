@@ -8,6 +8,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.RegridOutcome
+import com.github.reygnn.nyx_launcher.home.model.Span
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -97,6 +98,60 @@ class HomeLayoutRegridderTest {
         ).inOrder()
         assertThat(out.layout.items.single().item.id).isEqualTo(ItemId("d4"))
         assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+    }
+
+    private fun folder(id: String, vararg m: ComponentKey) = HomeItem.Folder(ItemId(id), "", m.toList())
+
+    @Test fun a_folder_in_the_dock_overflow_is_rehomed_onto_the_grid_not_dropped() {
+        // The overflow queue is HomeItem-typed, so a dock FOLDER (not just apps) that
+        // spills past dock capacity is re-homed onto the grid with a default span.
+        val g = GridSpec(4, 6)
+        val start = layout(
+            g,
+            dock = listOf(
+                app("d0", "p0"), app("d1", "p1"), app("d2", "p2"), app("d3", "p3"),
+                folder("fd", ck("pa"), ck("pb")), // 5th item → overflow
+            ),
+        )
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.dock.map { it.id }).containsExactly(
+            ItemId("d0"), ItemId("d1"), ItemId("d2"), ItemId("d3"),
+        ).inOrder()
+        val rehomed = out.layout.items.single()
+        assertThat(rehomed.item.id).isEqualTo(ItemId("fd"))
+        assertThat((rehomed.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
+        assertThat(rehomed.pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(rehomed.span).isEqualTo(Span())
+    }
+
+    @Test fun a_grid_change_recomputes_pages_and_drops_stale_trailing_pages() {
+        // pages says 5 but only page 0 is occupied; any grid change recomputes pages
+        // purely from item positions, so the stale trailing pages fall away.
+        val start = layout(GridSpec(4, 6), items = listOf(placed(app("a", "pa"), 0, 0, 0)), pages = 5)
+        val out = HomeLayoutRegridder.fit(start, GridSpec(5, 6)) as RegridOutcome.Changed
+        assertThat(out.layout.grid).isEqualTo(GridSpec(5, 6))
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
+    @Test fun a_dock_exactly_at_capacity_on_the_same_grid_is_unchanged() {
+        // Boundary of the persist-storm guard (dock.size <= columns): exactly `columns`
+        // dock items on the matching grid must be a no-op, not a needless re-home/save.
+        val g = GridSpec(4, 6)
+        val start = layout(g, dock = (0 until 4).map { app("d$it", "p$it") }) // size == columns
+        assertThat(HomeLayoutRegridder.fit(start, g)).isEqualTo(RegridOutcome.Unchanged)
+    }
+
+    @Test fun an_empty_layout_grows_to_the_new_grid_with_a_single_page() {
+        val start = layout(GridSpec(4, 6)) // no items, empty dock
+        val out = HomeLayoutRegridder.fit(start, GridSpec(5, 8)) as RegridOutcome.Changed
+        assertThat(out.layout.grid).isEqualTo(GridSpec(5, 8))
+        assertThat(out.layout.items).isEmpty()
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
+    @Test fun an_empty_layout_on_the_same_grid_is_unchanged() {
+        val g = GridSpec(4, 6)
+        assertThat(HomeLayoutRegridder.fit(layout(g), g)).isEqualTo(RegridOutcome.Unchanged)
     }
 
     @Test fun regrid_is_idempotent() {
