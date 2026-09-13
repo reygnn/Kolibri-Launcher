@@ -11,10 +11,14 @@
     android:background="?attr/colorSurface"
     android:fitsSystemWindows="true">
 
+    <!-- Explicit flat colorSurface background: without it the M3 toolbar picks up a
+         tinted/elevated surface (brown on the A17's One UI palette) while the rest of
+         the screen stays flat colorSurface (black) — this forces them to match. -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/settings_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorSurface"
         app:navigationIcon="@drawable/ic_arrow_back"
         app:title="@string/settings_title" />
 
