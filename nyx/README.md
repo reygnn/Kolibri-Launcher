@@ -1,6 +1,5 @@
 # Nyx Launcher
 
-[![Android CI](https://github.com/reygnn/Nyx-Launcher/actions/workflows/android.yml/badge.svg)](https://github.com/reygnn/Nyx-Launcher/actions/workflows/android.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![API](https://img.shields.io/badge/API-36-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers)
 
