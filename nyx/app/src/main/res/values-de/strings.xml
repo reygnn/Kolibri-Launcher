@@ -12,6 +12,13 @@
     <string name="backup_import_done">Layout importiert</string>
     <string name="backup_import_failed">Datei konnte nicht gelesen werden</string>
     <string name="backup_import_invalid">Ungültige Sicherungsdatei</string>
+    <string name="factory_reset_title">Zurücksetzen</string>
+    <string name="factory_reset_summary">Layout, Einstellungen und Hintergrund auf Standard zurücksetzen</string>
+    <string name="factory_reset_dialog_title">App zurücksetzen?</string>
+    <string name="factory_reset_dialog_message">Alle deine Apps, Einstellungen und der Hintergrund werden unwiderruflich gelöscht.</string>
+    <string name="factory_reset_confirm">Zurücksetzen</string>
+    <string name="factory_reset_done">Zurücksetzen abgeschlossen</string>
+    <string name="factory_reset_failed">Zurücksetzen fehlgeschlagen</string>
 
     <!-- Settings -->
     <string name="settings_title">Einstellungen</string>

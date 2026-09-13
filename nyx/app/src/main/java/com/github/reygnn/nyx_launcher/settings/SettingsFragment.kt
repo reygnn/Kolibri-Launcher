@@ -26,6 +26,9 @@ import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
+import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
+import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
+import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,6 +47,9 @@ import javax.inject.Inject
 class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject lateinit var backupManager: NyxBackupManager
+    @Inject lateinit var resetManager: NyxResetManager
+    @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
+    @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var consentController: ConsentController
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
@@ -135,6 +141,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
         findPreference<Preference>("import_layout")?.setOnPreferenceClickListener {
             openDocument.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+            true
+        }
+        findPreference<Preference>("factory_reset")?.setOnPreferenceClickListener {
+            showFactoryResetDialog()
             true
         }
 
@@ -251,6 +261,34 @@ class SettingsFragment : PreferenceFragmentCompat() {
             ImportResult.InvalidData -> toast(getString(R.string.backup_import_invalid))
             null -> toast(getString(R.string.backup_import_failed))
         }
+    }
+
+    /**
+     * Factory reset (mirrors Kolibri): confirm, then wipe all state. The positive
+     * button is destructive, so it needs an explicit confirm; cancel is a no-op.
+     */
+    private fun showFactoryResetDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.factory_reset_dialog_title)
+            .setMessage(R.string.factory_reset_dialog_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.factory_reset_confirm) { _, _ -> doFactoryReset() }
+            .show()
+    }
+
+    private fun doFactoryReset() = lifecycleScope.launch {
+        val ok = resetManager.reset()
+        if (ok) {
+            // Reset clears the seed flag, but the first-run seed only fires in
+            // MainActivity.onCreate — which won't re-run on the way back to an already
+            // created home. So re-seed the default dock here, so "reset" lands on the
+            // default state (Phone/Messages/Email/Browser/Camera), not an empty screen.
+            val apps = withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
+            homeLayoutRepository.seedInitialDock(apps)
+        }
+        toast(getString(if (ok) R.string.factory_reset_done else R.string.factory_reset_failed))
+        // Back to home, which re-renders from the re-seeded default state.
+        if (ok) requireActivity().finish()
     }
 
     private fun setWallpaperFromUri(uri: Uri) = lifecycleScope.launch {

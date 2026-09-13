@@ -65,6 +65,12 @@
             android:title="@string/backup_import"
             android:summary="@string/backup_import_summary"
             app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="factory_reset"
+            android:title="@string/factory_reset_title"
+            android:summary="@string/factory_reset_summary"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <!-- ACRA dev commands: hidden at runtime unless BuildConfig.SHOW_DEV_COMMANDS

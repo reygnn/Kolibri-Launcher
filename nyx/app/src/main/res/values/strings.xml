@@ -12,6 +12,13 @@
     <string name="backup_import_done">Layout imported</string>
     <string name="backup_import_failed">Could not read file</string>
     <string name="backup_import_invalid">Invalid backup file</string>
+    <string name="factory_reset_title">Factory reset</string>
+    <string name="factory_reset_summary">Reset layout, settings and wallpaper to defaults</string>
+    <string name="factory_reset_dialog_title">Reset app?</string>
+    <string name="factory_reset_dialog_message">All your apps, settings and wallpaper will be permanently deleted.</string>
+    <string name="factory_reset_confirm">Reset</string>
+    <string name="factory_reset_done">Reset complete</string>
+    <string name="factory_reset_failed">Reset failed</string>
     <!-- Home-info header placeholders (shown until the ClockDelegate emits). Not
          UI prose — the clock/battery fill them at runtime. -->
     <string name="time_placeholder" translatable="false">--:--</string>
