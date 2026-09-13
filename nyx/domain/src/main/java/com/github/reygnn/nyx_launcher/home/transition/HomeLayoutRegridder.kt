@@ -38,15 +38,27 @@ object HomeLayoutRegridder {
 
     fun fit(layout: HomeLayout, target: GridSpec): RegridOutcome {
         // Nothing to do only when the grid already matches AND the dock is within
-        // capacity AND no item sits past the page cap — an over-capacity dock (e.g. a
+        // capacity AND every item is fully on-grid — an over-capacity dock (e.g. a
         // first-run seed of more apps than the measured grid is wide) still needs its
-        // overflow re-homed, and a stale item on a page the pager never renders
-        // (pre-cap build) must be pulled back even when the grid is unchanged, or it
-        // would stay unreachable. Normal layouts satisfy all three, so this stays a
-        // no-op on every routine layout pass (no persist storm).
+        // overflow re-homed, and any item the loop below would classify as off-grid
+        // must be pulled back even when the grid is unchanged, or it stays unreachable.
+        // "Off-grid" covers a stale page past the cap (a pre-cap build) AND a stale
+        // x/y outside the grid bounds: the regridder itself never emits the latter on a
+        // matching grid, but an imported/restored/hand-edited blob (ImportLayoutUseCase,
+        // NyxBackupManager) is saved verbatim with no coordinate clamp, so a blob whose
+        // stored grid equals the measured device grid can carry a spatially off-grid
+        // item — which pageCells would then silently alias onto another cell or drop
+        // from view. This predicate mirrors the off-grid partition below exactly, so the
+        // guard trusts a layout as a no-op only when the relocation loop would have moved
+        // nothing. Normal layouts satisfy all three terms, so this stays a no-op on every
+        // routine layout pass (no persist storm).
         if (layout.grid == target &&
             layout.dock.size <= target.columns &&
-            layout.items.none { it.pos.page >= HomeLayout.MAX_PAGES }
+            layout.items.none {
+                it.pos.page !in 0 until HomeLayout.MAX_PAGES ||
+                    it.pos.x !in 0 until target.columns ||
+                    it.pos.y !in 0 until target.rows
+            }
         ) {
             return RegridOutcome.Unchanged
         }

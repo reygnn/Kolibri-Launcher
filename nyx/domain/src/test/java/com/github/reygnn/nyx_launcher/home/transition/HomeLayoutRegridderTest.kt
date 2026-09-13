@@ -246,6 +246,33 @@ class HomeLayoutRegridderTest {
         assertThat(out.layout.pages).isEqualTo(1)
     }
 
+    @Test fun a_spatially_off_grid_item_on_the_matching_grid_is_pulled_back_not_a_no_op() {
+        // Spatial counterpart to a_stale_over_cap_item_on_the_matching_grid…: the persist-
+        // storm guard short-circuits on a matching grid, but an item whose x (or y) sits
+        // outside the grid bounds must still override that. The regridder never emits such
+        // an item, but an imported/restored/hand-edited blob is saved verbatim with no
+        // coordinate clamp (ImportLayoutUseCase, NyxBackupManager) — so a blob whose stored
+        // grid equals the measured device grid can carry one. Left in place it would be
+        // mis-rendered (pageCells aliases y*cols+x onto a foreign cell or drops it); it must
+        // be relocated onto a reachable cell instead. Page and dock are both fine here, so
+        // only the spatial term of the guard can catch it.
+        val g = GridSpec(4, 6)
+        val start = layout(g, items = listOf(placed(app("wide", "pw"), 0, 5, 0))) // x=5 ≥ columns 4
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
+    @Test fun a_y_off_grid_item_on_the_matching_grid_is_also_pulled_back() {
+        // The guard's y term, symmetric to the x case above: a valid column but a row past
+        // the grid height on an otherwise-matching grid is off-grid too and is relocated.
+        val g = GridSpec(4, 6)
+        val start = layout(g, items = listOf(placed(app("tall", "pt"), 0, 0, 6))) // y=6 ≥ rows 6
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
     // ---- Placement details: hole-filling, cross-page collision, span, idempotency ----
 
     @Test fun relocated_items_fill_in_bounds_holes_before_appending() {
