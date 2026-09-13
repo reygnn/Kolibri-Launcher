@@ -215,6 +215,12 @@ object HomeLayoutTransition {
         if (dockWithoutSource.size >= layout.grid.columns) {
             return MoveResult.Rejected(MoveResult.Reason.DOCK_FULL)
         }
+        // An index past the (source-inclusive) dock size is out of range — the UI
+        // never counts more slots than that. Reject it rather than silently clamp
+        // and append, mirroring emptyTargetReason's DockSlot check and the GridInsert
+        // path (which rejects index > cells). The legitimate past-the-end append
+        // (index == dock.size, source counted) still passes and is clamped below.
+        if (index > layout.dock.size) return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
         val insertIdx = index.coerceAtMost(dockWithoutSource.size)
         val newDock = dockWithoutSource.toMutableList().apply { add(insertIdx, source) }
         if (newDock == layout.dock) return MoveResult.NoOp // reorder to the same spot

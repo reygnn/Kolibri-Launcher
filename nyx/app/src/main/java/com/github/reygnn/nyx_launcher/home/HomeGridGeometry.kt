@@ -27,6 +27,10 @@ internal fun gridCellAt(
     density: Float,
 ): CellPos? {
     if (pageWidth <= 0 || pageHeight <= 0) return null
+    // A degenerate grid (a persisted/seeded GridSpec with a non-positive axis) is
+    // "not yet laid out" as far as this total function is concerned: return null
+    // rather than divide by zero / coerce into an empty range below.
+    if (grid.columns <= 0 || grid.rows <= 0) return null
     val cellHeight = homeCellHeightPx(pageHeight, grid.rows, density)
     if (cellHeight <= 0) return null
     val cellWidth = pageWidth.toFloat() / grid.columns
