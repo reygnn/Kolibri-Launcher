@@ -55,6 +55,7 @@ class NyxBackupManager @Inject constructor(
         withContext(ioDispatcher) {
             try {
                 val layout = homeLayoutRepository.layout().first().toDto()
+                val fab = fabPositionStore.fabPositionFlow.first() // read once (x/y atomic)
                 val prefs = NyxBackupPrefs(
                     monochromeIcons = preferences.monochromeIcons().first(),
                     showAlarm = preferences.showAlarmFlow.first(),
@@ -62,8 +63,8 @@ class NyxBackupManager @Inject constructor(
                     scrimAlpha = displaySettings.wallpaperScrimAlphaStateFlow.first(),
                     backdrop = displaySettings.wallpaperBackdropFlow.first().name,
                     surfaceMode = displaySettings.wallpaperSurfaceModeFlow.first().name,
-                    fabXFraction = fabPositionStore.fabPositionFlow.first().xFraction,
-                    fabYFraction = fabPositionStore.fabPositionFlow.first().yFraction,
+                    fabXFraction = fab.xFraction,
+                    fabYFraction = fab.yFraction,
                 )
                 // Layers + their blob file names. Only file:// layers with an existing
                 // file get a blob entry; the imageFileName ties manifest ↔ blob.
@@ -92,10 +93,9 @@ class NyxBackupManager @Inject constructor(
                     zip.putNextEntry(ZipEntry(MANIFEST))
                     zip.write(serializer.serialize(backup).toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
-                    // Dedup by absolute path so shared files reuse one blob entry.
-                    val written = HashSet<String>()
+                    // One blob per layer entry (each Nyx layer is a distinct internal
+                    // file), so every referenced imageFileName has its blob written.
                     for ((entryName, file) in layerBlobs) {
-                        if (!written.add(file.absolutePath)) continue
                         zip.putNextEntry(ZipEntry(entryName))
                         file.inputStream().use { it.copyTo(zip) }
                         zip.closeEntry()
@@ -121,7 +121,9 @@ class NyxBackupManager @Inject constructor(
                     while (entry != null) {
                         if (entry.name == MANIFEST) {
                             manifest = zip.readBytes().toString(Charsets.UTF_8)
-                        } else if (entry.name.startsWith(WALLPAPER_DIR)) {
+                        } else if (options.importWallpaper && entry.name.startsWith(WALLPAPER_DIR)) {
+                            // Extract only when actually importing wallpaper — else the
+                            // blobs would land in internal storage unreferenced (leak).
                             // copyFromInputStream reads to entry-end without closing the zip stream.
                             fileManager.copyFromInputStream(zip)?.let { extracted[entry!!.name] = it.toString() }
                         }
@@ -158,11 +160,16 @@ class NyxBackupManager @Inject constructor(
     }
 
     private suspend fun restoreWallpaper(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>) {
-        if (layers.isEmpty()) return
-        // Rebind each layer's imageFileName to its freshly-extracted internal URI.
-        // A layer whose blob is missing/failed is dropped (all-or-nothing per layer).
+        // Replace semantics: a backup with no wallpaper clears the current one.
+        if (layers.isEmpty()) {
+            wallpaperRepository.saveWallpaperState(WallpaperState.NONE)
+            return
+        }
+        // Rebind each blob-backed layer to its freshly-extracted internal URI. A
+        // blob-backed layer whose blob is missing/failed is DROPPED (its source
+        // file:// path is dead on the restore target) — all-or-nothing per layer.
         val restored = layers.mapNotNull { layer ->
-            val uri = layer.imageFileName?.let { extracted[it] } ?: layer.imageUri
+            val uri = if (layer.imageFileName != null) extracted[layer.imageFileName] else layer.imageUri
             uri?.let {
                 WallpaperLayerState(
                     id = layer.id ?: WallpaperLayerState.newId(),
@@ -170,9 +177,12 @@ class NyxBackupManager @Inject constructor(
                     scale = layer.scale,
                     translateX = layer.translateX,
                     translateY = layer.translateY,
+                    captureSampleSize = layer.captureSampleSize,
                 )
             }
         }
+        // Only overwrite when at least one layer survived; if every blob failed
+        // (corrupt backup) keep the current wallpaper rather than wiping it.
         if (restored.isNotEmpty()) {
             wallpaperRepository.saveWallpaperState(WallpaperState.multiLayer(restored))
         }

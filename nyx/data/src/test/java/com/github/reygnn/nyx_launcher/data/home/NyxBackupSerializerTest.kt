@@ -38,7 +38,7 @@ class NyxBackupSerializerTest {
                 fabYFraction = 0.75f,
             ),
             wallpaperLayers = listOf(
-                WallpaperLayerBackup(id = "l0", imageFileName = "wallpapers/layer_0.img", scale = 1.5f, translateX = 10f, translateY = -5f),
+                WallpaperLayerBackup(id = "l0", imageFileName = "wallpapers/layer_0.img", scale = 1.5f, translateX = 10f, translateY = -5f, captureSampleSize = 2),
                 WallpaperLayerBackup(id = "l1", imageFileName = "wallpapers/layer_1.img"),
             ),
         )

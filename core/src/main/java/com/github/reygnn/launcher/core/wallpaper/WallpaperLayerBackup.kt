@@ -36,6 +36,16 @@ data class WallpaperLayerBackup(
 
     @JsonNames("translate_y")
     val translateY: Float = 0f,
+
+    /**
+     * The decode inSampleSize the transform (scale/translate) was captured
+     * against — bitmap-absolute values are only meaningful paired with it
+     * (WALLPAPER_RENDER_RES_SPEC §4-Y). Null = legacy backup (pre-field);
+     * the render side backfills from the original image dims. Persisting it
+     * keeps a zoomed/panned wallpaper faithful across a backup round-trip.
+     */
+    @JsonNames("capture_sample_size")
+    val captureSampleSize: Int? = null,
 ) {
     fun toLayerState(): WallpaperLayerState {
         return WallpaperLayerState(
@@ -47,6 +57,7 @@ data class WallpaperLayerBackup(
             scale = scale,
             translateX = translateX,
             translateY = translateY,
+            captureSampleSize = captureSampleSize,
         )
     }
 
@@ -58,6 +69,7 @@ data class WallpaperLayerBackup(
                 scale = state.scale,
                 translateX = state.translateX,
                 translateY = state.translateY,
+                captureSampleSize = state.captureSampleSize,
             )
         }
     }

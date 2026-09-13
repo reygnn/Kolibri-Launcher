@@ -223,18 +223,24 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun doExport(uri: Uri) = lifecycleScope.launch {
+        // Open the SAF stream off the main thread (a DocumentsProvider binder IPC
+        // can block); the manager also hops to IO for the ZIP transfer.
         val ok = runCatching {
-            requireContext().contentResolver.openOutputStream(uri)?.use { out ->
-                backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
-            } ?: false
+            withContext(Dispatchers.IO) {
+                requireContext().contentResolver.openOutputStream(uri)?.use { out ->
+                    backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
+                } ?: false
+            }
         }.getOrDefault(false)
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
     }
 
     private fun doImport(uri: Uri) = lifecycleScope.launch {
         val result = runCatching {
-            requireContext().contentResolver.openInputStream(uri)?.use { inp ->
-                backupManager.import(inp, NyxBackupOptions())
+            withContext(Dispatchers.IO) {
+                requireContext().contentResolver.openInputStream(uri)?.use { inp ->
+                    backupManager.import(inp, NyxBackupOptions())
+                }
             }
         }.getOrNull()
         when (result) {
