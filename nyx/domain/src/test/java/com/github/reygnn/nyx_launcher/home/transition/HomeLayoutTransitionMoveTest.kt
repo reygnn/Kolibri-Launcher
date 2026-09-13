@@ -9,6 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
+import com.github.reygnn.nyx_launcher.home.model.Span
 import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -755,6 +756,52 @@ class HomeLayoutTransitionMoveTest {
         val fOut = out.items.first { it.item.id == f.id }.item as HomeItem.Folder
         assertThat(fOut.members).containsExactly(ck("pm"), ck("pn")).inOrder() // members intact
         assertThat(out.items.count { it.item is HomeItem.Folder }).isEqualTo(1) // no new folder created
+    }
+
+    // ---- Span preservation across a move (A1-17, v2 widget lift) ----
+    // v1 never stores a span > 1×1, so these guard the forward-compat contract that the
+    // regridder already keeps (HomeLayoutRegridderTest.a_relocated_off_grid_items_span_is_
+    // preserved): dragging a widget must NOT shrink it back to 1×1. Before the fix every
+    // move built PlacedItem(source, pos) with a default span and silently dropped it.
+
+    @Test fun move_to_an_empty_cell_preserves_the_source_span() {
+        val wide = PlacedItem(app("w", "pw"), CellPos(0, 0, 0), Span(2, 2))
+        val start = layout(items = listOf(wide))
+        val r = move(start, ItemId("w"), DropTarget.Cell(CellPos(0, 1, 1)))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val moved = r.layout!!.items.single { it.item.id == ItemId("w") }
+        assertThat(moved.pos).isEqualTo(CellPos(0, 1, 1))
+        assertThat(moved.span).isEqualTo(Span(2, 2)) // span survives the relocation
+    }
+
+    @Test fun grid_insert_reorder_preserves_the_source_span() {
+        // Wide source reorder-inserted onto an occupied cell (the shift path): the shifted
+        // occupant keeps its own span via copy(), and the moved source keeps its span too.
+        val wide = PlacedItem(app("w", "pw"), CellPos(0, 0, 0), Span(2, 2))
+        val b = app("b", "pb")
+        // w@li0 (wide), b@li1, gap@li2.
+        val start = layout(items = listOf(wide, placed(b, 0, 1, 0)))
+        val r = move(start, ItemId("w"), DropTarget.GridInsert(0, 1)) // insert w at li1 (on b)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        val movedW = out.items.single { it.item.id == ItemId("w") }
+        assertThat(movedW.pos).isEqualTo(CellPos(0, 1, 0)) // landed at li1
+        assertThat(movedW.span).isEqualTo(Span(2, 2)) // span preserved through the shift path
+        assertThat(out.items.single { it.item.id == b.id }.pos).isEqualTo(CellPos(0, 2, 0)) // b shifted
+    }
+
+    @Test fun folder_creation_from_a_wide_source_uses_a_default_span() {
+        // A folder born from a drop is a fresh 1×1 item (MOVE_ITEM_SPEC §7-D1); the wide
+        // dragged app's span must NOT leak onto the new folder. Pins the deliberate
+        // default-span decision on the FolderCreated path.
+        val wide = PlacedItem(app("w", "pw"), CellPos(0, 0, 0), Span(2, 2))
+        val target = app("t", "pt")
+        val start = layout(items = listOf(wide, placed(target, 0, 1, 0)))
+        val r = move(start, ItemId("w"), DropTarget.Cell(CellPos(0, 1, 0))) // w onto t → folder
+        assertThat(r).isInstanceOf(MoveResult.FolderCreated::class.java)
+        val folder = r.layout!!.items.single()
+        assertThat(folder.item).isInstanceOf(HomeItem.Folder::class.java)
+        assertThat(folder.span).isEqualTo(Span()) // default 1×1, not the source's 2×2
     }
 
     // ---- Programmer-error precondition (§MIU-INV-2) ----
