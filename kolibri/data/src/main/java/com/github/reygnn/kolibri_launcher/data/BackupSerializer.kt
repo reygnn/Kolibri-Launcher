@@ -4,7 +4,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.json.JSONArray

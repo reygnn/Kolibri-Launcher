@@ -8,7 +8,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode

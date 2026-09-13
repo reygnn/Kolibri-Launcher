@@ -12,7 +12,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
-import com.github.reygnn.kolibri_launcher.domain.model.WallpaperLayerBackup
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository

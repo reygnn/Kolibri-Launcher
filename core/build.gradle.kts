@@ -19,6 +19,10 @@ kotlin {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
+    // Serialization runtime for the shared @Serializable backup models
+    // (WallpaperLayerBackup); the plugin was already applied as the kotlin("jvm")
+    // carrier — this adds the actual Json/@JsonNames runtime.
+    implementation(libs.kotlinx.serialization.json)
 
     // hilt-core (JVM JAR) for DispatcherModule's @Module/@Provides; aggregation
     // runs in each :app via the hilt-android plugin.
