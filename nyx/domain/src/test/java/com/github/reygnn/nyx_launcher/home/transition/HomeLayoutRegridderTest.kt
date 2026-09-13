@@ -200,4 +200,116 @@ class HomeLayoutRegridderTest {
         val second = HomeLayoutRegridder.fit(first.layout, GridSpec(4, 6))
         assertThat(second).isEqualTo(RegridOutcome.Unchanged)
     }
+
+    // ---- Page cap (HomeLayout.MAX_PAGES): the regridder must never emit a page the
+    // pager can't render, or the app lands on an unreachable page. Overflow is dropped
+    // from the layout, which is not "lost": the drawer lists every installed app. ----
+
+    @Test fun relocation_is_capped_at_max_pages_and_overflow_is_dropped() {
+        // Target 1×1 = one cell per page → the cap allows exactly MAX_PAGES occupants.
+        // Twelve off-grid items (x ≥ 1 under a single column) queue up in x order; the
+        // first MAX_PAGES fill pages 0..MAX_PAGES-1, the rest fall off the layout.
+        val ids = (1..12).map { "i%02d".format(it) }
+        val start = layout(
+            GridSpec(20, 1),
+            items = ids.mapIndexed { i, id -> placed(app(id, "p$id"), 0, i + 1, 0) },
+        )
+        val out = HomeLayoutRegridder.fit(start, GridSpec(1, 1)) as RegridOutcome.Changed
+        // Exactly MAX_PAGES items survive, one per page, none past the cap.
+        assertThat(out.layout.items).hasSize(HomeLayout.MAX_PAGES)
+        assertThat(out.layout.pages).isEqualTo(HomeLayout.MAX_PAGES)
+        assertThat(out.layout.items.all { it.pos.page in 0 until HomeLayout.MAX_PAGES }).isTrue()
+        val survivors = out.layout.items.map { it.item.id.raw }.toSet()
+        assertThat(survivors).containsExactlyElementsIn(ids.take(HomeLayout.MAX_PAGES))
+        // The trailing three (i10..i12) are dropped — reachable via the drawer, not lost.
+        assertThat(survivors).containsNoneIn(ids.drop(HomeLayout.MAX_PAGES))
+    }
+
+    @Test fun an_in_bounds_item_past_the_page_cap_is_pulled_back_onto_a_reachable_page() {
+        // A stale/pre-cap layout with an item spatially in bounds but on page 12: a grid
+        // change must NOT keep it there (the pager never renders page 12) — it is treated
+        // as off-grid and relocated onto the first reachable cell.
+        val start = layout(GridSpec(5, 6), items = listOf(placed(app("stale", "ps"), 12, 0, 0)))
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
+    @Test fun a_stale_over_cap_item_on_the_matching_grid_is_still_pulled_back_not_a_no_op() {
+        // The persist-storm guard short-circuits on a matching grid, but an item past the
+        // page cap must override that — otherwise it would stay unreachable forever. The
+        // spatial coordinates are in bounds; only the page is out of range.
+        val g = GridSpec(4, 6)
+        val start = layout(g, items = listOf(placed(app("stale", "ps"), 10, 2, 3)))
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(out.layout.pages).isEqualTo(1)
+    }
+
+    // ---- Placement details: hole-filling, cross-page collision, span, idempotency ----
+
+    @Test fun relocated_items_fill_in_bounds_holes_before_appending() {
+        // In-bounds items leave (0,0,0) free (they sit at (1,0) and (0,1)); an off-grid
+        // item must take that first free cell, not append after the occupied ones.
+        val start = layout(
+            GridSpec(6, 8),
+            items = listOf(
+                placed(app("h1", "ph1"), 0, 1, 0), // in bounds under 4×6
+                placed(app("h2", "ph2"), 0, 0, 1), // in bounds under 4×6
+                placed(app("off", "poff"), 0, 5, 0), // off-grid under 4×6
+            ),
+        )
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        val byId = out.layout.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("h1")]).isEqualTo(CellPos(0, 1, 0)) // unmoved
+        assertThat(byId[ItemId("h2")]).isEqualTo(CellPos(0, 0, 1)) // unmoved
+        assertThat(byId[ItemId("off")]).isEqualTo(CellPos(0, 0, 0)) // filled the hole
+    }
+
+    @Test fun relocation_skips_a_cell_an_in_bounds_item_holds_on_a_later_page() {
+        // Cross-page collision avoidance: `occupied` is seeded with in-bounds items on
+        // ALL pages, so a relocation scanning row-major must jump over an in-bounds
+        // occupant sitting on a later page. Target 1×1 = one cell per page.
+        val start = layout(
+            GridSpec(5, 5),
+            items = listOf(
+                placed(app("keep", "pk"), 2, 0, 0), // in bounds (page 2, cell 0,0)
+                placed(app("o1", "po1"), 0, 1, 0), // off-grid under 1×1
+                placed(app("o2", "po2"), 0, 2, 0), // off-grid
+                placed(app("o3", "po3"), 0, 3, 0), // off-grid
+            ),
+        )
+        val out = HomeLayoutRegridder.fit(start, GridSpec(1, 1)) as RegridOutcome.Changed
+        val byId = out.layout.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("keep")]).isEqualTo(CellPos(2, 0, 0)) // unmoved
+        assertThat(byId[ItemId("o1")]).isEqualTo(CellPos(0, 0, 0))
+        assertThat(byId[ItemId("o2")]).isEqualTo(CellPos(1, 0, 0))
+        assertThat(byId[ItemId("o3")]).isEqualTo(CellPos(3, 0, 0)) // skipped page 2 (keep)
+        assertThat(out.layout.pages).isEqualTo(4)
+    }
+
+    @Test fun an_off_grid_folder_is_relocated_with_members_and_span_preserved() {
+        // Counterpart to the dock-overflow folder case: a FOLDER sitting off-grid (not in
+        // the dock) is relocated onto the new grid keeping its members and its span.
+        val f = PlacedItem(folder("fg", ck("pa"), ck("pb")), CellPos(0, 5, 0), Span(2, 2))
+        val start = layout(GridSpec(6, 8), items = listOf(f))
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        val relocated = out.layout.items.single()
+        assertThat(relocated.item.id).isEqualTo(ItemId("fg"))
+        assertThat((relocated.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
+        assertThat(relocated.pos).isEqualTo(CellPos(0, 0, 0))
+        assertThat(relocated.span).isEqualTo(Span(2, 2))
+    }
+
+    @Test fun regrid_is_idempotent_after_a_multi_page_shrink() {
+        // The single-item idempotency test doesn't exercise a result that spilled onto a
+        // second page. Pack a page full so the shrink produces two pages, then re-fit to
+        // the same target: everything is now in bounds → Unchanged.
+        val eight = (0 until 8).map { i -> placed(app("a$i", "pa$i"), 0, i % 4, i / 4) } // 4×2 packed
+        val start = layout(GridSpec(4, 2), items = eight)
+        val first = HomeLayoutRegridder.fit(start, GridSpec(2, 2)) as RegridOutcome.Changed
+        assertThat(first.layout.pages).isEqualTo(2) // spilled onto a second page
+        val second = HomeLayoutRegridder.fit(first.layout, GridSpec(2, 2))
+        assertThat(second).isEqualTo(RegridOutcome.Unchanged)
+    }
 }

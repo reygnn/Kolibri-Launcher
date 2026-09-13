@@ -49,4 +49,13 @@ class HomeRenderedPagesTest {
         val items = (0 until max - 1).map { at(it) } // highest occupied = max - 2
         assertThat(layout(items, pages = max - 1).renderedPageCount()).isEqualTo(max)
     }
+
+    @Test fun an_item_beyond_the_cap_never_inflates_the_count_past_max_pages() {
+        // Defensive: the regridder now guarantees no item sits past the cap, but this pure
+        // renderer must stay bounded even on a stale/pre-cap layout — an item on page
+        // index MAX_PAGES (out of the valid 0 until MAX_PAGES range) still clamps to
+        // MAX_PAGES, so the dot indicator can never overflow.
+        val max = HomeLayout.MAX_PAGES
+        assertThat(layout(listOf(at(max)), pages = max + 1).renderedPageCount()).isEqualTo(max)
+    }
 }

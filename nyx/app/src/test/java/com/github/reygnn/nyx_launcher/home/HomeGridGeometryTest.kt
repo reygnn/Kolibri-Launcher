@@ -116,4 +116,53 @@ class HomeGridGeometryTest {
         // x < 0: cell.x clamps to col 0, fx < 0 (< 0.2) → insert before → li = 0.
         assertThat(drop(-50f, 60f)).isEqualTo(DropTarget.GridInsert(0, 0))
     }
+
+    // ---- gridCellAt: further boundaries ----
+
+    @Test fun exact_column_boundary_falls_into_the_next_column() {
+        // localX == cellWidth (100) → (100/100).toInt() == 1 → col 1, not col 0.
+        assertThat(cell(100f, 60f)).isEqualTo(CellPos(0, 1, 0))
+    }
+
+    @Test fun exact_row_boundary_falls_into_the_next_row() {
+        // localY == topPad + cellHeight (50 + 110 = 160) → (110/110).toInt() == 1 → row 1.
+        assertThat(cell(50f, 160f)).isEqualTo(CellPos(0, 0, 1))
+    }
+
+    @Test fun a_page_shorter_than_its_row_count_is_treated_as_not_laid_out() {
+        // pageHeight (3) < rows (5) → cell height collapses to 0 → null (cf. homeCellHeightPx).
+        assertThat(gridCellAt(0, 10f, 1f, pageWidth = 400, pageHeight = 3, grid = grid, density = 1f)).isNull()
+    }
+
+    @Test fun density_shifts_the_top_padding_but_keeps_the_mapping_consistent() {
+        // @2x on a tall page: cell 220 high (110dp·2, < split 1200/5=240), topPad = 1200−5·220 = 100.
+        // A point at localY == topPad is the first row's top edge; one cell down is row 1.
+        val g = GridSpec(columns = 4, rows = 5)
+        assertThat(gridCellAt(0, 0f, 100f, pageWidth = 400, pageHeight = 1200, grid = g, density = 2f))
+            .isEqualTo(CellPos(0, 0, 0))
+        assertThat(gridCellAt(0, 0f, 100f + 220f, pageWidth = 400, pageHeight = 1200, grid = g, density = 2f))
+            .isEqualTo(CellPos(0, 0, 1))
+    }
+
+    // ---- gridDropAt: further edges ----
+
+    @Test fun single_column_grid_classifies_left_centre_and_right() {
+        val g = GridSpec(columns = 1, rows = 5) // colWidth == pageWidth (100)
+        fun d(x: Float) = gridDropAt(0, x, 60f, pageWidth = 100, pageHeight = 600, grid = g, density = 1f)
+        assertThat(d(10f)).isEqualTo(DropTarget.GridInsert(0, 0)) // fx 0.1 → before
+        assertThat(d(50f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0))) // fx 0.5 → on cell
+        assertThat(d(90f)).isEqualTo(DropTarget.GridInsert(0, 1)) // fx 0.9 → after
+    }
+
+    @Test fun fraction_boundaries_are_inclusive_of_the_centre_band() {
+        // fx == 0.2 and fx == 0.8 are NOT strictly beyond the edge fractions, so both
+        // land ON the cell (the < / > comparisons are exclusive). col 0 = 0..100.
+        assertThat(drop(20f, 60f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0))) // fx == 0.2
+        assertThat(drop(80f, 60f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0))) // fx == 0.8
+    }
+
+    @Test fun degenerate_rows_make_the_classifier_null_too() {
+        // Symmetry with the columns==0 guard: a non-positive row count also yields null.
+        assertThat(gridDropAt(0, 50f, 50f, 400, 600, GridSpec(columns = 4, rows = 0), 1f)).isNull()
+    }
 }
