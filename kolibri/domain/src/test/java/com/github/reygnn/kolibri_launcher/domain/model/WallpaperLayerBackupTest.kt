@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
