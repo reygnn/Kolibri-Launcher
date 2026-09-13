@@ -518,6 +518,65 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
+    @Test fun insert_prefers_a_forward_gap_over_a_closer_backward_gap() {
+        // The shift is forward-FIRST, not nearest-gap (HomeLayoutTransition.kt:106-118):
+        // free cells at li3 (backward, distance 1) and li7 (forward, distance 3). Inserting
+        // X (from the dock) at the occupied li4 must shift the block [4,7) forward and leave
+        // li3 untouched — proving the forward gap wins even though li3 is nearer.
+        val occupants = listOf(0, 1, 2, 4, 5, 6).map { li -> app("o$li", "po$li") to li }
+        val x = app("x", "px")
+        val start = layout(
+            items = occupants.map { (a, li) -> placed(a, 0, li % 4, li / 4) },
+            dock = listOf(x),
+        )
+        val r = move(start, x.id, DropTarget.GridInsert(0, 4))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(1)
+        assertThat(out.idAtLi(3)).isNull() // backward gap deliberately NOT consumed
+        assertThat(out.idAtLi(4)).isEqualTo(x.id) // X inserted
+        assertThat(out.idAtLi(5)).isEqualTo(ItemId("o4")) // block shifted forward one cell
+        assertThat(out.idAtLi(6)).isEqualTo(ItemId("o5"))
+        assertThat(out.idAtLi(7)).isEqualTo(ItemId("o6")) // last of the block lands in the forward gap
+        assertThat(out.dock).isEmpty()
+    }
+
+    @Test fun reorder_shift_on_a_non_zero_page_stays_on_that_page() {
+        // Every other reorder/shift test runs on page 0; this pins that the shift honours
+        // the target page (cellOf(page, …), the page-scoped occupied map, and the
+        // filterNot { page == this } reconstruction) instead of silently touching page 0.
+        val filler = app("filler", "pfill") // keeps page 0 alive and untouched
+        val a = app("a", "pa"); val b = app("b", "pb"); val c = app("c", "pc")
+        val start = layout(
+            items = listOf(
+                placed(filler, 0, 0, 0),
+                placed(a, 1, 0, 0), // page 1, li0
+                placed(b, 1, 1, 0), // page 1, li1
+                placed(c, 1, 3, 0), // page 1, li3 (gap at li2)
+            ),
+            pages = 2,
+        )
+        val r = move(start, c.id, DropTarget.GridInsert(1, 1)) // insert C at page-1 li1 (on B)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        val byId = out.items.associate { it.item.id to it.pos }
+        assertThat(byId[filler.id]).isEqualTo(CellPos(0, 0, 0)) // page 0 untouched
+        assertThat(byId[a.id]).isEqualTo(CellPos(1, 0, 0)) // before the insert point — unchanged
+        assertThat(byId[c.id]).isEqualTo(CellPos(1, 1, 0)) // C inserted at page-1 li1
+        assertThat(byId[b.id]).isEqualTo(CellPos(1, 2, 0)) // B shifted into the page-1 gap
+    }
+
+    @Test fun dock_negative_index_is_rejected() {
+        // moveToDock guards index < 0 first (HomeLayoutTransition.kt:210): the total
+        // function rejects rather than crashing on a MutableList.add(-1, …).
+        val a = app("a")
+        val x = app("x", "px")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = listOf(x)) // dock not full
+        val r = move(start, a.id, DropTarget.DockSlot(-1))
+        assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
     // ---- Programmer-error precondition (§MIU-INV-2) ----
 
     @Test fun unknown_moving_id_is_noop() {

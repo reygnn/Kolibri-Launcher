@@ -154,6 +154,46 @@ class HomeLayoutRegridderTest {
         assertThat(HomeLayoutRegridder.fit(layout(g), g)).isEqualTo(RegridOutcome.Unchanged)
     }
 
+    @Test fun off_grid_items_relocate_before_dock_overflow() {
+        // Both relocation queues are non-empty at once: the ordering guarantee
+        // (off-grid grid items in page/y/x order FIRST, then dock overflow) is only
+        // tested in isolation elsewhere. Shrinking 6×8 → 4×6 pushes one grid item
+        // off-grid AND overflows the dock; the off-grid item must take the earlier
+        // free cell.
+        val start = layout(
+            GridSpec(6, 8),
+            items = listOf(placed(app("keep", "pk"), 0, 0, 0), placed(app("off", "poff"), 0, 5, 0)),
+            dock = (0 until 6).map { app("d$it", "p$it") }, // 6 > target columns (4)
+        )
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        // Dock trimmed to capacity, order preserved.
+        assertThat(out.layout.dock.map { it.id }).containsExactly(
+            ItemId("d0"), ItemId("d1"), ItemId("d2"), ItemId("d3"),
+        ).inOrder()
+        val byId = out.layout.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("keep")]).isEqualTo(CellPos(0, 0, 0)) // in bounds, unmoved
+        assertThat(byId[ItemId("off")]).isEqualTo(CellPos(0, 1, 0)) // off-grid item first
+        assertThat(byId[ItemId("d4")]).isEqualTo(CellPos(0, 2, 0)) // then dock overflow…
+        assertThat(byId[ItemId("d5")]).isEqualTo(CellPos(0, 3, 0)) // …in dock order
+        assertThat(out.layout.items).hasSize(4) // nothing lost
+    }
+
+    @Test fun a_relocated_off_grid_items_span_is_preserved() {
+        // The regridder promises "Span is preserved" for relocated off-grid grid items
+        // (HomeLayoutRegridder.kt:59). v1 never sets a span > 1×1, so this guards the v2
+        // widget lift: an off-grid item carrying a non-default span keeps it after the
+        // re-fit, while dock overflow gets the default span.
+        val wide = PlacedItem(app("wide", "pw"), CellPos(0, 5, 0), Span(2, 2)) // off-grid under 4×6
+        val start = layout(
+            GridSpec(6, 8),
+            items = listOf(wide),
+        )
+        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
+        val relocated = out.layout.items.single { it.item.id == ItemId("wide") }
+        assertThat(relocated.pos).isEqualTo(CellPos(0, 0, 0)) // moved onto the new grid
+        assertThat(relocated.span).isEqualTo(Span(2, 2)) // span survives the relocation
+    }
+
     @Test fun regrid_is_idempotent() {
         val start = layout(GridSpec(6, 8), items = listOf(placed(app("a", "pa"), 0, 5, 7)))
         val first = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed

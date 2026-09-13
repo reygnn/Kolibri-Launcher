@@ -103,6 +103,15 @@ class HomeGridGeometryTest {
         assertThat(drop(999f, 60f)).isEqualTo(DropTarget.GridInsert(0, 4))
     }
 
+    @Test fun right_edge_of_the_bottom_right_cell_produces_the_past_last_cell_index() {
+        // The very last cell (col 3, row 4 → li = 4*4+3 = 19) on its right edge inserts
+        // AFTER it: li+1 = 20 == columns*rows. DropTarget.GridInsert documents this
+        // "past the last cell" value, and insertOnGrid/gridInsertCell handle it — this
+        // pins that the geometry actually emits it. (400×600, 4×5: col 3 = 300..400,
+        // row 4 = 490..600; fx 0.95 > 0.8.)
+        assertThat(drop(395f, 550f)).isEqualTo(DropTarget.GridInsert(0, grid.columns * grid.rows))
+    }
+
     @Test fun negative_x_reads_as_before_the_first_cell() {
         // x < 0: cell.x clamps to col 0, fx < 0 (< 0.2) → insert before → li = 0.
         assertThat(drop(-50f, 60f)).isEqualTo(DropTarget.GridInsert(0, 0))
