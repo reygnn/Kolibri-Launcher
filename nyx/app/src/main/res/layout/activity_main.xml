@@ -142,6 +142,9 @@
 
     </LinearLayout>
 
+    <!-- Folder overlay (in-DragLayer, so members can be finger-dragged out). -->
+    <include layout="@layout/folder_overlay" />
+
     <!-- Drawer overlay, revealed by swipe-up / long-press and toggled by
          visibility (no re-inflate per open). Hosts AppDrawerFragment, whose own
          root is a GestureFrameLayout owning the swipe-down dismiss. -->

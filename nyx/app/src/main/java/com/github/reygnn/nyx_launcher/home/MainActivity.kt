@@ -74,9 +74,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemId
-import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -140,6 +138,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var dock: RecyclerView
     private lateinit var drawerContainer: View
     private lateinit var removeBar: TextView
+
+    // In-DragLayer folder overlay (finger-drag extraction). Populated on open.
+    private lateinit var folderOverlay: View
+    private lateinit var folderTitle: EditText
+    private lateinit var folderMembers: RecyclerView
+    private var openFolderId: ItemId? = null
+    private var openFolderTitle: String = ""
     private lateinit var clockTime: TextView
     private lateinit var clockDate: TextView
     private lateinit var clockBattery: TextView
@@ -204,6 +209,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         dock = findViewById(R.id.dock)
         drawerContainer = findViewById(R.id.drawer_container)
         removeBar = findViewById(R.id.remove_bar)
+        folderOverlay = findViewById(R.id.folder_overlay)
+        folderTitle = findViewById(R.id.folder_title)
+        folderMembers = findViewById(R.id.folder_members)
+        // Tap the scrim (outside the card) closes; the card swallows its own taps.
+        folderOverlay.setOnClickListener { closeFolderOverlay() }
+        findViewById<View>(R.id.folder_card).setOnClickListener { /* swallow */ }
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
         clockBattery = findViewById(R.id.clock_battery)
@@ -261,6 +272,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // Flush live transforms then commit (same as the Save FAB) — a bare
                 // commit would drop the active layer's unsaved pan/zoom.
                 wallpaperEditController.commitEdit()
+            } else if (folderOverlay.isVisible) {
+                closeFolderOverlay()
             } else if (drawerContainer.isVisible) {
                 hideDrawer()
             }
@@ -714,6 +727,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private fun applyDrop(payload: DragPayload, target: DropTarget) = when (payload) {
         is DragPayload.Existing -> viewModel.move(payload.id, target)
         is DragPayload.NewApp -> viewModel.place(payload.key, target)
+        is DragPayload.FolderMember -> viewModel.extractFromFolder(payload.folderId, payload.key, target)
     }
 
     // ---- pager edge auto-advance during a drag ----
@@ -770,28 +784,46 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val layout = viewModel.layout.value ?: return
         val folder = layout.allHomeItems().firstOrNull { it.id == folderId } as? HomeItem.Folder ?: return
 
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.folder_sheet, null)
-        val titleField = view.findViewById<EditText>(R.id.folder_title)
-        titleField.setText(folder.title)
-        dialog.setOnDismissListener {
-            val newTitle = titleField.text.toString()
-            if (newTitle != folder.title) viewModel.renameFolder(folderId, newTitle)
-        }
-        val members = view.findViewById<RecyclerView>(R.id.folder_members)
-        members.layoutManager = GridLayoutManager(this, currentColumns())
-        members.adapter = FolderMemberAdapter(
+        openFolderId = folderId
+        openFolderTitle = folder.title
+        folderTitle.setText(folder.title)
+        folderMembers.layoutManager = GridLayoutManager(this, currentColumns())
+        folderMembers.adapter = FolderMemberAdapter(
             iconLoader = iconLoader,
             scope = lifecycleScope,
             iconSizePx = gridIconPx,
-            onLaunch = { key -> launchApp(key); dialog.dismiss() },
-            onExtract = { key ->
-                viewModel.extractFromFolder(folderId, key, DropTarget.Cell(layout.firstFreeCell()))
-                dialog.dismiss()
-            },
+            onLaunch = { key -> launchApp(key); closeFolderOverlay() },
+            onStartDrag = { view, key -> startFolderMemberDrag(view, key) },
         ).also { it.submit(folder.members) }
-        dialog.setContentView(view)
-        dialog.show()
+        folderOverlay.isVisible = true
+    }
+
+    /**
+     * Long-press on a folder member → start a normal home drag of it (finger-drag),
+     * then hide the overlay so it lands on the grid/dock where the user drops it.
+     * The drag continues in the same window (the overlay lives in the DragLayer),
+     * so the touch stream hands straight off to the DragController.
+     */
+    private fun startFolderMemberDrag(view: View, key: ComponentKey) {
+        val folderId = openFolderId ?: return
+        applyFolderTitleEdit() // persist any rename before the folder may dissolve
+        startDrag(view, DragPayload.FolderMember(folderId, key))
+        openFolderId = null
+        folderOverlay.isVisible = false
+    }
+
+    /** Closes the folder overlay (tap-outside / launch), applying any title edit. */
+    private fun closeFolderOverlay() {
+        if (!folderOverlay.isVisible) return
+        applyFolderTitleEdit()
+        openFolderId = null
+        folderOverlay.isVisible = false
+    }
+
+    private fun applyFolderTitleEdit() {
+        val folderId = openFolderId ?: return
+        val newTitle = folderTitle.text.toString()
+        if (newTitle != openFolderTitle) viewModel.renameFolder(folderId, newTitle)
     }
 
     // ---- helpers ----

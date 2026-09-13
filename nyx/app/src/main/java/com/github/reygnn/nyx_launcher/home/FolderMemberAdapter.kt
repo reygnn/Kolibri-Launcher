@@ -11,13 +11,14 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import kotlinx.coroutines.CoroutineScope
 
-/** Icons of a folder's members. Tap launches; long-press extracts to the home. */
+/** Icons of a folder's members. Tap launches; long-press starts a home drag to
+ *  extract the member (finger-drag, placed where the user drops it). */
 class FolderMemberAdapter(
     private val iconLoader: IconLoader,
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
     private val onLaunch: (ComponentKey) -> Unit,
-    private val onExtract: (ComponentKey) -> Unit,
+    private val onStartDrag: (view: View, key: ComponentKey) -> Unit,
 ) : RecyclerView.Adapter<FolderMemberAdapter.MemberHolder>() {
 
     private var members: List<ComponentKey> = emptyList()
@@ -40,7 +41,7 @@ class FolderMemberAdapter(
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
         holder.itemView.setOnClickListener { onLaunch(key) }
-        holder.itemView.setOnLongClickListener { onExtract(key); true }
+        holder.itemView.setOnLongClickListener { onStartDrag(holder.itemView, key); true }
         holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
             iconLoader.bitmap(IconRef.System(key), iconSizePx)
         }
