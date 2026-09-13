@@ -39,6 +39,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
@@ -71,6 +72,7 @@ import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
+import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
@@ -114,6 +116,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
     @Inject lateinit var fabPositionStore: NyxFabPositionStore
+
+    // First-run dock seed: resolve the device's default Phone/SMS/Browser/Camera and
+    // place them in the dock so a fresh install isn't a blank screen (one-shot; the
+    // repo no-ops on a returning install).
+    @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
+    @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
 
     // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
     // wallpaper state (mirrored from the repo), drives the transactional edit session.
@@ -283,6 +291,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
         // copy and save (the shared repo/file-manager split doesn't self-clean).
         lifecycleScope.launch { wallpaperImageSetter.reclaimOrphans() }
+
+        // One-shot on startup: seed the dock with the device's default apps on first
+        // run. Resolving hits PackageManager, so it's done off the main thread; the
+        // repo gates the write (SEEDED_KEY) so a returning install is a no-op.
+        lifecycleScope.launch {
+            val apps = withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
+            homeLayoutRepository.seedInitialDock(apps)
+        }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {

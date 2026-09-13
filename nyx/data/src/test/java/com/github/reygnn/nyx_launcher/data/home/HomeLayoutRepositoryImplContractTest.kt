@@ -17,7 +17,7 @@ import kotlinx.coroutines.runBlocking
 class HomeLayoutRepositoryImplContractTest : HomeLayoutRepositoryContract() {
 
     override fun createRepository(initial: HomeLayout): HomeLayoutRepository {
-        val repository = HomeLayoutRepositoryImpl(FakeDataStore(), HomeLayoutSerializer())
+        val repository = HomeLayoutRepositoryImpl(FakeDataStore(), HomeLayoutSerializer(), UuidItemIdFactory())
         runBlocking { repository.save(initial) }
         return repository
     }

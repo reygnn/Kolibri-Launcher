@@ -2,10 +2,14 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
+import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
+import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +29,7 @@ import javax.inject.Inject
 class HomeLayoutRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val serializer: LayoutSerializer,
+    private val itemIdFactory: ItemIdFactory,
 ) : HomeLayoutRepository {
 
     // Serializes all writes: a full [save] and the read-modify-write of [update]
@@ -45,12 +50,43 @@ class HomeLayoutRepositoryImpl @Inject constructor(
             Unit
         }
 
+    override suspend fun seedInitialDock(dockApps: List<ComponentKey>): Boolean =
+        writeMutex.withLock {
+            if (dockApps.isEmpty()) return@withLock false
+            val prefs = dataStore.data.first()
+            // One-shot: [SEEDED_KEY] records that the first-run decision was already
+            // made — a plain KEY-presence gate can't be used because FitHomeGridUseCase
+            // writes an empty layout under KEY on the very first layout pass (it just
+            // stamps the device grid), which would race and defeat seeding. This flag
+            // is never touched by save/update/fit.
+            if (prefs[SEEDED_KEY] == true) return@withLock false
+            // Seed onto whatever is already there so a grid already stamped by fit is
+            // preserved (never reset to DEFAULT's grid). If content already exists —
+            // e.g. an import landed first — the layout is established: mark the decision
+            // done and leave it untouched.
+            val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DEFAULT
+            if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
+                dataStore.edit { it[SEEDED_KEY] = true }
+                return@withLock false
+            }
+            val seeded = current.copy(dock = dockApps.map { HomeItem.App(itemIdFactory.next(), it) })
+            dataStore.edit {
+                it[SEEDED_KEY] = true
+                it[KEY] = serializer.serialize(seeded)
+            }
+            true
+        }
+
     private suspend fun writeRaw(layout: HomeLayout) {
         dataStore.edit { it[KEY] = serializer.serialize(layout) }
     }
 
     private companion object {
         val KEY = stringPreferencesKey("home_layout_v1")
+
+        // First-run seed one-shot (see seedInitialDock). Separate from KEY so a
+        // fit-only write doesn't read as "already seeded".
+        val SEEDED_KEY = booleanPreferencesKey("home_dock_seeded_v1")
 
         // Cold-start default only: FitHomeGridUseCase re-fits to the device grid
         // (GridSpecProvider) on start, so these dimensions are just the seed until

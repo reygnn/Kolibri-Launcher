@@ -1,6 +1,9 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
+import com.github.reygnn.nyx_launcher.home.model.ItemId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -19,6 +22,11 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
 
     private val state = MutableStateFlow(initial)
     private val writeMutex = Mutex()
+
+    // First-run seed one-shot, mirroring the impl's SEEDED_KEY: set only by
+    // [seedInitialDock], never by save/update/fit.
+    private var seeded = false
+    private var seedCounter = 0
 
     var saveCount = 0
         private set
@@ -39,5 +47,21 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
                 state.value = it
             }
             Unit
+        }
+
+    override suspend fun seedInitialDock(dockApps: List<ComponentKey>): Boolean =
+        writeMutex.withLock {
+            if (dockApps.isEmpty() || seeded) return@withLock false
+            val current = state.value
+            if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
+                seeded = true
+                return@withLock false
+            }
+            seeded = true
+            saveCount++
+            state.value = current.copy(
+                dock = dockApps.map { HomeItem.App(ItemId("seed-${seedCounter++}"), it) },
+            )
+            true
         }
 }
