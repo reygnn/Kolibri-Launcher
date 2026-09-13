@@ -152,3 +152,38 @@ dependencies {
     kspAndroidTest(libs.hilt.compiler)
     androidTestUtil(libs.androidx.test.orchestrator)
 }
+
+// --- ACRA ProGuard mapping upload (mirrors Kolibri) ---
+// After a release build, POST build/outputs/mapping/release/mapping.txt to the ACRA
+// server (Acrarium) so obfuscated crash stacks deobfuscate. No-op when minify is off
+// (no mapping) or the script/secrets are missing. Credentials come from the shared
+// root secrets.properties via acra-scripts/load_secrets.sh.
+tasks.register("uploadProguardMapping") {
+    group = "acra"
+    description = "Upload the release ProGuard mapping to the ACRA server"
+    doLast {
+        val mappingFile = layout.buildDirectory.file("outputs/mapping/release/mapping.txt").get().asFile
+        if (!mappingFile.exists()) {
+            println("uploadProguardMapping: no mapping (${mappingFile.path}) — skipped (minify off?)")
+            return@doLast
+        }
+        val script = file("acra-scripts/upload_mapping.sh")
+        if (!script.exists()) {
+            println("uploadProguardMapping: ${script.path} missing — skipped")
+            return@doLast
+        }
+        val pkg = android.defaultConfig.applicationId
+        val versionCode = android.defaultConfig.versionCode
+        println("uploadProguardMapping: uploading mapping for $pkg ($versionCode)…")
+        val exit = ProcessBuilder("bash", script.absolutePath, mappingFile.absolutePath, pkg, versionCode.toString())
+            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+            .waitFor()
+        if (exit != 0) throw GradleException("Mapping upload failed (exit $exit)")
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "bundleRelease") finalizedBy("uploadProguardMapping")
+}
