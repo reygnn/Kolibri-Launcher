@@ -700,6 +700,35 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
+    @Test fun dock_reorder_to_its_current_slot_in_a_multi_item_dock_is_a_noop() {
+        // dock_item_to_own_slot_is_noop covers a single-item dock; this pins the
+        // newDock == dock short-circuit (HomeLayoutTransition.kt:235) for a MULTI-item
+        // dock: moving the middle icon to the slot it already occupies rebuilds the
+        // identical list → NoOp (one icon, a, sits to b's left → source-exclusive index 1).
+        val a = app("a"); val b = app("b", "pb"); val c = app("c", "pc")
+        val start = layout(dock = listOf(a, b, c))
+        val r = move(start, b.id, DropTarget.DockSlot(1))
+        assertThat(r).isEqualTo(MoveResult.NoOp)
+    }
+
+    @Test fun grid_insert_with_a_folder_source_reorders_like_any_item() {
+        // Every other GridInsert test drags an app; insertOnGrid is type-agnostic, so a
+        // FOLDER reorder-inserted onto an occupied cell must shift the occupant and land the
+        // folder (never fold — foldering is the Cell centre path), its members untouched.
+        val a = app("a"); val b = app("b", "pb"); val f = folder("f", ck("pm"), ck("pn"))
+        // a@li0, b@li1, gap@li2, folder@li3.
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(b, 0, 1, 0), placed(f, 0, 3, 0)))
+        val r = move(start, f.id, DropTarget.GridInsert(0, 1)) // insert folder at li1 (on b)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(a.id)
+        assertThat(out.idAtLi(1)).isEqualTo(f.id) // folder inserted
+        assertThat(out.idAtLi(2)).isEqualTo(b.id) // b shifted into the gap
+        val fOut = out.items.first { it.item.id == f.id }.item as HomeItem.Folder
+        assertThat(fOut.members).containsExactly(ck("pm"), ck("pn")).inOrder() // members intact
+        assertThat(out.items.count { it.item is HomeItem.Folder }).isEqualTo(1) // no new folder created
+    }
+
     // ---- Programmer-error precondition (§MIU-INV-2) ----
 
     @Test fun unknown_moving_id_is_noop() {
