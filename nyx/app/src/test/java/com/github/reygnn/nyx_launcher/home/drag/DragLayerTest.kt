@@ -60,6 +60,10 @@ class DragLayerTest {
         val zone = FakeZone(Rect(0, 0, 500, 500))
         dragLayer.dragController.addDropZone(zone)
 
+        // A real drag is always preceded by the ACTION_DOWN that latches the active
+        // pointer id (DragLayer tracks the dragging finger by id, not index). Without
+        // it the MOVE handler's findPointerIndex(INVALID) would drop the event.
+        dragLayer.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, 0f, 0f))
         dragLayer.startDrag(payload, laidOutSource()) // starts at (0,0), inside zone
         assertThat(dragLayer.dragController.isDragging).isTrue()
         assertThat(zone.enter).isEqualTo(1)

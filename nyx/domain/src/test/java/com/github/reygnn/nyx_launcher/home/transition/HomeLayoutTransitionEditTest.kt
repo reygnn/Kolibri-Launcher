@@ -48,7 +48,7 @@ class HomeLayoutTransitionEditTest {
         assertThat(r).isInstanceOf(MoveResult.FolderCreated::class.java)
         val fc = r as MoveResult.FolderCreated
         assertThat(fc.folder).isEqualTo(ItemId("folder"))
-        val f = fc.layout!!.items.single().item as HomeItem.Folder
+        val f = fc.layout.items.single().item as HomeItem.Folder
         assertThat(f.members).containsExactly(ck("pb"), ck("pc")).inOrder()
     }
 

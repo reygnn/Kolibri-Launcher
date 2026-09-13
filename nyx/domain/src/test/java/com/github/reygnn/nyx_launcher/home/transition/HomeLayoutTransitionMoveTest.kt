@@ -65,7 +65,7 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r).isInstanceOf(MoveResult.FolderCreated::class.java)
         val fc = r as MoveResult.FolderCreated
         assertThat(fc.folder).isEqualTo(ItemId("folder-new"))
-        val out = fc.layout!!
+        val out = fc.layout
         assertThat(out.items).hasSize(1)
         val placedFolder = out.items.single()
         assertThat(placedFolder.pos).isEqualTo(CellPos(0, 1, 0))
