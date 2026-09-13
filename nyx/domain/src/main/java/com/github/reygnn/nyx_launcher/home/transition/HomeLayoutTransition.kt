@@ -215,9 +215,13 @@ object HomeLayoutTransition {
         // finger), so it is already relative to dockWithoutSource; clamp for the
         // past-the-end append case.
         val dockWithoutSource = layout.dock.filterNot { it.id == moving }
-        // Capacity is per grid columns; a reorder within the dock never grows it
-        // (source is excluded), so only an incoming item can hit the cap.
-        if (dockWithoutSource.size >= layout.grid.columns) {
+        // Capacity is per grid columns. A reorder within the dock never grows it (the
+        // source is excluded then re-added), so it is always allowed — including tidying
+        // a transient over-capacity dock (a grid shrink before the regridder re-homes the
+        // overflow). Only an INCOMING item (from grid/drawer) that would push the dock
+        // past capacity is rejected.
+        val isReorderWithinDock = dockWithoutSource.size < layout.dock.size
+        if (!isReorderWithinDock && dockWithoutSource.size >= layout.grid.columns) {
             return MoveResult.Rejected(MoveResult.Reason.DOCK_FULL)
         }
         // An index past the (source-inclusive) dock size is out of range — the UI

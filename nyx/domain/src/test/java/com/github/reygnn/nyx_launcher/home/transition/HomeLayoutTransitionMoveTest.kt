@@ -225,17 +225,28 @@ class HomeLayoutTransitionMoveTest {
         assertThat(r.layout!!.dock.map { it.id }).containsExactlyElementsIn(expected).inOrder()
     }
 
-    @Test fun reorder_within_an_over_capacity_dock_is_rejected_as_full() {
-        // Documents current behaviour (NOT necessarily desirable): a dock OVER capacity
-        // (size > columns) can't even be reordered. Excluding the source still leaves
-        // `columns` icons, so the capacity guard (HomeLayoutTransition.kt:220) fires
-        // DOCK_FULL. This over-capacity state is only transient — the regridder re-homes
-        // dock overflow onto the grid against the real device grid before the user
-        // normally interacts — so the block is largely theoretical. Pinned so that a
-        // future change to allow reordering an over-full dock is a conscious decision.
+    @Test fun reorder_within_an_over_capacity_dock_is_allowed() {
+        // A dock OVER capacity (size > columns) is a transient state after a grid shrink,
+        // before the regridder re-homes the overflow. The user must still be able to tidy
+        // it: a reorder never grows the dock (source excluded then re-added), so it is
+        // allowed even while over capacity — only an INCOMING item is capped. Regression
+        // for the UX bug where the capacity guard also blocked reordering an over-full dock.
         val overCap = (0..grid.columns).map { app("d$it", "pd$it") } // columns + 1 icons
         val start = layout(dock = overCap)
-        val r = move(start, overCap.first().id, DropTarget.DockSlot(grid.columns))
+        val r = move(start, overCap.first().id, DropTarget.DockSlot(grid.columns)) // move d0 to the end
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val expected = overCap.drop(1).map { it.id } + overCap.first().id
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(*expected.toTypedArray()).inOrder()
+        assertThat(r.layout!!.dock).hasSize(grid.columns + 1) // still over capacity — the reorder didn't shrink it
+    }
+
+    @Test fun incoming_item_into_an_over_capacity_dock_is_still_rejected() {
+        // The flip side of the fix: the capacity guard must still bite for an INCOMING
+        // item (a grid source), which WOULD grow an already-over-capacity dock further.
+        val overCap = (0..grid.columns).map { app("d$it", "pd$it") } // columns + 1 icons
+        val a = app("a", "pa")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)), dock = overCap)
+        val r = move(start, a.id, DropTarget.DockSlot(0))
         assertThat(r).isEqualTo(MoveResult.Rejected(MoveResult.Reason.DOCK_FULL))
     }
 
