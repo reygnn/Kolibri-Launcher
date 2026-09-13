@@ -221,6 +221,74 @@ class HomeLayoutTransitionMoveTest {
         assertThat(out.items.single().item.id).isEqualTo(a.id)
     }
 
+    // ---- Grid reorder-insert (DropTarget.GridInsert) — Launcher3-style shift ----
+
+    // grid is 4×6 = 24 cells; li = y*4 + x.
+    private fun HomeLayout.idAtLi(li: Int): ItemId? =
+        items.firstOrNull { it.pos == CellPos(0, li % 4, li / 4) }?.item?.id
+
+    @Test fun insert_shifts_occupant_right_and_absorbs_the_gap() {
+        val a = app("a"); val b = app("b", "pb"); val c = app("c", "pc")
+        // A@li0, B@li1, gap@li2, C@li3.
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(b, 0, 1, 0), placed(c, 0, 3, 0)))
+        val r = move(start, c.id, DropTarget.GridInsert(0, 1)) // insert C at li1 (on B), not a folder
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(a.id)
+        assertThat(out.idAtLi(1)).isEqualTo(c.id) // C inserted
+        assertThat(out.idAtLi(2)).isEqualTo(b.id) // B shifted into the gap
+        assertThat(out.items.none { it.item is HomeItem.Folder }).isTrue() // no folder
+    }
+
+    @Test fun insert_on_an_empty_cell_just_places() {
+        val a = app("a"); val b = app("b", "pb")
+        val start = layout(items = listOf(placed(a, 0, 0, 0), placed(b, 0, 1, 0)))
+        val r = move(start, b.id, DropTarget.GridInsert(0, 10)) // li10 is empty
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(a.id)
+        assertThat(out.idAtLi(10)).isEqualTo(b.id)
+        assertThat(out.items).hasSize(2)
+    }
+
+    @Test fun insert_before_first_shifts_a_full_row_wrapping_to_next_row() {
+        val row = listOf(app("a"), app("b", "pb"), app("c", "pc"), app("d", "pd"))
+        val e = app("e", "pe")
+        // Row 0 full (li0..3); E comes from the dock, inserted at li0.
+        val start = layout(
+            items = row.mapIndexed { i, it -> placed(it, 0, i, 0) },
+            dock = listOf(e),
+        )
+        val r = move(start, e.id, DropTarget.GridInsert(0, 0))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.idAtLi(0)).isEqualTo(e.id)
+        assertThat(out.idAtLi(1)).isEqualTo(ItemId("a"))
+        assertThat(out.idAtLi(4)).isEqualTo(ItemId("d")) // wrapped to row 1, col 0
+        assertThat(out.dock).isEmpty()
+    }
+
+    @Test fun insert_into_a_dense_tail_overflows_to_a_new_page() {
+        val x = app("x", "px")
+        val y = app("y", "py")
+        // Only li23 (last cell) occupied; Y from the dock inserted there.
+        val start = layout(items = listOf(placed(x, 0, 3, 5)), dock = listOf(y))
+        val r = move(start, y.id, DropTarget.GridInsert(0, 23))
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.idAtLi(23)).isEqualTo(y.id)
+        val overflowed = out.items.first { it.item.id == x.id }
+        assertThat(overflowed.pos).isEqualTo(CellPos(1, 0, 0)) // spilled to page 1
+    }
+
+    @Test fun insert_at_own_position_is_a_noop() {
+        val a = app("a")
+        val start = layout(items = listOf(placed(a, 0, 0, 0)))
+        val r = move(start, a.id, DropTarget.GridInsert(0, 0))
+        assertThat(r).isEqualTo(MoveResult.NoOp)
+    }
+
     // ---- Programmer-error precondition (§MIU-INV-2) ----
 
     @Test fun unknown_moving_id_is_noop() {

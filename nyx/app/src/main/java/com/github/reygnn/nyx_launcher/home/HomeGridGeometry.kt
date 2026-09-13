@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.nyx_launcher.home.model.CellPos
+import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 
 /**
@@ -35,4 +36,36 @@ internal fun gridCellAt(
     val col = (localX / cellWidth).toInt().coerceIn(0, grid.columns - 1)
     val row = ((localY - topPad) / cellHeight).toInt().coerceIn(0, grid.rows - 1)
     return CellPos(page, col, row)
+}
+
+/** Outer fraction of a cell's width (each side) that reorders instead of foldering. */
+private const val GRID_INSERT_EDGE_FRACTION = 0.2f
+
+/**
+ * Classifies a grid drop point into a [DropTarget]: the central ~60% of a cell's
+ * width lands ON the cell ([DropTarget.Cell] → place / folder / add-to-folder),
+ * while the outer ~20% on each side reorders ([DropTarget.GridInsert]) — the left
+ * edge inserts before the cell, the right edge after it (between two icons). Only
+ * the horizontal position decides folder-vs-reorder; the row picks the cell.
+ * Mirrors [gridCellAt]'s coordinate mapping; returns null for a not-yet-laid-out
+ * page.
+ */
+internal fun gridDropAt(
+    page: Int,
+    localX: Float,
+    localY: Float,
+    pageWidth: Int,
+    pageHeight: Int,
+    grid: GridSpec,
+    density: Float,
+): DropTarget? {
+    val cell = gridCellAt(page, localX, localY, pageWidth, pageHeight, grid, density) ?: return null
+    val cellWidth = pageWidth.toFloat() / grid.columns
+    val fx = (localX - cell.x * cellWidth) / cellWidth
+    val li = cell.y * grid.columns + cell.x
+    return when {
+        fx < GRID_INSERT_EDGE_FRACTION -> DropTarget.GridInsert(page, li)
+        fx > 1f - GRID_INSERT_EDGE_FRACTION -> DropTarget.GridInsert(page, li + 1)
+        else -> DropTarget.Cell(cell)
+    }
 }

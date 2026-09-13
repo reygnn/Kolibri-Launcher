@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.nyx_launcher.home.model.CellPos
+import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -48,5 +49,36 @@ class HomeGridGeometryTest {
     @Test fun not_laid_out_returns_null() {
         assertThat(gridCellAt(0, 10f, 10f, 0, 600, grid, 1f)).isNull()
         assertThat(gridCellAt(0, 10f, 10f, 400, 0, grid, 1f)).isNull()
+    }
+
+    // ---- gridDropAt: centre = Cell (place/folder), edges = GridInsert (reorder) ----
+
+    private fun drop(x: Float, y: Float) =
+        gridDropAt(0, x, y, pageWidth = 400, pageHeight = 600, grid = grid, density = 1f)
+
+    @Test fun cell_centre_is_a_cell_target() {
+        // col 0 (0..100), fx=0.5 → centre → land ON the cell.
+        assertThat(drop(50f, 60f)).isEqualTo(DropTarget.Cell(CellPos(0, 0, 0)))
+    }
+
+    @Test fun left_edge_inserts_before_the_cell() {
+        // col 0, fx=0.1 (<0.2) → insert at this cell's linear index (li = 0).
+        assertThat(drop(10f, 60f)).isEqualTo(DropTarget.GridInsert(0, 0))
+    }
+
+    @Test fun right_edge_inserts_after_the_cell() {
+        // col 0, fx=0.95 (>0.8) → insert after (li + 1 = 1).
+        assertThat(drop(95f, 60f)).isEqualTo(DropTarget.GridInsert(0, 1))
+    }
+
+    @Test fun between_two_icons_resolves_to_the_same_index_from_either_side() {
+        // Right edge of col 0 and left edge of col 1 both insert at index 1.
+        assertThat(drop(98f, 60f)).isEqualTo(DropTarget.GridInsert(0, 1))
+        assertThat(drop(102f, 60f)).isEqualTo(DropTarget.GridInsert(0, 1))
+    }
+
+    @Test fun edge_on_second_row_uses_linear_index() {
+        // Row 1, col 2 → li = 1*4 + 2 = 6; left edge inserts before it.
+        assertThat(drop(210f, 160f)).isEqualTo(DropTarget.GridInsert(0, 6))
     }
 }

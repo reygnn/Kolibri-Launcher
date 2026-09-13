@@ -523,12 +523,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }
         })
 
-        // 3) Grid zone — the rest of the surface; cell resolved geometrically.
+        // 3) Grid zone — the rest of the surface; target resolved geometrically
+        // (cell centre → place/folder, cell edge → reorder-insert).
         controller.addDropZone(object : DropZone {
             override fun hitRect(out: Rect) = rectInDragLayer(pager, out)
             override fun accepts(payload: DragPayload) = true
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
-                resolveGridCell(x.toFloat(), y.toFloat())?.let { applyDrop(payload, it) }
+                resolveGridDrop(x.toFloat(), y.toFloat())?.let { applyDrop(payload, it) }
             }
         })
     }
@@ -690,7 +691,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
      * the pure [gridCellAt] geometry. Returns null only if the pager isn't laid
      * out yet.
      */
-    private fun resolveGridCell(rootX: Float, rootY: Float): DropTarget.Cell? {
+    private fun resolveGridDrop(rootX: Float, rootY: Float): DropTarget? {
         val grid = viewModel.layout.value?.grid ?: return null
         val internal = pager.getChildAt(0) as? RecyclerView ?: return null
         val page = pager.currentItem
@@ -701,8 +702,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val localX = rootX - (pageLoc[0] - rootLoc[0])
         val localY = rootY - (pageLoc[1] - rootLoc[1])
 
-        return gridCellAt(page, localX, localY, pageView.width, pageView.height, grid, resources.displayMetrics.density)
-            ?.let { DropTarget.Cell(it) }
+        return gridDropAt(page, localX, localY, pageView.width, pageView.height, grid, resources.displayMetrics.density)
     }
 
     private fun applyDrop(payload: DragPayload, target: DropTarget) = when (payload) {

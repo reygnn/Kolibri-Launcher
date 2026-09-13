@@ -52,7 +52,78 @@ object HomeLayoutTransition {
     ): MoveResult = when (target) {
         is DropTarget.Cell -> moveToCell(layout, source, moving, target.pos, newFolderId)
         is DropTarget.DockSlot -> moveToDock(layout, source, moving, target.index)
+        is DropTarget.GridInsert -> insertOnGrid(layout, source, moving, target.page, target.index)
     }
+
+    /**
+     * Reorder-insert on the grid: put [source] at reading-order [index] on [page]
+     * and shift the occupant there — and the following ones — one cell forward,
+     * stopping at the first gap that absorbs the shift (Launcher3-style). If the
+     * page is dense from [index] to its end, the last occupant spills onto the next
+     * page's first free cell (adding a page only when needed). An empty target cell
+     * is a plain place with no shift; [index] == columns*rows appends. No item is
+     * ever dropped or foldered — foldering is the [DropTarget.Cell] centre path.
+     */
+    private fun insertOnGrid(
+        layout: HomeLayout,
+        source: HomeItem,
+        moving: ItemId,
+        page: Int,
+        index: Int,
+    ): MoveResult {
+        val cols = layout.grid.columns
+        val cells = cols * layout.grid.rows
+        if (page < 0 || page > layout.pages || index < 0 || index > cells) {
+            return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
+        }
+        val base = layout.removing(moving)
+
+        // Past the last cell, or a brand-new trailing page → append at the first
+        // free cell from this page on (adds a trailing page if all are full).
+        if (index >= cells || page >= base.pages) {
+            val pos = firstFreeCellFrom(base, page.coerceAtMost(base.pages))
+            val pages = if (pos.page >= base.pages) pos.page + 1 else base.pages
+            return resultOf(layout, base.copy(pages = pages, items = base.items + PlacedItem(source, pos)))
+        }
+
+        val pageItems = base.items.filter { it.pos.page == page }
+        val occupied = pageItems.associateBy { it.pos.y * cols + it.pos.x }
+
+        // Empty target cell → straight place, no shift.
+        if (occupied[index] == null) {
+            return resultOf(layout, base.copy(items = base.items + PlacedItem(source, cellOf(page, index, cols))))
+        }
+
+        // The shift block is [index, gap-1]; `gap` is the first empty cell after it.
+        var gap = index + 1
+        while (gap < cells && occupied[gap] != null) gap++
+
+        val newPageItems = ArrayList<PlacedItem>(pageItems.size + 1)
+        var overflow: PlacedItem? = null
+        for (p in pageItems) {
+            val li = p.pos.y * cols + p.pos.x
+            if (li < index || li >= gap) {
+                newPageItems.add(p) // before the insert point, or past the gap — unchanged
+            } else {
+                val to = li + 1
+                if (to < cells) newPageItems.add(p.copy(pos = cellOf(page, to, cols)))
+                else overflow = p // last-cell occupant of a dense page spills over
+            }
+        }
+        newPageItems.add(PlacedItem(source, cellOf(page, index, cols)))
+
+        var items = base.items.filterNot { it.pos.page == page } + newPageItems
+        var pages = base.pages
+        overflow?.let {
+            val pos = firstFreeCellFrom(base.copy(items = items), page + 1)
+            if (pos.page >= pages) pages = pos.page + 1
+            items = items + it.copy(pos = pos)
+        }
+        return resultOf(layout, base.copy(pages = pages, items = items))
+    }
+
+    private fun resultOf(before: HomeLayout, after: HomeLayout): MoveResult =
+        if (after == before) MoveResult.NoOp else MoveResult.Moved(after)
 
     private fun moveToCell(
         layout: HomeLayout,
@@ -210,6 +281,24 @@ object HomeLayoutTransition {
     private fun HomeLayout.removing(id: ItemId): HomeLayout =
         copy(items = items.filterNot { it.item.id == id }, dock = dock.filterNot { it.id == id })
 
+    /** [CellPos] for a linear reading-order index (`y*columns + x`) on [page]. */
+    private fun cellOf(page: Int, index: Int, cols: Int) = CellPos(page, index % cols, index / cols)
+
+    /**
+     * First free cell scanning pages from [startPage] on (row-major within a page);
+     * if none, the first cell of a new trailing page (`CellPos(pages, 0, 0)`).
+     */
+    private fun firstFreeCellFrom(layout: HomeLayout, startPage: Int): CellPos {
+        val cols = layout.grid.columns
+        val cells = cols * layout.grid.rows
+        for (page in startPage until layout.pages) {
+            val occ = layout.items.filter { it.pos.page == page }
+                .mapTo(HashSet()) { it.pos.y * cols + it.pos.x }
+            for (li in 0 until cells) if (li !in occ) return cellOf(page, li, cols)
+        }
+        return CellPos(layout.pages, 0, 0)
+    }
+
     private fun HomeLayout.replacingItem(id: ItemId, newItem: HomeItem): HomeLayout =
         copy(items = items.map { if (it.item.id == id) it.copy(item = newItem) else it })
 
@@ -227,6 +316,12 @@ object HomeLayoutTransition {
         when (target) {
             is DropTarget.Cell -> offGridReason(layout, target.pos)
                 ?: if (layout.items.any { it.pos == target.pos }) MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE else null
+            // Folder extraction has no reorder-shift: a reorder-insert target is
+            // treated as a plain placement at its cell (rejected if occupied).
+            is DropTarget.GridInsert -> cellOf(target.page, target.index, layout.grid.columns).let { pos ->
+                offGridReason(layout, pos)
+                    ?: if (layout.items.any { it.pos == pos }) MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE else null
+            }
             // A dock drop inserts at [index], shifting the rest right — any in-range
             // index is a valid landing spot; only a full dock or an out-of-range
             // index is rejected.
@@ -243,6 +338,10 @@ object HomeLayoutTransition {
             is DropTarget.Cell -> {
                 val pages = if (target.pos.page == layout.pages) layout.pages + 1 else layout.pages
                 layout.copy(pages = pages, items = layout.items + PlacedItem(item, target.pos))
+            }
+            is DropTarget.GridInsert -> cellOf(target.page, target.index, layout.grid.columns).let { pos ->
+                val pages = if (pos.page == layout.pages) layout.pages + 1 else layout.pages
+                layout.copy(pages = pages, items = layout.items + PlacedItem(item, pos))
             }
             is DropTarget.DockSlot -> {
                 val idx = target.index.coerceIn(0, layout.dock.size)
