@@ -52,6 +52,10 @@ class DragLayer @JvmOverloads constructor(
 
     private var lastX = 0f
     private var lastY = 0f
+    // The pointer that started the current gesture (captured on ACTION_DOWN). Arm and
+    // drag track THIS finger by id, not pointer index 0, so a second finger lifting the
+    // first (ACTION_POINTER_UP reassigns index 0) can't promote/move under the wrong one.
+    private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var dragView: ImageView? = null
     private var dragSource: View? = null
     private var dragWidth = 0
@@ -79,27 +83,43 @@ class DragLayer @JvmOverloads constructor(
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         lastX = ev.x
         lastY = ev.y
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) activePointerId = ev.getPointerId(0)
         if (!gesturesEnabled) return super.dispatchTouchEvent(ev)
         if (dragController.isDragging) {
             when (ev.actionMasked) {
-                MotionEvent.ACTION_MOVE -> dragController.onMove(ev.x.toInt(), ev.y.toInt())
+                MotionEvent.ACTION_MOVE -> {
+                    val i = ev.findPointerIndex(activePointerId)
+                    if (i >= 0) dragController.onMove(ev.getX(i).toInt(), ev.getY(i).toInt())
+                }
                 MotionEvent.ACTION_UP -> dragController.onDrop(ev.x.toInt(), ev.y.toInt())
+                // The dragging finger lifted while others remain down → settle the drop at
+                // its last position; a secondary finger lifting is ignored (drag continues).
+                MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == activePointerId) {
+                    val i = ev.findPointerIndex(activePointerId)
+                    dragController.onDrop(ev.getX(i).toInt(), ev.getY(i).toInt())
+                }
                 MotionEvent.ACTION_CANCEL -> dragController.onCancel()
             }
             return true
         }
-        // Armed (menu shown, deciding drag-vs-menu): own the stream until the finger
-        // moves (→ promote to drag) or lifts (→ keep the menu).
+        // Armed (menu shown, deciding drag-vs-menu): own the stream until the arming
+        // finger moves (→ promote to drag) or lifts (→ keep the menu). Track that finger
+        // by id so a second finger can't drive the decision.
         if (armedPayload != null) {
             when (ev.actionMasked) {
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = ev.x - armX
-                    val dy = ev.y - armY
-                    if (dx * dx + dy * dy > touchSlop * touchSlop) {
-                        promoteArmedDrag(ev.x.toInt(), ev.y.toInt())
+                    val i = ev.findPointerIndex(activePointerId)
+                    if (i >= 0) {
+                        val dx = ev.getX(i) - armX
+                        val dy = ev.getY(i) - armY
+                        if (dx * dx + dy * dy > touchSlop * touchSlop) {
+                            promoteArmedDrag(ev.getX(i).toInt(), ev.getY(i).toInt())
+                        }
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> disarm()
+                // Arming finger lifted (others still down) → keep-the-menu, same as UP.
+                MotionEvent.ACTION_POINTER_UP -> if (ev.getPointerId(ev.actionIndex) == activePointerId) disarm()
             }
             return true
         }

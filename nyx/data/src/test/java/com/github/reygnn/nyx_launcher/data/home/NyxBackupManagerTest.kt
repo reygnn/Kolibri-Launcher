@@ -225,4 +225,18 @@ class NyxBackupManagerTest {
         coVerify(exactly = 0) { displaySettings.setWallpaperBackdrop(any()) } // invalid enum skipped
         coVerify(exactly = 0) { displaySettings.setWallpaperSurfaceMode(any()) }
     }
+
+    @Test
+    fun import_leaves_the_home_layout_untouched_when_a_settings_write_fails() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Settings are applied before the layout write; a mid-import settings failure
+            // must not have already replaced the existing home layout (layout is last).
+            coEvery { preferences.setMonochromeIcons(any()) } throws java.io.IOException("disk full")
+            val backup = NyxBackup(layout = layout.toDto(), prefs = NyxBackupPrefs(monochromeIcons = true))
+
+            val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
+
+            assertThat(result).isEqualTo(ImportResult.InvalidData)
+            coVerify(exactly = 0) { homeLayoutRepository.save(any()) } // layout write never reached
+        }
 }

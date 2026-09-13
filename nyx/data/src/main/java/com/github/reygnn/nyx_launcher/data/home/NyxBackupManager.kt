@@ -136,11 +136,15 @@ class NyxBackupManager @Inject constructor(
                 }
                 val backup = manifest?.let { serializer.deserialize(it) } ?: return@withContext ImportResult.InvalidData
 
+                // Apply the home layout LAST. Cross-DataStore atomicity isn't available,
+                // so if a settings/wallpaper write throws mid-import, doing layout last
+                // leaves the existing (most valuable) home layout intact rather than
+                // half-replaced — it is a single write and the least likely to fail.
+                if (options.importSettings) applyPrefs(backup.prefs)
+                if (options.importWallpaper) restoreWallpaper(backup.wallpaperLayers, extracted)
                 if (options.importLayout) {
                     backup.layout?.toDomain()?.let { homeLayoutRepository.save(it) }
                 }
-                if (options.importSettings) applyPrefs(backup.prefs)
-                if (options.importWallpaper) restoreWallpaper(backup.wallpaperLayers, extracted)
 
                 ImportResult.Success
             } catch (e: CancellationException) {

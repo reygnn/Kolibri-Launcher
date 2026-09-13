@@ -344,9 +344,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         lifecycleScope.launch {
             // The repo gates on its seed flag and invokes the resolver only on a real
             // first run, so a returning install doesn't pay for the resolver's IPCs.
-            homeLayoutRepository.seedInitialDock {
+            val seeded = homeLayoutRepository.seedInitialDock {
                 withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
             }
+            // The one-shot device-grid fit (pager.doOnLayout) runs against the pre-seed
+            // empty layout, so a dock seeded above the device's column count wouldn't be
+            // reconciled until the next cold start. Re-fit once seeding actually wrote, so
+            // the regridder re-homes any over-capacity dock overflow in THIS session.
+            if (seeded) pager.doOnLayout { applyDeviceGrid() }
         }
 
         lifecycleScope.launch {
