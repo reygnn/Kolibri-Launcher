@@ -450,6 +450,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
         dock.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         dock.adapter = dockAdapter
+        // Re-center the dock whenever its item set changes. Tied to the adapter's
+        // data-change, NOT a render-time one-shot: after a drag-out the final render
+        // could miss the new count and leave the dock off-center ("doesn't always
+        // re-center"). onChanged fires from submit()'s notifyDataSetChanged, by which
+        // point itemCount already reflects the new set.
+        dockAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+            override fun onChanged() = recenterDock()
+        })
         // No setOnLongClickListener here: a long-click listener on a RecyclerView
         // never fires (its onTouchEvent handles scrolling and never triggers the
         // View long-press path), and it would mark the dock long-clickable, which
@@ -575,7 +583,6 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         pagerAdapter?.submit((0 until layout.pages).map(layout::pageCells))
         if (currentPage < layout.pages) pager.setCurrentItem(currentPage, false)
         dockAdapter.submit(layout.dockCells())
-        centerDock(layout.dock.size)
         // A drop leaves its drag view in place to bridge the async commit; the
         // commit's re-render arrives here, so clear it now (idempotent otherwise).
         // Skip while an actual drag is in flight (an unrelated re-render mid-drag
@@ -585,19 +592,22 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     /**
      * Centers the dock icons as a group via symmetric padding, instead of the
-     * LinearLayoutManager's left-packing. One icon lands dead-center; an odd count
-     * puts one exactly in the middle; an even count straddles it — the balanced,
-     * "premium" look. The dock View stays match_parent so its whole width remains a
-     * drop target (a drop over the padding hits no child → append). Clamped to a
-     * base padding so a full dock never loses its edge inset.
+     * LinearLayoutManager's left-packing: one icon lands dead-center, an odd count
+     * keeps one exactly in the middle, an even count straddles it — the balanced,
+     * "premium" look. Computed from the LIVE adapter count so it is always current.
+     * The dock View stays match_parent, so its whole width remains a drop target (a
+     * drop over the padding hits no child → append); only the content is centered.
+     * Clamped to the base inset so a full dock keeps its edge padding; the
+     * paddingStart guard makes the setPadding → relayout settle instead of looping.
      */
-    private fun centerDock(itemCount: Int) {
-        dock.doOnLayout {
-            val density = resources.displayMetrics.density
-            val itemPx = (DOCK_ITEM_DP * density).toInt()
-            val basePx = (DOCK_MIN_PADDING_DP * density).toInt()
-            val content = itemCount * itemPx
-            val pad = ((dock.width - content) / 2).coerceAtLeast(basePx)
+    private fun recenterDock() {
+        if (dock.width == 0) { dock.doOnLayout { recenterDock() }; return }
+        val density = resources.displayMetrics.density
+        val itemPx = (DOCK_ITEM_DP * density).toInt()
+        val basePx = (DOCK_MIN_PADDING_DP * density).toInt()
+        val content = dockAdapter.itemCount * itemPx
+        val pad = ((dock.width - content) / 2).coerceAtLeast(basePx)
+        if (dock.paddingStart != pad) {
             dock.setPaddingRelative(pad, dock.paddingTop, pad, dock.paddingBottom)
         }
     }
