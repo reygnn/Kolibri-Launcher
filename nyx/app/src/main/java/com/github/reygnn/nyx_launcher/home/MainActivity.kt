@@ -117,8 +117,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
     @Inject lateinit var fabPositionStore: NyxFabPositionStore
 
-    // First-run dock seed: resolve the device's default Phone/SMS/Browser/Camera and
-    // place them in the dock so a fresh install isn't a blank screen (one-shot; the
+    // First-run dock seed: resolve the device's default Phone/SMS/Email/Browser/Camera
+    // and place them in the dock so a fresh install isn't a blank screen (one-shot; the
     // repo no-ops on a returning install).
     @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
     @Inject lateinit var homeLayoutRepository: HomeLayoutRepository

@@ -12,12 +12,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 /**
- * Resolves the device's actual default Phone / SMS / Browser / Camera apps to
- * their launcher components, for seeding a first-run home dock (so a fresh install
+ * Resolves the device's actual default Phone / SMS / Email / Browser / Camera apps
+ * to their launcher components, for seeding a first-run home dock (so a fresh install
  * isn't an empty screen). Uses the system defaults/roles — never hardcoded package
  * names — so it matches whatever the user's OEM ships. An app that can't be
  * resolved (role unset, no launcher activity, hidden by package visibility) is
- * simply omitted; the result may be shorter than four and is de-duplicated
+ * simply omitted; the result may be shorter than five and is de-duplicated
  * (some OEMs point two roles at one app).
  */
 class DefaultAppsResolver @Inject constructor(
@@ -27,6 +27,9 @@ class DefaultAppsResolver @Inject constructor(
         val packages = listOfNotNull(
             runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull(),
             runCatching { Telephony.Sms.getDefaultSmsPackage(context) }.getOrNull(),
+            // Default email app via the standard app-category selector (OEM-neutral,
+            // like the phone/SMS roles) rather than a mailto: content probe.
+            defaultPackageFor(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_EMAIL)),
             defaultPackageFor(Intent(Intent.ACTION_VIEW, Uri.parse("http://example.com")).addCategory(Intent.CATEGORY_BROWSABLE)),
             defaultPackageFor(Intent(MediaStore.ACTION_IMAGE_CAPTURE)),
         )
