@@ -5,8 +5,8 @@
     <string name="remove_from_home">Remove from home</string>
     <string name="settings_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons">Monochrome icons</string>
-    <string name="backup_export">Export layout</string>
-    <string name="backup_import">Import layout</string>
+    <string name="backup_export">Export backup</string>
+    <string name="backup_import">Import backup</string>
     <string name="backup_export_done">Layout exported</string>
     <string name="backup_export_failed">Export failed</string>
     <string name="backup_import_done">Layout imported</string>
@@ -51,8 +51,8 @@
     <string name="events_dialog_title">Upcoming</string>
     <string name="events_tomorrow_separator">— Tomorrow —</string>
     <string name="home_info_no_app">No app found for that</string>
-    <string name="backup_export_summary">Save the home layout to a file</string>
-    <string name="backup_import_summary">Restore the home layout from a file</string>
+    <string name="backup_export_summary">Save layout, settings and wallpaper to a file</string>
+    <string name="backup_import_summary">Restore layout, settings and wallpaper from a file</string>
     <!-- Developer (ACRA) — debug / -PdevCommands only, not shown publicly -->
     <string name="dev_commands_category_title" translatable="false">Developer — ACRA</string>
     <string name="dev_grant_consent_title" translatable="false">Grant consent + enable</string>

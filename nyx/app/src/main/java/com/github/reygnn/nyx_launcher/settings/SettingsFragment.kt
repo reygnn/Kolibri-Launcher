@@ -24,8 +24,8 @@ import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.home.usecase.ExportLayoutUseCase
-import com.github.reygnn.nyx_launcher.home.usecase.ImportLayoutUseCase
+import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
+import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,8 +43,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
 
-    @Inject lateinit var exportLayout: ExportLayoutUseCase
-    @Inject lateinit var importLayout: ImportLayoutUseCase
+    @Inject lateinit var backupManager: NyxBackupManager
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var consentController: ConsentController
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
@@ -73,7 +72,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
     private val createDocument =
-        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
             uri?.let(::doExport)
         }
 
@@ -131,11 +130,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         findPreference<Preference>("export_layout")?.setOnPreferenceClickListener {
-            createDocument.launch("nyx-layout.json")
+            createDocument.launch("nyx-backup.zip")
             true
         }
         findPreference<Preference>("import_layout")?.setOnPreferenceClickListener {
-            openDocument.launch(arrayOf("application/json", "*/*"))
+            openDocument.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
             true
         }
 
@@ -224,32 +223,27 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun doExport(uri: Uri) = lifecycleScope.launch {
-        val raw = exportLayout()
         val ok = runCatching {
-            withContext(Dispatchers.IO) {
-                requireContext().contentResolver.openOutputStream(uri)?.use { it.write(raw.toByteArray()) }
-                    ?: error("no output stream")
-            }
-        }.isSuccess
+            requireContext().contentResolver.openOutputStream(uri)?.use { out ->
+                backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
+            } ?: false
+        }.getOrDefault(false)
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
     }
 
     private fun doImport(uri: Uri) = lifecycleScope.launch {
-        val raw = runCatching {
-            withContext(Dispatchers.IO) {
-                requireContext().contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        val result = runCatching {
+            requireContext().contentResolver.openInputStream(uri)?.use { inp ->
+                backupManager.import(inp, NyxBackupOptions())
             }
         }.getOrNull()
-        if (raw == null) {
-            toast(getString(R.string.backup_import_failed))
-            return@launch
-        }
-        when (importLayout(raw)) {
+        when (result) {
             ImportResult.Success -> {
                 toast(getString(R.string.backup_import_done))
-                requireActivity().finish() // back to home, which re-renders from the imported layout
+                requireActivity().finish() // back to home, which re-renders from the restored state
             }
             ImportResult.InvalidData -> toast(getString(R.string.backup_import_invalid))
+            null -> toast(getString(R.string.backup_import_failed))
         }
     }
 

@@ -5,8 +5,8 @@
     <string name="remove_from_home">Vom Startbildschirm entfernen</string>
     <string name="settings_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons">Monochrome Symbole</string>
-    <string name="backup_export">Layout exportieren</string>
-    <string name="backup_import">Layout importieren</string>
+    <string name="backup_export">Backup exportieren</string>
+    <string name="backup_import">Backup importieren</string>
     <string name="backup_export_done">Layout exportiert</string>
     <string name="backup_export_failed">Export fehlgeschlagen</string>
     <string name="backup_import_done">Layout importiert</string>
@@ -46,8 +46,8 @@
     <string name="events_dialog_title">Anstehend</string>
     <string name="events_tomorrow_separator">— Morgen —</string>
     <string name="home_info_no_app">Keine passende App gefunden</string>
-    <string name="backup_export_summary">Startbildschirm-Layout in eine Datei sichern</string>
-    <string name="backup_import_summary">Startbildschirm-Layout aus einer Datei wiederherstellen</string>
+    <string name="backup_export_summary">Layout, Einstellungen und Hintergrund in eine Datei sichern</string>
+    <string name="backup_import_summary">Layout, Einstellungen und Hintergrund aus einer Datei wiederherstellen</string>
 
     <!-- Wallpaper edit (WV5d, copied from Kolibri) -->
     <string name="cd_open_commands">Weitere Hintergrund-Steuerungen</string>
