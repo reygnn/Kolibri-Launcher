@@ -46,7 +46,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
@@ -128,6 +130,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     // repo no-ops on a returning install).
     @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
     @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
+
+    // Dev builds report crashes automatically (no consent prompt); see onCreate.
+    @Inject lateinit var consentController: ConsentController
 
     // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
     // wallpaper state (mirrored from the repo), drives the transactional edit session.
@@ -323,6 +328,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             launchLayerPicker = { layerPickerLauncher.launch("image/*") },
             rerenderWallpaper = { renderWallpaper(wallpaperEditCoordinator.wallpaperState.value) },
         )
+
+        // Dev builds (SHOW_DEV_COMMANDS: debug / -PdailyDriver / -PdevCommands) hard-set
+        // ACRA consent to true so our own crashes always report — no first-launch prompt.
+        // Public release keeps consent opt-in (untouched here).
+        if (BuildConfig.SHOW_DEV_COMMANDS) consentController.applyConsent(true)
 
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
         // copy and save (the shared repo/file-manager split doesn't self-clean).
