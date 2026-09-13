@@ -1,10 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Settings: an explicit MaterialToolbar over the PreferenceFragmentCompat,
+     rather than the decor ActionBar (which overlaps the content under Android
+     15+ edge-to-edge). fitsSystemWindows on the root insets the whole thing
+     below the status bar so the first row is never hidden behind the bar;
+     SettingsActivity additionally calls setDecorFitsSystemWindows(false) for
+     consistency with the sibling activities. The fragment is loaded into
+     settings_container in code (crash-safe commitAllowingStateLoss), so the
+     container carries no android:name. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="?attr/colorSurface"
     android:fitsSystemWindows="true">
 
-    <!-- ActionBar wird automatisch vom Theme hinzugefügt -->
-    
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/settings_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:title="@string/settings_title" />
+
+    <FrameLayout
+        android:id="@+id/settings_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
 </LinearLayout>

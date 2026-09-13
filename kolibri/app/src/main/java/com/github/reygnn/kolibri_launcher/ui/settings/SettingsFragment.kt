@@ -357,7 +357,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 val fragment = BackupFragment()
 
                 parentFragmentManager.beginTransaction()
-                    .replace(android.R.id.content, fragment)
+                    .replace(R.id.settings_container, fragment)
                     .addToBackStack(null)
                     .commitAllowingStateLoss()
 
@@ -392,7 +392,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 val fragment = UsageExportFragment()
 
                 parentFragmentManager.beginTransaction()
-                    .replace(android.R.id.content, fragment)
+                    .replace(R.id.settings_container, fragment)
                     .addToBackStack(null)
                     .commitAllowingStateLoss()
 
@@ -887,7 +887,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 FavoritesSortFragment.Companion.newInstance(ArrayList(orderedFavoriteApps))
 
             parentFragmentManager.beginTransaction()
-                .replace(android.R.id.content, fragment)
+                .replace(R.id.settings_container, fragment)
                 .addToBackStack(null)
                 .commitAllowingStateLoss() // CRITICAL: Use commitAllowingStateLoss
         } catch (e: CancellationException) {

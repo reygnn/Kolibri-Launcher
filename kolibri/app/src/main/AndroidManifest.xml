@@ -120,7 +120,7 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false"
             android:parentActivityName=".ui.main.MainActivity"
-            android:theme="@style/SettingsTheme"
+            android:theme="@style/AppTheme"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             tools:ignore="DiscouragedApi">
 
