@@ -258,6 +258,12 @@ object HomeLayoutTransition {
     ): FolderEditResult {
         val folderItem = layout.itemById(folder) as? HomeItem.Folder ?: return FolderEditResult.NoOp
         if (member !in folderItem.members) return FolderEditResult.NoOp // RFF-INV-4
+        // IHM-INV-7 forbids duplicate members, but the total function must stay defined for an
+        // invariant-violating (imported/hand-edited) blob. A duplicated member makes "remove
+        // one" ambiguous: filterNot below strips EVERY copy, wrongly dissolving the folder and
+        // losing a copy. Treat it as structurally-impossible input → NoOp (the use-case fires
+        // silentError in DEBUG), leaving the layout untouched rather than mangling it.
+        if (folderItem.members.count { it == member } > 1) return FolderEditResult.NoOp
         val placement = layout.placementOf(folder) ?: return FolderEditResult.NoOp
 
         emptyTargetReason(layout, target)?.let { return FolderEditResult.Rejected(it) }
