@@ -81,38 +81,45 @@ class HomeCellTest {
         assertThat(layout().dockCells()).isEmpty()
     }
 
-    // ---- Defensive: pageCells under an invariant violation (off-grid / collision) ----
+    // ---- pageCells under an invariant violation (off-grid / collision) ----
     // On-grid, no-collision are transition + regridder invariants (HomeLayout KDoc: a
     // violation is a programmer error, NOT a user outcome), so pageCells assumes
     // 0 <= x < columns, 0 <= y < rows and one item per cell. An imported/restored/hand-
-    // edited blob is saved verbatim with no coordinate clamp, so it CAN slip one in. These
-    // pin what the row-major renderer actually does with such input so a future hardening
-    // (e.g. filtering out-of-bounds items) is a deliberate, test-flipping change rather than
-    // a silent behavior shift.
+    // edited blob is saved verbatim with no coordinate clamp, so it CAN slip one in.
+    // pageCells now filters out-of-bounds items BEFORE indexing so such an item can never
+    // alias onto a valid neighbour cell; a same-cell collision still resolves last-wins.
 
-    @Test fun an_off_grid_column_item_aliases_onto_a_valid_cell() {
-        // x == columns folds y*cols+x onto the SAME linear index as (x=0, y+1): an item at
-        // (x=2, y=0) on a 2-wide grid gets index 0*2+2 = 2 = (x=0, y=1)'s slot. It renders at
-        // a foreign valid cell rather than being ignored — the silent-aliasing failure mode.
+    @Test fun an_off_grid_column_item_is_ignored_not_aliased_onto_a_valid_cell() {
+        // Regression for the aliasing bug: x == columns folds y*cols+x onto the SAME linear
+        // index as (x=0, y+1) — (x=2, y=0) on a 2-wide grid would land on (x=0, y=1)'s slot.
+        // The bounds filter drops it instead, so the neighbour cell stays Empty.
         val b = app("b", "pb")
         val cells = layout(items = listOf(placed(b, x = 2, y = 0))).pageCells(0)
-        assertThat(cells[2]).isEqualTo(HomeCell.App(b.id, ck("pb"))) // aliased onto (x0,y1)'s slot
-        assertThat(cells[0]).isEqualTo(HomeCell.Empty)
+        assertThat(cells).hasSize(4)
+        assertThat(cells.all { it == HomeCell.Empty }).isTrue() // off-grid item ignored, no alias
     }
 
-    @Test fun an_item_below_the_grid_is_dropped_from_the_render() {
-        // y == rows pushes the index to cols*rows (4 here), outside the rendered
-        // 0 until cols*rows range → the item silently vanishes (no crash, no alias).
+    @Test fun an_item_below_the_grid_is_ignored() {
+        // y == rows is out of bounds → filtered out (previously fell out of the index range
+        // anyway; now it is dropped explicitly by the same guard).
         val b = app("b", "pb")
-        val cells = layout(items = listOf(placed(b, x = 0, y = 2))).pageCells(0) // li = 2*2+0 = 4
+        val cells = layout(items = listOf(placed(b, x = 0, y = 2))).pageCells(0)
         assertThat(cells).hasSize(4)
         assertThat(cells.all { it == HomeCell.Empty }).isTrue()
     }
 
+    @Test fun a_negative_coordinate_item_is_ignored() {
+        // The bounds filter's lower end: a negative x (or y) is out of bounds too and must
+        // not produce a negative index or otherwise leak into the render.
+        val b = app("b", "pb")
+        val cells = layout(items = listOf(placed(b, x = -1, y = 0))).pageCells(0)
+        assertThat(cells.all { it == HomeCell.Empty }).isTrue()
+    }
+
     @Test fun two_items_sharing_a_cell_render_only_the_last() {
-        // If two items land on one CellPos, associateBy keeps the LAST in list order; the
-        // earlier one is dropped from the render. Pinned so the last-wins resolution is
-        // deliberate, not accidental.
+        // Both are in-bounds, so the bounds filter leaves them; associateBy keeps the LAST in
+        // list order. Pinned so the last-wins resolution stays deliberate (the guard above
+        // does NOT dedup a genuine same-cell collision — that remains a transition invariant).
         val a = app("a", "pa")
         val b = app("b", "pb")
         val cells = layout(items = listOf(placed(a, 0, 0), placed(b, 0, 0))).pageCells(0) // both li0

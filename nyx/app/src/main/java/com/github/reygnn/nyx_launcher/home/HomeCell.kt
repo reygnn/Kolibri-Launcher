@@ -23,8 +23,16 @@ private fun HomeItem.toCell(): HomeCell = when (this) {
 /** Dense row-major cells for one page (empties for gaps); index = y*columns + x. */
 fun HomeLayout.pageCells(page: Int): List<HomeCell> {
     val cols = grid.columns
-    val byIndex = items.filter { it.pos.page == page }.associateBy { it.pos.y * cols + it.pos.x }
-    return (0 until cols * grid.rows).map { index -> byIndex[index]?.item?.toCell() ?: HomeCell.Empty }
+    val rows = grid.rows
+    // Filter to in-bounds cells BEFORE indexing: on-grid is a transition + regridder
+    // invariant, but an imported/restored/hand-edited blob is saved verbatim with no
+    // coordinate clamp. Without this guard an off-grid column (x >= cols) folds y*cols+x
+    // onto a DIFFERENT valid cell's index and silently aliases over a neighbour; an
+    // out-of-bounds item is simply ignored instead.
+    val byIndex = items
+        .filter { it.pos.page == page && it.pos.x in 0 until cols && it.pos.y in 0 until rows }
+        .associateBy { it.pos.y * cols + it.pos.x }
+    return (0 until cols * rows).map { index -> byIndex[index]?.item?.toCell() ?: HomeCell.Empty }
 }
 
 /** Flat cell list for the dock (no empties). */
