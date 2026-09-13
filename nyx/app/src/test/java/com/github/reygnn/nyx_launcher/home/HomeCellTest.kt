@@ -80,4 +80,42 @@ class HomeCellTest {
     @Test fun empty_dock_has_no_cells() {
         assertThat(layout().dockCells()).isEmpty()
     }
+
+    // ---- Defensive: pageCells under an invariant violation (off-grid / collision) ----
+    // On-grid, no-collision are transition + regridder invariants (HomeLayout KDoc: a
+    // violation is a programmer error, NOT a user outcome), so pageCells assumes
+    // 0 <= x < columns, 0 <= y < rows and one item per cell. An imported/restored/hand-
+    // edited blob is saved verbatim with no coordinate clamp, so it CAN slip one in. These
+    // pin what the row-major renderer actually does with such input so a future hardening
+    // (e.g. filtering out-of-bounds items) is a deliberate, test-flipping change rather than
+    // a silent behavior shift.
+
+    @Test fun an_off_grid_column_item_aliases_onto_a_valid_cell() {
+        // x == columns folds y*cols+x onto the SAME linear index as (x=0, y+1): an item at
+        // (x=2, y=0) on a 2-wide grid gets index 0*2+2 = 2 = (x=0, y=1)'s slot. It renders at
+        // a foreign valid cell rather than being ignored — the silent-aliasing failure mode.
+        val b = app("b", "pb")
+        val cells = layout(items = listOf(placed(b, x = 2, y = 0))).pageCells(0)
+        assertThat(cells[2]).isEqualTo(HomeCell.App(b.id, ck("pb"))) // aliased onto (x0,y1)'s slot
+        assertThat(cells[0]).isEqualTo(HomeCell.Empty)
+    }
+
+    @Test fun an_item_below_the_grid_is_dropped_from_the_render() {
+        // y == rows pushes the index to cols*rows (4 here), outside the rendered
+        // 0 until cols*rows range → the item silently vanishes (no crash, no alias).
+        val b = app("b", "pb")
+        val cells = layout(items = listOf(placed(b, x = 0, y = 2))).pageCells(0) // li = 2*2+0 = 4
+        assertThat(cells).hasSize(4)
+        assertThat(cells.all { it == HomeCell.Empty }).isTrue()
+    }
+
+    @Test fun two_items_sharing_a_cell_render_only_the_last() {
+        // If two items land on one CellPos, associateBy keeps the LAST in list order; the
+        // earlier one is dropped from the render. Pinned so the last-wins resolution is
+        // deliberate, not accidental.
+        val a = app("a", "pa")
+        val b = app("b", "pb")
+        val cells = layout(items = listOf(placed(a, 0, 0), placed(b, 0, 0))).pageCells(0) // both li0
+        assertThat(cells[0]).isEqualTo(HomeCell.App(b.id, ck("pb"))) // last in list wins
+    }
 }

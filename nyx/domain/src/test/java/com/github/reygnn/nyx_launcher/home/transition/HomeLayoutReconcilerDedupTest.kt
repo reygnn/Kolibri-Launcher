@@ -126,6 +126,71 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(second).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
+    @Test fun dedup_emptying_a_folder_removes_it_not_dissolves_it() {
+        // Both members of a folder are ALSO top-level grid apps → dedup strips both → the
+        // folder is emptied to 0 members and Pass 3 REMOVES it. This is a distinct data flow
+        // from the prune-emptied path (the empty list comes from dedupMembers, not
+        // pruneMembers) and from the dedup-cascade-to-1 dissolve; nothing pins it.
+        val start = layout(
+            items = listOf(
+                placed(app("g1", "pa"), 0, 0, 0),
+                placed(app("g2", "pb"), 0, 1, 0),
+                placed(folder("f", ck("pa"), ck("pb")), 0, 2, 0),
+            ),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
+        assertThat(out.layout.items.map { it.item.id }).containsExactly(ItemId("g1"), ItemId("g2"))
+        assertThat(out.report.dedupedApps).isEqualTo(2) // both members stripped
+        assertThat(out.report.removedEmptyFolders).isEqualTo(1) // emptied → removed, not dissolved
+        assertThat(out.report.dissolvedFolders).isEqualTo(0)
+        assertThat(out.report.prunedApps).isEqualTo(0) // nothing uninstalled
+    }
+
+    @Test fun a_key_in_dock_grid_and_a_folder_resolves_dock_over_grid_over_folder() {
+        // The full Dock > Grid > Folder precedence chain on ONE key in a single input — the
+        // headline RHL-INV-4 guarantee, only ever verified PAIRWISE before. pa lives as a dock
+        // app, a grid app, and a grid-folder member simultaneously: the dock app wins, the grid
+        // app AND the folder member are both dropped.
+        val start = layout(
+            items = listOf(
+                placed(app("g", "pa"), 0, 0, 0),
+                placed(folder("f", ck("pa"), ck("pb"), ck("pc")), 0, 1, 0),
+            ),
+            dock = listOf(app("d", "pa")),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("d")) // dock wins
+        assertThat(out.layout.items.any { it.item.id == ItemId("g") }).isFalse() // grid app dropped
+        val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
+        assertThat(f.members).containsExactly(ck("pb"), ck("pc")).inOrder() // member pa dropped
+        assertThat(out.report.dedupedApps).isEqualTo(2) // grid app + folder member
+    }
+
+    @Test fun duplicate_member_keys_within_one_folder_collapse_to_the_first() {
+        // dedupMembers also dedups WITHIN a single folder's own list (a plausible bad import):
+        // [pa, pa, pb] → [pa, pb], first occurrence kept, order preserved. The cross-source
+        // tests execute the branch but never prove intra-list collapse.
+        val start = layout(items = listOf(placed(folder("f", ck("pa"), ck("pa"), ck("pb")), 0, 0, 0)))
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
+        assertThat(f.members).containsExactly(ck("pa"), ck("pb")).inOrder()
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+    }
+
+    @Test fun a_folder_of_two_identical_members_dissolves_after_dedup() {
+        // The dangerous sub-variant: [pa, pa] → dedup to [pa] → Pass 3 dissolves the 1-member
+        // folder into a plain app. dedupedApps == 1 AND dissolvedFolders == 1 in one pass.
+        val start = layout(items = listOf(placed(folder("f", ck("pa"), ck("pa")), 0, 0, 0)))
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids("solo")::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
+        val survivor = out.layout.items.first { it.pos == CellPos(0, 0, 0) }
+        assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(survivor.item.id).isEqualTo(ItemId("solo"))
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+        assertThat(out.report.dissolvedFolders).isEqualTo(1)
+    }
+
     @Test fun no_duplicates_is_unchanged() {
         val start = layout(
             items = listOf(placed(app("a", "pa"), 0, 0, 0), placed(app("b", "pb"), 0, 1, 0)),

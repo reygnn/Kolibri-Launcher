@@ -192,6 +192,26 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.OFF_GRID))
     }
 
+    @Test fun removing_a_duplicated_member_dissolves_the_folder_and_drops_the_extra_copy() {
+        // DEFENSIVE / invariant violation: IHM-INV-7 forbids duplicate members, but the total
+        // function must stay defined. filterNot { it == member } strips ALL copies, so a folder
+        // [pa, pb, pb] with pb removed collapses to [pa] and DISSOLVES — a 3-icon folder vanishes
+        // and one pb copy is silently lost (result type FolderDissolved, not Extracted). Pinned
+        // as current behavior; arguably worth a guard (clean no-op) if duplicates ever become
+        // reachable, since a user would expect the folder to keep pa + the remaining pb.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pb"), page = 0, x = 0, y = 0)
+        val start = layout(items = listOf(f))
+        val ids = seq("extracted", "survivor")
+        val r = HomeLayoutTransition.removeFromFolder(start, ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(0, 1, 1)), ids::next)
+        assertThat(r).isInstanceOf(FolderEditResult.FolderDissolved::class.java)
+        val out = r.layout!!
+        assertThat(out.items.any { it.item.id == ItemId("f") }).isFalse() // folder dissolved away
+        val survivor = out.items.first { it.pos == CellPos(0, 0, 0) } // pa at the folder's old cell
+        assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        val extracted = out.items.first { it.pos == CellPos(0, 1, 1) } // pb at the target
+        assertThat((extracted.item as HomeItem.App).key).isEqualTo(ck("pb"))
+    }
+
     @Test fun member_not_in_folder_is_noop() {
         val f = folder("f", ck("pa"), ck("pb"), page = 0, x = 0, y = 0)
         val start = layout(items = listOf(f))
