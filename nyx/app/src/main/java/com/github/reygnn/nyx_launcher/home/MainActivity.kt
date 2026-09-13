@@ -342,8 +342,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // run. Resolving hits PackageManager, so it's done off the main thread; the
         // repo gates the write (SEEDED_KEY) so a returning install is a no-op.
         lifecycleScope.launch {
-            val apps = withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
-            homeLayoutRepository.seedInitialDock(apps)
+            // The repo gates on its seed flag and invokes the resolver only on a real
+            // first run, so a returning install doesn't pay for the resolver's IPCs.
+            homeLayoutRepository.seedInitialDock {
+                withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
+            }
         }
 
         lifecycleScope.launch {
@@ -597,19 +600,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // it fires even over the ViewPager2 / dock RecyclerViews (which would
         // eat an OnTouchListener-based fling mid-scroll). Horizontal page
         // swipes fall through untouched via the analyzer's axis dominance.
-        homeRoot.onSwipeUp = { if (!wallpaperEditCoordinator.isEditMode.value) showDrawer() }
+        homeRoot.onSwipeUp = { if (homeGesturesAllowed()) showDrawer() }
 
         // Long-press on empty home space opens the live-preview customization
         // sheet (scrim/dim, monochrome, wallpaper, → full Settings). The shared
         // core's hit-test suppresses this over app icons and dock icons (they
         // keep their own long-press → drag), so it only fires on the wallpaper /
         // empty area.
-        homeRoot.onLongPress = { if (!wallpaperEditCoordinator.isEditMode.value) showCustomizationDialog() }
+        homeRoot.onLongPress = { if (homeGesturesAllowed()) showCustomizationDialog() }
 
         // Double-tap on empty home space shows the upcoming events (HIE Phase C3,
         // mirrors Kolibri); the two indicators next to the clock just signal that
         // events exist. Suppressed over icons by the shared core's hit-test.
-        homeRoot.onDoubleTap = { if (!wallpaperEditCoordinator.isEditMode.value) showEventsDialog() }
+        homeRoot.onDoubleTap = { if (homeGesturesAllowed()) showEventsDialog() }
 
         // The drawer's own swipe-down dismiss lives in AppDrawerFragment (its
         // root is a GestureFrameLayout), so it isn't wired here.
@@ -861,21 +864,43 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         if (newTitle != openFolderTitle) viewModel.renameFolder(folderId, newTitle)
     }
 
+    /**
+     * Empty-space home gestures (swipe-up/long-press/double-tap) fire only when no
+     * modal surface is up — edit mode, the folder overlay, or the context menu.
+     * (These overlays keep gesturesEnabled=true so drags still capture, so the
+     * gesture core would otherwise still run the callbacks over them.)
+     */
+    private fun homeGesturesAllowed(): Boolean =
+        !wallpaperEditCoordinator.isEditMode.value &&
+            !folderOverlay.isVisible &&
+            !contextMenuOverlay.isVisible
+
     // ---- long-press context menu ----
 
     private class ContextMenuItem(val label: String, val icon: Drawable? = null, val action: () -> Unit)
 
     private fun showContextMenu(payload: DragPayload, source: View) {
         val standard = buildContextMenuItems(payload)
-        val shortcuts = payloadPackage(payload)?.let { appShortcuts(it) } ?: emptyList()
-        if (standard.isEmpty() && shortcuts.isEmpty()) return
+        val pkg = payloadPackage(payload)
+        if (standard.isEmpty() && pkg == null) return
         contextMenuCard.removeAllViews()
-        // Pixel order: the app's shortcuts on top, a divider, then the standard actions.
-        shortcuts.forEach(::addMenuRow)
-        if (shortcuts.isNotEmpty() && standard.isNotEmpty()) addMenuDivider()
         standard.forEach(::addMenuRow)
         contextMenuOverlay.isVisible = true
-        // Position the card near the pressed icon once it has measured.
+        positionContextMenu(source)
+        // Load the app's shortcuts OFF the main thread (getShortcuts + icon decode are
+        // cross-process), then prepend them Pixel-style; skip if the menu was dismissed.
+        pkg ?: return
+        lifecycleScope.launch {
+            val shortcuts = withContext(Dispatchers.Default) { appShortcuts(pkg) }
+            if (!contextMenuOverlay.isVisible || shortcuts.isEmpty()) return@launch
+            val header = shortcuts.map(::makeMenuRow) + makeMenuDivider()
+            header.forEachIndexed { i, view -> contextMenuCard.addView(view, i) }
+            positionContextMenu(source) // height grew — re-anchor
+        }
+    }
+
+    /** Anchors the menu card next to [source] once it has measured. */
+    private fun positionContextMenu(source: View) {
         contextMenuCard.doOnLayout {
             val icon = IntArray(2).also(source::getLocationInWindow)
             val root = IntArray(2).also(homeRoot::getLocationInWindow)
@@ -896,7 +921,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
     }
 
-    private fun addMenuRow(item: ContextMenuItem) {
+    private fun makeMenuRow(item: ContextMenuItem): View {
         val row = layoutInflater.inflate(R.layout.item_context_menu, contextMenuCard, false) as TextView
         row.text = item.label
         item.icon?.let {
@@ -904,19 +929,22 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             row.compoundDrawablePadding = (14 * resources.displayMetrics.density).toInt()
         }
         row.setOnClickListener { item.action(); dismissContextMenu() }
-        contextMenuCard.addView(row)
+        return row
     }
 
-    private fun addMenuDivider() {
+    private fun addMenuRow(item: ContextMenuItem) {
+        contextMenuCard.addView(makeMenuRow(item))
+    }
+
+    private fun makeMenuDivider(): View {
         val margin = (6 * resources.displayMetrics.density).toInt()
-        val divider = View(this).apply {
+        return View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (1 * resources.displayMetrics.density).toInt(),
             ).apply { topMargin = margin; bottomMargin = margin }
             setBackgroundColor(0x22FFFFFF)
         }
-        contextMenuCard.addView(divider)
     }
 
     private fun payloadPackage(payload: DragPayload): String? = when (payload) {

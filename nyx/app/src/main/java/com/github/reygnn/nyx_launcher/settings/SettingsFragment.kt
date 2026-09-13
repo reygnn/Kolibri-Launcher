@@ -283,8 +283,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
             // MainActivity.onCreate — which won't re-run on the way back to an already
             // created home. So re-seed the default dock here, so "reset" lands on the
             // default state (Phone/Messages/Email/Browser/Camera), not an empty screen.
-            val apps = withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
-            homeLayoutRepository.seedInitialDock(apps)
+            homeLayoutRepository.seedInitialDock {
+                withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
+            }
         }
         toast(getString(if (ok) R.string.factory_reset_done else R.string.factory_reset_failed))
         // Back to home, which re-renders from the re-seeded default state.

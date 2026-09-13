@@ -97,6 +97,21 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.DOCK_FULL))
     }
 
+    @Test fun extract_to_out_of_range_grid_insert_lands_at_first_free() {
+        // A drop on the right edge of the last grid cell yields GridInsert(index==cells),
+        // which is out of range — the extraction must still land (first free cell), not
+        // be silently rejected as OFF_GRID.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val start = layout(items = listOf(f))
+        val cells = grid.columns * grid.rows
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.GridInsert(0, cells), seq("x")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        val out = r.layout!!
+        assertThat(out.items.any { (it.item as? HomeItem.App)?.key == ck("pb") }).isTrue()
+    }
+
     @Test fun member_not_in_folder_is_noop() {
         val f = folder("f", ck("pa"), ck("pb"), page = 0, x = 0, y = 0)
         val start = layout(items = listOf(f))

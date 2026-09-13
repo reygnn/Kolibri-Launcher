@@ -78,13 +78,14 @@ class HomeLayoutReconcilerTest {
         assertThat(out.report.trimmedPages).isEqualTo(2)
     }
 
-    @Test fun over_capacity_dock_is_trimmed_to_columns() {
+    @Test fun over_capacity_dock_is_left_untouched_by_reconcile() {
+        // Reconcile no longer enforces dock capacity (the regridder owns it against the
+        // real device grid) — an over-capacity dock is kept intact, not trimmed/dropped.
         val dock = (0..4).map { app("d$it", "pd$it") } // 5 > columns(4)
         val installed = (0..4).map { ck("pd$it") }.toSet()
         val start = layout(dock = dock)
-        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next) as ReconcileOutcome.Changed
-        assertThat(out.layout.dock).hasSize(4)
-        assertThat(out.report.dockTrimmed).isEqualTo(1)
+        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
     @Test fun reconcile_is_idempotent() {

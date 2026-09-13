@@ -38,7 +38,7 @@ class HomeLayoutRepositoryImplSeedTest {
     fun seeds_the_dock_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
 
-        val seeded = repo.seedInitialDock(listOf(PHONE, SMS))
+        val seeded = repo.seedInitialDock { listOf(PHONE, SMS) }
 
         assertThat(seeded).isTrue()
         val dock = repo.layout().first().dock
@@ -48,11 +48,11 @@ class HomeLayoutRepositoryImplSeedTest {
     @Test
     fun seeds_only_once() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
-        assertThat(repo.seedInitialDock(listOf(PHONE))).isTrue()
+        assertThat(repo.seedInitialDock { listOf(PHONE) }).isTrue()
 
         // A returning launch — even one that empties the layout — must not re-seed.
         repo.save(HomeLayout(grid = repo.layout().first().grid, pages = 1, items = emptyList(), dock = emptyList()))
-        val second = repo.seedInitialDock(listOf(SMS))
+        val second = repo.seedInitialDock { listOf(SMS) }
 
         assertThat(second).isFalse()
         assertThat(repo.layout().first().dock).isEmpty()
@@ -65,7 +65,7 @@ class HomeLayoutRepositoryImplSeedTest {
         val deviceGrid = GridSpec(columns = 5, rows = 7)
         repo.save(HomeLayout(grid = deviceGrid, pages = 1, items = emptyList(), dock = emptyList()))
 
-        val seeded = repo.seedInitialDock(listOf(PHONE))
+        val seeded = repo.seedInitialDock { listOf(PHONE) }
 
         assertThat(seeded).isTrue()
         val layout = repo.layout().first()
@@ -85,7 +85,7 @@ class HomeLayoutRepositoryImplSeedTest {
             ),
         )
 
-        val seeded = repo.seedInitialDock(listOf(PHONE))
+        val seeded = repo.seedInitialDock { listOf(PHONE) }
 
         assertThat(seeded).isFalse()
         assertThat(repo.layout().first().dock.map { (it as HomeItem.App).key }).containsExactly(SMS)
@@ -95,9 +95,22 @@ class HomeLayoutRepositoryImplSeedTest {
     fun does_not_seed_with_no_apps() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
 
-        val seeded = repo.seedInitialDock(emptyList())
+        val seeded = repo.seedInitialDock { emptyList() }
 
         assertThat(seeded).isFalse()
+    }
+
+    @Test
+    fun does_not_resolve_apps_on_a_returning_install() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = newRepo()
+        assertThat(repo.seedInitialDock { listOf(PHONE) }).isTrue()
+
+        // Second call: the gate is already set, so the resolver must never run.
+        var resolved = false
+        val second = repo.seedInitialDock { resolved = true; listOf(SMS) }
+
+        assertThat(second).isFalse()
+        assertThat(resolved).isFalse()
     }
 
     private companion object {

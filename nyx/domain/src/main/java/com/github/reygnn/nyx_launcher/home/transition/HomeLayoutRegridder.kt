@@ -29,7 +29,10 @@ import com.github.reygnn.nyx_launcher.home.model.Span
 object HomeLayoutRegridder {
 
     fun fit(layout: HomeLayout, target: GridSpec): RegridOutcome {
-        if (layout.grid == target) return RegridOutcome.Unchanged
+        // Nothing to do only when the grid already matches AND the dock is within
+        // capacity — an over-capacity dock (e.g. a first-run seed of more apps than
+        // the measured grid is wide) still needs its overflow re-homed onto the grid.
+        if (layout.grid == target && layout.dock.size <= target.columns) return RegridOutcome.Unchanged
 
         val cols = target.columns
         val rows = target.rows

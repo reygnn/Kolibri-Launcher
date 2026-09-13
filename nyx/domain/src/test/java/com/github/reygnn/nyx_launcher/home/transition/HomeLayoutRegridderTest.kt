@@ -83,6 +83,22 @@ class HomeLayoutRegridderTest {
         assertThat(out.layout.items).hasSize(3) // nothing lost
     }
 
+    @Test fun over_capacity_dock_on_the_same_grid_rehomes_the_overflow() {
+        // A first-run seed can put more apps in the dock than the measured grid is
+        // wide; fitting to the SAME grid must still re-home the overflow (not no-op).
+        val g = GridSpec(4, 6)
+        val start = layout(
+            g,
+            dock = listOf(app("d0", "p0"), app("d1", "p1"), app("d2", "p2"), app("d3", "p3"), app("d4", "p4")),
+        )
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.dock.map { it.id }).containsExactly(
+            ItemId("d0"), ItemId("d1"), ItemId("d2"), ItemId("d3"),
+        ).inOrder()
+        assertThat(out.layout.items.single().item.id).isEqualTo(ItemId("d4"))
+        assertThat(out.layout.items.single().pos).isEqualTo(CellPos(0, 0, 0))
+    }
+
     @Test fun regrid_is_idempotent() {
         val start = layout(GridSpec(6, 8), items = listOf(placed(app("a", "pa"), 0, 5, 7)))
         val first = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed

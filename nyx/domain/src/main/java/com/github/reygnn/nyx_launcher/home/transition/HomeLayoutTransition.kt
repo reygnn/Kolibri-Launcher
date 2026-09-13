@@ -318,7 +318,7 @@ object HomeLayoutTransition {
                 ?: if (layout.items.any { it.pos == target.pos }) MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE else null
             // Folder extraction has no reorder-shift: a reorder-insert target is
             // treated as a plain placement at its cell (rejected if occupied).
-            is DropTarget.GridInsert -> cellOf(target.page, target.index, layout.grid.columns).let { pos ->
+            is DropTarget.GridInsert -> gridInsertCell(layout, target).let { pos ->
                 offGridReason(layout, pos)
                     ?: if (layout.items.any { it.pos == pos }) MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE else null
             }
@@ -339,7 +339,7 @@ object HomeLayoutTransition {
                 val pages = if (target.pos.page == layout.pages) layout.pages + 1 else layout.pages
                 layout.copy(pages = pages, items = layout.items + PlacedItem(item, target.pos))
             }
-            is DropTarget.GridInsert -> cellOf(target.page, target.index, layout.grid.columns).let { pos ->
+            is DropTarget.GridInsert -> gridInsertCell(layout, target).let { pos ->
                 val pages = if (pos.page == layout.pages) layout.pages + 1 else layout.pages
                 layout.copy(pages = pages, items = layout.items + PlacedItem(item, pos))
             }
@@ -348,6 +348,18 @@ object HomeLayoutTransition {
                 layout.copy(dock = layout.dock.toMutableList().apply { add(idx, item) })
             }
         }
+
+    /**
+     * Concrete target cell for a folder-extract [DropTarget.GridInsert]. An index
+     * past the last cell (`>= columns*rows`, e.g. a drop on the right edge of the
+     * bottom-right cell → `li + 1 == cells`) would map to an off-grid cell and be
+     * rejected; fall back to the first free cell instead so the extraction lands.
+     */
+    private fun gridInsertCell(layout: HomeLayout, target: DropTarget.GridInsert): CellPos {
+        val cells = layout.grid.columns * layout.grid.rows
+        return if (target.index in 0 until cells) cellOf(target.page, target.index, layout.grid.columns)
+        else firstFreeCellFrom(layout, 0)
+    }
 
     /** Adds [item] at a deterministic [placement] (a dissolved folder's old spot). */
     private fun placeAtPlacement(layout: HomeLayout, item: HomeItem, placement: Placement): HomeLayout =

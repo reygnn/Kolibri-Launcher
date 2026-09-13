@@ -14,8 +14,8 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileReport
  * in the use-case, so this only ever sees a genuine [installed] set.
  *
  * Passes: prune dead → dedup by precedence → repair folders (dissolve at 1 / drop
- * at 0) → trim the dock to `columns` → trim trailing empty pages (keep >= 1).
- * Idempotent (RHL-INV-2).
+ * at 0) → trim trailing empty pages (keep >= 1). Dock capacity is NOT enforced here
+ * (the regridder owns it, against the real device grid). Idempotent (RHL-INV-2).
  *
  * Dedup precedence (RHL-INV-4): each [ComponentKey] survives at its most
  * intentional position — Dock (slot order) > Grid top-level (page, y, x) > Folder
@@ -33,7 +33,6 @@ object HomeLayoutReconciler {
         var dedupedApps = 0
         var dissolvedFolders = 0
         var removedEmptyFolders = 0
-        val columns = layout.grid.columns
 
         // ---- Pass 1: prune dead references (members filtered; folders kept) ----
         fun pruneMembers(members: List<ComponentKey>): List<ComponentKey> {
@@ -104,14 +103,10 @@ object HomeLayoutReconciler {
         val dockR = dockD.mapNotNull { repair(it) }
         val itemsR = itemsD.mapNotNull { placed -> repair(placed.item)?.let { placed.copy(item = it) } }
 
-        // ---- Pass 4: dock capacity = columns ----
-        var dockTrimmed = 0
-        val dockFinal = if (dockR.size > columns) {
-            dockTrimmed = dockR.size - columns
-            dockR.take(columns)
-        } else {
-            dockR
-        }
+        // Dock capacity is intentionally NOT enforced here: it is keyed to the grid
+        // columns, and reconcile can run against a stale grid (before FitHomeGridUseCase
+        // stamps the measured device grid). The regridder owns dock capacity against
+        // the REAL grid and re-homes overflow onto the grid rather than dropping it.
 
         // ---- Pass 5: trim trailing empty pages (keep >= 1); interior kept ----
         val usedPages = itemsR.maxOfOrNull { it.pos.page + 1 } ?: 0
@@ -119,18 +114,18 @@ object HomeLayoutReconciler {
         val trimmedPages = layout.pages - newPages
 
         val changed = prunedApps > 0 || dedupedApps > 0 || dissolvedFolders > 0 ||
-            removedEmptyFolders > 0 || dockTrimmed > 0 || trimmedPages > 0
+            removedEmptyFolders > 0 || trimmedPages > 0
         if (!changed) return ReconcileOutcome.Unchanged
 
         return ReconcileOutcome.Changed(
-            layout = layout.copy(pages = newPages, items = itemsR, dock = dockFinal),
+            layout = layout.copy(pages = newPages, items = itemsR, dock = dockR),
             report = ReconcileReport(
                 prunedApps = prunedApps,
                 dedupedApps = dedupedApps,
                 dissolvedFolders = dissolvedFolders,
                 removedEmptyFolders = removedEmptyFolders,
                 trimmedPages = trimmedPages,
-                dockTrimmed = dockTrimmed,
+                dockTrimmed = 0,
             ),
         )
     }

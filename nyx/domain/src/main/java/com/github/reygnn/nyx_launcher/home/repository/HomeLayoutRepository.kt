@@ -40,15 +40,16 @@ interface HomeLayoutRepository {
     suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?)
 
     /**
-     * First-run seed: if no layout has ever been persisted, save one that places
-     * [dockApps] in the dock (order preserved) on top of the default grid; if a
-     * layout already exists, or [dockApps] is empty, this is a no-op. Returns true
-     * only when it actually seeded — so the caller can tell a fresh install from a
-     * returning one. Serialized against [save] / [update] like any other write.
+     * First-run seed: if no layout has ever been persisted, save one that places the
+     * apps from [resolveDockApps] in the dock (order preserved, capped at the grid
+     * width) on top of the default grid; if a layout already exists this is a no-op.
+     * Returns true only when it actually seeded. [resolveDockApps] is invoked ONLY
+     * when a seed will happen — so a returning install (or one whose layout is
+     * already established) never pays for resolving the apps (which does system IPCs).
      *
-     * The "was anything persisted yet?" check and the seeding write happen under
-     * the same writer lock, so a concurrent [update] from a background reconcile
-     * can't slip a layout in between the check and the write (AUDIT-1 A1-03).
+     * The first-run gate and the seeding write happen under the same writer lock, so
+     * a concurrent [update] from a background reconcile can't slip a layout in between
+     * the check and the write (AUDIT-1 A1-03).
      */
-    suspend fun seedInitialDock(dockApps: List<ComponentKey>): Boolean
+    suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean
 }

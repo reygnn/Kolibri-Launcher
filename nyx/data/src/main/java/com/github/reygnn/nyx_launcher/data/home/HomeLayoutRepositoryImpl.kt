@@ -50,31 +50,38 @@ class HomeLayoutRepositoryImpl @Inject constructor(
             Unit
         }
 
-    override suspend fun seedInitialDock(dockApps: List<ComponentKey>): Boolean =
+    override suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean =
         writeMutex.withLock {
-            if (dockApps.isEmpty()) return@withLock false
             val prefs = dataStore.data.first()
             // One-shot: [SEEDED_KEY] records that the first-run decision was already
-            // made — a plain KEY-presence gate can't be used because FitHomeGridUseCase
-            // writes an empty layout under KEY on the very first layout pass (it just
-            // stamps the device grid), which would race and defeat seeding. This flag
-            // is never touched by save/update/fit.
+            // made. Gated FIRST, before resolving apps, so a returning install never
+            // runs the resolver's system IPCs again. A plain KEY-presence gate can't be
+            // used because FitHomeGridUseCase writes an empty layout under KEY on the
+            // first layout pass. This flag is never touched by save/update/fit.
             if (prefs[SEEDED_KEY] == true) return@withLock false
             // Seed onto whatever is already there so a grid already stamped by fit is
             // preserved (never reset to DEFAULT's grid). If content already exists —
             // e.g. an import landed first — the layout is established: mark the decision
-            // done and leave it untouched.
+            // done and leave it untouched (still without resolving apps).
             val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DEFAULT
             if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
                 dataStore.edit { it[SEEDED_KEY] = true }
                 return@withLock false
             }
-            val seeded = current.copy(dock = dockApps.map { HomeItem.App(itemIdFactory.next(), it) })
+            // Resolve only now that we know we will seed. No cap here: the seed-time
+            // grid is DEFAULT (before FitHomeGridUseCase stamps the real device grid),
+            // so capping on it would wrongly drop apps on a wider device. Dock capacity
+            // is enforced later by the regridder against the REAL device grid, which
+            // re-homes any overflow onto the grid (never drops it).
+            val dockApps = resolveDockApps()
             dataStore.edit {
                 it[SEEDED_KEY] = true
-                it[KEY] = serializer.serialize(seeded)
+                if (dockApps.isNotEmpty()) {
+                    val dock = dockApps.map { HomeItem.App(itemIdFactory.next(), it) }
+                    it[KEY] = serializer.serialize(current.copy(dock = dock))
+                }
             }
-            true
+            dockApps.isNotEmpty()
         }
 
     private suspend fun writeRaw(layout: HomeLayout) {

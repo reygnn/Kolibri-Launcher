@@ -49,19 +49,22 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
             Unit
         }
 
-    override suspend fun seedInitialDock(dockApps: List<ComponentKey>): Boolean =
+    override suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean =
         writeMutex.withLock {
-            if (dockApps.isEmpty() || seeded) return@withLock false
+            if (seeded) return@withLock false
             val current = state.value
             if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
                 seeded = true
                 return@withLock false
             }
+            val dockApps = resolveDockApps()
             seeded = true
-            saveCount++
-            state.value = current.copy(
-                dock = dockApps.map { HomeItem.App(ItemId("seed-${seedCounter++}"), it) },
-            )
-            true
+            if (dockApps.isNotEmpty()) {
+                saveCount++
+                state.value = current.copy(
+                    dock = dockApps.map { HomeItem.App(ItemId("seed-${seedCounter++}"), it) },
+                )
+            }
+            dockApps.isNotEmpty()
         }
 }
