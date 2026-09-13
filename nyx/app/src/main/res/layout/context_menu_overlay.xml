@@ -13,9 +13,8 @@
 
     <LinearLayout
         android:id="@+id/context_menu_card"
-        android:layout_width="wrap_content"
+        android:layout_width="248dp"
         android:layout_height="wrap_content"
-        android:minWidth="200dp"
         android:orientation="vertical"
         android:clickable="true"
         android:focusable="true"

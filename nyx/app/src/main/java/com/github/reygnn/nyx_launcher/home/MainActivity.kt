@@ -8,7 +8,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import android.os.Process
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.Settings
@@ -850,18 +853,17 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     // ---- long-press context menu ----
 
-    private class ContextMenuItem(val label: String, val action: () -> Unit)
+    private class ContextMenuItem(val label: String, val icon: Drawable? = null, val action: () -> Unit)
 
     private fun showContextMenu(payload: DragPayload, source: View) {
-        val items = buildContextMenuItems(payload)
-        if (items.isEmpty()) return
+        val standard = buildContextMenuItems(payload)
+        val shortcuts = payloadPackage(payload)?.let { appShortcuts(it) } ?: emptyList()
+        if (standard.isEmpty() && shortcuts.isEmpty()) return
         contextMenuCard.removeAllViews()
-        for (item in items) {
-            val row = layoutInflater.inflate(R.layout.item_context_menu, contextMenuCard, false) as TextView
-            row.text = item.label
-            row.setOnClickListener { item.action(); dismissContextMenu() }
-            contextMenuCard.addView(row)
-        }
+        // Pixel order: the app's shortcuts on top, a divider, then the standard actions.
+        shortcuts.forEach(::addMenuRow)
+        if (shortcuts.isNotEmpty() && standard.isNotEmpty()) addMenuDivider()
+        standard.forEach(::addMenuRow)
         contextMenuOverlay.isVisible = true
         // Position the card near the pressed icon once it has measured.
         contextMenuCard.doOnLayout {
@@ -872,10 +874,83 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             val margin = (12 * resources.displayMetrics.density).toInt()
             val cw = contextMenuCard.width
             val ch = contextMenuCard.height
-            val x = (ix + source.width / 2 - cw / 2).coerceIn(margin, homeRoot.width - cw - margin)
-            val y = if (iy - ch - margin >= margin) iy - ch - margin else iy + source.height + margin
+            // coerceAtLeast guards the case where the card is as wide/tall as the
+            // screen (max would fall below min → IllegalArgumentException).
+            val maxX = (homeRoot.width - cw - margin).coerceAtLeast(margin)
+            val maxY = (homeRoot.height - ch - margin).coerceAtLeast(margin)
+            val x = (ix + source.width / 2 - cw / 2).coerceIn(margin, maxX)
+            val y = (if (iy - ch - margin >= margin) iy - ch - margin else iy + source.height + margin)
+                .coerceIn(margin, maxY)
             contextMenuCard.translationX = x.toFloat()
             contextMenuCard.translationY = y.toFloat()
+        }
+    }
+
+    private fun addMenuRow(item: ContextMenuItem) {
+        val row = layoutInflater.inflate(R.layout.item_context_menu, contextMenuCard, false) as TextView
+        row.text = item.label
+        item.icon?.let {
+            row.setCompoundDrawablesRelative(it, null, null, null)
+            row.compoundDrawablePadding = (14 * resources.displayMetrics.density).toInt()
+        }
+        row.setOnClickListener { item.action(); dismissContextMenu() }
+        contextMenuCard.addView(row)
+    }
+
+    private fun addMenuDivider() {
+        val margin = (6 * resources.displayMetrics.density).toInt()
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (1 * resources.displayMetrics.density).toInt(),
+            ).apply { topMargin = margin; bottomMargin = margin }
+            setBackgroundColor(0x22FFFFFF)
+        }
+        contextMenuCard.addView(divider)
+    }
+
+    private fun payloadPackage(payload: DragPayload): String? = when (payload) {
+        is DragPayload.Existing ->
+            (viewModel.layout.value?.allHomeItems()?.firstOrNull { it.id == payload.id } as? HomeItem.App)
+                ?.key?.packageName
+        is DragPayload.NewApp -> payload.key.packageName
+        is DragPayload.FolderMember -> payload.key.packageName
+    }
+
+    /**
+     * The app's launcher shortcuts (dynamic + manifest + pinned), tap-to-launch —
+     * only available while nyx is the default launcher (else getShortcuts throws
+     * SecurityException and we simply show none). Pinning-to-home is not offered
+     * yet (would need a shortcut item type in the layout model).
+     */
+    private fun appShortcuts(pkg: String): List<ContextMenuItem> {
+        val launcherApps = getSystemService(LauncherApps::class.java) ?: return emptyList()
+        return try {
+            val query = LauncherApps.ShortcutQuery()
+                .setPackage(pkg)
+                .setQueryFlags(
+                    LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED,
+                )
+            val sizePx = (24 * resources.displayMetrics.density).toInt()
+            (launcherApps.getShortcuts(query, Process.myUserHandle()) ?: emptyList())
+                .filter { it.isEnabled }
+                .sortedBy { it.rank }
+                .take(4)
+                .mapNotNull { sc ->
+                    val label = (sc.shortLabel ?: sc.longLabel)?.toString() ?: return@mapNotNull null
+                    val icon = runCatching {
+                        launcherApps.getShortcutIconDrawable(sc, resources.displayMetrics.densityDpi)
+                    }.getOrNull()?.apply { setBounds(0, 0, sizePx, sizePx) }
+                    ContextMenuItem(label, icon) {
+                        runCatching { launcherApps.startShortcut(sc, null, null) }
+                    }
+                }
+        } catch (e: SecurityException) {
+            emptyList() // not the default launcher
+        } catch (e: IllegalStateException) {
+            emptyList() // user locked / shortcuts unavailable
         }
     }
 
