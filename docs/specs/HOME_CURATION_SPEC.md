@@ -232,12 +232,25 @@ class BuildAppContextMenuUseCase @Inject constructor(
   (Append wächst, GC schrumpft auf letzte-belegte + 1). Die GC-Funktion gehört als
   reine `:domain`-Logik nach `MOVE_ITEM_SPEC` (Platzierungs-Policy), JVM-testbar;
   `MainActivity` klemmt `currentPage` bereits (`if (currentPage < layout.pages)`).
+
+- **Umgesetzt (Abweichung von der GC-Idee, gleiche UX):** Die eine leere
+  Landing-Seite wird in nyx **nicht persistiert und nicht per GC geschrumpft**,
+  sondern beim Rendern aus der Belegung berechnet:
+  `HomeLayout.renderedPageCount()` = `höchste-belegte-Seite + 2` (bzw. 1 bei leerem
+  Grid), und `MainActivity` rendert `(0 until renderedPageCount)`. Die Landing-Seite
+  wird erst persistiert, wenn wirklich etwas darauf abgelegt wird (die vorhandene
+  Append-on-Drop-Transition) — d. h. das Repository bleibt vertragstreu
+  (`save` rundtrippt), und es braucht **keine** persistierte Invariante `pages ==
+  höchste+2` und **keinen** Trailing-Seiten-GC. Reconciler/Regridder dürfen weiter
+  auf `höchste+1` trimmen; die Render-Schicht addiert die Landing-Seite obendrauf.
+  Edge-Auto-Advance blättert über `renderedPageCount` (inkl. Landing-Seite).
 ---
 
 ## Review-Log
 
 | Runde | Datum | Reviewer | Ergebnis |
 |---|---|---|---|
+| v1.5 | 2026-09-13 | reygnn | Umsetzungs-Notiz: Landing-Seite wird render-berechnet (`renderedPageCount` = höchste+2), nicht persistiert/GC'd — Repo bleibt vertragstreu, kein Seiten-GC nötig; Edge-Auto-Advance blättert über die Landing-Seite |
 | v1.4 | `<offen>` | `<offen>` | Snapshot-Entscheid: `curatedKeys.first()` beim Menübau; keine offenen Punkte mehr |
 | v1.3 | `<offen>` | `<offen>` | Trailing-Seiten-GC entschieden: (b) genau eine leere Landing-Seite; Invariante `pages == höchste-belegte+2` festgeschrieben; GC-Funktion → `MOVE_ITEM_SPEC` |
 | v1.2 | `<offen>` | `<offen>` | Korrigiert: Overflow→neue Seite ist bereits implementiert (`firstFreeCell`+Transition+Pager), kein offener/kritischer Punkt; ersetzt durch die echte offene Frage Trailing-Seiten-GC (Empfehlung: eine leere Landing-Seite behalten) |
