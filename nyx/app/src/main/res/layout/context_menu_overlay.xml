@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- In-DragLayer long-press context menu (Launcher3-style). Lives in home_root so
+     the arming touch stream stays in one window; the card is positioned near the
+     pressed icon in code. Light scrim so the home stays visible; tap outside closes. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/context_menu_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:visibility="gone"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="#40000000">
+
+    <LinearLayout
+        android:id="@+id/context_menu_card"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="200dp"
+        android:orientation="vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@drawable/bg_context_menu" />
+
+</FrameLayout>

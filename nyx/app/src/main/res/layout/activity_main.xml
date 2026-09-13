@@ -155,6 +155,10 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
+    <!-- Long-press context menu (in-DragLayer, above the drawer so it shows over a
+         long-pressed drawer app). -->
+    <include layout="@layout/context_menu_overlay" />
+
     <!-- Drop-to-delete target: a top overlay shown only during a drag. INVISIBLE
          at rest (not GONE) so it stays laid out and receives drag events, but
          being a FrameLayout overlay it reserves no space and never reflows the

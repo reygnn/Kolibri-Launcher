@@ -19,6 +19,9 @@
     <string name="factory_reset_confirm">Zurücksetzen</string>
     <string name="factory_reset_done">Zurücksetzen abgeschlossen</string>
     <string name="factory_reset_failed">Zurücksetzen fehlgeschlagen</string>
+    <string name="menu_app_info">App-Info</string>
+    <string name="menu_remove_from_home">Vom Home entfernen</string>
+    <string name="menu_uninstall">Deinstallieren</string>
 
     <!-- Settings -->
     <string name="settings_title">Einstellungen</string>

@@ -7,8 +7,11 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.provider.Settings
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
@@ -19,6 +22,7 @@ import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -145,6 +149,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var folderMembers: RecyclerView
     private var openFolderId: ItemId? = null
     private var openFolderTitle: String = ""
+
+    // In-DragLayer long-press context menu (Launcher3-style).
+    private lateinit var contextMenuOverlay: View
+    private lateinit var contextMenuCard: LinearLayout
     private lateinit var clockTime: TextView
     private lateinit var clockDate: TextView
     private lateinit var clockBattery: TextView
@@ -215,6 +223,16 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // Tap the scrim (outside the card) closes; the card swallows its own taps.
         folderOverlay.setOnClickListener { closeFolderOverlay() }
         findViewById<View>(R.id.folder_card).setOnClickListener { /* swallow */ }
+        contextMenuOverlay = findViewById(R.id.context_menu_overlay)
+        contextMenuCard = findViewById(R.id.context_menu_card)
+        contextMenuOverlay.setOnClickListener { dismissContextMenu() }
+        contextMenuCard.setOnClickListener { /* swallow */ }
+        // Launcher3-style long-press: arm shows the menu; a move promotes to a drag.
+        homeRoot.onArm = { payload, source -> showContextMenu(payload, source) }
+        homeRoot.onArmedPromote = {
+            dismissContextMenu()
+            if (drawerContainer.isVisible) hideDrawer()
+        }
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
         clockBattery = findViewById(R.id.clock_battery)
@@ -272,6 +290,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 // Flush live transforms then commit (same as the Save FAB) — a bare
                 // commit would drop the active layer's unsaved pan/zoom.
                 wallpaperEditController.commitEdit()
+            } else if (contextMenuOverlay.isVisible) {
+                dismissContextMenu()
             } else if (folderOverlay.isVisible) {
                 closeFolderOverlay()
             } else if (drawerContainer.isVisible) {
@@ -458,7 +478,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun setupDock() {
         dockAdapter = DockAdapter(iconLoader, folderRenderer, lifecycleScope, gridIconPx, ::launchApp, ::openFolder) { v, id ->
-            startDrag(v, DragPayload.Existing(id))
+            homeRoot.armDrag(DragPayload.Existing(id), v)
         }
         dock.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         dock.adapter = dockAdapter
@@ -601,7 +621,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 rows = layout.grid.rows,
                 onLaunch = ::launchApp,
                 onOpenFolder = ::openFolder,
-                onStartDrag = { v, id -> startDrag(v, DragPayload.Existing(id)) },
+                onStartDrag = { v, id -> homeRoot.armDrag(DragPayload.Existing(id), v) },
             ).also { pager.adapter = it }
         }
         val currentPage = pager.currentItem
@@ -677,8 +697,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     }
 
     override fun startDrawerDrag(view: View, key: ComponentKey) {
-        startDrag(view, DragPayload.NewApp(key))
-        hideDrawer()
+        // Arm (menu + drag): the drawer is hidden only once a move promotes to a drag
+        // (onArmedPromote); a plain long-press keeps the menu over the drawer.
+        homeRoot.armDrag(DragPayload.NewApp(key), view)
     }
 
     // ---- drag ----
@@ -824,6 +845,89 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val folderId = openFolderId ?: return
         val newTitle = folderTitle.text.toString()
         if (newTitle != openFolderTitle) viewModel.renameFolder(folderId, newTitle)
+    }
+
+    // ---- long-press context menu ----
+
+    private class ContextMenuItem(val label: String, val action: () -> Unit)
+
+    private fun showContextMenu(payload: DragPayload, source: View) {
+        val items = buildContextMenuItems(payload)
+        if (items.isEmpty()) return
+        contextMenuCard.removeAllViews()
+        for (item in items) {
+            val row = layoutInflater.inflate(R.layout.item_context_menu, contextMenuCard, false) as TextView
+            row.text = item.label
+            row.setOnClickListener { item.action(); dismissContextMenu() }
+            contextMenuCard.addView(row)
+        }
+        contextMenuOverlay.isVisible = true
+        // Position the card near the pressed icon once it has measured.
+        contextMenuCard.doOnLayout {
+            val icon = IntArray(2).also(source::getLocationInWindow)
+            val root = IntArray(2).also(homeRoot::getLocationInWindow)
+            val ix = icon[0] - root[0]
+            val iy = icon[1] - root[1]
+            val margin = (12 * resources.displayMetrics.density).toInt()
+            val cw = contextMenuCard.width
+            val ch = contextMenuCard.height
+            val x = (ix + source.width / 2 - cw / 2).coerceIn(margin, homeRoot.width - cw - margin)
+            val y = if (iy - ch - margin >= margin) iy - ch - margin else iy + source.height + margin
+            contextMenuCard.translationX = x.toFloat()
+            contextMenuCard.translationY = y.toFloat()
+        }
+    }
+
+    private fun buildContextMenuItems(payload: DragPayload): List<ContextMenuItem> = when (payload) {
+        is DragPayload.Existing -> {
+            val item = viewModel.layout.value?.allHomeItems()?.firstOrNull { it.id == payload.id }
+            val pkg = (item as? HomeItem.App)?.key?.packageName
+            buildList {
+                if (pkg != null) add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
+                add(ContextMenuItem(getString(R.string.menu_remove_from_home)) { viewModel.remove(payload.id) })
+                if (pkg != null && !isSystemApp(pkg)) {
+                    add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
+                }
+            }
+        }
+        is DragPayload.NewApp -> buildList {
+            val pkg = payload.key.packageName
+            add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
+            if (!isSystemApp(pkg)) add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
+        }
+        is DragPayload.FolderMember -> emptyList() // folder members extract by drag only
+    }
+
+    private fun dismissContextMenu() {
+        if (!contextMenuOverlay.isVisible) return
+        contextMenuOverlay.isVisible = false
+        contextMenuCard.removeAllViews()
+    }
+
+    // Intent construction mirrors Kolibri's app-info action (Uri.fromParts +
+    // NEW_TASK) for consistency across the family.
+    private fun openAppInfo(pkg: String) = startActivitySafe(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", pkg, null)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+    )
+
+    private fun uninstallApp(pkg: String) =
+        startActivitySafe(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)))
+
+    private fun isSystemApp(pkg: String): Boolean = try {
+        (packageManager.getApplicationInfo(pkg, 0).flags and ApplicationInfo.FLAG_SYSTEM) != 0
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    private fun startActivitySafe(intent: Intent) {
+        try {
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            TimberWrapper.silentError(e, "No activity for $intent")
+        }
     }
 
     // ---- helpers ----

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.view.drawToBitmap
@@ -32,6 +33,22 @@ class DragLayer @JvmOverloads constructor(
 
     private val gestureCore = GestureDispatchCore(this)
     val dragController = DragController(this)
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+
+    // Launcher3-style unified long-press: an icon long-press ARMS a drag and shows a
+    // context menu. Moving past the slop promotes it to a real drag (menu dismissed);
+    // lifting in place keeps the menu. Between arm and that decision, this layer owns
+    // the stream (like a drag) so children don't scroll or re-trigger.
+    private var armedPayload: DragPayload? = null
+    private var armedSource: View? = null
+    private var armX = 0f
+    private var armY = 0f
+
+    /** Called when a long-press arms: show the context menu for [payload] at [source]. */
+    var onArm: ((payload: DragPayload, source: View) -> Unit)? = null
+    /** Called when an armed press promotes to a drag (dismiss the menu, hide the drawer). */
+    var onArmedPromote: (() -> Unit)? = null
 
     private var lastX = 0f
     private var lastY = 0f
@@ -71,7 +88,52 @@ class DragLayer @JvmOverloads constructor(
             }
             return true
         }
+        // Armed (menu shown, deciding drag-vs-menu): own the stream until the finger
+        // moves (→ promote to drag) or lifts (→ keep the menu).
+        if (armedPayload != null) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.x - armX
+                    val dy = ev.y - armY
+                    if (dx * dx + dy * dy > touchSlop * touchSlop) {
+                        promoteArmedDrag(ev.x.toInt(), ev.y.toInt())
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> disarm()
+            }
+            return true
+        }
         return gestureCore.dispatch(ev) { super.dispatchTouchEvent(it) }
+    }
+
+    /**
+     * Arm a long-press: cancel the pressing child's gesture, remember the payload,
+     * and let [onArm] show the context menu. The stream is now owned here until the
+     * finger moves (promote) or lifts (keep menu). Call from the source's long-press.
+     */
+    fun armDrag(payload: DragPayload, source: View) {
+        val cancel = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, lastX, lastY, 0)
+        super.dispatchTouchEvent(cancel)
+        cancel.recycle()
+        armedPayload = payload
+        armedSource = source
+        armX = lastX
+        armY = lastY
+        onArm?.invoke(payload, source)
+    }
+
+    private fun promoteArmedDrag(x: Int, y: Int) {
+        val payload = armedPayload ?: return
+        val source = armedSource ?: return
+        armedPayload = null
+        armedSource = null
+        onArmedPromote?.invoke()
+        dragController.startDrag(payload, source, x, y)
+    }
+
+    private fun disarm() {
+        armedPayload = null
+        armedSource = null
     }
 
     /**
