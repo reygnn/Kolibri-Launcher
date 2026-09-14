@@ -320,7 +320,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val moved = r as FolderEditResult.MovedBetweenFolders
         assertThat(moved.from).isEqualTo(ItemId("a"))
         assertThat(moved.to).isEqualTo(ItemId("b"))
-        val out = r.layout!!
+        val out = r.layout
         val aOut = out.items.first { it.item.id == ItemId("a") }.item as HomeItem.Folder
         val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
         assertThat(aOut.members).containsExactly(ck("pa"), ck("pc")).inOrder() // pb removed, order kept
@@ -340,7 +340,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val moved = r as FolderEditResult.MovedBetweenFoldersDissolve
         assertThat(moved.to).isEqualTo(ItemId("b"))
         assertThat(moved.survivor).isEqualTo(ItemId("survivor"))
-        val out = r.layout!!
+        val out = r.layout
         assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse() // A retired
         val survivor = out.items.first { it.pos == CellPos(0, 2, 3) } // A's old cell
         assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
@@ -394,7 +394,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         )
         assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
         assertThat((r as FolderEditResult.Extracted).app).isEqualTo(ItemId("tile")) // reused, not minted
-        val out = r.layout!!
+        val out = r.layout
         val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
         assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 2, 2)) // exactly one, at target
         assertThat(pbTiles.single().item.id).isEqualTo(ItemId("tile"))
@@ -416,7 +416,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val d = r as FolderEditResult.FolderDissolved
         assertThat(d.extracted).isEqualTo(ItemId("extracted"))
         assertThat(d.survivor).isEqualTo(ItemId("tile")) // reused existing tile, no second mint
-        val out = r.layout!!
+        val out = r.layout
         assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse() // A retired
         val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
         assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 0, 5)) // unmoved, single
@@ -438,7 +438,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         )
         assertThat(r).isInstanceOf(FolderEditResult.MovedBetweenFoldersDissolve::class.java)
         assertThat((r as FolderEditResult.MovedBetweenFoldersDissolve).survivor).isEqualTo(ItemId("tile"))
-        val out = r.layout!!
+        val out = r.layout
         assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse()
         val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
         assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 0, 5)) // unmoved, single

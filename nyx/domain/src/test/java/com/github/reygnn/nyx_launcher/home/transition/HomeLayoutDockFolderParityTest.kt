@@ -41,7 +41,7 @@ class HomeLayoutDockFolderParityTest {
         val r = HomeLayoutTransition.move(start, d1.id, DropTarget.DockItem(0), seq("folder")::next)
         assertThat(r).isInstanceOf(MoveResult.FolderCreated::class.java)
         assertThat((r as MoveResult.FolderCreated).folder).isEqualTo(ItemId("folder"))
-        val out = r.layout!!
+        val out = r.layout
         val f = out.dock.single { it.id == ItemId("folder") } as HomeItem.Folder
         assertThat(f.members).containsExactly(ck("pa"), ck("pb")).inOrder() // occupant first, then dragged
         assertThat(out.dock.any { it.id == d1.id }).isFalse() // dragged app consumed
@@ -88,7 +88,7 @@ class HomeLayoutDockFolderParityTest {
         val moved = r as FolderEditResult.MovedBetweenFolders
         assertThat(moved.from).isEqualTo(ItemId("a"))
         assertThat(moved.to).isEqualTo(ItemId("b"))
-        val out = r.layout!!
+        val out = r.layout
         val aOut = out.items.first { it.item.id == ItemId("a") }.item as HomeItem.Folder
         val bOut = out.dock.first { it.id == ItemId("b") } as HomeItem.Folder
         assertThat(aOut.members).containsExactly(ck("pa"), ck("pc")).inOrder()
@@ -106,7 +106,7 @@ class HomeLayoutDockFolderParityTest {
         val d = r as FolderEditResult.MovedBetweenFoldersDissolve
         assertThat(d.to).isEqualTo(ItemId("b"))
         assertThat(d.survivor).isEqualTo(ItemId("survivor"))
-        val out = r.layout!!
+        val out = r.layout
         assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse() // A retired
         val survivor = out.items.first { it.pos == CellPos(0, 2, 3) } // A's old cell
         assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
