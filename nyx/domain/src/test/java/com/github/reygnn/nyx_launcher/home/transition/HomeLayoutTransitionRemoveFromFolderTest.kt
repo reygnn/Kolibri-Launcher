@@ -97,6 +97,23 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.DOCK_FULL))
     }
 
+    @Test fun full_dock_out_of_range_dock_item_extract_is_rejected_not_overflowed() {
+        // REGRESSION: emptyTargetReason's DockItem branch used to reject only an OCCUPIED
+        // slot; on an out-of-range index (getOrNull == null) it degraded to a plain dock
+        // insert WITHOUT the DOCK_FULL guard that DockSlot enforces, so a folder extraction
+        // grew the dock past grid.columns (dock size 5 > 4 — broke the layout invariant).
+        // The fix mirrors the DockSlot column cap here. Pinned fail-fast so the property
+        // test isn't the only thing standing between us and this bug.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val fullDock = (0 until grid.columns).map { app("d$it", "pd$it") } // dock.size == columns
+        val start = layout(items = listOf(f), dock = fullDock)
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.DockItem(grid.columns), seq("x")::next, // index past the dock
+        )
+        assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.DOCK_FULL))
+        assertThat(r.layout).isNull() // rejected → no change, dock never grew to columns + 1
+    }
+
     @Test fun extract_to_out_of_range_grid_insert_lands_at_first_free() {
         // A drop on the right edge of the last grid cell yields GridInsert(index==cells),
         // which is out of range — the extraction must still land (first free cell), not
