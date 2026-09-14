@@ -39,6 +39,9 @@ Keine mehr — alle Entscheidungen getroffen.
 ## Folge-Arbeit (kein offener Punkt, eigene künftige Specs)
 - `WALLPAPER_SHARE_SPEC` (Rendering/Compositing-Extraktion).
 - `MOVE_ITEM_SPEC`-Ergänzung: Trailing-Seiten-GC + `normalizePages()` als Transition-Schritt.
+- `DRAWER_FOLDERS_SPEC` (ENTWURF v1.0) — Folders im App-Drawer als abgeleitete
+  Projektion; `FolderMembership` aus `HomeLayoutTransition` extrahiert und mit Home
+  geteilt. Nyx-eigenes Feature, nicht Teil des Merge-Bundles.
 
 ## Empfohlene Reihenfolge (Auszug MONOREPO_MERGE_SPEC §6/§3.5)
 `:core` → ACRA (`:feature-crashreporting`) → Info-Elemente → App-Usage →
