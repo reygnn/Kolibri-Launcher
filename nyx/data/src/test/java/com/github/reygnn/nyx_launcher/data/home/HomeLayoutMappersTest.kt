@@ -7,6 +7,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
+import com.github.reygnn.nyx_launcher.home.model.Span
 import com.github.reygnn.nyx_launcher.home.testing.RandomHomeLayouts
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -73,6 +74,26 @@ class HomeLayoutMappersTest {
                 HomeItem.App(ItemId("d"), ck("pd")),
                 HomeItem.Folder(ItemId("df"), "Tools", listOf(ck("pe"), ck("pf"))),
             ),
+        )
+
+        assertThat(layout.toDto().toDomain()).isEqualTo(layout)
+    }
+
+    /**
+     * The generator only ever emits default [Span] (1×1), so a swapped or dropped
+     * span field would round-trip invisibly there. Pin asymmetric spans explicitly
+     * so `span.w↔spanW` / `span.h↔spanH` can't silently regress.
+     */
+    @Test
+    fun non_default_spans_round_trip() {
+        val layout = HomeLayout(
+            grid = GridSpec(columns = 5, rows = 6),
+            pages = 1,
+            items = listOf(
+                PlacedItem(HomeItem.App(ItemId("wide"), ck("pw")), CellPos(0, 0, 0), Span(w = 2, h = 1)),
+                PlacedItem(HomeItem.App(ItemId("tall"), ck("pt")), CellPos(0, 3, 0), Span(w = 1, h = 3)),
+            ),
+            dock = emptyList(),
         )
 
         assertThat(layout.toDto().toDomain()).isEqualTo(layout)
