@@ -488,10 +488,17 @@ object HomeLayoutTransition {
             // it through silently dissolves the folder (and, for a dock folder, can
             // overflow the dock past its column cap). An App occupant is likewise
             // occupied; only an empty / out-of-range index degrades to a plain insert.
-            is DropTarget.DockItem ->
-                if (layout.dock.getOrNull(target.index) != null)
+            is DropTarget.DockItem -> when {
+                layout.dock.getOrNull(target.index) != null ->
                     MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE
-                else null
+                // No landable item at [index] → this degrades to a plain dock insert
+                // (placeNewAtTarget), so it must honour the same column cap as DockSlot.
+                // Without this, a folder extraction/dissolve onto an out-of-range dock
+                // slot on a full dock overflows it past grid.columns (breaks IHM-INV).
+                layout.dock.size >= layout.grid.columns ->
+                    MoveResult.Reason.DOCK_FULL
+                else -> null
+            }
         }
 
     /** Adds a NEW [item] at an already-validated-empty [target]. */
