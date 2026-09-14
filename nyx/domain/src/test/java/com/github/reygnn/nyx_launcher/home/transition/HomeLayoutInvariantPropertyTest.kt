@@ -25,7 +25,9 @@ import kotlin.random.Random
  * layouts and assert the structural invariants (IHM-INV-3/-4/-7, RFF-INV-1) hold
  * after every accepted edit, and that [HomeLayoutReconciler] output is valid and
  * idempotent. This closes the combinatorial gap the example-based tests can't:
- * source-type x target-type x occupant x scope x page-fullness.
+ * source-type x target-type x occupant x scope x page-fullness x grid-shape x
+ * dock-capacity (grid dimensions and the app pool are randomized per run, so the
+ * dock capacity — = columns — varies from 2 upward instead of the fixed 4).
  *
  * The randomized walk here is exactly the one that surfaced the FolderDissolved
  * cell-collision (extract a member from a 2-member folder onto an out-of-range /
@@ -107,8 +109,9 @@ class HomeLayoutInvariantPropertyTest {
     private fun walk(runs: Int, steps: Int) {
         for (run in 0 until runs) {
             val rnd = Random(run.toLong() * 1_000_003L + 7)
-            var cur = seed(rnd)
-            assertTrue("seed invalid: ${cur.invariantViolations()}", cur.invariantViolations().isEmpty())
+            val sc = scenario(rnd)
+            var cur = seed(rnd, sc)
+            assertTrue("seed invalid (run=$run $sc): ${cur.invariantViolations()}", cur.invariantViolations().isEmpty())
             var idc = 0
             val newId = { ItemId("g${run}_${idc++}") }
             for (step in 0 until steps) {
@@ -116,7 +119,7 @@ class HomeLayoutInvariantPropertyTest {
                 if (ids.isEmpty()) continue
                 val res: LayoutEditResult? = when (rnd.nextInt(100)) {
                     in 0 until 40 -> HomeLayoutTransition.move(cur, ids[rnd.nextInt(ids.size)], target(cur, rnd), newId)
-                    in 40 until 65 -> HomeLayoutTransition.place(cur, ck(rnd.nextInt(pool.size)), target(cur, rnd), newId)
+                    in 40 until 65 -> HomeLayoutTransition.place(cur, sc.pool[rnd.nextInt(sc.pool.size)], target(cur, rnd), newId)
                     in 65 until 90 -> {
                         val fs = (cur.items.map { it.item } + cur.dock).filterIsInstance<HomeItem.Folder>()
                         if (fs.isEmpty()) null else fs[rnd.nextInt(fs.size)].let { f ->
@@ -131,16 +134,16 @@ class HomeLayoutInvariantPropertyTest {
                 val next = res?.layout ?: continue
                 cur = next
                 val bad = cur.invariantViolations()
-                if (bad.isNotEmpty()) fail("run=$run step=$step violations=$bad\nlayout=$cur")
+                if (bad.isNotEmpty()) fail("run=$run step=$step $sc violations=$bad\nlayout=$cur")
 
                 if (step % 20 == 19) {
-                    val installed = pool.toSet()
+                    val installed = sc.pool.toSet()
                     val r1 = HomeLayoutReconciler.reconcile(cur, installed, newId)
                     val after1 = (r1 as? ReconcileOutcome.Changed)?.layout ?: cur
                     val rbad = after1.invariantViolations()
-                    if (rbad.isNotEmpty()) fail("reconcile invalid run=$run step=$step $rbad")
+                    if (rbad.isNotEmpty()) fail("reconcile invalid run=$run step=$step $sc $rbad")
                     val r2 = HomeLayoutReconciler.reconcile(after1, installed, newId)
-                    assertTrue("reconcile not idempotent run=$run step=$step", r2 is ReconcileOutcome.Unchanged)
+                    assertTrue("reconcile not idempotent run=$run step=$step $sc", r2 is ReconcileOutcome.Unchanged)
                     cur = after1
                 }
             }
@@ -148,8 +151,27 @@ class HomeLayoutInvariantPropertyTest {
     }
 
     // ---------------------------------------------------------------- generators
-    private fun seed(rnd: Random): HomeLayout {
-        val cols = 4; val rows = 5; val pages = 1 + rnd.nextInt(2)
+
+    /**
+     * A per-run randomized problem shape: grid dimensions + the installed app pool.
+     * [grid].columns is the dock capacity, so drawing it from 2..6 (instead of the
+     * fixed 4) is what exercises the small-dock and dock-full/overflow paths.
+     */
+    private data class Scenario(val grid: GridSpec, val pool: List<ComponentKey>)
+
+    private fun scenario(rnd: Random): Scenario {
+        val cols = 2 + rnd.nextInt(5)          // 2..6  → dock capacity 2..6
+        val rows = 3 + rnd.nextInt(4)          // 3..6
+        val poolSize = 4 + rnd.nextInt(13)     // 4..16 distinct apps
+        val pool = (0 until poolSize).map { ComponentKey("com.app$it", "Main") }
+        return Scenario(GridSpec(cols, rows), pool)
+    }
+
+    /** A random, invariant-VALID starting layout for [sc]'s grid and app pool. */
+    private fun seed(rnd: Random, sc: Scenario): HomeLayout {
+        val cols = sc.grid.columns; val rows = sc.grid.rows
+        val pages = 1 + rnd.nextInt(3)         // 1..3 (well within MAX_PAGES)
+        val pool = sc.pool
         val items = ArrayList<PlacedItem>()
         val dock = ArrayList<HomeItem>()
         var n = 0
@@ -159,20 +181,21 @@ class HomeLayoutInvariantPropertyTest {
         free.shuffle(rnd)
         repeat(rnd.nextInt(3)) {
             if (free.isEmpty()) return@repeat
-            val m = (0 until (2 + rnd.nextInt(2))).map { ck(rnd.nextInt(pool.size)) }.distinct()
+            val m = (0 until (2 + rnd.nextInt(2))).map { pool[rnd.nextInt(pool.size)] }.distinct()
             if (m.size >= 2) items += PlacedItem(HomeItem.Folder(ItemId("s${n++}"), "", m), free.removeAt(0))
         }
         repeat(rnd.nextInt(5)) {
             if (free.isEmpty()) return@repeat
-            val k = ck(rnd.nextInt(pool.size)); if (!usedTop.add(k)) return@repeat
+            val k = pool[rnd.nextInt(pool.size)]; if (!usedTop.add(k)) return@repeat
             items += PlacedItem(HomeItem.App(ItemId("s${n++}"), k), free.removeAt(0))
         }
+        // Dock is seeded up to `cols` entries → never above capacity (= cols).
         repeat(rnd.nextInt(cols + 1)) {
             if (rnd.nextInt(4) == 0) {
-                val m = (0 until 2).map { ck(rnd.nextInt(pool.size)) }.distinct()
+                val m = (0 until 2).map { pool[rnd.nextInt(pool.size)] }.distinct()
                 if (m.size == 2) dock += HomeItem.Folder(ItemId("s${n++}"), "", m)
             } else {
-                val k = ck(rnd.nextInt(pool.size)); if (usedTop.add(k)) dock += HomeItem.App(ItemId("s${n++}"), k)
+                val k = pool[rnd.nextInt(pool.size)]; if (usedTop.add(k)) dock += HomeItem.App(ItemId("s${n++}"), k)
             }
         }
         return HomeLayout(GridSpec(cols, rows), pages, items, dock)
