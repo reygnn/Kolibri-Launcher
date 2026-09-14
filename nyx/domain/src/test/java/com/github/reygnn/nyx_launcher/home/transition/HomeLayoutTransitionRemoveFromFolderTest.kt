@@ -95,6 +95,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val start = layout(items = listOf(f), dock = fullDock)
         val r = HomeLayoutTransition.removeFromFolder(start, ItemId("f"), ck("pb"), DropTarget.DockSlot(grid.columns), seq("x")::next)
         assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.DOCK_FULL))
+        assertThat(r.layout).isNull() // rejected → no change, dock never grew past columns
     }
 
     @Test fun full_dock_out_of_range_dock_item_extract_is_rejected_not_overflowed() {
@@ -207,6 +208,7 @@ class HomeLayoutTransitionRemoveFromFolderTest {
             start, ItemId("f"), ck("pb"), DropTarget.DockSlot(2), seq("x")::next, // 2 > dock.size (1)
         )
         assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.OFF_GRID))
+        assertThat(r.layout).isNull() // rejected → no change, nothing inserted into the dock
     }
 
     @Test fun removing_a_duplicated_member_is_a_noop_guard_not_a_dissolve() {
