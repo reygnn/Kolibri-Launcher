@@ -355,4 +355,65 @@ class HomeLayoutRegridderTest {
         val second = HomeLayoutRegridder.fit(first.layout, GridSpec(2, 2))
         assertThat(second).isEqualTo(RegridOutcome.Unchanged)
     }
+
+    // ---- Same-cell collision healing (imported/hand-edited blob) ----
+    // Off-grid coordinates are pulled back (above); a same-cell collision of two DISTINCT
+    // items must be healed the same way. Left in place the loser stays hidden under the
+    // winner forever — pageCells renders last-wins, reconcile dedups only by ComponentKey,
+    // and (before this fix) the regridder classified BOTH as in-bounds and moved neither.
+
+    @Test fun a_same_cell_collision_on_the_matching_grid_relocates_the_later_item() {
+        // Both items are spatially in bounds and the grid matches, so only the collision term
+        // of the no-op guard can catch this. The first item in list order keeps the cell; the
+        // later one is relocated to the first free cell — both end up visible and reachable.
+        val g = GridSpec(4, 6)
+        val start = layout(
+            g,
+            items = listOf(placed(app("first", "pf"), 0, 0, 0), placed(app("dup", "pd"), 0, 0, 0)),
+        )
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed // NOT a no-op
+        val byId = out.layout.items.associate { it.item.id to it.pos }
+        assertThat(byId[ItemId("first")]).isEqualTo(CellPos(0, 0, 0)) // first claimant keeps the cell
+        assertThat(byId[ItemId("dup")]).isEqualTo(CellPos(0, 1, 0)) // later one relocated to first free
+        assertThat(out.layout.items.map { it.pos }.toSet()).hasSize(2) // no two share a cell now
+    }
+
+    @Test fun collision_healing_preserves_a_folder_collider_with_its_members() {
+        // The relocated collider can be a FOLDER — it keeps its members and span, it is not
+        // dropped or flattened. Here the folder is the later (losing) item at the shared cell.
+        val g = GridSpec(4, 6)
+        val keeper = placed(app("keep", "pk"), 0, 2, 3)
+        val f = PlacedItem(folder("fd", ck("pa"), ck("pb")), CellPos(0, 2, 3), Span(2, 2)) // same cell
+        val out = HomeLayoutRegridder.fit(layout(g, items = listOf(keeper, f)), g) as RegridOutcome.Changed
+        assertThat(out.layout.items.first { it.item.id == ItemId("keep") }.pos).isEqualTo(CellPos(0, 2, 3))
+        val rehomed = out.layout.items.first { it.item.id == ItemId("fd") }
+        assertThat((rehomed.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
+        assertThat(rehomed.span).isEqualTo(Span(2, 2)) // span survives
+        assertThat(rehomed.pos).isNotEqualTo(CellPos(0, 2, 3)) // moved off the shared cell
+    }
+
+    @Test fun collision_healing_is_idempotent() {
+        // Once healed, the positions are all distinct → a re-fit to the same grid is a no-op.
+        val g = GridSpec(4, 6)
+        val start = layout(
+            g,
+            items = listOf(placed(app("first", "pf"), 0, 0, 0), placed(app("dup", "pd"), 0, 0, 0)),
+        )
+        val healed = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(HomeLayoutRegridder.fit(healed.layout, g)).isEqualTo(RegridOutcome.Unchanged)
+    }
+
+    @Test fun a_folder_that_only_fits_past_the_page_cap_is_dropped() {
+        // Counterpart to relocation_is_capped_at_max_pages_…: the dropped overflow item can be
+        // a FOLDER, not just an app. Every MAX_PAGES cell of a 1×1 grid is filled by an app; an
+        // off-grid folder then has nowhere within the cap and is dropped from the layout — its
+        // grouping is lost, but the member apps remain reachable via the drawer. Pins the KDoc
+        // claim about folders, which was previously untested.
+        val tiny = GridSpec(1, 1)
+        val fillers = (0 until HomeLayout.MAX_PAGES).map { p -> placed(app("f$p", "pf$p"), p, 0, 0) }
+        val overflowFolder = PlacedItem(folder("fd", ck("pa"), ck("pb")), CellPos(0, 5, 0)) // off-grid under 1 col
+        val out = HomeLayoutRegridder.fit(layout(tiny, items = fillers + overflowFolder), tiny) as RegridOutcome.Changed
+        assertThat(out.layout.items.any { it.item.id == ItemId("fd") }).isFalse() // folder dropped
+        assertThat(out.layout.items).hasSize(HomeLayout.MAX_PAGES) // only the in-bounds apps survive
+    }
 }

@@ -15,7 +15,11 @@ import com.github.reygnn.nyx_launcher.home.model.Span
  * Policy — lossless and minimally disruptive:
  *  - The grid dimensions become [target].
  *  - Grid items already inside the new bounds keep their exact [CellPos]; only
- *    items that fall off-grid (x ≥ columns or y ≥ rows) are relocated.
+ *    items that fall off-grid (x ≥ columns or y ≥ rows) are relocated. An in-bounds
+ *    item whose cell is already taken by an earlier item is a same-cell collision
+ *    (only an imported/hand-edited blob can carry one — transitions keep one item per
+ *    cell); the first claimant keeps the cell, the later one is relocated so it can't
+ *    stay hidden under the winner (pageCells renders last-wins).
  *  - Dock capacity is `columns`; overflow dock items are re-homed onto the grid
  *    rather than dropped (never lose an app — cf. HEU-INV-2).
  *  - Relocated items (off-grid grid items in page/y/x order, then dock overflow)
@@ -58,7 +62,14 @@ object HomeLayoutRegridder {
                 it.pos.page !in 0 until HomeLayout.MAX_PAGES ||
                     it.pos.x !in 0 until target.columns ||
                     it.pos.y !in 0 until target.rows
-            }
+            } &&
+            // …and no two items share a cell. A same-cell collision only arises from an
+            // imported/hand-edited blob (transitions keep one item per cell); left in place
+            // the loser stays hidden under the winner forever (pageCells renders last-wins,
+            // reconcile dedups only by ComponentKey, so nothing else heals it). Mirror the
+            // relocation partition below, which would move the collider, so the guard trusts a
+            // matching grid as a no-op only when that loop truly moves nothing.
+            layout.items.mapTo(HashSet<CellPos>()) { it.pos }.size == layout.items.size
         ) {
             return RegridOutcome.Unchanged
         }
@@ -76,10 +87,15 @@ object HomeLayoutRegridder {
         // reachable page rather than kept on one the pager never renders.
         val inBounds = ArrayList<PlacedItem>()
         val offGrid = ArrayList<PlacedItem>()
+        val claimed = HashSet<CellPos>()
         for (placed in layout.items) {
-            if (placed.pos.page in 0 until HomeLayout.MAX_PAGES &&
+            val onGrid = placed.pos.page in 0 until HomeLayout.MAX_PAGES &&
                 placed.pos.x in 0 until cols && placed.pos.y in 0 until rows
-            ) {
+            // An in-bounds cell already claimed by an earlier item is a same-cell collision
+            // (imported/hand-edited blob only). Keep the first claimant; the later one joins
+            // the relocation queue so it lands on a free cell instead of staying hidden under
+            // the winner — symmetric to how a spatially off-grid item is pulled back.
+            if (onGrid && claimed.add(placed.pos)) {
                 inBounds.add(placed)
             } else {
                 offGrid.add(placed)
@@ -93,7 +109,7 @@ object HomeLayoutRegridder {
         offGrid.forEach { queue.add(it.item to it.span) }
         dockOverflow.forEach { queue.add(it to Span()) }
 
-        val occupied = HashSet<CellPos>().apply { inBounds.forEach { add(it.pos) } }
+        val occupied = claimed // already exactly the kept in-bounds cells
         val relocated = ArrayList<PlacedItem>(queue.size)
         var page = 0
         var x = 0
