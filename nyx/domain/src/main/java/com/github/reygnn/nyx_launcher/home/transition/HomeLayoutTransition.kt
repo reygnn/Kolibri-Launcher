@@ -266,6 +266,37 @@ object HomeLayoutTransition {
         if (folderItem.members.count { it == member } > 1) return FolderEditResult.NoOp
         val placement = layout.placementOf(folder) ?: return FolderEditResult.NoOp
 
+        // Scoped IHM-INV-7: a drop onto ANOTHER grid folder moves the member straight into
+        // it — no extraction to empty space. Folder B is its own uniqueness scope, so the
+        // member may already be a tile or a member of a third folder; only a duplicate WITHIN
+        // B is refused. A drop on the source folder's own cell (targetFolder.id == folder) is
+        // not a folder-move and falls through to the reject-occupied path below (that keeps the
+        // existing own-cell TARGET_OCCUPIED behaviour). A grid App occupant (not a folder) also
+        // falls through → still Rejected (folder-from-extraction stays v2).
+        val targetFolder: HomeItem.Folder? = (target as? DropTarget.Cell)?.let { t ->
+            layout.items.firstOrNull { it.pos == t.pos }?.item as? HomeItem.Folder
+        }
+        if (targetFolder != null && targetFolder.id != folder) {
+            if (member in targetFolder.members) return FolderEditResult.NoOp // B-scope uniqueness
+            val withB = layout.replacingItem(
+                targetFolder.id, targetFolder.copy(members = targetFolder.members + member),
+            )
+            val remainingInA = folderItem.members.filterNot { it == member }
+            return if (remainingInA.size >= 2) {
+                val shrunk = withB.replacingItem(folder, folderItem.copy(members = remainingInA))
+                FolderEditResult.MovedBetweenFolders(shrunk, from = folder, to = targetFolder.id)
+            } else {
+                // A drops to one member → dissolves; survivor promoted to A's old placement
+                // (RFF-INV-1/-2). Only ONE new id is minted (the survivor); the moved member
+                // travels as a raw ComponentKey into B.
+                val survivor = HomeItem.App(newId(), remainingInA.single())
+                val dissolved = placeAtPlacement(withB.removing(folder), survivor, placement)
+                FolderEditResult.MovedBetweenFoldersDissolve(
+                    dissolved, to = targetFolder.id, survivor = survivor.id,
+                )
+            }
+        }
+
         emptyTargetReason(layout, target)?.let { return FolderEditResult.Rejected(it) }
 
         val remaining = folderItem.members.filterNot { it == member }
@@ -294,9 +325,13 @@ object HomeLayoutTransition {
         target: DropTarget,
         newId: () -> ItemId,
     ): MoveResult {
-        // HEU-INV-1: already placed ⇒ move the existing item, never duplicate.
+        // HEU-INV-1 (scoped IHM-INV-7): a TOP-LEVEL occurrence (grid ∪ dock is one scope)
+        // still moves rather than duplicating — an app is at most one top-level thing. But
+        // folder membership is a SEPARATE scope now: an app that lives ONLY in a folder is
+        // placed fresh (a drawer drop onto an empty cell makes it a tile in ADDITION to the
+        // membership; a drop onto another folder adds it there — moveResolved's occupant path).
+        // The old `isFolderMember ⇒ NoOp` guard is therefore gone.
         layout.topLevelIdOf(app)?.let { return move(layout, it, target, newId) }
-        if (layout.isFolderMember(app)) return MoveResult.NoOp
         val fresh = HomeItem.App(newId(), app)
         return moveResolved(layout, fresh, Span(), fresh.id, target, newId)
     }
@@ -333,10 +368,6 @@ object HomeLayoutTransition {
     private fun HomeLayout.topLevelIdOf(key: ComponentKey): ItemId? =
         items.firstOrNull { (it.item as? HomeItem.App)?.key == key }?.item?.id
             ?: dock.firstOrNull { (it as? HomeItem.App)?.key == key }?.id
-
-    private fun HomeLayout.isFolderMember(key: ComponentKey): Boolean =
-        items.any { (it.item as? HomeItem.Folder)?.members?.contains(key) == true } ||
-            dock.any { (it as? HomeItem.Folder)?.members?.contains(key) == true }
 
     private fun HomeLayout.removing(id: ItemId): HomeLayout =
         copy(items = items.filterNot { it.item.id == id }, dock = dock.filterNot { it.id == id })

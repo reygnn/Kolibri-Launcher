@@ -60,11 +60,13 @@ data class PlacedItem(
  *
  * This replaces the flat favourites *list* of the text launchers with a real
  * positioned graph (ICON_HOME_MODEL_SPEC §0.3). The structural invariants —
- * no collision / on-grid (IHM-INV-3), unique stable ids (IHM-INV-4), and app
- * uniqueness across `items` ∪ all folder members ∪ `dock` (IHM-INV-7) — are
- * upheld by the use-case transitions (`MIU-*`, `RFF-*`, `RHL-*`, `HEU-*`), NOT
- * by this datatype. A violation constructed here is a programmer error, not a
- * user outcome (CLAUDE.md rule 21).
+ * no collision / on-grid (IHM-INV-3), unique stable ids (IHM-INV-4), and SCOPED
+ * app uniqueness (IHM-INV-7): a `ComponentKey` appears at most once in the
+ * top-level scope (`items` ∪ `dock` combined) and at most once WITHIN each folder,
+ * but the scopes are independent — the same app may be a top-level tile AND a member
+ * of one or more folders simultaneously — are upheld by the use-case transitions
+ * (`MIU-*`, `RFF-*`, `RHL-*`, `HEU-*`), NOT by this datatype. A violation
+ * constructed here is a programmer error, not a user outcome (CLAUDE.md rule 21).
  *
  * Persisted as one versioned JSON blob in DataStore; the `@Serializable` DTOs
  * and mappers live in `:data`, so these classes stay annotation-free

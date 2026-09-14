@@ -12,7 +12,13 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileOutcome
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** RHL-INV-4 dedup precedence: Dock > Grid > Folder. Pure JVM. */
+/**
+ * RHL-INV-4 scoped dedup (scoped IHM-INV-7). Two independent scopes:
+ *  - Top-level (grid ∪ dock): one survivor, Dock > Grid precedence.
+ *  - Each folder on its own: dedup only WITHIN a folder; a key may live as a tile AND
+ *    in several folders at once.
+ * Pure JVM.
+ */
 class HomeLayoutReconcilerDedupTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
@@ -54,38 +60,37 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(out.report.dedupedApps).isEqualTo(1)
     }
 
-    @Test fun member_duplicating_a_top_level_app_is_dropped() {
-        // pa is top-level (grid) AND a folder member → member dropped (Grid > Folder).
+    @Test fun a_member_may_also_be_a_top_level_tile() {
+        // pa is a top-level grid tile AND a folder member. Independent scopes → BOTH survive,
+        // nothing deduped (was: member dropped under the old global rule).
         val start = layout(
             items = listOf(
                 placed(app("g", "pa"), 0, 0, 0),
                 placed(folder("f", ck("pa"), ck("pb"), ck("pc")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
-        val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
-        assertThat(f.members).containsExactly(ck("pb"), ck("pc")).inOrder() // pa removed from folder
-        assertThat(out.report.dedupedApps).isEqualTo(1)
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun dedup_can_cascade_into_a_dissolve() {
-        // folder [pa, pb]; pa also top-level → member pa dropped → folder has 1 → dissolves.
+    @Test fun a_top_level_dup_no_longer_cascades_a_folder_into_dissolve() {
+        // folder [pa, pb] with pa ALSO a top-level tile. Under the old global rule the member
+        // pa was dropped, cascading the folder to one member and dissolving it. Now the folder
+        // scope is independent → the member stays, the folder survives, nothing changes. (The
+        // WITHIN-folder cascade-to-dissolve still exists — see a_folder_of_two_identical_members.)
         val start = layout(
             items = listOf(
                 placed(app("g", "pa"), 0, 0, 0),
                 placed(folder("f", ck("pa"), ck("pb")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids("survivor")::next) as ReconcileOutcome.Changed
-        assertThat(out.report.dedupedApps).isEqualTo(1)
-        assertThat(out.report.dissolvedFolders).isEqualTo(1)
-        val survivor = out.layout.items.first { it.pos == CellPos(0, 1, 0) }
-        assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids("unused")::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun a_key_shared_by_two_grid_folders_survives_in_the_lower_positioned_one() {
-        // Two grid folders both list pa; the earlier one (page,y,x order) keeps it, the
-        // later one drops it. Both stay folders (>=2 survivors), so no dissolve masks it.
+    @Test fun a_key_may_live_in_two_grid_folders_at_once() {
+        // Two grid folders both list pa. Each folder is its own scope → pa survives in BOTH
+        // (was: dropped from the later-positioned one).
         val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"), ck("pe"))
         val start = layout(
             items = listOf(
@@ -93,27 +98,20 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f2", ck("pa"), ck("pd"), ck("pe")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next) as ReconcileOutcome.Changed
-        val f1 = out.layout.items.first { it.item.id == ItemId("f1") }.item as HomeItem.Folder
-        val f2 = out.layout.items.first { it.item.id == ItemId("f2") }.item as HomeItem.Folder
-        assertThat(f1.members).containsExactly(ck("pa"), ck("pb"), ck("pc")).inOrder() // keeps pa
-        assertThat(f2.members).containsExactly(ck("pd"), ck("pe")).inOrder() // pa dropped
-        assertThat(out.report.dedupedApps).isEqualTo(1)
+        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun a_key_shared_by_a_dock_folder_and_a_grid_folder_survives_in_the_dock_folder() {
-        // Dedup pass 2c runs dock folders before grid folders → the dock folder wins pa.
+    @Test fun a_key_may_live_in_a_dock_folder_and_a_grid_folder_at_once() {
+        // pa in a dock folder AND a grid folder. Independent folder scopes → survives in both
+        // (was: dropped from the grid folder by dock-over-grid precedence).
         val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"))
         val start = layout(
             items = listOf(placed(folder("fg", ck("pa"), ck("pc"), ck("pd")), 0, 0, 0)),
             dock = listOf(folder("fd", ck("pa"), ck("pb"))),
         )
-        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next) as ReconcileOutcome.Changed
-        val fd = out.layout.dock.first { it.id == ItemId("fd") } as HomeItem.Folder
-        val fg = out.layout.items.first { it.item.id == ItemId("fg") }.item as HomeItem.Folder
-        assertThat(fd.members).containsExactly(ck("pa"), ck("pb")).inOrder() // dock folder keeps pa
-        assertThat(fg.members).containsExactly(ck("pc"), ck("pd")).inOrder() // pa dropped from grid folder
-        assertThat(out.report.dedupedApps).isEqualTo(1)
+        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
     @Test fun dedup_is_idempotent() {
@@ -126,11 +124,11 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(second).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun dedup_emptying_a_folder_removes_it_not_dissolves_it() {
-        // Both members of a folder are ALSO top-level grid apps → dedup strips both → the
-        // folder is emptied to 0 members and Pass 3 REMOVES it. This is a distinct data flow
-        // from the prune-emptied path (the empty list comes from dedupMembers, not
-        // pruneMembers) and from the dedup-cascade-to-1 dissolve; nothing pins it.
+    @Test fun folder_members_that_are_also_top_level_tiles_now_coexist() {
+        // Both members of a folder are ALSO top-level grid tiles. Under the old global rule the
+        // members were stripped and the folder emptied+removed; now the folder scope is
+        // independent, so the members stay, the folder survives, and nothing changes. (The
+        // empty-folder REMOVAL path is still reachable via prune — see the prune tests.)
         val start = layout(
             items = listOf(
                 placed(app("g1", "pa"), 0, 0, 0),
@@ -138,20 +136,15 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f", ck("pa"), ck("pb")), 0, 2, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
-        assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
-        assertThat(out.layout.items.map { it.item.id }).containsExactly(ItemId("g1"), ItemId("g2"))
-        assertThat(out.report.dedupedApps).isEqualTo(2) // both members stripped
-        assertThat(out.report.removedEmptyFolders).isEqualTo(1) // emptied → removed, not dissolved
-        assertThat(out.report.dissolvedFolders).isEqualTo(0)
-        assertThat(out.report.prunedApps).isEqualTo(0) // nothing uninstalled
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun a_key_in_dock_grid_and_a_folder_resolves_dock_over_grid_over_folder() {
-        // The full Dock > Grid > Folder precedence chain on ONE key in a single input — the
-        // headline RHL-INV-4 guarantee, only ever verified PAIRWISE before. pa lives as a dock
-        // app, a grid app, and a grid-folder member simultaneously: the dock app wins, the grid
-        // app AND the folder member are both dropped.
+    @Test fun top_level_dedups_dock_over_grid_but_a_folder_member_is_a_separate_scope() {
+        // pa lives as a dock app, a grid tile, AND a grid-folder member. Top-level scope
+        // (grid ∪ dock) keeps ONE: the dock app wins, the grid tile is dropped. The folder
+        // member is a DIFFERENT scope → it survives. So exactly one dedup (the grid tile),
+        // not two (was: grid app + folder member both dropped under the old global rule).
         val start = layout(
             items = listOf(
                 placed(app("g", "pa"), 0, 0, 0),
@@ -160,11 +153,11 @@ class HomeLayoutReconcilerDedupTest {
             dock = listOf(app("d", "pa")),
         )
         val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
-        assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("d")) // dock wins
-        assertThat(out.layout.items.any { it.item.id == ItemId("g") }).isFalse() // grid app dropped
+        assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("d")) // dock wins top-level
+        assertThat(out.layout.items.any { it.item.id == ItemId("g") }).isFalse() // grid tile dropped
         val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
-        assertThat(f.members).containsExactly(ck("pb"), ck("pc")).inOrder() // member pa dropped
-        assertThat(out.report.dedupedApps).isEqualTo(2) // grid app + folder member
+        assertThat(f.members).containsExactly(ck("pa"), ck("pb"), ck("pc")).inOrder() // member pa SURVIVES
+        assertThat(out.report.dedupedApps).isEqualTo(1) // only the grid tile
     }
 
     @Test fun duplicate_member_keys_within_one_folder_collapse_to_the_first() {
@@ -200,24 +193,17 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
-    @Test fun a_key_shared_by_two_dock_folders_survives_in_the_earlier_slot() {
-        // B6: dedup pass 2c walks dock folders in SLOT order (dockP), so the earlier dock
-        // slot keeps the shared key and the later loses it. Only grid-vs-grid and
-        // dock-vs-grid folder precedence were pinned before; this pins the dock-folder vs
-        // dock-folder slot ordering guarantee.
-        // The later folder keeps a second surviving member (pd) so it stays a folder rather
-        // than dissolving in Pass 3 — this test isolates the dedup slot-order guarantee.
+    @Test fun a_key_may_live_in_two_dock_folders_at_once() {
+        // Two dock folders both list pa. Each folder is its own scope → pa survives in BOTH
+        // (was: dropped from the later slot). Distinct from top-level dock dedup, which still
+        // collapses two bare dock APPS of the same key (duplicate_apps_within_the_dock…).
         val start = layout(
             dock = listOf(
                 folder("early", ck("pa"), ck("pb")),
                 folder("late", ck("pa"), ck("pc"), ck("pd")),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
-        val early = out.layout.dock.first { it.id == ItemId("early") } as HomeItem.Folder
-        val late = out.layout.dock.first { it.id == ItemId("late") } as HomeItem.Folder
-        assertThat(early.members).containsExactly(ck("pa"), ck("pb")).inOrder() // earlier slot keeps pa
-        assertThat(late.members).containsExactly(ck("pc"), ck("pd")).inOrder() // pa dropped from the later slot
-        assertThat(out.report.dedupedApps).isEqualTo(1)
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 }

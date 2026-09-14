@@ -304,4 +304,79 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         // extracted (pa) at the grid target.
         assertThat(out.items.first { it.pos == CellPos(0, 0, 0) }.item.id).isEqualTo(ItemId("extracted"))
     }
+
+    // ===================== folder → folder (scoped IHM-INV-7) ===============
+
+    @Test fun move_member_into_another_grid_folder_shrinks_the_source() {
+        // A (>=3 members) → drop pb onto grid folder B: A shrinks, B gains pb. No extraction
+        // to empty space, no new ItemId minted (members are raw ComponentKeys).
+        val a = folder("a", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val b = folder("b", ck("pd"), ck("pe"), page = 0, x = 1, y = 0)
+        val start = layout(items = listOf(a, b))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pb"), DropTarget.Cell(CellPos(0, 1, 0)), seq("unused")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.MovedBetweenFolders::class.java)
+        val moved = r as FolderEditResult.MovedBetweenFolders
+        assertThat(moved.from).isEqualTo(ItemId("a"))
+        assertThat(moved.to).isEqualTo(ItemId("b"))
+        val out = r.layout!!
+        val aOut = out.items.first { it.item.id == ItemId("a") }.item as HomeItem.Folder
+        val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
+        assertThat(aOut.members).containsExactly(ck("pa"), ck("pc")).inOrder() // pb removed, order kept
+        assertThat(bOut.members).containsExactly(ck("pd"), ck("pe"), ck("pb")).inOrder() // pb appended
+    }
+
+    @Test fun move_last_pair_member_into_another_folder_dissolves_the_source() {
+        // A (exactly 2) → drop pa onto grid folder B: A dissolves, its survivor pb is promoted
+        // to A's old cell, B gains pa. Exactly ONE new id (the survivor).
+        val a = folder("a", ck("pa"), ck("pb"), page = 0, x = 2, y = 3)
+        val b = folder("b", ck("pd"), ck("pe"), page = 0, x = 1, y = 0)
+        val start = layout(items = listOf(a, b))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pa"), DropTarget.Cell(CellPos(0, 1, 0)), seq("survivor")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.MovedBetweenFoldersDissolve::class.java)
+        val moved = r as FolderEditResult.MovedBetweenFoldersDissolve
+        assertThat(moved.to).isEqualTo(ItemId("b"))
+        assertThat(moved.survivor).isEqualTo(ItemId("survivor"))
+        val out = r.layout!!
+        assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse() // A retired
+        val survivor = out.items.first { it.pos == CellPos(0, 2, 3) } // A's old cell
+        assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pb"))
+        assertThat(survivor.item.id).isEqualTo(ItemId("survivor"))
+        val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
+        assertThat(bOut.members).containsExactly(ck("pd"), ck("pe"), ck("pa")).inOrder()
+    }
+
+    @Test fun move_into_a_folder_that_already_contains_the_member_is_a_noop() {
+        // B-scope uniqueness: dropping pa onto a folder B that already has pa changes nothing.
+        val a = folder("a", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val b = folder("b", ck("pa"), ck("pd"), page = 0, x = 1, y = 0)
+        val start = layout(items = listOf(a, b))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pa"), DropTarget.Cell(CellPos(0, 1, 0)), seq("unused")::next,
+        )
+        assertThat(r).isEqualTo(FolderEditResult.NoOp)
+        assertThat(r.layout).isNull()
+    }
+
+    @Test fun move_member_the_target_is_also_a_top_level_tile_still_moves_between_folders() {
+        // Independent scopes: pb is ALSO a top-level tile elsewhere. Moving it A→B is
+        // unaffected by the tile; the tile stays put (top-level scope is separate).
+        val a = folder("a", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val b = folder("b", ck("pd"), ck("pe"), page = 0, x = 1, y = 0)
+        val tile = PlacedItem(app("tile", "pb"), CellPos(0, 3, 3))
+        val start = layout(items = listOf(a, b, tile))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pb"), DropTarget.Cell(CellPos(0, 1, 0)), seq("unused")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.MovedBetweenFolders::class.java)
+        val out = r.layout!!
+        // the pb tile is untouched
+        val tileOut = out.items.first { it.item.id == ItemId("tile") }
+        assertThat((tileOut.item as HomeItem.App).key).isEqualTo(ck("pb"))
+        val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
+        assertThat(bOut.members).containsExactly(ck("pd"), ck("pe"), ck("pb")).inOrder()
+    }
 }

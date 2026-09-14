@@ -17,10 +17,16 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileReport
  * at 0) → trim trailing empty pages (keep >= 1). Dock capacity is NOT enforced here
  * (the regridder owns it, against the real device grid). Idempotent (RHL-INV-2).
  *
- * Dedup precedence (RHL-INV-4): each [ComponentKey] survives at its most
- * intentional position — Dock (slot order) > Grid top-level (page, y, x) > Folder
- * member (folder position, then member index). Duplicates only arise from
- * import/merge; normal transitions keep app-uniqueness.
+ * Dedup is PER SCOPE (RHL-INV-4, scoped IHM-INV-7). Two independent scopes:
+ *  - Top-level (grid ∪ dock): a [ComponentKey] survives once, at its most intentional
+ *    position — Dock (slot order) > Grid (page, y, x). An app is at most one top-level
+ *    thing (a tile OR a dock icon), never both.
+ *  - Each folder on its own: a member is deduped only WITHIN its own folder (first
+ *    occurrence kept). A member is NOT dropped for also being a top-level app or a
+ *    member of another folder — those are different scopes, so the same key may live as
+ *    a tile AND in several folders at once.
+ * Duplicates within a scope only arise from import/merge; normal transitions keep
+ * per-scope uniqueness.
  */
 object HomeLayoutReconciler {
 
@@ -53,35 +59,39 @@ object HomeLayoutReconciler {
             }
         }
 
-        // ---- Pass 2: dedup by precedence (RHL-INV-4) ----
-        val seen = HashSet<ComponentKey>()
+        // ---- Pass 2: dedup PER SCOPE (RHL-INV-4, scoped IHM-INV-7) ----
         val droppedAppIds = HashSet<ItemId>()
 
-        // 2a: dock top-level apps (slot order) reserve keys first.
-        for (item in dockP) if (item is HomeItem.App && !seen.add(item.key)) {
+        // 2a + 2b: TOP-LEVEL scope (grid ∪ dock share one set). Dock slots reserve keys
+        // first (Dock > Grid), then grid top-level apps in (page, y, x) order.
+        val seenTopLevel = HashSet<ComponentKey>()
+        for (item in dockP) if (item is HomeItem.App && !seenTopLevel.add(item.key)) {
             droppedAppIds.add(item.id); dedupedApps++
         }
-        // 2b: grid top-level apps (page, y, x order).
         val gridByPos = itemsP.sortedWith(compareBy({ it.pos.page }, { it.pos.y }, { it.pos.x }))
         for (placed in gridByPos) {
             val home = placed.item
-            if (home is HomeItem.App && !seen.add(home.key)) {
+            if (home is HomeItem.App && !seenTopLevel.add(home.key)) {
                 droppedAppIds.add(home.id); dedupedApps++
             }
         }
-        // 2c: folder members — dock folders (slot), then grid folders (pos).
-        fun dedupMembers(members: List<ComponentKey>): List<ComponentKey> {
+        // 2c: folder members — each folder is its OWN scope. Dedup only WITHIN a folder's
+        // own member list (fresh set per folder); a member is NOT compared against the
+        // top-level set or against other folders. So a key may be a tile AND a member of
+        // several folders at once (independent scopes).
+        fun dedupWithinFolder(members: List<ComponentKey>): List<ComponentKey> {
+            val seenHere = HashSet<ComponentKey>(members.size)
             val kept = ArrayList<ComponentKey>(members.size)
-            for (key in members) if (seen.add(key)) kept.add(key) else dedupedApps++
+            for (key in members) if (seenHere.add(key)) kept.add(key) else dedupedApps++
             return kept
         }
         val dedupedMembersById = HashMap<ItemId, List<ComponentKey>>()
         for (item in dockP) if (item is HomeItem.Folder) {
-            dedupedMembersById[item.id] = dedupMembers(item.members)
+            dedupedMembersById[item.id] = dedupWithinFolder(item.members)
         }
         for (placed in gridByPos) {
             val home = placed.item
-            if (home is HomeItem.Folder) dedupedMembersById[home.id] = dedupMembers(home.members)
+            if (home is HomeItem.Folder) dedupedMembersById[home.id] = dedupWithinFolder(home.members)
         }
 
         fun applyDedup(item: HomeItem): HomeItem? = when (item) {

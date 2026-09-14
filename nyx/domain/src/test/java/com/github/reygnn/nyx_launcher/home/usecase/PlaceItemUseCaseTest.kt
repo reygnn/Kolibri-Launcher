@@ -51,17 +51,24 @@ class PlaceItemUseCaseTest {
     }
 
     @Test
-    fun placing_an_app_that_is_already_a_folder_member_is_a_noop_and_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
-        // place()'s folder-member guard (HomeLayoutTransition: isFolderMember → NoOp) is
-        // unique to the place path (no analogue in move). It must NOT re-add the app (HEU-INV-1
-        // uniqueness) and must NOT persist — the persist-storm guard for place, untested until now.
+    fun placing_an_app_that_is_only_a_folder_member_adds_a_fresh_tile() = runTest(mainDispatcherRule.dispatcher) {
+        // Scoped IHM-INV-7: folder membership is its OWN scope, so a drawer place of an app
+        // that currently lives only in a folder creates a fresh grid tile — the app becomes a
+        // tile AND stays a member (cross-scope coexistence). This is the case the old
+        // `isFolderMember → NoOp` guard forbade; it is now a real placement that persists.
         val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb")))
         val start = empty().copy(items = listOf(PlacedItem(folder, CellPos(0, 0, 0))))
         val repo = FakeHomeLayoutRepository(start)
         val result = PlaceItemUseCase(repo, ids, mainDispatcherRule.dispatcher)(ck("pa"), DropTarget.Cell(CellPos(0, 2, 2)))
-        assertThat(result).isEqualTo(MoveResult.NoOp)
-        assertThat(repo.saveCount).isEqualTo(0)
-        assertThat(repo.current).isEqualTo(start) // layout untouched
+        assertThat(result).isInstanceOf(MoveResult.Moved::class.java)
+        assertThat(repo.saveCount).isEqualTo(1)
+        // folder untouched — pa still a member (independent scope)
+        val f = repo.current.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
+        assertThat(f.members).containsExactly(ck("pa"), ck("pb")).inOrder()
+        // fresh tile created for pa at the target
+        val tile = repo.current.items.first { it.pos == CellPos(0, 2, 2) }
+        assertThat((tile.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(tile.item.id).isEqualTo(ItemId("new"))
     }
 
     @Test
