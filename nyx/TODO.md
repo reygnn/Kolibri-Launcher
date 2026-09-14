@@ -118,3 +118,59 @@ aufgerufen werden.
 
 Anker: `MainActivity.applyDeviceGrid`, `HomeViewModel.applyDeviceGrid`,
 `FitHomeGridUseCase`, `HomeLayoutRegridder`.
+
+### Folder im App-Drawer — Feature (idealerweise Home-Struktur wiederverwenden)
+
+Der Drawer kennt aktuell **keine** Folder: `GetDrawerAppsUseCase` liefert eine
+flache `List<LauncherApp>` (nur `key/label/customName`, kein Children/Folder-
+Feld), `AppDrawerAdapter` bindet ausschließlich Einzel-App-ViewHolder (kein
+`getItemViewType`, keine Gruppen), und der einzige Interaktionspfad ist
+Tap = Launch / Long-Press = `DragPayload.NewApp(key)`. Folder sind bislang rein
+ein Home-/Dock-Konzept (`HomeItem.Folder`); die Specs führen den Drawer bewusst
+als „nur eine Liste" (`ICON_HOME_MODEL_SPEC.md:46`, `HOME_EDIT_USECASES_SPEC.md`
+Scope-Ausschluss).
+
+Ziel: Gruppieren von Apps zu Foldern **innerhalb** des Drawers. **Idealerweise
+die Home-Struktur übernehmen statt ein zweites Modell zu bauen** — d.h. den
+`HomeItem`/`HomeItem.Folder`-Typ und die reine Transitions-Logik
+(`HomeLayoutTransition`: app-onto-app → FolderCreated, app-onto-folder → member,
+`removeFromFolder`) für den Drawer wiederverwenden, inkl. der scoped IHM-INV-7-
+Uniqueness und der Invarianten-Absicherung (`HomeLayoutInvariants`). Zu klären:
+eigener Drawer-Layout-State (persistiert) vs. Ableitung, und wie sich das mit
+„Drawer zeigt *alle* Apps" verträgt (Folder als Gruppierungs-Overlay über der
+vollständigen Liste, nicht als exklusive Container).
+
+Braucht: einen persistierten Drawer-Layout-Zustand (Store in `:nyx:data`),
+`getItemViewType` + Folder-ViewHolder/-Öffnen im `AppDrawerAdapter`, einen
+Drag-to-Fold-Pfad im `AppDrawerFragment` und eine ViewModel-Verdrahtung auf die
+geteilte Transitions-Logik. Vorab **Produkt-/Scope-Entscheid** nötig (der
+Launcher3-Scope-Entscheid oben nennt Drawer-Folder nicht explizit).
+
+Anker: `home/usecase/GetDrawerAppsUseCase.kt`, `home/model/LauncherApp.kt`,
+`home/drawer/AppDrawerAdapter.kt`, `home/drawer/AppDrawerFragment.kt`,
+`DragPayload.kt`; Wiederverwendung aus `home/model/HomeItem.kt`,
+`home/transition/HomeLayoutTransition.kt`, `home/model/HomeLayoutInvariants.kt`.
+
+### Hidden Apps — Feature (aus Kolibri portieren)
+
+Der Drawer zeigt aktuell **alle** installierten Apps: `GetDrawerAppsUseCase`
+lädt `repository.loadInstalledApps()`, sortiert nach Anzeigename und gibt zurück
+— **kein Hidden-Filter** dazwischen. `HiddenAppsRepository` existiert nur in den
+Specs, nicht im nyx-Code.
+
+`ICON_HOME_MODEL_SPEC.md:47` (§0.1-Tabelle) führt Hidden Apps als **Übernahme
+aus dem großen Kolibri** (`HiddenAppsRepository`, „keine" Anpassung) — geplant,
+aber noch nicht portiert (gleiches Muster wie Custom Names / Backup/Restore in
+derselben Tabelle).
+
+Braucht: `HiddenAppsRepository` (Interface + DataStore-Impl in `:nyx:data`, Rule
+1/5), Einhängen des Hidden-Sets in `GetDrawerAppsUseCase` (rausfiltern; Sortieren
+bleibt Consumer-Job), einen Aus-/Einblenden-Pfad (Long-Press im Drawer bzw.
+Settings-Liste) und eine „versteckte Apps"-Verwaltungsansicht. Reconcile-
+Interaktion prüfen: eine versteckte App darf beim Reconcile nicht als
+deinstalliert gewertet und vom Home entfernt werden.
+
+Anker: `home/usecase/GetDrawerAppsUseCase.kt`,
+`home/repository/InstalledAppsRepository.kt`, `home/model/LauncherApp.kt`,
+`home/drawer/AppDrawerFragment.kt`, `settings/*`; Referenz (Kolibri):
+`HiddenAppsRepository`.
