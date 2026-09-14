@@ -79,8 +79,9 @@ sealed interface ReconcileResult {
 ## §2 Reihenfolge der Operationen (bestimmt Korrektheit + Idempotenz)
 
 1. **Prune** — jede `ComponentKey ∉ installed` aus `dock`, `items`, Folder-`members`.
-2. **Dedup** — verbleibende Duplikate nach RHL-INV-4-Präzedenz auf ein Vorkommen
-   reduzieren.
+2. **Dedup** — verbleibende Duplikate **pro Scope** (RHL-INV-4) auf ein Vorkommen
+   reduzieren: Top-Level (`items` ∪ `dock`) Dock > Grid, jeder Folder für sich.
+   Cross-Scope-Duplikate bleiben (App darf Kachel *und* Folder-Member sein).
 3. **Folder-Reparatur** — Folder mit **1** Member → **Dissolve** (Survivor an die
    Folder-Zelle/den Slot promoten, Folder-`ItemId` retired; RFF-INV-2); Folder mit
    **0** Membern → entfernen, Zelle frei.
@@ -98,18 +99,25 @@ sealed interface ReconcileResult {
 
 ---
 
-## §3 Dedup-Präzedenz
+## §3 Dedup-Präzedenz (per Scope)
 
-Erscheint eine `ComponentKey` mehrfach, gewinnt das Vorkommen an der **absichtlichsten
-Position**; die übrigen fallen weg. Deterministisch, unabhängig von Listen-Reihenfolge:
+Dedup ist **pro Scope** (scoped IHM-INV-7). Innerhalb eines Scopes gewinnt das
+Vorkommen an der **absichtlichsten Position**; die übrigen dieses Scopes fallen weg.
+Über Scope-Grenzen hinweg wird **nicht** dedupliziert. Deterministisch, unabhängig von
+Listen-Reihenfolge:
 
-> **RHL-INV-4 — Präzedenz Dock > Grid > Folder.**
-> 1. **Dock** (kleinster Slot-Index zuerst)
-> 2. **Top-Level-Grid** (`page` ↑, `y` ↑, `x` ↑)
-> 3. **Folder-Member** (Grid-Rang des Folders, dann Member-Index)
+> **RHL-INV-4 — Per-Scope-Präzedenz.**
+> - **Top-Level-Scope** (`items` ∪ `dock`): ein Überlebender, Präzedenz **Dock > Grid**.
+>   1. **Dock** (kleinster Slot-Index zuerst)
+>   2. **Top-Level-Grid** (`page` ↑, `y` ↑, `x` ↑)
+> - **Folder-Scope** (jeder Folder für sich): nur **innerhalb** eines Folders wird auf
+>   das erste Vorkommen dedupliziert. Ein Member wird **nicht** entfernt, weil dieselbe
+>   `ComponentKey` auch top-level oder in einem anderen Folder liegt — das sind eigene
+>   Scopes.
 >
-> Das höchstplatzierte Vorkommen bleibt, alle anderen werden entfernt. Dies **ersetzt**
-> die lose Formulierung „letztes Vorkommen gewinnt" in `ICON_HOME_MODEL_SPEC` IHM-INV-7.
+> Das höchstplatzierte Vorkommen **je Scope** bleibt. Eine `ComponentKey` darf also als
+> Top-Level-Kachel **und** in mehreren Foldern gleichzeitig überleben. Dies **ersetzt**
+> die frühere globale Formulierung „Dock > Grid > Folder".
 
 ---
 

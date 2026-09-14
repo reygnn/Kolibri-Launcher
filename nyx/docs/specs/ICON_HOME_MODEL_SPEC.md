@@ -177,15 +177,26 @@ data class HomeLayout(
 > **IHM-INV-4 — Item-IDs sind global eindeutig und stabil.** Ein `ItemId` erscheint
 > höchstens einmal über `items` ∪ `dock`. Umsortieren mutiert `pos`, nie `id`.
 
-> **IHM-INV-7 — App-Unizität** *(ratifiziert Runde 2)*. Jede `ComponentKey` erscheint
-> **höchstens einmal** über `items` ∪ alle Folder-`members` ∪ `dock`. Eine App ist also
-> nie zugleich top-level und in einem Folder (oder in zwei Foldern). Folgen: die
-> Transitionen (`MIU-*`, `RFF-*`) **verschieben** eine App, duplizieren sie nie; ein
-> „Add" einer bereits enthaltenen App ist damit **unerreichbar** und wäre ein
-> Programmierfehler (`silentError`, Rule 11) — **kein** `NoOp`, **kein** `Rejected`.
-> **Etabliert** wird die Invariante am Rand (Import/Reconcile: fail-closed dedupe nach
-> `RECONCILE_HOME_LAYOUT_SPEC` RHL-INV-4, Präzedenz Dock > Grid > Folder), **erhalten**
-> von jeder Transition.
+> **IHM-INV-7 — App-Unizität, SCOPED** *(ratifiziert Runde 2; auf Scopes gelockert Runde 3)*.
+> Unizität gilt nicht mehr global, sondern **pro Scope**. Es gibt zwei unabhängige
+> Scopes:
+> - **Top-Level** (`items` ∪ `dock` zusammen): jede `ComponentKey` erscheint dort
+>   **höchstens einmal** — eine App ist entweder Grid-Kachel *oder* Dock-Icon, nie beides
+>   und nie zweimal.
+> - **Pro Folder**: innerhalb eines einzelnen Folders erscheint jede `ComponentKey`
+>   höchstens einmal.
+>
+> Die Scopes sind **unabhängig**: dieselbe App darf gleichzeitig eine Top-Level-Kachel
+> sein **und** Mitglied eines oder mehrerer Folder (auch mehrerer Folder auf derselben
+> Seite). Folgen: die Transitionen (`MIU-*`, `RFF-*`, `HEU-*`) **verschieben** eine App
+> innerhalb eines Scopes (nie zwei Kacheln, nie zwei Dock-Icons, nie zwei gleiche Member
+> in einem Folder), erzeugen sie aber **frei** in einem anderen Scope (Drawer-Drop einer
+> Folder-App auf eine leere Zelle ⇒ neue Kachel *zusätzlich* zur Mitgliedschaft;
+> Folder-Member-Drop auf einen anderen Folder ⇒ `MovedBetweenFolders`, siehe
+> `REMOVE_FROM_FOLDER_SPEC` §2). Ein „Add" einer bereits **im selben Folder** enthaltenen
+> App bleibt unerreichbar (`silentError`/`NoOp`, Rule 11). **Etabliert** wird die
+> Invariante am Rand (Import/Reconcile: per-Scope dedupe nach
+> `RECONCILE_HOME_LAYOUT_SPEC` RHL-INV-4), **erhalten** von jeder Transition.
 
 ---
 

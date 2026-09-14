@@ -62,6 +62,21 @@ sealed interface FolderEditResult {
     data class Rejected(val reason: MoveResult.Reason) : FolderEditResult {  // reuse §MOVE_ITEM §2
         override val layout: HomeLayout? get() = null
     }
+
+    // Folder → Folder (scoped IHM-INV-7). Member zieht direkt in einen anderen Grid-Folder.
+    // Quell-Folder ≥3 → schrumpft.
+    data class MovedBetweenFolders(
+        override val layout: HomeLayout,
+        val from: ItemId,                 // Quell-Folder (geschrumpft)
+        val to: ItemId,                   // Ziel-Folder (Member angehängt)
+    ) : FolderEditResult
+
+    // Quell-Folder war genau 2 → löst auf; Survivor an dessen alte Zelle/Slot, Member in `to`.
+    data class MovedBetweenFoldersDissolve(
+        override val layout: HomeLayout,
+        val to: ItemId,                   // Ziel-Folder (Member angehängt)
+        val survivor: ItemId,             // promoteter Rest-Member
+    ) : FolderEditResult
 }
 ```
 
@@ -76,7 +91,10 @@ Ziel-Regeln (leer/off-grid/dock voll/belegt) sind **identisch** zu `MOVE_ITEM_SP
 |---|---|---|
 | ≥ 3 | leere Zelle / leerer Dock-Slot mit Platz | `Extracted` — Folder schrumpft (bleibt ≥ 2), App an Ziel; **eine** neue `ItemId` |
 | = 2 | leere Zelle / leerer Dock-Slot mit Platz | `FolderDissolved` — extrahierte App an Ziel, **Rest-Member an die alte Folder-Zelle/den alten Slot**, Folder-`ItemId` retired; **zwei** neue `ItemId` |
-| beliebig | belegte Zelle/Slot | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — Folder-Erzeugung-aus-Extraktion ist v2 (§8, §7-D1) |
+| ≥ 3 | Zelle mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFolders` — Quell-Folder schrumpft (bleibt ≥ 2), Member ans Ende von B angehängt; **keine** neue `ItemId` (Member ist ein `ComponentKey`) |
+| = 2 | Zelle mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFoldersDissolve` — Quell-Folder löst auf (Survivor an dessen alte Zelle/Slot), Member ans Ende von B; **eine** neue `ItemId` (der Survivor) |
+| beliebig | Zelle mit Folder B, **der den Member schon hat** (B-Scope-Unizität) | `NoOp` |
+| beliebig | eigene Folder-Zelle / belegte Zelle mit **App** | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — Folder-Erzeugung-aus-Extraktion (App-Occupant) bleibt v2 (§8, §7-D1); eigene Zelle ist per Definition belegt |
 | beliebig | `page > pages` / außerhalb `grid` | `Rejected(OFF_GRID)` |
 | beliebig | Dock voll (`dock.size == columns`) | `Rejected(DOCK_FULL)` |
 | `member ∉ folder` oder `folder` ist kein Folder | — | Programmierfehler → `silentError` → `NoOp` (RFF-INV-4) |
@@ -172,34 +190,41 @@ Kein neues Repository ⇒ kein Contract-Triple. Folder-öffnen/Member-Drag → `
 
 ---
 
-## §6 Cross-Spec-Fund: Duplikat-Handling — ENTSCHIEDEN (Runde 2)
+## §6 Cross-Spec-Fund: Duplikat-Handling — ENTSCHIEDEN (Runde 2, gelockert Runde 3)
 
 Beim Ausmodellieren aufgefallen: `MOVE_ITEM_SPEC` §3.1 `AddedToFolder` sagte nicht,
 was passiert, wenn die Quell-App schon Mitglied des Ziel-Folders ist. Das setzte die
 Frage voraus, ob dieselbe `ComponentKey` mehrfach im Layout vorkommen darf.
 
-> **Entschieden:** Variante **(A) App-Unizität** — ratifiziert als
-> `ICON_HOME_MODEL_SPEC` **IHM-INV-7**. Jede `ComponentKey` erscheint höchstens einmal
-> über `items` ∪ alle Folder ∪ `dock`.
+> **Entschieden (Runde 2):** Variante **(A) App-Unizität**, ratifiziert als
+> `ICON_HOME_MODEL_SPEC` **IHM-INV-7**.
+>
+> **Gelockert (Runde 3):** Unizität ist jetzt **scoped** — Top-Level (`items` ∪ `dock`)
+> und **jeder Folder für sich** sind unabhängige Scopes. Dieselbe `ComponentKey` darf
+> Top-Level-Kachel **und** Mitglied mehrerer Folder gleichzeitig sein; nur ein Duplikat
+> **innerhalb** eines Scopes ist verboten.
 
-**Konsequenz — schärfer als ursprünglich vermutet:** unter IHM-INV-7 ist eine
-top-level App nie zugleich in einem Folder. Damit ist „Add einer schon enthaltenen
-App" kein normaler `NoOp`, sondern ein **unerreichbarer** Zustand → Programmierfehler
-→ `silentError` (Rule 11). Für diesen Spec heißt das: eine Extraktion entfernt genau
-ein tatsächlich vorhandenes Vorkommen; die extrahierte App wird top-level und bleibt
-damit unizitätskonform (sie war vorher nur im Folder). Kein zusätzlicher Dedupe-Pfad
-nötig.
+**Konsequenz für diesen Spec:** eine Extraktion in leeren Raum entfernt genau ein
+Vorkommen und macht den Member top-level (Extract/Dissolve, unverändert). **Neu:** ein
+Drop auf einen **anderen** Grid-Folder verschiebt den Member direkt dorthin
+(`MovedBetweenFolders` / `MovedBetweenFoldersDissolve`, §2) — kein Umweg über leeren
+Raum, keine Extraktion. „Add einer schon **im Ziel-Folder** enthaltenen App" bleibt
+unerreichbar → `NoOp` (B-Scope-Unizität). Cross-Scope entsteht kein Konflikt: der Member
+darf im Ziel-Folder landen, auch wenn er zusätzlich eine Kachel ist.
 
-Die Invariante wird am Rand etabliert (Import/Reconcile: fail-closed dedupe) und von
-`MIU-*`/`RFF-*` erhalten.
+Die Invariante wird am Rand etabliert (Import/Reconcile: per-Scope dedupe) und von
+`MIU-*`/`RFF-*`/`HEU-*` erhalten.
 
 ---
 
 ## §7 Entscheidungen (getroffen — v1, Review-Runde 1 ausstehend)
 
-- **§7-D1 — Extraktions-Ziel muss frei sein.** App-aus-Folder auf eine belegte
-  Zelle/Slot → `Rejected`, keine neue Folder-Erzeugung. Spiegelt `MOVE_ITEM_SPEC`
-  §7-D2 (eine Richtung, nichts Zweideutiges raten).
+- **§7-D1 — Extraktions-Ziel muss frei sein — AUSSER ein anderer Folder (Runde 3).**
+  App-aus-Folder auf eine leere Zelle/Slot → Extract/Dissolve. Auf eine Zelle mit einem
+  **anderen Folder B** → der Member zieht direkt in B (`MovedBetweenFolders` /
+  `MovedBetweenFoldersDissolve`, scoped IHM-INV-7). Auf eine Zelle mit einer **App** →
+  weiterhin `Rejected` (Folder-Erzeugung-aus-Extraktion bleibt v2, spiegelt
+  `MOVE_ITEM_SPEC` §7-D2). Auf die **eigene** Folder-Zelle → `Rejected` (belegt).
 - **§7-D2 — Survivor erbt die Folder-Position**, nicht eine Nachbarzelle —
   vorhersagbar und ohne Suche nach „nächster freier Zelle".
 - **§7-D3 — Dissolve-Schwelle < 2.** Direkt aus RFF-INV-1.
