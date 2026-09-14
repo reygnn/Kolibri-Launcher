@@ -287,12 +287,14 @@ object HomeLayoutTransition {
                 FolderEditResult.MovedBetweenFolders(shrunk, from = folder, to = targetFolder.id)
             } else {
                 // A drops to one member → dissolves; survivor promoted to A's old placement
-                // (RFF-INV-1/-2). Only ONE new id is minted (the survivor); the moved member
-                // travels as a raw ComponentKey into B.
-                val survivor = HomeItem.App(newId(), remainingInA.single())
-                val dissolved = placeAtPlacement(withB.removing(folder), survivor, placement)
+                // (RFF-INV-1/-2). The moved member travels as a raw ComponentKey into B.
+                // Scoped IHM-INV-7: if the survivor is ALSO already a top-level tile, do NOT
+                // mint a duplicate — leave the existing tile in place and just retire A (so
+                // zero new ids), otherwise mint the one survivor id.
+                val (dissolved, survivorId) =
+                    promoteSurvivor(withB.removing(folder), remainingInA.single(), placement, newId)
                 FolderEditResult.MovedBetweenFoldersDissolve(
-                    dissolved, to = targetFolder.id, survivor = survivor.id,
+                    dissolved, to = targetFolder.id, survivor = survivorId,
                 )
             }
         }
@@ -301,19 +303,22 @@ object HomeLayoutTransition {
 
         val remaining = folderItem.members.filterNot { it == member }
         return if (remaining.size >= 2) {
-            val extracted = HomeItem.App(newId(), member) // RFF-INV-5: 1 id
+            // Scoped IHM-INV-7: if `member` is ALSO already a top-level tile, do NOT mint a
+            // second one — relocate the existing tile to the target (mirrors place()/HEU-INV-1).
+            // RFF-INV-5: one new id in the normal case, zero when an existing tile is reused.
             val shrunk = layout.replacingItem(folder, folderItem.copy(members = remaining))
-            FolderEditResult.Extracted(placeNewAtTarget(shrunk, extracted, target), extracted.id)
+            val (out, extractedId) = promoteToTarget(shrunk, member, target, newId)
+            FolderEditResult.Extracted(out, extractedId)
         } else {
-            // remaining.size == 1 → dissolve. RFF-INV-5: 2 ids, extracted then survivor.
-            val extracted = HomeItem.App(newId(), member)
-            val survivor = HomeItem.App(newId(), remaining.single())
-            val withSurvivor = placeAtPlacement(layout.removing(folder), survivor, placement)
-            FolderEditResult.FolderDissolved(
-                placeNewAtTarget(withSurvivor, extracted, target),
-                extracted.id,
-                survivor.id,
-            )
+            // remaining.size == 1 → dissolve. RFF-INV-5: extracted then survivor (id order).
+            // Scoped IHM-INV-7: either the extracted member or the survivor (or both) may
+            // already be top-level tiles — each reuses its existing tile instead of minting a
+            // duplicate. The extracted member is relocated to the target; the survivor is
+            // promoted to the folder's old cell only if it is not already a tile.
+            val withoutFolder = layout.removing(folder)
+            val (withMember, extractedId) = promoteToTarget(withoutFolder, member, target, newId)
+            val (out, survivorId) = promoteSurvivor(withMember, remaining.single(), placement, newId)
+            FolderEditResult.FolderDissolved(out, extractedId, survivorId)
         }
     }
 
@@ -452,6 +457,42 @@ object HomeLayoutTransition {
         val cells = layout.grid.columns * layout.grid.rows
         return if (target.index in 0 until cells) cellOf(target.page, target.index, layout.grid.columns)
         else firstFreeCellFrom(layout, 0)
+    }
+
+    /**
+     * Promote [key] to a top-level tile at an explicit [target] drop — SCOPED IHM-INV-7:
+     * if [key] is already a top-level tile, RELOCATE that existing tile to [target]
+     * (reusing its [ItemId]) rather than minting a second occurrence (mirrors [place] /
+     * HEU-INV-1). [target] must be pre-validated empty by the caller. Returns the new
+     * layout and the surviving top-level id (existing → zero new ids; else one).
+     */
+    private fun promoteToTarget(
+        layout: HomeLayout,
+        key: ComponentKey,
+        target: DropTarget,
+        newId: () -> ItemId,
+    ): Pair<HomeLayout, ItemId> {
+        val existing = layout.topLevelIdOf(key)
+        val id = existing ?: newId()
+        val base = if (existing != null) layout.removing(existing) else layout
+        return placeNewAtTarget(base, HomeItem.App(id, key), target) to id
+    }
+
+    /**
+     * Promote [key] as a dissolved folder's survivor to its old [placement] — SCOPED
+     * IHM-INV-7: if [key] is already a top-level tile, do NOT mint a second one; the
+     * existing tile stays put and the freed cell/slot is simply left empty. Returns the
+     * layout and the surviving top-level id (existing → zero new ids; else one).
+     */
+    private fun promoteSurvivor(
+        layout: HomeLayout,
+        key: ComponentKey,
+        placement: Placement,
+        newId: () -> ItemId,
+    ): Pair<HomeLayout, ItemId> {
+        layout.topLevelIdOf(key)?.let { return layout to it }
+        val survivor = HomeItem.App(newId(), key)
+        return placeAtPlacement(layout, survivor, placement) to survivor.id
     }
 
     /** Adds [item] at a deterministic [placement] (a dissolved folder's old spot). */

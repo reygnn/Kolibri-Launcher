@@ -206,4 +206,27 @@ class HomeLayoutReconcilerDedupTest {
         val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
+
+    @Test fun a_one_member_folder_whose_member_is_also_a_tile_is_removed_not_duplicated() {
+        // Scoped IHM-INV-7 + idempotency (RHL-INV-2): an (imported) 1-member folder whose sole
+        // member is ALSO a top-level tile must NOT dissolve into a SECOND tile. Pass 3 would
+        // otherwise promote a duplicate that a re-run then dedups — breaking idempotency. Fixed:
+        // the redundant member is dropped, the folder removed, the existing tile left untouched.
+        val start = layout(
+            items = listOf(
+                placed(app("tile", "pa"), 0, 0, 0),
+                placed(folder("f", ck("pa")), 0, 1, 0),
+            ),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
+        val paTiles = out.layout.items.filter { (it.item as? HomeItem.App)?.key == ck("pa") }
+        assertThat(paTiles.map { it.item.id }).containsExactly(ItemId("tile")) // one, the original
+        assertThat(paTiles.single().pos).isEqualTo(CellPos(0, 0, 0)) // unmoved
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+        assertThat(out.report.dissolvedFolders).isEqualTo(0) // suppressed promotion, not a dissolve
+        // idempotent: a second pass over the result changes nothing
+        val second = HomeLayoutReconciler.reconcile(out.layout, allInstalled, ids()::next)
+        assertThat(second).isEqualTo(ReconcileOutcome.Unchanged)
+    }
 }

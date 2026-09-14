@@ -85,6 +85,13 @@ sealed interface ReconcileResult {
 3. **Folder-Reparatur** — Folder mit **1** Member → **Dissolve** (Survivor an die
    Folder-Zelle/den Slot promoten, Folder-`ItemId` retired; RFF-INV-2); Folder mit
    **0** Membern → entfernen, Zelle frei.
+   *Scoped IHM-INV-7 + Idempotenz (RHL-INV-2):* Ist der Survivor-Key **bereits top-level**
+   (ein Grid/Dock-Überlebender aus Schritt 2 **oder** ein in diesem Pass zuvor promoteter
+   Survivor), wird **nicht** promotet — der redundante Member wird verworfen und der Folder
+   nur entfernt (zählt als `dedupedApps`, nicht als `dissolvedFolders`). Sonst entstünde ein
+   zweites Top-Level-Vorkommen, das ein erneuter Lauf wegdeduplizieren würde (nicht
+   idempotent). Cross-Scope-Koexistenz (Kachel **und** Folder-Member) bleibt erlaubt; die
+   Unterdrückung greift nur, wenn der 1-Member-Folder ohnehin verschwinden muss.
 4. **Dock kappen** — `dock` auf `grid.columns` kürzen (Import-Sicherheit; erste
    `columns` behalten).
 5. **Endseiten trimmen** — hinten liegende **leere** Seiten entfernen, mindestens **1**

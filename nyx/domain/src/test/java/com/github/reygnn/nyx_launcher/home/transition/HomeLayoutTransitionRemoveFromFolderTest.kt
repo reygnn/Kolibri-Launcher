@@ -379,4 +379,70 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
         assertThat(bOut.members).containsExactly(ck("pd"), ck("pe"), ck("pb")).inOrder()
     }
+
+    // ===== scoped IHM-INV-7: promotion must not duplicate an existing top-level tile =====
+
+    @Test fun extract_a_member_that_is_also_a_top_level_tile_relocates_the_tile_no_duplicate() {
+        // pb is a member of A (>=3) AND already a top-level tile. Extracting pb to an empty cell
+        // must NOT mint a second pb tile: the existing tile is relocated to the target (id
+        // reused), A shrinks, and no new ItemId is minted.
+        val a = folder("a", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val tile = PlacedItem(app("tile", "pb"), CellPos(0, 3, 3))
+        val start = layout(items = listOf(a, tile))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pb"), DropTarget.Cell(CellPos(0, 2, 2)), seq("unused")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        assertThat((r as FolderEditResult.Extracted).app).isEqualTo(ItemId("tile")) // reused, not minted
+        val out = r.layout!!
+        val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
+        assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 2, 2)) // exactly one, at target
+        assertThat(pbTiles.single().item.id).isEqualTo(ItemId("tile"))
+        val aOut = out.items.first { it.item.id == ItemId("a") }.item as HomeItem.Folder
+        assertThat(aOut.members).containsExactly(ck("pa"), ck("pc")).inOrder()
+    }
+
+    @Test fun dissolve_where_the_survivor_is_also_a_top_level_tile_keeps_the_tile_no_duplicate() {
+        // A=[pa,pb] (exactly 2); survivor pb is ALSO a top-level tile. Extracting pa dissolves A
+        // but pb is NOT promoted a second time: the existing pb tile stays put, A's old cell is
+        // left empty, and pa is the ONLY newly minted id.
+        val a = folder("a", ck("pa"), ck("pb"), page = 0, x = 2, y = 3)
+        val tile = PlacedItem(app("tile", "pb"), CellPos(0, 0, 5))
+        val start = layout(items = listOf(a, tile))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("extracted")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.FolderDissolved::class.java)
+        val d = r as FolderEditResult.FolderDissolved
+        assertThat(d.extracted).isEqualTo(ItemId("extracted"))
+        assertThat(d.survivor).isEqualTo(ItemId("tile")) // reused existing tile, no second mint
+        val out = r.layout!!
+        assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse() // A retired
+        val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
+        assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 0, 5)) // unmoved, single
+        assertThat(out.items.any { it.pos == CellPos(0, 2, 3) }).isFalse() // A's old cell empty
+        val extracted = out.items.first { it.pos == CellPos(0, 1, 1) }
+        assertThat((extracted.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(extracted.item.id).isEqualTo(ItemId("extracted"))
+    }
+
+    @Test fun move_into_another_folder_dissolving_when_survivor_is_a_tile_no_duplicate() {
+        // A=[pa,pb] dissolves into B; survivor pb is ALSO a top-level tile → not promoted again.
+        // The existing tile is kept, A retired, B gains pa, and NO new id is minted.
+        val a = folder("a", ck("pa"), ck("pb"), page = 0, x = 2, y = 3)
+        val b = folder("b", ck("pd"), ck("pe"), page = 0, x = 1, y = 0)
+        val tile = PlacedItem(app("tile", "pb"), CellPos(0, 0, 5))
+        val start = layout(items = listOf(a, b, tile))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("a"), ck("pa"), DropTarget.Cell(CellPos(0, 1, 0)), seq("unused")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.MovedBetweenFoldersDissolve::class.java)
+        assertThat((r as FolderEditResult.MovedBetweenFoldersDissolve).survivor).isEqualTo(ItemId("tile"))
+        val out = r.layout!!
+        assertThat(out.items.any { it.item.id == ItemId("a") }).isFalse()
+        val pbTiles = out.items.filter { (it.item as? HomeItem.App)?.key == ck("pb") }
+        assertThat(pbTiles.map { it.pos }).containsExactly(CellPos(0, 0, 5)) // unmoved, single
+        val bOut = out.items.first { it.item.id == ItemId("b") }.item as HomeItem.Folder
+        assertThat(bOut.members).containsExactly(ck("pd"), ck("pe"), ck("pa")).inOrder()
+    }
 }

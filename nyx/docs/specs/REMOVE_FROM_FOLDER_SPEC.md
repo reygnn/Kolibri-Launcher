@@ -205,7 +205,14 @@ Frage voraus, ob dieselbe `ComponentKey` mehrfach im Layout vorkommen darf.
 > **innerhalb** eines Scopes ist verboten.
 
 **Konsequenz für diesen Spec:** eine Extraktion in leeren Raum entfernt genau ein
-Vorkommen und macht den Member top-level (Extract/Dissolve, unverändert). **Neu:** ein
+Vorkommen und macht den Member top-level (Extract/Dissolve). **Achtung scoped:** weil ein
+Member jetzt *zusätzlich* eine Top-Level-Kachel sein darf, dürfen die
+top-level-erzeugenden Pfade (`Extracted`, `FolderDissolved`, `MovedBetweenFoldersDissolve`)
+**keine** zweite Kachel prägen, wenn der Key schon top-level ist: der **extrahierte Member**
+(explizite Geste) wird als bestehende Kachel ans Ziel **verschoben** (ID wiederverwendet),
+der **Survivor** (automatisch) bleibt an seiner bestehenden Kachel und die alte Folder-Zelle
+bleibt leer. In diesen Fällen wird **keine** neue `ItemId` geprägt (RFF-INV-5 zählt „bis zu",
+nicht „genau"). **Neu:** ein
 Drop auf einen **anderen** Grid-Folder verschiebt den Member direkt dorthin
 (`MovedBetweenFolders` / `MovedBetweenFoldersDissolve`, §2) — kein Umweg über leeren
 Raum, keine Extraktion. „Add einer schon **im Ziel-Folder** enthaltenen App" bleibt

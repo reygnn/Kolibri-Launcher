@@ -102,11 +102,30 @@ object HomeLayoutReconciler {
         val itemsD = itemsP.mapNotNull { placed -> applyDedup(placed.item)?.let { placed.copy(item = it) } }
 
         // ---- Pass 3: repair folders (dissolve at 1, drop at 0) ----
+        // Scoped IHM-INV-7 + idempotency (RHL-INV-2): a 1-member folder dissolves by promoting
+        // its sole member to a top-level tile — UNLESS that key is already top-level (a Pass-2
+        // grid/dock survivor, or a survivor promoted by an EARLIER dissolve in this same pass).
+        // Promoting it anyway would emit a SECOND top-level occurrence that a re-run would then
+        // dedup away, breaking idempotency; instead the redundant member is dropped and the
+        // folder simply removed. Cross-scope coexistence (a key as tile AND folder member) is
+        // legal and untouched — this only fires when the 1-member folder must go regardless.
+        val topLevelKeys = HashSet<ComponentKey>()
+        for (item in dockD) if (item is HomeItem.App) topLevelKeys.add(item.key)
+        for (placed in itemsD) (placed.item as? HomeItem.App)?.let { topLevelKeys.add(it.key) }
+
         fun repair(item: HomeItem): HomeItem? = when (item) {
             is HomeItem.App -> item
             is HomeItem.Folder -> when (item.members.size) {
                 0 -> { removedEmptyFolders++; null }
-                1 -> { dissolvedFolders++; HomeItem.App(newId(), item.members.single()) }
+                1 -> {
+                    val key = item.members.single()
+                    if (topLevelKeys.add(key)) {
+                        dissolvedFolders++; HomeItem.App(newId(), key)
+                    } else {
+                        // survivor already top-level → drop the redundant member, remove folder
+                        dedupedApps++; null
+                    }
+                }
                 else -> item
             }
         }
