@@ -812,4 +812,27 @@ class HomeLayoutTransitionMoveTest {
         val r = move(start, ItemId("ghost"), DropTarget.Cell(CellPos(0, 1, 1)))
         assertThat(r).isEqualTo(MoveResult.NoOp)
     }
+
+    // ---- `pages` is never trimmed downward by a move (A1) ----
+
+    @Test fun pulling_the_last_item_off_the_top_page_does_not_trim_pages() {
+        // A1: move only ever GROWS `pages` (append/landing-page), never recomputes it
+        // downward. Dragging the sole resident of the highest page down to a lower page
+        // leaves `pages` inflated until HomeLayoutReconciler Pass 5 (trailing-page trim)
+        // runs. This is correct, not a bug: `layout.pages` drives NO visible page — the
+        // pager and page-dots both derive their count from renderedPageCount() (position-
+        // derived, MainActivity.kt:658/835), so an inflated `pages` is inert and unreachable,
+        // and trailing-trim is deliberately the reconciler's job (Pass 5 keeps interior empty
+        // pages). Recomputing here would be redundant hot-path work that risks diverging from
+        // that trim policy. This pins the move core deliberately leaving `pages` alone.
+        val onTop = app("top", "ptop")
+        val onBase = app("base", "pbase")
+        val start = layout(items = listOf(placed(onBase, 0, 0, 0), placed(onTop, 1, 0, 0)), pages = 2)
+        val r = move(start, onTop.id, DropTarget.Cell(CellPos(0, 1, 1))) // pull it down to page 0
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2) // NOT trimmed to 1 despite page 1 now being empty
+        assertThat(out.items.first { it.item.id == onTop.id }.pos).isEqualTo(CellPos(0, 1, 1))
+        assertThat(out.items.none { it.pos.page == 1 }).isTrue() // page 1 is empty but still counted
+    }
 }

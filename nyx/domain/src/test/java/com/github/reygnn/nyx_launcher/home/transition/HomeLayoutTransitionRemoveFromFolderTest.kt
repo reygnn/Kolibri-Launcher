@@ -218,4 +218,90 @@ class HomeLayoutTransitionRemoveFromFolderTest {
         val r = HomeLayoutTransition.removeFromFolder(start, ItemId("a"), ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("x")::next)
         assertThat(r).isEqualTo(FolderEditResult.NoOp)
     }
+
+    @Test fun extract_onto_the_folders_own_cell_is_rejected() {
+        // B2: emptyTargetReason runs BEFORE the folder is shrunk, so the folder still
+        // occupies its own cell — dropping the extracted member there hits TARGET_OCCUPIED.
+        // This fragile pre-shrink ordering is exactly what structurally prevents a
+        // survivor-vs-target collision; occupied_target_is_rejected uses a SEPARATE app, so
+        // this pins the own-cell case specifically.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 2, y = 1)
+        val start = layout(items = listOf(f))
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(0, 2, 1)), seq("x")::next,
+        )
+        assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE))
+    }
+
+    @Test fun extract_via_grid_insert_onto_a_brand_new_trailing_page_adds_the_page() {
+        // B3a: placeNewAtTarget's GridInsert branch adds a page when the resolved cell lands
+        // on the landing page (pos.page == pages). extract_onto_a_brand_new_trailing_page
+        // pins the Cell branch; this pins the GridInsert branch with an IN-range index.
+        val f = folder("f", ck("pa"), ck("pb"), ck("pc"), page = 0, x = 0, y = 0)
+        val start = layout(items = listOf(f), pages = 1)
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.GridInsert(1, 0), seq("extracted")::next,
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.items.first { it.pos == CellPos(1, 0, 0) }.item.id).isEqualTo(ItemId("extracted"))
+    }
+
+    @Test fun extract_via_out_of_range_grid_insert_on_a_full_page_lands_on_a_fresh_page() {
+        // B3b (new-page return): gridInsertCell falls back to firstFreeCellFrom for an
+        // out-of-range index; on a home whose only page is full that returns a fresh trailing
+        // page, and placeNewAtTarget adds it. extract_to_out_of_range_grid_insert_lands_at_
+        // first_free lands on the SAME page — this pins the new-page path. 1×1 grid makes
+        // "full" cheap (mirrors the move test's page-cap fixtures).
+        val tiny = GridSpec(columns = 1, rows = 1)
+        val f = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"), ck("pc")))
+        val start = HomeLayout(tiny, pages = 1, items = listOf(PlacedItem(f, CellPos(0, 0, 0))), dock = emptyList())
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.GridInsert(0, 5), seq("extracted")::next, // index 5 out of range
+        )
+        assertThat(r).isInstanceOf(FolderEditResult.Extracted::class.java)
+        val out = r.layout!!
+        assertThat(out.pages).isEqualTo(2)
+        assertThat(out.items.first { it.pos == CellPos(1, 0, 0) }.item.id).isEqualTo(ItemId("extracted"))
+    }
+
+    @Test fun extract_via_out_of_range_grid_insert_when_every_page_is_full_is_rejected() {
+        // B3b (MAX_PAGES rejection): the same fallback rejects (OFF_GRID) when
+        // firstFreeCellFrom returns a page at the MAX_PAGES cap — the home is genuinely full,
+        // so the extraction can't land (no app dropped, no off-cap page created). 1×1 grid,
+        // folder on page 0, apps filling pages 1..MAX_PAGES-1.
+        val tiny = GridSpec(columns = 1, rows = 1)
+        val f = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"), ck("pc")))
+        val fillers = (1 until HomeLayout.MAX_PAGES).map { p -> PlacedItem(app("fill$p", "pfill$p"), CellPos(p, 0, 0)) }
+        val start = HomeLayout(
+            tiny,
+            pages = HomeLayout.MAX_PAGES,
+            items = listOf(PlacedItem(f, CellPos(0, 0, 0))) + fillers,
+            dock = emptyList(),
+        )
+        val r = HomeLayoutTransition.removeFromFolder(
+            start, ItemId("f"), ck("pb"), DropTarget.GridInsert(0, 5), seq("x")::next,
+        )
+        assertThat(r).isEqualTo(FolderEditResult.Rejected(MoveResult.Reason.OFF_GRID))
+    }
+
+    @Test fun dissolve_puts_the_survivor_at_the_dock_folders_original_non_zero_slot() {
+        // B3c: placeAtPlacement's Dock branch re-inserts the survivor at the dissolved
+        // folder's ORIGINAL dock index. dissolve_with_folder_in_dock uses a single-element
+        // dock (index 0); here the folder sits at slot 1 behind a neighbour, pinning the
+        // non-zero index shift.
+        val neighbor = app("n", "pn")
+        val f = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb")))
+        val start = layout(dock = listOf(neighbor, f))
+        val ids = seq("extracted", "survivor")
+        val r = HomeLayoutTransition.removeFromFolder(start, ItemId("f"), ck("pa"), DropTarget.Cell(CellPos(0, 0, 0)), ids::next)
+        assertThat(r).isInstanceOf(FolderEditResult.FolderDissolved::class.java)
+        val out = r.layout!!
+        // survivor (pb) re-inserted at the folder's old slot (index 1), behind the neighbour.
+        assertThat(out.dock.map { (it as HomeItem.App).key }).containsExactly(ck("pn"), ck("pb")).inOrder()
+        assertThat(out.dock[1].id).isEqualTo(ItemId("survivor"))
+        // extracted (pa) at the grid target.
+        assertThat(out.items.first { it.pos == CellPos(0, 0, 0) }.item.id).isEqualTo(ItemId("extracted"))
+    }
 }

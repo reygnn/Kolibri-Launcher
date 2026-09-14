@@ -8,6 +8,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
+import com.github.reygnn.nyx_launcher.home.repository.ThrowingHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -58,5 +59,19 @@ class FitHomeGridUseCaseTest {
         assertThat(repo.current.grid).isEqualTo(target)
         // The single item survives the regrid (regridder repacks, never drops).
         assertThat(repo.current.items).hasSize(1)
+    }
+
+    @Test
+    fun a_failed_persist_propagates_out_of_the_use_case() = runTest(mainDispatcherRule.dispatcher) {
+        // B1: FitHomeGridUseCase writes via repository.update inside withContext with no
+        // runCatching — a throwing repository must surface, not be swallowed and reported as
+        // a successful (silent) layout pass.
+        val repo = ThrowingHomeLayoutRepository(layout(grid))
+        val useCase = FitHomeGridUseCase(repo, mainDispatcherRule.dispatcher)
+        val target = GridSpec(columns = 5, rows = 8) // a real regrid → the write path fires
+
+        val thrown = runCatching { useCase(target) }.exceptionOrNull()
+
+        assertThat(thrown).isInstanceOf(IllegalStateException::class.java)
     }
 }

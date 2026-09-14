@@ -911,7 +911,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     private fun applyFolderTitleEdit() {
         val folderId = openFolderId ?: return
-        val newTitle = folderTitle.text.toString()
+        // Trim before comparing/persisting so a whitespace-only entry collapses to "" (the
+        // default-hint state) instead of being stored verbatim (see normalizeFolderTitle).
+        val newTitle = normalizeFolderTitle(folderTitle.text.toString())
         if (newTitle != openFolderTitle) viewModel.renameFolder(folderId, newTitle)
     }
 

@@ -162,6 +162,28 @@ class HomeLayoutTransitionEditTest {
         assertThat(r).isEqualTo(LayoutEdit.NoOp)
     }
 
+    @Test fun remove_a_dock_app_drops_it_from_the_dock() {
+        // B4: remove()/removing() and itemById() all scan the dock, but every other remove
+        // test uses grid items — a regression that filtered only `items` would go unnoticed.
+        // Pins the dock arm for a plain app.
+        val d = app("d", "pd")
+        val start = layout(dock = listOf(d))
+        val r = HomeLayoutTransition.remove(start, d.id)
+        assertThat(r).isInstanceOf(LayoutEdit.Changed::class.java)
+        assertThat(r.layout!!.dock).isEmpty()
+    }
+
+    @Test fun remove_a_dock_folder_drops_only_that_folder_from_the_dock() {
+        // B4: the dock arm again, for a folder among dock neighbours — only the target is
+        // dropped, the neighbour stays (mirrors remove_folder_drops_only_the_folder_item).
+        val f = folder("f", ck("pa"), ck("pb"))
+        val keep = app("keep", "pk")
+        val start = layout(dock = listOf(f, keep))
+        val r = HomeLayoutTransition.remove(start, f.id)
+        assertThat(r).isInstanceOf(LayoutEdit.Changed::class.java)
+        assertThat(r.layout!!.dock.map { it.id }).containsExactly(ItemId("keep"))
+    }
+
     // ---- renameFolder ----
 
     @Test fun rename_folder_sets_title() {
@@ -185,5 +207,21 @@ class HomeLayoutTransitionEditTest {
         val start = layout(items = listOf(placed(a, 0, 0, 0)))
         val r = HomeLayoutTransition.renameFolder(start, a.id, "Nope")
         assertThat(r).isEqualTo(LayoutEdit.NoOp)
+    }
+
+    @Test fun rename_folder_to_a_blank_title_is_an_allowed_change() {
+        // A2: renameFolder deliberately has NO blank guard, and that is correct — an empty
+        // title is the DEFAULT state, not an error: freshly created folders are born with
+        // title="" (HomeLayoutTransition.kt:197) and the folder-sheet EditText renders the
+        // localized default via android:hint=folder_default_title (folder_overlay.xml) when
+        // the title is empty. So clearing a custom name back to the default is a real Changed
+        // edit; a blank-reject guard would BREAK that. This pins the behavior as intended —
+        // if a guard is ever added, this test is the flag that it regressed.
+        val f = HomeItem.Folder(ItemId("f"), "Games", listOf(ck("pa"), ck("pb")))
+        val start = layout(items = listOf(placed(f, 0, 0, 0)))
+        val r = HomeLayoutTransition.renameFolder(start, f.id, "")
+        assertThat(r).isInstanceOf(LayoutEdit.Changed::class.java)
+        val fOut = r.layout!!.items.single().item as HomeItem.Folder
+        assertThat(fOut.title).isEmpty()
     }
 }

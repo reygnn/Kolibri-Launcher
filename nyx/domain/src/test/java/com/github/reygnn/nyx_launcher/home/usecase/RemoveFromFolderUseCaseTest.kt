@@ -55,4 +55,36 @@ class RemoveFromFolderUseCaseTest {
         assertThat(result).isEqualTo(FolderEditResult.NoOp)
         assertThat(repo.saveCount).isEqualTo(0)
     }
+
+    @Test
+    fun dissolve_persists_and_returns_folder_dissolved() = runTest(mainDispatcherRule.dispatcher) {
+        // B5: a two-member folder dissolves on extract — a save-triggering result. Only the
+        // Extracted-save path was pinned; this pins the dissolve one.
+        val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb")))
+        val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 2, 3))), emptyList())
+        val repo = FakeHomeLayoutRepository(start)
+
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+            ItemId("f"), ck("pa"), DropTarget.Cell(CellPos(0, 0, 0)),
+        )
+
+        assertThat(result).isInstanceOf(FolderEditResult.FolderDissolved::class.java)
+        assertThat(repo.saveCount).isEqualTo(1)
+    }
+
+    @Test
+    fun rejected_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+        // B5: an off-grid target is Rejected → no write. Complements member_not_in_folder
+        // (a NoOp no-save) by pinning the Rejected no-save at the use-case edge.
+        val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"), ck("pc")))
+        val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 0, 0))), emptyList())
+        val repo = FakeHomeLayoutRepository(start)
+
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+            ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(0, 9, 9)), // off-grid
+        )
+
+        assertThat(result).isInstanceOf(FolderEditResult.Rejected::class.java)
+        assertThat(repo.saveCount).isEqualTo(0)
+    }
 }

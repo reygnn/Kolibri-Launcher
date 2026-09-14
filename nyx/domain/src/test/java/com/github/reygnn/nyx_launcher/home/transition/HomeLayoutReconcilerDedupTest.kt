@@ -199,4 +199,25 @@ class HomeLayoutReconcilerDedupTest {
         val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
+
+    @Test fun a_key_shared_by_two_dock_folders_survives_in_the_earlier_slot() {
+        // B6: dedup pass 2c walks dock folders in SLOT order (dockP), so the earlier dock
+        // slot keeps the shared key and the later loses it. Only grid-vs-grid and
+        // dock-vs-grid folder precedence were pinned before; this pins the dock-folder vs
+        // dock-folder slot ordering guarantee.
+        // The later folder keeps a second surviving member (pd) so it stays a folder rather
+        // than dissolving in Pass 3 — this test isolates the dedup slot-order guarantee.
+        val start = layout(
+            dock = listOf(
+                folder("early", ck("pa"), ck("pb")),
+                folder("late", ck("pa"), ck("pc"), ck("pd")),
+            ),
+        )
+        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val early = out.layout.dock.first { it.id == ItemId("early") } as HomeItem.Folder
+        val late = out.layout.dock.first { it.id == ItemId("late") } as HomeItem.Folder
+        assertThat(early.members).containsExactly(ck("pa"), ck("pb")).inOrder() // earlier slot keeps pa
+        assertThat(late.members).containsExactly(ck("pc"), ck("pd")).inOrder() // pa dropped from the later slot
+        assertThat(out.report.dedupedApps).isEqualTo(1)
+    }
 }
