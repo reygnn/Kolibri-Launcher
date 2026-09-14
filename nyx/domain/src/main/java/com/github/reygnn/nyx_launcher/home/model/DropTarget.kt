@@ -26,4 +26,13 @@ sealed interface DropTarget {
 
     /** Seatless dock slot: inserts into the flat [HomeLayout.dock] list at [index]. */
     data class DockSlot(val index: Int) : DropTarget
+
+    /**
+     * Land ON the dock item at [index] — the dock counterpart of [Cell]: an app
+     * makes a folder, a folder adds a member / accepts a moved member
+     * (MOVE_ITEM_SPEC §3.1, REMOVE_FROM_FOLDER_SPEC §2). Distinct from [DockSlot],
+     * which inserts BETWEEN dock items; produced when the drop is over the central
+     * part of a dock icon (mirrors the grid's centre-vs-edge split).
+     */
+    data class DockItem(val index: Int) : DropTarget
 }

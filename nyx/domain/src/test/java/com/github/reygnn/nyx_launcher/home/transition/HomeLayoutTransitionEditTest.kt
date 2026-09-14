@@ -72,11 +72,20 @@ class HomeLayoutTransitionEditTest {
         assertThat(out.items.single().item.id).isEqualTo(ItemId("a")) // same id
     }
 
-    @Test fun place_app_that_is_a_folder_member_is_noop() {
+    @Test fun place_app_that_is_only_a_folder_member_adds_a_fresh_tile() {
+        // Scoped IHM-INV-7: folder membership is its OWN scope, so a drawer place of an app
+        // that currently lives only in a (grid) folder creates a fresh top-level tile — it is
+        // NOT a NoOp. The folder is untouched (pa stays a member: cross-scope coexistence).
         val f = folder("f", ck("pa"), ck("pb"))
         val start = layout(items = listOf(placed(f, 0, 0, 0)))
-        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("unused")::next)
-        assertThat(r).isEqualTo(MoveResult.NoOp) // uniqueness: no duplicate
+        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("new")::next)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        val fOut = out.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
+        assertThat(fOut.members).containsExactly(ck("pa"), ck("pb")).inOrder() // folder untouched
+        val tile = out.items.first { it.pos == CellPos(0, 1, 1) }
+        assertThat((tile.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(tile.item.id).isEqualTo(ItemId("new"))
     }
 
     @Test fun place_app_already_in_the_dock_moves_it_out_without_duplicating() {
@@ -94,15 +103,21 @@ class HomeLayoutTransitionEditTest {
         assertThat(out.items.single().pos).isEqualTo(CellPos(0, 1, 1))
     }
 
-    @Test fun place_app_that_is_a_member_of_a_dock_folder_is_noop() {
-        // isFolderMember checks dock folders too (HomeLayoutTransition.kt:322): placing an
-        // app already inside a folder that sits in the DOCK is a uniqueness no-op. The
-        // grid-folder case is place_app_that_is_a_folder_member_is_noop; this pins the
-        // dock-folder branch.
+    @Test fun place_app_that_is_only_a_dock_folder_member_adds_a_fresh_tile() {
+        // Same scope rule with the folder in the DOCK: folder membership (even in a dock
+        // folder) is its own scope, so a drawer place makes a fresh grid tile and leaves the
+        // dock folder untouched. This is the case the old `isFolderMember → NoOp` guard
+        // (which checked dock folders too) forbade; it is now a real placement.
         val f = folder("f", ck("pa"), ck("pb"))
         val start = layout(dock = listOf(f))
-        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("unused")::next)
-        assertThat(r).isEqualTo(MoveResult.NoOp)
+        val r = HomeLayoutTransition.place(start, ck("pa"), DropTarget.Cell(CellPos(0, 1, 1)), seq("new")::next)
+        assertThat(r).isInstanceOf(MoveResult.Moved::class.java)
+        val out = r.layout!!
+        val fOut = out.dock.first { it.id == ItemId("f") } as HomeItem.Folder
+        assertThat(fOut.members).containsExactly(ck("pa"), ck("pb")).inOrder() // dock folder untouched
+        val tile = out.items.first { it.pos == CellPos(0, 1, 1) }
+        assertThat((tile.item as HomeItem.App).key).isEqualTo(ck("pa"))
+        assertThat(tile.item.id).isEqualTo(ItemId("new"))
     }
 
     @Test fun place_new_app_via_grid_insert_reorders_the_occupant() {

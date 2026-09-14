@@ -61,6 +61,7 @@ object HomeLayoutTransition {
     ): MoveResult = when (target) {
         is DropTarget.Cell -> moveToCell(layout, source, sourceSpan, moving, target.pos, newFolderId)
         is DropTarget.DockSlot -> moveToDock(layout, source, moving, target.index)
+        is DropTarget.DockItem -> moveOntoDockItem(layout, source, moving, target.index, newFolderId)
         is DropTarget.GridInsert -> insertOnGrid(layout, source, sourceSpan, moving, target.page, target.index)
     }
 
@@ -247,6 +248,44 @@ object HomeLayoutTransition {
         return MoveResult.Moved(layout.removing(moving).copy(dock = newDock))
     }
 
+    /**
+     * Land ON a dock item (the dock counterpart of [moveToCell]'s occupant path).
+     * Mirrors the grid centre-drop exactly so dock folders behave identically to
+     * grid folders (MOVE_ITEM_SPEC §3.1): app-onto-app makes a dock folder,
+     * app-onto-folder adds a member (NoOp if already in that folder — B-scope
+     * IHM-INV-7), a folder source onto either is [Rejected] (folder-onto-folder /
+     * folder-onto-app stay v2). A [index] with no landable item degrades to a plain
+     * insert ([moveToDock]) rather than failing.
+     */
+    private fun moveOntoDockItem(
+        layout: HomeLayout,
+        source: HomeItem,
+        moving: ItemId,
+        index: Int,
+        newFolderId: () -> ItemId,
+    ): MoveResult {
+        val occupant = layout.dock.getOrNull(index)?.takeIf { it.id != moving }
+            ?: return moveToDock(layout, source, moving, index)
+        return when (occupant) {
+            is HomeItem.App -> when (source) {
+                is HomeItem.App -> {
+                    // §7-D1: target first, then the dragged app — same order as the grid.
+                    val folder = HomeItem.Folder(newFolderId(), "", listOf(occupant.key, source.key))
+                    MoveResult.FolderCreated(layout.removing(moving).replacingItem(occupant.id, folder), folder.id)
+                }
+                is HomeItem.Folder -> MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
+            }
+            is HomeItem.Folder -> when (source) {
+                is HomeItem.App -> {
+                    if (source.key in occupant.members) return MoveResult.NoOp // IHM-INV-7 (B-scope)
+                    val updated = occupant.copy(members = occupant.members + source.key)
+                    MoveResult.AddedToFolder(layout.removing(moving).replacingItem(occupant.id, updated), occupant.id)
+                }
+                is HomeItem.Folder -> MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
+            }
+        }
+    }
+
     // =================== removeFromFolder (REMOVE_FROM_FOLDER_SPEC) ==========
 
     fun removeFromFolder(
@@ -273,8 +312,10 @@ object HomeLayoutTransition {
         // not a folder-move and falls through to the reject-occupied path below (that keeps the
         // existing own-cell TARGET_OCCUPIED behaviour). A grid App occupant (not a folder) also
         // falls through → still Rejected (folder-from-extraction stays v2).
-        val targetFolder: HomeItem.Folder? = (target as? DropTarget.Cell)?.let { t ->
-            layout.items.firstOrNull { it.pos == t.pos }?.item as? HomeItem.Folder
+        val targetFolder: HomeItem.Folder? = when (target) {
+            is DropTarget.Cell -> layout.items.firstOrNull { it.pos == target.pos }?.item as? HomeItem.Folder
+            is DropTarget.DockItem -> layout.dock.getOrNull(target.index) as? HomeItem.Folder
+            else -> null
         }
         if (targetFolder != null && targetFolder.id != folder) {
             if (member in targetFolder.members) return FolderEditResult.NoOp // B-scope uniqueness
@@ -396,7 +437,10 @@ object HomeLayoutTransition {
     }
 
     private fun HomeLayout.replacingItem(id: ItemId, newItem: HomeItem): HomeLayout =
-        copy(items = items.map { if (it.item.id == id) it.copy(item = newItem) else it })
+        copy(
+            items = items.map { if (it.item.id == id) it.copy(item = newItem) else it },
+            dock = dock.map { if (it.id == id) newItem else it },
+        )
 
     /** OFF_GRID reason for a cell, or null if in bounds ([0,pages] allows append). */
     private fun offGridReason(layout: HomeLayout, pos: CellPos): MoveResult.Reason? {
@@ -428,6 +472,14 @@ object HomeLayoutTransition {
                 target.index < 0 || target.index > layout.dock.size -> MoveResult.Reason.OFF_GRID
                 else -> null
             }
+            // A DockItem landing on a folder is handled earlier (move-between-folders);
+            // reaching here means the slot holds an APP → occupied, same as a grid cell
+            // with an app (folder-from-extraction stays v2). An empty/out-of-range index
+            // degrades to a plain insert.
+            is DropTarget.DockItem ->
+                if (layout.dock.getOrNull(target.index) is HomeItem.App)
+                    MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE
+                else null
         }
 
     /** Adds a NEW [item] at an already-validated-empty [target]. */
@@ -442,6 +494,12 @@ object HomeLayoutTransition {
                 layout.copy(pages = pages, items = layout.items + PlacedItem(item, pos))
             }
             is DropTarget.DockSlot -> {
+                val idx = target.index.coerceIn(0, layout.dock.size)
+                layout.copy(dock = layout.dock.toMutableList().apply { add(idx, item) })
+            }
+            // Only reached when a DockItem target had no landable folder/app (degraded
+            // to a plain placement); insert at the index like a DockSlot.
+            is DropTarget.DockItem -> {
                 val idx = target.index.coerceIn(0, layout.dock.size)
                 layout.copy(dock = layout.dock.toMutableList().apply { add(idx, item) })
             }

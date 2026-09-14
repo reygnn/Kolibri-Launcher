@@ -91,10 +91,10 @@ Ziel-Regeln (leer/off-grid/dock voll/belegt) sind **identisch** zu `MOVE_ITEM_SP
 |---|---|---|
 | ≥ 3 | leere Zelle / leerer Dock-Slot mit Platz | `Extracted` — Folder schrumpft (bleibt ≥ 2), App an Ziel; **eine** neue `ItemId` |
 | = 2 | leere Zelle / leerer Dock-Slot mit Platz | `FolderDissolved` — extrahierte App an Ziel, **Rest-Member an die alte Folder-Zelle/den alten Slot**, Folder-`ItemId` retired; **zwei** neue `ItemId` |
-| ≥ 3 | Zelle mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFolders` — Quell-Folder schrumpft (bleibt ≥ 2), Member ans Ende von B angehängt; **keine** neue `ItemId` (Member ist ein `ComponentKey`) |
-| = 2 | Zelle mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFoldersDissolve` — Quell-Folder löst auf (Survivor an dessen alte Zelle/Slot), Member ans Ende von B; **eine** neue `ItemId` (der Survivor) |
-| beliebig | Zelle mit Folder B, **der den Member schon hat** (B-Scope-Unizität) | `NoOp` |
-| beliebig | eigene Folder-Zelle / belegte Zelle mit **App** | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — Folder-Erzeugung-aus-Extraktion (App-Occupant) bleibt v2 (§8, §7-D1); eigene Zelle ist per Definition belegt |
+| ≥ 3 | Grid-Zelle **oder Dock-Item** mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFolders` — Quell-Folder schrumpft (bleibt ≥ 2), Member ans Ende von B angehängt; **keine** neue `ItemId` (Member ist ein `ComponentKey`) |
+| = 2 | Grid-Zelle **oder Dock-Item** mit **anderem Folder B** (B enthält den Member noch nicht) | `MovedBetweenFoldersDissolve` — Quell-Folder löst auf (Survivor an dessen alte Zelle/Slot), Member ans Ende von B; **eine** neue `ItemId` (der Survivor) |
+| beliebig | Grid-Zelle/Dock-Item mit Folder B, **der den Member schon hat** (B-Scope-Unizität) | `NoOp` |
+| beliebig | eigene Folder-Zelle / belegte Zelle **oder Dock-Item** mit **App** | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — Folder-Erzeugung-aus-Extraktion (App-Occupant) bleibt v2 (§8, §7-D1); eigene Zelle ist per Definition belegt |
 | beliebig | `page > pages` / außerhalb `grid` | `Rejected(OFF_GRID)` |
 | beliebig | Dock voll (`dock.size == columns`) | `Rejected(DOCK_FULL)` |
 | `member ∉ folder` oder `folder` ist kein Folder | — | Programmierfehler → `silentError` → `NoOp` (RFF-INV-4) |
@@ -226,12 +226,17 @@ Die Invariante wird am Rand etabliert (Import/Reconcile: per-Scope dedupe) und v
 
 ## §7 Entscheidungen (getroffen — v1, Review-Runde 1 ausstehend)
 
-- **§7-D1 — Extraktions-Ziel muss frei sein — AUSSER ein anderer Folder (Runde 3).**
-  App-aus-Folder auf eine leere Zelle/Slot → Extract/Dissolve. Auf eine Zelle mit einem
-  **anderen Folder B** → der Member zieht direkt in B (`MovedBetweenFolders` /
-  `MovedBetweenFoldersDissolve`, scoped IHM-INV-7). Auf eine Zelle mit einer **App** →
-  weiterhin `Rejected` (Folder-Erzeugung-aus-Extraktion bleibt v2, spiegelt
-  `MOVE_ITEM_SPEC` §7-D2). Auf die **eigene** Folder-Zelle → `Rejected` (belegt).
+- **§7-D1 — Extraktions-Ziel muss frei sein — AUSSER ein anderer Folder (Runde 3;
+  Dock-Parität Runde 4).** App-aus-Folder auf eine leere Zelle/Slot → Extract/Dissolve.
+  Auf eine Grid-Zelle (`Cell`) **oder ein Dock-Item** (`DockItem`) mit einem **anderen
+  Folder B** → der Member zieht direkt in B (`MovedBetweenFolders` /
+  `MovedBetweenFoldersDissolve`, scoped IHM-INV-7) — **Dock-Folder verhalten sich
+  identisch zu Grid-Foldern**. Auf eine **App** → weiterhin `Rejected`
+  (Folder-Erzeugung-aus-Extraktion bleibt v2, spiegelt `MOVE_ITEM_SPEC` §7-D2). Auf die
+  **eigene** Folder-Zelle → `Rejected` (belegt). Voraussetzung ist, dass die UI beim
+  Landen auf der Mitte eines Dock-Icons `DockItem` liefert (nicht `DockSlot`, das nur
+  ZWISCHEN Icons einfügt) — dieselbe Mitte-vs-Rand-Geste wie auf dem Grid
+  (`HOME_DRAG_ENGINE_SPEC`).
 - **§7-D2 — Survivor erbt die Folder-Position**, nicht eine Nachbarzelle —
   vorhersagbar und ohne Suche nach „nächster freier Zelle".
 - **§7-D3 — Dissolve-Schwelle < 2.** Direkt aus RFF-INV-1.

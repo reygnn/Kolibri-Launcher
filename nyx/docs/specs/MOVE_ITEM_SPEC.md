@@ -63,8 +63,10 @@ Namens-Helfer gezogen hat (`APPLIST_SORT_SPLIT_SPEC`, RAL-4).
 ```kotlin
 // Wohin gedroppt wurde. DockSlot ist seitenlos (kein CellPos), vgl. HomeLayout.dock.
 sealed interface DropTarget {
-    data class Cell(val pos: CellPos) : DropTarget
-    data class DockSlot(val index: Int) : DropTarget
+    data class Cell(val pos: CellPos) : DropTarget       // auf eine Grid-Zelle landen
+    data class GridInsert(val page: Int, val index: Int) : DropTarget // zwischen Grid-Items
+    data class DockSlot(val index: Int) : DropTarget     // ZWISCHEN Dock-Items einfügen
+    data class DockItem(val index: Int) : DropTarget     // AUF das Dock-Item bei index landen (Dock-Pendant zu Cell)
 }
 
 // Was passiert ist — sealed Identifier, :app mappt zu UI-Feedback (kein String hier).
@@ -112,11 +114,25 @@ Folders sind nicht Quelle dieses Use-Cases (§8, `RemoveFromFolderUseCase`).
 |---|---|---|
 | App oder Folder | leer, Dock hat Platz | `Moved` (Item wird Dock-Item) |
 | App oder Folder | Dock voll (`dock.size == columns`, §7-D3) | `Rejected(DOCK_FULL)` |
-| App oder Folder | belegt | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — keine Folder-Erzeugung im Dock in v1 (§7-D2) |
+| App oder Folder | belegt | reines Einfügen (verschiebt die übrigen), nie „lands on"; Foldern/Merge im Dock läuft über `DockItem` (§3.3) |
+
+### §3.3 Ziel = `DockItem` (Dock-Pendant zu `Cell` — Dock-Folder verhalten sich identisch zum Grid)
+
+`DockItem(index)` bedeutet „auf das Dock-Item bei `index` landen" (mittige Geste),
+analog zu `Cell` auf dem Grid. Die Matrix ist zeilengleich zu §3.1 (belegte Zelle):
+
+| Quelle | Dock-Item am Index | Ergebnis |
+|---|---|---|
+| App | App | `FolderCreated` — neuer Dock-Folder `[Ziel-App, Quell-App]` an der Slot-Position; genau **eine** neue `ItemId` |
+| App | Folder | `AddedToFolder` — Quell-App ans Folder-Ende; `NoOp`, falls Key schon in DIESEM Folder (B-Scope IHM-INV-7) |
+| Folder | App oder Folder | `Rejected(TARGET_OCCUPIED_INCOMPATIBLE)` — Folder-auf-App/Folder bleibt v2 (§7-D2, spiegelt Grid) |
+| beliebig | kein landbares Item am Index | Degradiert zu `DockSlot`-Einfügen |
+| beliebig | Dock voll für ein NEUES Item (`dock.size == columns`) | `Rejected(DOCK_FULL)` |
 
 > Ein Item, das aus dem Dock aufs Grid (oder umgekehrt) wandert, ist derselbe
 > `move`-Aufruf — die Quelle wird über `ItemId` gefunden, egal ob sie in `items` oder
-> `dock` lag.
+> `dock` lag. **Dock-Folder sind vollwertig:** sie entstehen (App-auf-Dock-App),
+> nehmen Member auf und sind Ziel von `MovedBetweenFolders` — genau wie Grid-Folder.
 
 ---
 

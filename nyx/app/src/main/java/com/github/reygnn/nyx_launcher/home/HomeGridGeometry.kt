@@ -43,7 +43,7 @@ internal fun gridCellAt(
 }
 
 /** Outer fraction of a cell's width (each side) that reorders instead of foldering. */
-private const val GRID_INSERT_EDGE_FRACTION = 0.2f
+internal const val GRID_INSERT_EDGE_FRACTION = 0.2f
 
 /**
  * Classifies a grid drop point into a [DropTarget]: the central ~60% of a cell's

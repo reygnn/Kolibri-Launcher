@@ -74,7 +74,7 @@ Liste** auflöst — damit ist jeder Punkt droppbar, inkl. der oberen Kante.
   (für Shadow + Rück-Animation bei Cancel).
 
 Wiederverwendet: `DragPayload` (`Existing`/`NewApp`), `DropTarget.Cell`/
-`.DockSlot`, die Zell-Geometrie aus `resolveGridCell`.
+`.DockSlot`/`.DockItem`, die Zell-Geometrie aus `resolveGridCell`.
 
 ---
 
@@ -102,8 +102,11 @@ entscheidet der Hit-Test, nicht die View-Z-Order.
 Reihenfolge (oben gewinnt):
 1. **RemoveZone** — `hitRect` reicht bis `y = 0` (Oberkante). `acceptDrop` nur
    für `DragPayload.Existing`.
-2. **Dock** — `hitRect` = Dock-Bereich; Slot aus x-Position (wie heute
-   `handleDockDrag`).
+2. **Dock** — `hitRect` = Dock-Bereich. **Mitte-vs-Rand wie das Grid**
+   (`GRID_INSERT_EDGE_FRACTION`, gemeinsame Konstante): liegt der Finger über den
+   zentralen ~60% eines Dock-Icons → `DockItem(index)` (auf das Icon landen: Ordner
+   anlegen / hinzufügen / `MovedBetweenFolders`); der äußere ~20%-Rand → `DockSlot(index)`
+   (zwischen Icons einfügen). So verhalten sich Dock-Folder identisch zu Grid-Foldern.
 3. **Grid (aktuelle Seite)** — Rest der Fläche; Zelle aus (x, y) per Geometrie
    (die heutige `resolveGridCell`-Rechnung als `GridDropTarget`).
 
@@ -134,6 +137,7 @@ identisch zu heute:
 |---------------|------------------------|-----------------------|
 | `Cell`        | `viewModel.move(id, Cell)`   | `viewModel.place(key, Cell)`   |
 | `DockSlot`    | `viewModel.move(id, DockSlot)` | `viewModel.place(key, DockSlot)` |
+| `DockItem`    | `viewModel.move(id, DockItem)` | `viewModel.place(key, DockItem)` |
 | `RemoveZone`  | `viewModel.remove(id)` | (kein `acceptDrop`)   |
 
 `HomeLayoutTransition` + Use Cases bleiben unverändert (**DRG-INV-4**). Die

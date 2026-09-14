@@ -578,14 +578,25 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
                 val bounds = Rect().also { rectInDragLayer(dock, it) }
                 val localX = (x - bounds.left).toFloat()
+                // Centre-vs-edge, identical to the grid (gridDropAt): a drop over the
+                // central ~60% of a dock icon lands ON it (DockItem → folder create /
+                // add-to-folder / move-between-folders), the outer ~20% on each side
+                // inserts BETWEEN icons (DockSlot). Same GRID_INSERT_EDGE_FRACTION so
+                // dock and grid folders behave the same.
                 var index = 0
                 for (i in 0 until dock.childCount) {
                     val child = dock.getChildAt(i)
                     if (child.visibility != View.VISIBLE) continue // the icon being dragged
-                    if (dock.getChildAdapterPosition(child) == RecyclerView.NO_POSITION) continue
+                    val adapterPos = dock.getChildAdapterPosition(child)
+                    if (adapterPos == RecyclerView.NO_POSITION) continue
+                    val fx = (localX - child.left) / child.width.toFloat()
+                    if (fx in GRID_INSERT_EDGE_FRACTION..(1f - GRID_INSERT_EDGE_FRACTION)) {
+                        applyDrop(payload, DropTarget.DockItem(adapterPos)) // land ON this icon
+                        return
+                    }
                     if (child.left + child.width / 2f < localX) index++
                 }
-                applyDrop(payload, DropTarget.DockSlot(index))
+                applyDrop(payload, DropTarget.DockSlot(index)) // insert between icons
             }
         })
 
