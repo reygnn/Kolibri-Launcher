@@ -357,8 +357,17 @@ object HomeLayoutTransition {
             // duplicate. The extracted member is relocated to the target; the survivor is
             // promoted to the folder's old cell only if it is not already a tile.
             val withoutFolder = layout.removing(folder)
-            val (withMember, extractedId) = promoteToTarget(withoutFolder, member, target, newId)
-            val (out, survivorId) = promoteSurvivor(withMember, remaining.single(), placement, newId)
+            // RFF-INV-5 keeps id order "extracted then survivor", so the extracted id is minted
+            // FIRST. But the SURVIVOR is PLACED first, onto the folder's freed cell, so the
+            // extracted member's fallback (an out-of-range / fresh-page GridInsert resolves to
+            // "first free cell") can no longer reuse that very cell and collide with the
+            // survivor (IHM-INV-3). If the extracted member is already a top-level tile it
+            // reuses that id (no new one); likewise the survivor.
+            val existingExtracted = withoutFolder.topLevelIdOf(member)
+            val extractedId = existingExtracted ?: newId()
+            val (withSurvivor, survivorId) = promoteSurvivor(withoutFolder, remaining.single(), placement, newId)
+            val base = if (existingExtracted != null) withSurvivor.removing(existingExtracted) else withSurvivor
+            val out = placeNewAtTarget(base, HomeItem.App(extractedId, member), target)
             FolderEditResult.FolderDissolved(out, extractedId, survivorId)
         }
     }
@@ -472,12 +481,15 @@ object HomeLayoutTransition {
                 target.index < 0 || target.index > layout.dock.size -> MoveResult.Reason.OFF_GRID
                 else -> null
             }
-            // A DockItem landing on a folder is handled earlier (move-between-folders);
-            // reaching here means the slot holds an APP → occupied, same as a grid cell
-            // with an app (folder-from-extraction stays v2). An empty/out-of-range index
-            // degrades to a plain insert.
+            // A DockItem landing on ANOTHER folder is handled earlier (move-between-
+            // folders), so a folder still present at this index is the SOURCE folder's
+            // OWN slot — the dock twin of a grid own-cell drop, which the Cell branch
+            // above rejects as occupied. Reject it here too (dock-folder parity): letting
+            // it through silently dissolves the folder (and, for a dock folder, can
+            // overflow the dock past its column cap). An App occupant is likewise
+            // occupied; only an empty / out-of-range index degrades to a plain insert.
             is DropTarget.DockItem ->
-                if (layout.dock.getOrNull(target.index) is HomeItem.App)
+                if (layout.dock.getOrNull(target.index) != null)
                     MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE
                 else null
         }
