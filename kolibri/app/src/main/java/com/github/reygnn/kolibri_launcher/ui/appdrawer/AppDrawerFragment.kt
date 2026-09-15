@@ -90,9 +90,10 @@ class AppDrawerFragment : Fragment() {
         fun hideDrawer()
 
         /**
-         * The host's INTENDED open state (its `drawerVisible`), not live view
-         * visibility (which lags the hide animation). Used to re-assert
-         * open-time chrome on a resume that happens while the drawer is open.
+         * The host's INTENDED open state (its DrawerOverlayController.isOpen),
+         * not live view visibility (which lags the hide animation). Used to
+         * re-assert open-time chrome on a resume that happens while the drawer
+         * is open.
          */
         fun isDrawerOpen(): Boolean
     }
@@ -484,8 +485,8 @@ class AppDrawerFragment : Fragment() {
         // ~180ms hide slide would run the core's settle-back, which cancels
         // hideDrawer()'s animation on the shared ViewPropertyAnimator; that
         // animation's withEndAction does not run on cancel, so the container would
-        // be left visible at rest while drawerVisible=false — a drawer stuck open
-        // and un-dismissable (hideDrawer early-returns on !drawerVisible).
+        // be left visible at rest while the controller's isOpen=false — a drawer
+        // stuck open and un-dismissable (hide() early-returns on !isOpen).
         binding.appDrawerRoot.onDismissDrag = { host.hideDrawer() }
     }
 
