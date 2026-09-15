@@ -2,9 +2,9 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
 import android.app.Activity
 import android.content.Intent
-import androidx.navigation.findNavController
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.CoordinatesProvider
 import androidx.test.espresso.action.GeneralLocation
 import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
@@ -18,6 +18,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
+import com.github.reygnn.kolibri_launcher.support.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
@@ -30,39 +31,37 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Pins that a slow vertical drag downward on the AppDrawer root does
- * NOT trigger SwipeDownDismissLayout — the analyzer stays under the
- * `1.2 px/ms` velocity threshold, the wrapper falls through to
- * `super.dispatchTouchEvent`, the RecyclerView consumes the touches
- * normally, and no `popBackStack()` fires.
+ * Pins the negative half of the drag-to-dismiss contract: a SHORT downward
+ * drag — below `DragToDismissCore.dismissDistanceFraction` (0.28 of the
+ * host height) and slow enough not to fling — must NOT dismiss. The core
+ * follows the finger, then `onStopNestedScroll` sees the offset is under the
+ * threshold and springs the sheet back (`animateSettleBack`). The overlay
+ * stays up.
  *
- * Why this test exists: symmetric mirror of
- * [com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayoutTest.slowDragUpOnHome_doesNotOpenAppDrawer]
- * for the AppDrawer side. `SwipeDownDismissLayout` is the original
- * `dispatchTouchEvent` wrapper that `HomeGestureLayout` was modeled on,
- * and shares the same velocity-threshold contract: fast swipes
- * dismiss, slow drags fall through. [AppDrawerSwipeDismissTest] pins
- * the positive direction (fast swipe-down dismisses); this test pins
- * the negative direction (slow drag-down does NOT). A future change
- * that lowers the velocity threshold, or that re-introduces a "dismiss
- * if total downward distance > X" branch without a velocity gate,
- * would surface here.
+ * Why the gesture changed from the pre-migration version: the old
+ * `SwipeDownDismissLayout` dismissed on a *velocity*-gated flick, so the
+ * negative case was "a slow drag of any length". `DragToDismissCore` is
+ * *distance*-gated on release (plus a fling shortcut), so a slow drag that
+ * travels far enough now legitimately dismisses. The meaningful negative is
+ * therefore a slow drag kept deliberately short — this is what a user does
+ * when they start to peek the sheet down and change their mind. The positive
+ * direction (fast fling dismisses) is pinned by [AppDrawerSwipeDismissTest].
  *
- * Why VISIBLE_CENTER, not TOP_CENTER, as the swipe origin:
- * `INSTRUMENTED_TESTING_NOTES.kt` rule 11. TOP_CENTER lands at y=0
- * which is the system status-bar window — events go to the status
- * bar and never reach `SwipeDownDismissLayout.dispatchTouchEvent`.
- * VISIBLE_CENTER is guaranteed inside the matched view's hit-test
- * region.
+ * Drag distance: 15% of the list's height, comfortably under the 28%
+ * host-height threshold (the list is shorter than the host, so 0.15·list <
+ * 0.28·host with margin). `Swipe.SLOW` keeps velocity well under the
+ * fling-dismiss cutoff, so neither the distance nor the fling path fires.
  *
- * Why `Thread.sleep` for the negative assertion: same reasoning as
- * the home-side slow-drag test. There is no positive condition for
- * `awaitUntil` to converge on — we want to verify that *no* nav
- * transition fires within a window long enough that one would have
- * completed if it were going to. 1500 ms covers
- * `findNavController().popBackStack()` + FragmentManager.commit +
- * HomeFragment view inflation. A real misfire surfaces well within
- * this window.
+ * Why VISIBLE_CENTER as the origin: TOP_CENTER lands at y=0, the system
+ * status-bar window; those events never reach the drawer. The drag starts on
+ * the RecyclerView (the nested-scroll child) so the offset is actually
+ * routed to DragToDismissCore.
+ *
+ * Why `Thread.sleep` for the negative assertion: there is no positive
+ * condition for `awaitUntil` to converge on — we verify that *no* dismiss
+ * fires within a window long enough that the hide animation (≈180 ms) plus
+ * the settle-back spring (≈220 ms) would both have completed. 1500 ms covers
+ * it comfortably; a real misfire surfaces well within it.
  */
 @HiltAndroidTest
 class AppDrawerSlowDragNoDismissTest {
@@ -81,59 +80,73 @@ class AppDrawerSlowDragNoDismissTest {
     }
 
     @Test
-    fun slowDragDownOnDrawerRoot_doesNotDismiss() {
+    fun shortSlowDragDownOnDrawer_doesNotDismiss() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
 
-        // PackageManager pre-warm — same idiom as
-        // AppDrawerSwipeDismissTest. The drawer's launchable-apps
-        // pipeline has cold-start latency; warming the system PM here
-        // keeps RootViewPicker patient enough.
+        // PackageManager pre-warm — same idiom as AppDrawerSwipeDismissTest.
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         ctx.packageManager.queryIntentActivities(launcherIntent, 0)
 
         val launchIntent = Intent(ctx, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launchIntent).use {
-            // Navigate Home → AppDrawer programmatically, same pattern
-            // as AppDrawerSwipeDismissTest.
+            // Open the drawer through the production event path, same as
+            // AppDrawerSwipeDismissTest.
             InstrumentationRegistry.getInstrumentation().runOnMainSync {
                 val activity = currentResumedActivity<MainActivity>()
-                    ?: error("MainActivity not RESUMED — cannot navigate")
-                val nav = activity.findNavController(R.id.nav_host_fragment)
-                nav.navigate(R.id.action_homeFragment_to_appDrawerFragment)
+                    ?: error("MainActivity not RESUMED — cannot open drawer")
+                activity.viewModel.onFlingUp()
             }
 
             // Pre-condition: drawer is up.
-            onView(withId(R.id.apps_recycler_view)).check(matches(isDisplayed()))
-            onView(withId(R.id.app_drawer_root)).check(matches(isDisplayed()))
+            awaitUntil(
+                timeoutMs = 5_000,
+                describe = { "AppDrawer overlay never became visible after onFlingUp()" },
+            ) {
+                try {
+                    onView(withId(R.id.apps_recycler_view)).check(matches(isDisplayed()))
+                    onView(withId(R.id.app_drawer_root)).check(matches(isDisplayed()))
+                    true
+                } catch (_: Throwable) {
+                    false
+                }
+            }
 
-            // ACT: slow downward drag on the drawer root.
-            // `Swipe.SLOW` stays under SwipeDownDismissLayout's
-            // `1.2 px/ms` velocity threshold. The wrapper's analyzer
-            // returns IGNORED, `super.dispatchTouchEvent` falls
-            // through to the RecyclerView, and no
-            // `popBackStack()` fires.
-            onView(withId(R.id.app_drawer_root)).perform(
+            // ACT: short, slow downward drag on the list. `Swipe.SLOW` stays
+            // under the fling-dismiss velocity, and the 15% travel stays under
+            // the 28% distance threshold, so DragToDismissCore settles back
+            // instead of dismissing.
+            onView(withId(R.id.apps_recycler_view)).perform(
                 actionWithAssertions(
                     GeneralSwipeAction(
                         Swipe.SLOW,
                         GeneralLocation.VISIBLE_CENTER,
-                        GeneralLocation.BOTTOM_CENTER,
+                        shortDownFrom(GeneralLocation.VISIBLE_CENTER, fraction = 0.15f),
                         Press.FINGER,
                     )
                 )
             )
 
-            // ASSERT: drawer is STILL up (no dismiss happened).
-            //
-            // Negative-window pattern — see KDoc above for why
-            // `Thread.sleep` is the correct idiom here, not a
-            // synchronization anti-pattern.
+            // ASSERT: drawer is STILL up (settle-back, no dismiss).
+            // Negative-window pattern — see the class KDoc for why
+            // `Thread.sleep` is the correct idiom here.
             Thread.sleep(1_500)
             onView(withId(R.id.apps_recycler_view)).check(matches(isDisplayed()))
             onView(withId(R.id.app_drawer_root)).check(matches(isDisplayed()))
         }
     }
+
+    /**
+     * A CoordinatesProvider that ends [fraction] of the matched view's height
+     * BELOW the point [origin] resolves to — used to build a deliberately
+     * short downward drag whose total travel stays under
+     * DragToDismissCore's dismiss-distance threshold.
+     */
+    private fun shortDownFrom(origin: GeneralLocation, fraction: Float) =
+        CoordinatesProvider { view ->
+            val start = origin.calculateCoordinates(view)
+            floatArrayOf(start[0], start[1] + view.height * fraction)
+        }
 
     private inline fun <reified T : Activity> currentResumedActivity(): T? {
         val resumed = ActivityLifecycleMonitorRegistry.getInstance()

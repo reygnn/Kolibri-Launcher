@@ -3,7 +3,6 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
 import android.app.Activity
 import android.content.Intent
 import android.view.View
-import androidx.navigation.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -48,10 +47,12 @@ import org.junit.Test
  *  1. MainActivity launches into HomeFragment after marking onboarding
  *     as complete (otherwise MainActivity redirects to OnboardingActivity
  *     and the test would never reach the drawer).
- *  2. Programmatic NavController.navigate from HomeFragment → AppDrawer
- *     succeeds. The swipe-up gesture would be more realistic but the
- *     RecyclerView+search pipeline is what we want to verify, not the
- *     gesture wiring.
+ *  2. Opening the drawer through the production event path
+ *     (`viewModel.onFlingUp()` → `UiEvent.ShowAppDrawer` → `showDrawer()`)
+ *     makes the overlay visible. The drawer is a visibility-toggled overlay,
+ *     not a NavController destination. The real swipe-up gesture would be
+ *     more realistic but the RecyclerView+search pipeline is what we want to
+ *     verify, not the gesture wiring.
  *  3. `apps_recycler_view` populates from real PackageManager via the
  *     WhileSubscribed StateFlow — this is the cold-path-priming pattern
  *     that the BACKUP_COLD_PATH_FIX commit exposed in a different code
@@ -116,10 +117,12 @@ class AppDrawerFragmentSearchTest {
         val launchIntent = Intent(ctx, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launchIntent).use {
-            // ── Navigate Home → AppDrawer programmatically. The swipe-
-            // gesture path lives in HomeFragment.gestureZone and is its
-            // own hazard surface (touch slop, gesture detector); not what
-            // we're verifying here.
+            // ── Open the drawer through the production event path
+            // (fling-up → UiEvent.ShowAppDrawer → showDrawer). The drawer is
+            // an overlay now, not a NavController destination; we drive the
+            // ViewModel rather than performing the home swipe, whose gesture
+            // wiring is its own hazard surface (touch slop, gesture detector)
+            // and not what we're verifying here.
             //
             // Why not `scenario.onActivity { }`: that path resolves
             // `androidx.test.internal.platform.app.ActivityInvoker$-CC`
@@ -129,15 +132,14 @@ class AppDrawerFragmentSearchTest {
             // ActivityLifecycleMonitorRegistry instead avoids that path.
             InstrumentationRegistry.getInstrumentation().runOnMainSync {
                 val activity = currentResumedActivity<MainActivity>()
-                    ?: error("MainActivity not RESUMED — cannot navigate")
-                val nav = activity.findNavController(R.id.nav_host_fragment)
-                nav.navigate(R.id.action_homeFragment_to_appDrawerFragment)
+                    ?: error("MainActivity not RESUMED — cannot open drawer")
+                activity.viewModel.onFlingUp()
             }
 
-            // ── WAIT: nav transaction commits asynchronously. Espresso's
-            // idle model doesn't gate on FragmentManager transactions
-            // outside its own dispatch, so a bare assertion here races
-            // with the AppDrawer view-tree inflation.
+            // ── WAIT: the ShowAppDrawer event hops a Channel and showDrawer
+            // runs a short slide-in animation. Espresso's idle model doesn't
+            // gate on either, so a bare assertion here races with the
+            // AppDrawer view-tree becoming visible.
             awaitUntil(
                 timeoutMs = 5_000,
                 describe = { "AppDrawer view tree never attached after navigate()" },

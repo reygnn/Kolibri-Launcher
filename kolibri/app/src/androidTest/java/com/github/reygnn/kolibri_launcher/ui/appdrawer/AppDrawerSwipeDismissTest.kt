@@ -2,7 +2,6 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
 import android.app.Activity
 import android.content.Intent
-import androidx.navigation.findNavController
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.GeneralLocation
@@ -26,39 +25,46 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.CoreMatchers.not
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Why instrumented: AppDrawerFragment dismisses-on-swipe-down via
- * `SwipeDownDismissLayout` — a custom `dispatchTouchEvent` implementation
- * that exists because RecyclerView's `requestDisallowInterceptTouchEvent`
- * defeats normal `OnTouchListener` / `onInterceptTouchEvent` once scrolling
- * starts. The class KDoc explicitly warns "don't try to move the detection
- * logic… it has to live in the View hierarchy where dispatchTouchEvent is
- * reachable."
+ * Why instrumented: the AppDrawer dismisses via `SwipeDownDismissLayout`,
+ * which now drives a **drag-to-dismiss** (`DragToDismissCore`) built on
+ * nested scrolling — the drawer follows the finger once the list is pinned
+ * at the top, and a decisive downward fling (or a release past the distance
+ * threshold) hands off to the host's hide animation. Touch slop, the
+ * velocity tracker and the nested-scroll callback chain are exactly what
+ * Robolectric cannot honestly cover; the Robolectric companion only attaches
+ * the fragment and asserts no crash, it never sends a gesture.
  *
- * That code is exactly the sort of touch-pipeline logic Robolectric cannot
- * honestly cover: touch slop, velocity tracker, the dispatchTouchEvent
- * callback chain. The Robolectric AppDrawerFragmentRobolectricTest just
- * attaches the fragment and asserts no crash; it never sends a gesture.
+ * Architecture note (post overlay-drawer migration): the drawer is no
+ * longer a NavController destination. It is a visibility-toggled overlay in
+ * `activity_main.xml` (MainActivity.showDrawer/hideDrawer). It is opened
+ * through the production path — `viewModel.onFlingUp()` emits
+ * `UiEvent.ShowAppDrawer`, which the Activity turns into `showDrawer()` —
+ * rather than by navigating to a fragment. Dismissal therefore no longer
+ * pops a back stack; it hides the overlay container. The correct "is the
+ * drawer gone" signal is that `app_drawer_root` is no longer displayed, NOT
+ * that HomeFragment's `favoritesRecyclerView` is displayed: the live home
+ * sits behind the overlay the whole time, so it is displayed even while the
+ * drawer is open.
  *
  * What this test asserts:
- *  1. After programmatically navigating Home → AppDrawer, the drawer's
- *     RecyclerView and search field render.
- *  2. A swipe-down gesture on `app_drawer_root` triggers the
- *     SwipeDownDismissLayout callback, which calls
- *     `findNavController().popBackStack()` and brings HomeFragment back.
- *  3. HomeFragment's `favoritesRecyclerView` is visible, proving we're back at the
- *     start destination of the nav graph.
+ *  1. After `onFlingUp()`, the drawer's RecyclerView and root render.
+ *  2. A fast swipe-down on the (top-pinned) list drives DragToDismissCore
+ *     past its fling threshold and commits the dismiss.
+ *  3. The overlay hides: `app_drawer_root` is no longer displayed.
  *
  * Why a custom GeneralSwipeAction instead of `swipeDown()`: Espresso's
- * built-in `swipeDown()` uses fixed coordinate ratios that, on the AppDrawer
- * root view, can fall on the (empty-state) RecyclerView area instead of the
- * search container. The custom action goes from TOP_CENTER to BOTTOM_CENTER
- * which traverses the full screen height and is unambiguously detectable
- * by SwipeDownDismissLayout's threshold logic.
+ * built-in `swipeDown()` uses fixed coordinate ratios that can land on the
+ * search container rather than the scrollable list. The custom action goes
+ * VISIBLE_CENTER → BOTTOM_CENTER across the list, so the nested-scroll child
+ * (the RecyclerView) reports the unconsumed downward delta that
+ * DragToDismissCore turns into a dismiss. VISIBLE_CENTER (not TOP_CENTER)
+ * avoids y=0, which is the system status-bar window.
  */
 @HiltAndroidTest
 class AppDrawerSwipeDismissTest {
@@ -77,53 +83,50 @@ class AppDrawerSwipeDismissTest {
     }
 
     @Test
-    fun swipeDownOnDrawerRoot_popsBackToHomeFragment() {
+    fun fastSwipeDownOnDrawer_dismissesOverlay() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
 
-        // Same PackageManager pre-warm as AppDrawerFragmentSearchTest:
-        // calling queryIntentActivities here ensures the system PM has
-        // its launcher list cached before MainActivity's drawerApps
-        // pipeline starts. Without this warm-up the cold first-launch
-        // can stretch past Espresso's default RootViewPicker patience.
+        // PackageManager pre-warm: ensure the system PM has its launcher
+        // list cached before MainActivity's drawerApps pipeline starts, so
+        // the cold first-launch doesn't stretch past RootViewPicker patience.
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         ctx.packageManager.queryIntentActivities(launcherIntent, 0)
 
         val launchIntent = Intent(ctx, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launchIntent).use {
-            // ── Navigate Home → AppDrawer (same pattern as
-            // AppDrawerFragmentSearchTest: programmatic nav via the
-            // lifecycle registry, avoids the
-            // ActivityScenario.onActivity { } path).
+            // ── Open the drawer through the production event path (fling-up
+            // → UiEvent.ShowAppDrawer → showDrawer). We drive the ViewModel
+            // directly rather than performing the home swipe, whose gesture
+            // wiring is its own hazard surface and not what we verify here.
             InstrumentationRegistry.getInstrumentation().runOnMainSync {
                 val activity = currentResumedActivity<MainActivity>()
-                    ?: error("MainActivity not RESUMED — cannot navigate")
-                val nav = activity.findNavController(R.id.nav_host_fragment)
-                nav.navigate(R.id.action_homeFragment_to_appDrawerFragment)
+                    ?: error("MainActivity not RESUMED — cannot open drawer")
+                activity.viewModel.onFlingUp()
             }
 
-            // ── ASSERT: drawer attached. Direct asserts (not wrapped in
-            // awaitUntil) — Espresso's RootViewPicker has its own ~10s
-            // patience built in. Wrapping in awaitUntil's 50ms polling
-            // races with Espresso's internal wait and gives confusing
-            // timeouts. AppDrawerFragmentSearchTest uses the same shape.
-            onView(withId(R.id.apps_recycler_view)).check(matches(isDisplayed()))
-            onView(withId(R.id.app_drawer_root)).check(matches(isDisplayed()))
+            // ── ASSERT: drawer attached and shown. Wrapped in awaitUntil
+            // because showDrawer runs a short slide-in animation and the
+            // ShowAppDrawer event hops a Channel before it fires.
+            awaitUntil(
+                timeoutMs = 5_000,
+                describe = { "AppDrawer overlay never became visible after onFlingUp()" },
+            ) {
+                try {
+                    onView(withId(R.id.apps_recycler_view)).check(matches(isDisplayed()))
+                    onView(withId(R.id.app_drawer_root)).check(matches(isDisplayed()))
+                    true
+                } catch (_: Throwable) {
+                    false
+                }
+            }
 
-            // ── ACT: swipe down on the drawer root.
-            //
-            // Use VISIBLE_CENTER → BOTTOM_CENTER instead of
-            // TOP_CENTER → BOTTOM_CENTER. TOP_CENTER lands at y=0 which
-            // on a real device is the system status bar area — those
-            // events go to the status-bar window and never reach
-            // SwipeDownDismissLayout. VISIBLE_CENTER is guaranteed to
-            // be inside the matched view's hit-test region.
-            //
-            // SwipeDownDismissLayout requires three thresholds (distance
-            // > 4×touchSlop, vertical-dominant, velocity > 1.2px/ms);
-            // a half-screen FAST swipe blows past all three on any
-            // density.
-            onView(withId(R.id.app_drawer_root)).perform(
+            // ── ACT: fast swipe down on the list. The list is pinned at the
+            // top (onDrawerShown scrolls to position 0), so the RecyclerView
+            // cannot consume the downward delta; the unconsumed remainder
+            // reaches SwipeDownDismissLayout's DragToDismissCore, and a FAST
+            // swipe blows past its fling-dismiss velocity.
+            onView(withId(R.id.apps_recycler_view)).perform(
                 actionWithAssertions(
                     GeneralSwipeAction(
                         Swipe.FAST,
@@ -134,16 +137,17 @@ class AppDrawerSwipeDismissTest {
                 )
             )
 
-            // ── ASSERT: HomeFragment is back. `favoritesRecyclerView` is HomeFragment's
-            // favorites RecyclerView; AppDrawerFragment doesn't have a view
-            // with that id, so its presence is a unique structural signal
-            // that the navigation popped back.
+            // ── ASSERT: the overlay is gone. In the overlay model the drawer
+            // is dismissed by hiding its container (visibility → gone after
+            // the hide animation), so `app_drawer_root` is no longer
+            // displayed. HomeFragment behind it is irrelevant — it was
+            // displayed the whole time.
             awaitUntil(
                 timeoutMs = 5_000,
-                describe = { "HomeFragment never returned after swipe-down" },
+                describe = { "AppDrawer overlay never hid after fast swipe-down" },
             ) {
                 try {
-                    onView(withId(R.id.favoritesRecyclerView)).check(matches(isDisplayed()))
+                    onView(withId(R.id.app_drawer_root)).check(matches(not(isDisplayed())))
                     true
                 } catch (_: Throwable) {
                     false

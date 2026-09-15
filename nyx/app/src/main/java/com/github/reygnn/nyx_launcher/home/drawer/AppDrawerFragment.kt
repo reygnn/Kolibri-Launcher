@@ -7,6 +7,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.core.view.doOnAttach
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -59,9 +60,12 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val root = view as GestureFrameLayout
-        // A decisive swipe-down dismisses; intentional at any y, so no top band.
-        root.topExclusionPx = 0f
-        root.onSwipeDown = { host.hideDrawer() }
+        // Pixel-style drag-to-dismiss (nested scrolling): the drawer follows the
+        // finger once the list is pinned at the top. dragTarget is the overlay
+        // container the host animates, so a released dismiss hands off to
+        // hideDrawer() from the current offset — no jump, no double slide.
+        view.doOnAttach { root.dragTarget = view.parent as View }
+        root.onDismissDrag = { host.hideDrawer() }
 
         val list = view.findViewById<RecyclerView>(R.id.drawer_panel)
         // The drawer scrim (root) fills edge-to-edge behind the system bars; the

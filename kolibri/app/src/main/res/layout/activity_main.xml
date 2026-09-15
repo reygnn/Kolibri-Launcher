@@ -27,4 +27,16 @@
         app:defaultNavHost="true"
         app:navGraph="@navigation/nav_graph" />
 
+    <!-- App-drawer overlay: EMPTY container by default. The AppDrawerFragment
+         is added lazily on the first MainActivity.showDrawer() (and restored
+         by the FragmentManager across config changes), so its view tree and
+         apps StateFlow are not built at launch. Toggled by visibility + slide;
+         sits above the NavHost so the live home stays drawn behind it. gone by
+         default. -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/drawer_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
 </FrameLayout>

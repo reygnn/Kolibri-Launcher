@@ -17,13 +17,13 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.doOnLayout
+import androidx.core.view.doOnAttach
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.R
@@ -84,6 +84,14 @@ class AppDrawerFragment : Fragment() {
     // ===========================================
 
     private val viewModel: LauncherViewModel by activityViewModels()
+
+    /** Implemented by the hosting activity (MainActivity). */
+    interface Host {
+        /** Dismiss the drawer overlay (swipe-down / back / after launch). */
+        fun hideDrawer()
+    }
+
+    private val host: Host get() = requireActivity() as Host
 
     // ===========================================
     // VIEW BINDING
@@ -454,11 +462,12 @@ class AppDrawerFragment : Fragment() {
      * call is needed here.
      */
     private fun setupSwipeToDismiss() {
-        binding.appDrawerRoot.onSwipeDown = {
-            if (isAdded) {
-                findNavController().popBackStack()
-            }
-        }
+        // Pixel-style drag-to-dismiss (nested scrolling). dragTarget is the
+        // overlay container the host animates, so a released dismiss hands off
+        // to hideDrawer() from the current offset (no second animation).
+        val root = binding.appDrawerRoot
+        root.doOnAttach { root.dragTarget = root.parent as View }
+        root.onDismissDrag = { host.hideDrawer() }
     }
 
     /**
@@ -587,8 +596,33 @@ class AppDrawerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // As a visibility-toggled overlay the fragment stays RESUMED while the
+        // drawer is closed, so open-time work (status bar, keyboard, search
+        // reset) moved to onDrawerShown(), driven by the host's showDrawer().
+    }
+
+    /**
+     * Open-time work, driven explicitly by MainActivity.showDrawer(). Needed
+     * because the overlay fragment no longer changes lifecycle state on open,
+     * so onResume can't drive it any more.
+     */
+    fun onDrawerShown(resetContent: Boolean = true) {
+        val b = _binding ?: return
         showStatusBar()
-        handleAutoShowKeyboard()  // launches its own coroutine with fragmentExceptionHandler
+        if (resetContent) {
+            // A fresh open starts with an empty query at the top of the list.
+            // On a config-change restore (resetContent = false) we keep the
+            // fragment's restored search text and scroll position instead.
+            b.searchEditText.setText("")
+            b.appsRecyclerView.scrollToPosition(0)
+        }
+        handleAutoShowKeyboard()
+    }
+
+    /** Close-time work, driven explicitly by MainActivity.hideDrawer(). */
+    fun onDrawerHidden() {
+        hideKeyboard()
+        viewModel.onAppDrawerClosed()
     }
 
     override fun onPause() {
@@ -746,7 +780,12 @@ class AppDrawerFragment : Fragment() {
                 binding.appsRecyclerView.adapter = null
             }
 
-            viewModel.onAppDrawerClosed()
+            // Note: "drawer closed" state (clearing the saved search query)
+            // is owned by onDrawerHidden(), driven by MainActivity.hideDrawer().
+            // As a visibility-toggled overlay this fragment's onDestroyView now
+            // only runs on Activity teardown, where clearing the query is moot
+            // (the next open resets it anyway), so we no longer call
+            // viewModel.onAppDrawerClosed() here.
 
             _binding = null
             longClickedApp = null

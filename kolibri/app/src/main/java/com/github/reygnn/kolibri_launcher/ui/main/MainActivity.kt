@@ -22,11 +22,13 @@ import android.widget.BaseAdapter
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
 import androidx.navigation.NavController
@@ -41,6 +43,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.BaseActivity
+import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerFragment
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.colorcustomization.ColorCustomizationDialogFragment
 import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
@@ -234,11 +237,110 @@ import timber.log.Timber
  * =============================================================================
  */
 @AndroidEntryPoint
-class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
+class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragment.Host {
 
     override val viewModel: LauncherViewModel by viewModels()
 
     private var navController: NavController? = null
+
+    // ---- app-drawer overlay (nyx-style: visibility toggle, not navigation) ----
+
+    // Null-safe: the container is absent before setContentView (onboarding
+    // redirect) and the cast is guarded so a torn-down FragmentManager can
+    // never crash show/hide — callers early-return on null instead.
+    private val drawerContainer: View? get() = findViewById(R.id.drawer_container)
+
+    private val drawerFragment: AppDrawerFragment?
+        get() = supportFragmentManager.findFragmentById(R.id.drawer_container) as? AppDrawerFragment
+
+    // Lazily add the drawer fragment on first open (and reuse it thereafter).
+    // commitNow so the view tree is built synchronously and onDrawerShown can
+    // touch its binding immediately. After a config change the FragmentManager
+    // has already restored the fragment into the container, so findFragmentById
+    // returns it and no second add happens.
+    private fun ensureDrawerFragment(): AppDrawerFragment {
+        drawerFragment?.let { return it }
+        val fragment = AppDrawerFragment()
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.drawer_container, fragment)
+            .commitNow()
+        return fragment
+    }
+
+    // Intended open/closed state — the single source of truth for guards and
+    // for save/restore. Deliberately NOT read from drawerContainer.isVisible,
+    // which stays `true` throughout the hide animation: guarding on it drops a
+    // reopen that arrives mid-close (rapid dismiss-then-fling-up).
+    private var drawerVisible = false
+
+    // Registered on show so it sits ABOVE HomeFragment's always-enabled back
+    // callback (later registration wins), removed on hide. Without this the
+    // home callback would swallow BACK and the drawer could never close.
+    private val drawerBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = hideDrawer()
+    }
+
+    // animate=false is the restore path (after a rotation): show instantly at
+    // rest, no slide-in, but otherwise identical wiring (back callback, open-
+    // time work). refreshInstalledApps is skipped on restore since the list
+    // StateFlow is re-collected by the recreated fragment anyway.
+    private fun showDrawer(animate: Boolean = true) {
+        if (drawerVisible) return
+        val container = drawerContainer ?: return
+        drawerVisible = true
+        // Cancel any in-flight hide before re-opening. NOTE: cancel() fires the
+        // hide's withEndAction, but that action is guarded on `drawerVisible`,
+        // which we have already set true above, so it won't hide us.
+        container.animate().cancel()
+        if (animate) {
+            viewModel.refreshInstalledApps() // pick up apps installed/removed since last open
+            // Start off-screen only for a genuine open-from-closed. A reopen
+            // that interrupts the hide keeps its current offset, so it slides
+            // back up from where it was instead of jumping to the bottom first.
+            if (!container.isVisible) {
+                container.translationY = resources.displayMetrics.heightPixels.toFloat()
+            }
+        } else {
+            container.translationY = 0f
+        }
+        container.isVisible = true
+        // A normal open (animate) starts fresh; the restore path (no animate)
+        // keeps the recreated fragment's restored query and scroll. Creates the
+        // fragment on first open (commitNow), reuses it afterwards.
+        ensureDrawerFragment().onDrawerShown(resetContent = animate)
+        onBackPressedDispatcher.addCallback(drawerBackCallback)
+        drawerBackCallback.isEnabled = true
+        if (animate) {
+            container.animate()
+                .translationY(0f)
+                .setDuration(DRAWER_SLIDE_MS)
+                .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+                .start()
+        }
+    }
+
+    override fun hideDrawer() {
+        if (!drawerVisible) return
+        drawerVisible = false
+        val container = drawerContainer ?: return
+        drawerFragment?.onDrawerHidden()
+        drawerBackCallback.remove()
+        // Cancel first so a reopen that already started its own animation isn't
+        // clobbered; the end action re-checks `drawerVisible` before committing
+        // the container to gone, so a mid-hide reopen leaves it shown.
+        container.animate().cancel()
+        container.animate()
+            .translationY(resources.displayMetrics.heightPixels.toFloat())
+            .setDuration(DRAWER_SLIDE_MS)
+            .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
+            .withEndAction {
+                if (!drawerVisible) {
+                    container.isVisible = false
+                    container.translationY = 0f
+                }
+            }
+            .start()
+    }
     private var isReceiverRegistered = false
     private var currentDialog: androidx.appcompat.app.AlertDialog? = null
 
@@ -333,6 +435,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
 
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
+
+        // Whether the app-drawer overlay was open, persisted so a config
+        // change (rotation) re-opens it instead of silently dropping it —
+        // the overlay's visibility is not part of saved view state.
+        private const val STATE_DRAWER_OPEN = "drawer_open"
+
+        // Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS.
+        private const val DRAWER_SLIDE_MS = 180L
 
         // Alpha (0-255) for the upcoming-events dialog today/tomorrow separator
         // line, applied to the wallpaper-aware onSurface colour. ~35% reads as a
@@ -735,6 +845,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         navController?.currentDestination?.id?.let { destinationId ->
             outState.putInt(STATE_CURRENT_DESTINATION, destinationId)
         }
+        // Overlay visibility is not part of saved view state, so persist it
+        // ourselves; restored in onRestoreInstanceState. We save the *intended*
+        // state (drawerVisible), not the live view visibility, so a rotation
+        // mid-hide restores as closed instead of snapping back open.
+        outState.putBoolean(STATE_DRAWER_OPEN, drawerVisible)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -772,6 +887,20 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                 }
             }
         }
+
+        // Re-open the overlay if it was open before the config change. Shown
+        // without the slide-in (it was already fully open) and re-registers
+        // the back callback, which addCallback does not survive recreation.
+        // The (programmatically-added) fragment is restored by the
+        // FragmentManager together with its view-hierarchy state — search text
+        // and scroll position — on BOTH a config change and a process-death
+        // restore (the FragmentManager state travels in the saved bundle), so
+        // showDrawer(animate = false) uses resetContent = false to keep it. On
+        // process death the ViewModel is rebuilt and the app list simply
+        // re-collects; the restored search text drives the filter as before.
+        if (savedInstanceState.getBoolean(STATE_DRAWER_OPEN)) {
+            showDrawer(animate = false)
+        }
     }
 
     override fun onDestroy() {
@@ -800,18 +929,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
         try {
             when (event) {
                 is UiEvent.ShowAppDrawer -> {
-                    if (navController?.currentDestination?.id == R.id.homeFragment) {
-                        // Traced: the drawer-open navigation. The 300ms
-                        // slide_in_up transition runs after this returns — the
-                        // fragment transaction cost itself is what this pins.
-                        LaunchTrace.section(LaunchTrace.Names.DRAWER_OPEN) {
-                            navController?.navigate(R.id.appDrawerFragment)
-                        }
-                        if (BuildConfig.DEBUG) {
-                            Timber.d("[MAIN] Navigated to app drawer")
-                        }
-                    } else if (BuildConfig.DEBUG) {
-                        Timber.d("[MAIN] Not navigating - wrong destination: ${navController?.currentDestination?.id}")
+                    // Overlay drawer: toggle visibility instead of navigating.
+                    LaunchTrace.section(LaunchTrace.Names.DRAWER_OPEN) {
+                        showDrawer()
                     }
                 }
 
@@ -855,39 +975,15 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>() {
                     // GAP before this section on the Perfetto timeline (from the
                     // app_launch_tap slice) is the Channel hop latency.
                     LaunchTrace.section(LaunchTrace.Names.DISPATCH) {
-                        val action = AppLaunchAction.decide(
-                            currentDestinationId = navController?.currentDestination?.id,
-                            drawerDestinationId = R.id.appDrawerFragment,
-                            app = event.app,
-                        )
-
-                        if (BuildConfig.DEBUG) {
-                            Timber.d(
-                                "[MAIN] Processing LaunchApp for: ${event.app.displayName}, " +
-                                    "action: ${action::class.simpleName}",
-                            )
-                        }
-
-                        if (action is AppLaunchAction.PopThenLaunch) {
-                            try {
-                                navController?.popBackStack()
-                                if (BuildConfig.DEBUG) {
-                                    Timber.d("[MAIN] Drawer closed")
-                                }
-                            } catch (e: Throwable) {
-                                // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-                                // Inner catch kept (Expected error, four-
-                                // category frame): scoped log "Error popping
-                                // back stack" preserves diagnostic context
-                                // that the outer Catchall would flatten to
-                                // "Error in handleSpecificEvent". Even if
-                                // popBackStack fails, launchApp below still
-                                // runs (correct user-visible behaviour).
-                                TimberWrapper.silentError(e, "[MAIN] Error popping back stack")
-                            }
-                        }
-
-                        launchApp(action.app)
+                        // Overlay drawer: close it (if open) before launching,
+                        // replacing the former NavController popBackStack. In the
+                        // overlay model there is no back stack, so the old
+                        // pop-vs-launch decision collapses to this visibility
+                        // check; AppLaunchAction (kept as the documented pattern
+                        // anchor for the other pure-decision extracts) is simply
+                        // not needed on this path.
+                        if (drawerVisible) hideDrawer()
+                        launchApp(event.app)
                     }
                 }
 
