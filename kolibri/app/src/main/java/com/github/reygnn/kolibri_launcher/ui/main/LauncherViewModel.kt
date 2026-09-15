@@ -27,7 +27,7 @@ import com.github.reygnn.launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ResolvedBackground

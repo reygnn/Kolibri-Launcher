@@ -134,7 +134,7 @@ import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
-import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState

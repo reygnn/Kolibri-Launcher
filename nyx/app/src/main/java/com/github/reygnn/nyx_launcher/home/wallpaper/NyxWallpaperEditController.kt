@@ -14,7 +14,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryReport
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSaveAction
 import com.github.reygnn.launcher.core.wallpaper.formatMegabytes
 import com.github.reygnn.nyx_launcher.R
-import com.github.reygnn.nyx_launcher.home.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.nyx_launcher.home.wallpaperfab.CommandsPanel
 import com.github.reygnn.nyx_launcher.home.wallpaperfab.SpeedDialFabCluster
 import com.google.android.material.dialog.MaterialAlertDialogBuilder

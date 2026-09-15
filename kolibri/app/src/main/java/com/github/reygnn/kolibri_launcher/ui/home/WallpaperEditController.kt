@@ -8,7 +8,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
-import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform

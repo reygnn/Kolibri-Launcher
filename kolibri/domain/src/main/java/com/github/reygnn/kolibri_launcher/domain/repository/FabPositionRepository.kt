@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.launcher.core.Purgeable
 
-import com.github.reygnn.kolibri_launcher.domain.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import kotlinx.coroutines.flow.Flow
 
 /**

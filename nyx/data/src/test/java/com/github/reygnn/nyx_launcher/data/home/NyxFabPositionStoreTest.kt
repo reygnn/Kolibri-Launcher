@@ -3,7 +3,7 @@ package com.github.reygnn.nyx_launcher.data.home
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
-import com.github.reygnn.nyx_launcher.home.model.FabPosition
+import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first

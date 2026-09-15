@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.domain.model
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Persisted position of the wallpaper-edit speed-dial FAB.
@@ -11,7 +11,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
  *
  * Clamping so the FAB stays fully on-screen is the consumer's job (the
  * drag handler does it at apply-time); the stored value is the user's
- * intent, not the rendered position.
+ * intent, not the rendered position. Shared by kolibri and nyx via :core.
  */
 data class FabPosition(
     val xFraction: Float,

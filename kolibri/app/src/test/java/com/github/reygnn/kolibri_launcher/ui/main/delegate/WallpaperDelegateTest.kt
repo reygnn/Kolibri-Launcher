@@ -2038,12 +2038,12 @@ class WallpaperDelegateTest {
     fun `fabPosition starts at DEFAULT when the use case has not emitted`() {
         val delegate = createDelegate()
         // initialValue of stateIn — the empty flow never emits.
-        assertEquals(com.github.reygnn.kolibri_launcher.domain.model.FabPosition.DEFAULT, delegate.fabPosition.value)
+        assertEquals(com.github.reygnn.launcher.core.wallpaper.FabPosition.DEFAULT, delegate.fabPosition.value)
     }
 
     @Test
     fun `fabPosition reflects use-case flow emissions`() = runTest {
-        val flow = MutableStateFlow(com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.2f, yFraction = 0.3f))
+        val flow = MutableStateFlow(com.github.reygnn.launcher.core.wallpaper.FabPosition(xFraction = 0.2f, yFraction = 0.3f))
         every { getFabPositionUseCase.invoke() } returns flow
 
         val delegate = createDelegate()
@@ -2054,7 +2054,7 @@ class WallpaperDelegateTest {
         assertEquals(0.2f, delegate.fabPosition.value.xFraction)
         assertEquals(0.3f, delegate.fabPosition.value.yFraction)
 
-        flow.value = com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.7f, yFraction = 0.8f)
+        flow.value = com.github.reygnn.launcher.core.wallpaper.FabPosition(xFraction = 0.7f, yFraction = 0.8f)
         advanceUntilIdle()
         assertEquals(0.7f, delegate.fabPosition.value.xFraction)
         assertEquals(0.8f, delegate.fabPosition.value.yFraction)
@@ -2067,7 +2067,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
         coVerify {
             saveFabPositionUseCase.invoke(
-                com.github.reygnn.kolibri_launcher.domain.model.FabPosition(xFraction = 0.42f, yFraction = 0.58f)
+                com.github.reygnn.launcher.core.wallpaper.FabPosition(xFraction = 0.42f, yFraction = 0.58f)
             )
         }
     }
