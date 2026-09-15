@@ -33,8 +33,8 @@ android {
         applicationId = "com.github.reygnn.nyx_launcher"
         minSdk = 36
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.1.5-dev"
+        versionCode = 7
+        versionName = "0.1.6-dev"
 
         buildConfigField("String", "ACRA_URL", "\"${secretsProperties.getProperty("acra.url", "")}\"")
         buildConfigField("String", "ACRA_LOGIN", "\"${secretsProperties.getProperty("acra.login", "")}\"")
