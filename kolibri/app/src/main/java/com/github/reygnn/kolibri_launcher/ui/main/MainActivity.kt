@@ -51,6 +51,7 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.launcher.common.ui.showToastSafe
@@ -267,12 +268,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         return fragment
     }
 
-    // Intended open/closed state — the single source of truth for guards and
-    // for save/restore. Deliberately NOT read from drawerContainer.isVisible,
-    // which stays `true` throughout the hide animation: guarding on it drops a
-    // reopen that arrives mid-close (rapid dismiss-then-fling-up).
-    private var drawerVisible = false
-
     // Registered on show so it sits ABOVE HomeFragment's always-enabled back
     // callback (later registration wins), removed on hide. Without this the
     // home callback would swallow BACK and the drawer could never close.
@@ -280,71 +275,45 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         override fun handleOnBackPressed() = hideDrawer()
     }
 
-    // animate=false is the restore path (after a rotation): show instantly at
-    // rest, no slide-in, but otherwise identical wiring (back callback, open-
-    // time work). refreshInstalledApps is skipped on restore since the list
-    // StateFlow is re-collected by the recreated fragment anyway.
+    // Shared overlay controller (common-ui): owns the slide, the intended-open
+    // state, the cancel-safe visibility hand-off and config-change persistence,
+    // identical to Nyx. App-specific open/close work lives in the hooks. Built
+    // once the content view exists (setupMainContent); null on the onboarding-
+    // redirect path where setContentView never runs.
+    private var drawerOverlay: DrawerOverlayController? = null
+
+    private fun buildDrawerOverlay(container: View) = DrawerOverlayController(
+        container = container,
+        slideDistancePx = { resources.displayMetrics.heightPixels.toFloat() },
+        slideDurationMs = DRAWER_SLIDE_MS,
+        onShown = { animate ->
+            // refreshInstalledApps is skipped on restore since the recreated
+            // fragment re-collects the list StateFlow anyway.
+            if (animate) viewModel.refreshInstalledApps() // pick up installs/removals since last open
+            // A normal open (animate) starts fresh; the restore path (no animate)
+            // keeps the recreated fragment's restored query and scroll. Creates
+            // the fragment on first open (commitNow), reuses it afterwards.
+            ensureDrawerFragment().onDrawerShown(resetContent = animate)
+            onBackPressedDispatcher.addCallback(drawerBackCallback)
+            drawerBackCallback.isEnabled = true
+        },
+        onHidden = {
+            drawerFragment?.onDrawerHidden()
+            drawerBackCallback.remove()
+        },
+    )
+
     private fun showDrawer(animate: Boolean = true) {
-        if (drawerVisible) return
-        val container = drawerContainer ?: return
-        drawerVisible = true
-        // Cancel any in-flight hide before re-opening. NOTE: cancel() fires the
-        // hide's withEndAction, but that action is guarded on `drawerVisible`,
-        // which we have already set true above, so it won't hide us.
-        container.animate().cancel()
-        if (animate) {
-            viewModel.refreshInstalledApps() // pick up apps installed/removed since last open
-            // Start off-screen only for a genuine open-from-closed. A reopen
-            // that interrupts the hide keeps its current offset, so it slides
-            // back up from where it was instead of jumping to the bottom first.
-            if (!container.isVisible) {
-                container.translationY = resources.displayMetrics.heightPixels.toFloat()
-            }
-        } else {
-            container.translationY = 0f
-        }
-        container.isVisible = true
-        // A normal open (animate) starts fresh; the restore path (no animate)
-        // keeps the recreated fragment's restored query and scroll. Creates the
-        // fragment on first open (commitNow), reuses it afterwards.
-        ensureDrawerFragment().onDrawerShown(resetContent = animate)
-        onBackPressedDispatcher.addCallback(drawerBackCallback)
-        drawerBackCallback.isEnabled = true
-        if (animate) {
-            container.animate()
-                .translationY(0f)
-                .setDuration(DRAWER_SLIDE_MS)
-                .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-                .start()
-        }
+        drawerOverlay?.show(animate)
     }
 
     // The intended open state, for the drawer/home fragments to coordinate
     // status-bar ownership on a resume-while-open (both stay RESUMED under the
-    // overlay model). Reads the same source of truth as the show/hide guards.
-    override fun isDrawerOpen(): Boolean = drawerVisible
+    // overlay model). Reads the controller's single source of truth.
+    override fun isDrawerOpen(): Boolean = drawerOverlay?.isOpen == true
 
     override fun hideDrawer() {
-        if (!drawerVisible) return
-        drawerVisible = false
-        val container = drawerContainer ?: return
-        drawerFragment?.onDrawerHidden()
-        drawerBackCallback.remove()
-        // Cancel first so a reopen that already started its own animation isn't
-        // clobbered; the end action re-checks `drawerVisible` before committing
-        // the container to gone, so a mid-hide reopen leaves it shown.
-        container.animate().cancel()
-        container.animate()
-            .translationY(resources.displayMetrics.heightPixels.toFloat())
-            .setDuration(DRAWER_SLIDE_MS)
-            .setInterpolator(android.view.animation.AccelerateDecelerateInterpolator())
-            .withEndAction {
-                if (!drawerVisible) {
-                    container.isVisible = false
-                    container.translationY = 0f
-                }
-            }
-            .start()
+        drawerOverlay?.hide()
     }
     private var isReceiverRegistered = false
     private var currentDialog: androidx.appcompat.app.AlertDialog? = null
@@ -441,12 +410,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     companion object {
         private const val STATE_CURRENT_DESTINATION = "current_destination"
 
-        // Whether the app-drawer overlay was open, persisted so a config
-        // change (rotation) re-opens it instead of silently dropping it —
-        // the overlay's visibility is not part of saved view state.
-        private const val STATE_DRAWER_OPEN = "drawer_open"
-
-        // Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS.
+        // Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS. (Drawer-open
+        // persistence now lives in DrawerOverlayController.onSaveInstanceState.)
         private const val DRAWER_SLIDE_MS = 180L
 
         // Alpha (0-255) for the upcoming-events dialog today/tomorrow separator
@@ -594,6 +559,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     private fun setupMainContent(): Boolean {
         return try {
             setContentView(R.layout.activity_main)
+            // Build the overlay controller now that the container exists (before
+            // onRestoreInstanceState, which may re-show the drawer).
+            drawerContainer?.let { drawerOverlay = buildDrawerOverlay(it) }
 
             val navHostFragment = supportFragmentManager
                 .findFragmentById(R.id.nav_host_fragment) as? NavHostFragment
@@ -850,11 +818,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         navController?.currentDestination?.id?.let { destinationId ->
             outState.putInt(STATE_CURRENT_DESTINATION, destinationId)
         }
-        // Overlay visibility is not part of saved view state, so persist it
-        // ourselves; restored in onRestoreInstanceState. We save the *intended*
-        // state (drawerVisible), not the live view visibility, so a rotation
-        // mid-hide restores as closed instead of snapping back open.
-        outState.putBoolean(STATE_DRAWER_OPEN, drawerVisible)
+        // Overlay visibility is not part of saved view state, so the controller
+        // persists the *intended* open state; restored in onRestoreInstanceState.
+        drawerOverlay?.onSaveInstanceState(outState)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -903,7 +869,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // showDrawer(animate = false) uses resetContent = false to keep it. On
         // process death the ViewModel is rebuilt and the app list simply
         // re-collects; the restored search text drives the filter as before.
-        if (savedInstanceState.getBoolean(STATE_DRAWER_OPEN)) {
+        if (drawerOverlay?.restore(savedInstanceState) == true) {
             showDrawer(animate = false)
         }
     }
@@ -987,7 +953,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                         // check; AppLaunchAction (kept as the documented pattern
                         // anchor for the other pure-decision extracts) is simply
                         // not needed on this path.
-                        if (drawerVisible) hideDrawer()
+                        if (isDrawerOpen()) hideDrawer()
                         launchApp(event.app)
                     }
                 }

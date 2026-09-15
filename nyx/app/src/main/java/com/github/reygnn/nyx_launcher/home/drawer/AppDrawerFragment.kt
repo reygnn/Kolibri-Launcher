@@ -7,7 +7,6 @@ import androidx.fragment.app.activityViewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.core.view.doOnAttach
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -64,7 +63,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         // finger once the list is pinned at the top. dragTarget is the overlay
         // container the host animates, so a released dismiss hands off to
         // hideDrawer() from the current offset — no jump, no double slide.
-        view.doOnAttach { root.dragTarget = view.parent as View }
+        //
+        // ARMED per-open in onDrawerShown() and DISARMED in onDrawerHidden() (not
+        // once on attach), so a fresh pull during the host's hide slide cannot
+        // cancel the hide animation — the same wedge guard Kolibri uses, now
+        // shared via DrawerOverlayController.
         root.onDismissDrag = { host.hideDrawer() }
 
         val list = view.findViewById<RecyclerView>(R.id.drawer_panel)
@@ -94,6 +97,23 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 launch { viewModel.monochromeIcons.collect { adapter.notifyDataSetChanged() } }
             }
         }
+    }
+
+    /**
+     * Arm drag-to-dismiss. Driven by MainActivity.showDrawer() via the
+     * DrawerOverlayController onShown hook. dragTarget = the overlay container
+     * (this view's parent), which the host animates on show/hide.
+     */
+    fun onDrawerShown() {
+        (view as? GestureFrameLayout)?.let { it.dragTarget = it.parent as? View }
+    }
+
+    /**
+     * Disarm drag-to-dismiss before the hide slide, so a fresh pull cannot cancel
+     * the host's hide animation. Driven by MainActivity.hideDrawer().
+     */
+    fun onDrawerHidden() {
+        (view as? GestureFrameLayout)?.dragTarget = null
     }
 
     private fun drawerColumns(): Int {

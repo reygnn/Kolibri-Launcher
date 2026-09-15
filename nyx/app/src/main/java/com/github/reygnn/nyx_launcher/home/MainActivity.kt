@@ -22,7 +22,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -57,6 +56,7 @@ import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
+import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
@@ -151,7 +151,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var pageIndicator: LinearLayout
     private lateinit var dock: RecyclerView
     private lateinit var drawerContainer: View
+    private lateinit var drawerOverlay: DrawerOverlayController
     private lateinit var removeBar: TextView
+
+    private val drawerFragment: AppDrawerFragment?
+        get() = supportFragmentManager.findFragmentById(R.id.drawer_container) as? AppDrawerFragment
 
     // In-DragLayer folder overlay (finger-drag extraction). Populated on open.
     private lateinit var folderOverlay: View
@@ -232,6 +236,16 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         })
         dock = findViewById(R.id.dock)
         drawerContainer = findViewById(R.id.drawer_container)
+        drawerOverlay = DrawerOverlayController(
+            container = drawerContainer,
+            slideDistancePx = { drawerSlideDistance() },
+            slideDurationMs = DRAWER_SLIDE_MS,
+            onShown = { animate ->
+                if (animate) viewModel.refreshDrawer() // pick up installs/removals since last open (A1-04)
+                drawerFragment?.onDrawerShown() // arm drag-to-dismiss
+            },
+            onHidden = { drawerFragment?.onDrawerHidden() }, // disarm before the hide slide
+        )
         removeBar = findViewById(R.id.remove_bar)
         folderOverlay = findViewById(R.id.folder_overlay)
         folderTitle = findViewById(R.id.folder_title)
@@ -247,7 +261,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         homeRoot.onArm = { payload, source -> showContextMenu(payload, source) }
         homeRoot.onArmedPromote = {
             dismissContextMenu()
-            if (drawerContainer.isVisible) hideDrawer()
+            if (drawerOverlay.isOpen) hideDrawer()
         }
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
@@ -310,7 +324,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 dismissContextMenu()
             } else if (folderOverlay.isVisible) {
                 closeFolderOverlay()
-            } else if (drawerContainer.isVisible) {
+            } else if (drawerOverlay.isOpen) {
                 hideDrawer()
             }
         }
@@ -740,35 +754,33 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     // ---- drawer overlay (AppDrawerFragment.Host) ----
 
-    private fun showDrawer() {
-        if (drawerContainer.isVisible) return
-        viewModel.refreshDrawer() // pick up apps installed/removed since last open (A1-04)
-        // Slide up from below, over the home (which stays put) — matching
-        // Kolibri's drawer transition (translateY 100%→0, 180ms, accel-decel).
-        drawerContainer.translationY = drawerSlideDistance()
-        drawerContainer.isVisible = true
-        drawerContainer.animate()
-            .translationY(0f)
-            .setDuration(DRAWER_SLIDE_MS)
-            .setInterpolator(AccelerateDecelerateInterpolator())
-            .start()
-    }
+    // Show/hide + slide + intended-open state now live in the shared
+    // DrawerOverlayController (common-ui), identical to Kolibri; app-specific
+    // open/close work (refresh, drag arm/disarm) runs in its hooks (see onCreate).
+    private fun showDrawer() = drawerOverlay.show()
 
-    override fun hideDrawer() {
-        if (!drawerContainer.isVisible) return
-        drawerContainer.animate()
-            .translationY(drawerSlideDistance())
-            .setDuration(DRAWER_SLIDE_MS)
-            .setInterpolator(AccelerateDecelerateInterpolator())
-            .withEndAction {
-                drawerContainer.isVisible = false
-                drawerContainer.translationY = 0f
-            }
-            .start()
-    }
+    override fun hideDrawer() = drawerOverlay.hide()
 
     /** Full off-screen travel for the slide; the overlay is full-height. */
     private fun drawerSlideDistance(): Float = resources.displayMetrics.heightPixels.toFloat()
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Persist the intended-open state so a config change re-opens the drawer
+        // instead of dropping it (parity with Kolibri; overlay visibility is not
+        // part of saved view state).
+        drawerOverlay.onSaveInstanceState(outState)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        // restore() normalises the container to hidden (so a restored view
+        // visibility cannot desync from isOpen) and reports whether it was open.
+        if (drawerOverlay.restore(savedInstanceState)) showDrawerRestored()
+    }
+
+    /** Re-show at rest (no slide) after a config change. */
+    private fun showDrawerRestored() = drawerOverlay.show(animate = false)
 
     override fun launchFromDrawer(key: ComponentKey) {
         launchApp(key)
@@ -1099,7 +1111,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private fun addToHome(key: ComponentKey) {
         val cell = viewModel.layout.value?.firstFreeCell() ?: return
         viewModel.place(key, DropTarget.Cell(cell))
-        if (drawerContainer.isVisible) hideDrawer()
+        if (drawerOverlay.isOpen) hideDrawer()
     }
 
     // Intent construction mirrors Kolibri's app-info action (Uri.fromParts +
