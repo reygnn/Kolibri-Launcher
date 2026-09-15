@@ -19,8 +19,13 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Deterministic pin for the drag-to-dismiss WEDGE fix (patch 7), at the level
- * of the shared [DragToDismissCore] so it covers every host (Nyx + Kolibri).
+ * JVM pins for the shared [DragToDismissCore], covering every host (Nyx +
+ * Kolibri). Beyond the original WEDGE fix (patch 7, below), it also pins the
+ * gesture-decision branches that the instrumented suite cannot drive
+ * deterministically: distance-release dismiss, the upward-flick CANCEL of a
+ * past-threshold drag, the at-top fling guard (a downward flick that only
+ * scrolls the list must never dismiss), and the pre-scroll re-collapse
+ * accounting.
  *
  * Why this test and not only the instrumented one: the wedge is that a STALE
  * `settling` flag survives when the host cancels the settle-back animator on
@@ -92,6 +97,62 @@ class DragToDismissCoreTest {
         assertEquals("Dismiss should fire exactly once", 1, dismissCount)
     }
 
+    @Test fun `a slow drag past the threshold dismisses on release`() {
+        // The primary "pull past the threshold and let go" gesture — distinct
+        // from the fling shortcut. Pull PAST 0.28*height, then release.
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -PAST_THRESHOLD_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
+        assertEquals("A release past the distance threshold dismisses", 1, dismissCount)
+    }
+
+    @Test fun `a decisive upward flick cancels a past-threshold drag instead of dismissing`() {
+        // Pull PAST the threshold, then flick UP to abort. Must settle back, not
+        // dismiss — onStopNestedScroll then no-ops because settling is set.
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -PAST_THRESHOLD_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+
+        val consumed = core.onNestedPreFling(listChild, velocityY = FAST_UP_VELOCITY)
+        assertTrue("An upward cancel flick must consume the fling", consumed)
+
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
+        assertEquals("An upward cancel flick must NOT dismiss, even past threshold", 0, dismissCount)
+        verify { dragTarget.animate() } // settle-back was started
+    }
+
+    @Test fun `a fast downward flick that scrolls the list up must not dismiss`() {
+        // The core safety guarantee: with the list still scrollable up and no
+        // active drag, a hard finger-down flick means "scroll the list", never
+        // "dismiss". Pre-guard this against a regression that drops the at-top check.
+        every { listChild.canScrollVertically(-1) } returns true // list NOT at top
+
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        val consumed = core.onNestedPreFling(listChild, velocityY = -FAST_DOWN_VELOCITY)
+        assertFalse("A downward fling while the list can still scroll up must not be consumed", consumed)
+        assertEquals("No dismiss while the list is not at its top", 0, dismissCount)
+    }
+
+    @Test fun `preScroll re-collapses the pulled sheet and reports what it consumed`() {
+        // Finger moving UP while the sheet is pulled down must spend the delta on
+        // re-collapsing (before the list scrolls), clamped to the available offset,
+        // and report exactly that via consumed[1] so the nested-scroll chain stays
+        // consistent.
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -BELOW_THRESHOLD_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+
+        // Over-consume: dy (250) exceeds the current 200 px offset → clamp to 200.
+        val consumed = intArrayOf(0, 0)
+        core.onNestedPreScroll(dy = BELOW_THRESHOLD_PULL + 50, consumed = consumed, type = ViewCompat.TYPE_TOUCH)
+        assertEquals("Re-collapse consumes only the available offset", BELOW_THRESHOLD_PULL, consumed[1])
+
+        // Fully collapsed now: a release neither dismisses nor settles.
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
+        assertEquals("A fully re-collapsed sheet does not dismiss on release", 0, dismissCount)
+    }
+
     @Test fun `onStartNestedScroll is rejected without a dragTarget`() {
         core.dragTarget = null
         assertFalse(
@@ -131,7 +192,9 @@ class DragToDismissCoreTest {
     private companion object {
         const val HOST_HEIGHT = 1000
         const val BELOW_THRESHOLD_PULL = 200 // 200 < 0.28 * HOST_HEIGHT (280)
+        const val PAST_THRESHOLD_PULL = 300  // 300 > 0.28 * HOST_HEIGHT (280)
         const val MIN_FLING_VELOCITY = 50    // → flingDismissVelocity = 150 px/s
         const val FAST_DOWN_VELOCITY = 100_000f
+        const val FAST_UP_VELOCITY = 100_000f // finger-up (velocityY > 0)
     }
 }

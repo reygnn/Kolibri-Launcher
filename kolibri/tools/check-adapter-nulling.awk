@@ -28,7 +28,11 @@ END {
     # ---- is this a Fragment? ----
     is_fragment = 0
     for (n = 1; n <= NR; n++) {
-        if (lines[n] ~ /^[[:space:]]*(internal |open |abstract |sealed )*class [A-Za-z0-9_]+[[:space:]]*:[^{]*(Fragment|PreferenceFragmentCompat)/) {
+        # The (Fragment|…) token must END the supertype name — a following
+        # identifier char or `.` means it is a substring of a longer name (e.g.
+        # an Activity implementing `AppDrawerFragment.Host`), NOT a Fragment
+        # superclass, so it must not be misclassified as in-scope.
+        if (lines[n] ~ /^[[:space:]]*(internal |open |abstract |sealed )*class [A-Za-z0-9_]+[[:space:]]*:[^{]*(Fragment|PreferenceFragmentCompat)([^A-Za-z0-9_.]|$)/) {
             is_fragment = 1
             break
         }

@@ -1,5 +1,7 @@
 package com.github.reygnn.launcher.common.ui.gesture
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
@@ -150,9 +152,19 @@ class DragToDismissCore(private val host: ViewGroup) {
      * finger-down.
      */
     fun onNestedPreFling(target: View, velocityY: Float): Boolean {
+        if (settling) return false
+        // A decisive UPWARD flick while the sheet is pulled down is a CANCEL:
+        // settle back instead of letting onStopNestedScroll dismiss on distance
+        // alone. Without this, pulling PAST the threshold and then flicking up to
+        // abort still dismissed, because onStopNestedScroll consults only drag
+        // distance, never release direction/velocity. velocityY > 0 is finger-up.
+        if (velocityY > flingDismissVelocity && dragOffset > 0f) {
+            animateSettleBack()
+            return true // consume the fling; onStopNestedScroll then no-ops (settling)
+        }
         val fingerDownFast = velocityY < -flingDismissVelocity
         val atTopOrDragging = dragOffset > 0f || !target.canScrollVertically(-1)
-        if (fingerDownFast && atTopOrDragging && !settling) {
+        if (fingerDownFast && atTopOrDragging) {
             commitDismiss()
             return true // consume: no list fling
         }
@@ -176,11 +188,25 @@ class DragToDismissCore(private val host: ViewGroup) {
                 dragOffset = target.translationY
                 onDragProgress?.invoke((dragOffset / dismissDistancePx).coerceIn(0f, 1f))
             }
-            .withEndAction {
-                dragOffset = 0f
-                settling = false
-                onDragProgress?.invoke(0f)
-            }
+            // End state runs from an AnimatorListener, NOT withEndAction, because
+            // it MUST also fire on cancel. `dragTarget` is the overlay container
+            // the host animates on show/hide through the SAME cached
+            // ViewPropertyAnimator, and our setUpdateListener would otherwise stay
+            // attached to it (VPA never auto-clears its update listener) and keep
+            // firing on every later host slide — overwriting `dragOffset` up to
+            // ~screen height and letting a subsequent grab commit an unintended
+            // dismiss. onAnimationEnd fires on both natural end AND cancel, so
+            // detaching the listener there closes the corruption path no matter
+            // who ends the settle (us via a new gesture, or the host's own
+            // container.animate().cancel()).
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    target.animate().setUpdateListener(null).setListener(null)
+                    dragOffset = 0f
+                    settling = false
+                    onDragProgress?.invoke(0f)
+                }
+            })
             .start()
     }
 

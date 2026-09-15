@@ -131,12 +131,25 @@ class SomeActivity : AppCompatActivity() {
     }
 }
 EOF
+# An Activity implementing a `*Fragment.Host` interface must NOT be
+# misclassified as a Fragment via the "Fragment" substring in the interface
+# name (regression: MainActivity : BaseActivity<…>, AppDrawerFragment.Host).
+af5="$tmpdir/HostActivity.kt"
+cat > "$af5" <<'EOF'
+class HostActivity : BaseActivity<UiEvent, VM>(), AppDrawerFragment.Host {
+    private fun buildDialog() {
+        val adapter = object : BaseAdapter() {}
+        listView.adapter = adapter
+    }
+}
+EOF
 actual_a3=$(awk -f "$adapter_awk" "$af3")
 actual_a4=$(awk -f "$adapter_awk" "$af4")
-if [ -n "$actual_a3" ] || [ -n "$actual_a4" ]; then
-  echo "✗ Adapter fixture 3/4 should be silent, got:"; echo "$actual_a3"; echo "$actual_a4"; fail=1
+actual_a5=$(awk -f "$adapter_awk" "$af5")
+if [ -n "$actual_a3" ] || [ -n "$actual_a4" ] || [ -n "$actual_a5" ]; then
+  echo "✗ Adapter fixture 3/4/5 should be silent, got:"; echo "$actual_a3"; echo "$actual_a4"; echo "$actual_a5"; fail=1
 else
-  echo "✓ Adapter 3: escape marker exempts; Activity is out of scope."
+  echo "✓ Adapter 3: escape marker exempts; Activity (incl. *Fragment.Host impl) is out of scope."
 fi
 
 if [ "$fail" -eq 0 ]; then

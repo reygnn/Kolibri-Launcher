@@ -89,6 +89,13 @@ class AppDrawerFragment : Fragment() {
     interface Host {
         /** Dismiss the drawer overlay (swipe-down / back / after launch). */
         fun hideDrawer()
+
+        /**
+         * The host's INTENDED open state (its `drawerVisible`), not live view
+         * visibility (which lags the hide animation). Used to re-assert
+         * open-time chrome on a resume that happens while the drawer is open.
+         */
+        fun isDrawerOpen(): Boolean
     }
 
     private val host: Host get() = requireActivity() as Host
@@ -599,6 +606,20 @@ class AppDrawerFragment : Fragment() {
         // As a visibility-toggled overlay the fragment stays RESUMED while the
         // drawer is closed, so open-time work (status bar, keyboard, search
         // reset) moved to onDrawerShown(), driven by the host's showDrawer().
+        //
+        // BUT: when the activity is paused and resumed while the drawer is OPEN
+        // (screen off/on, a runtime-permission dialog), onDrawerShown() is not
+        // re-run, and HomeFragment.onResume() re-hides the status bar while
+        // onPause() hid the keyboard — leaving the still-open drawer without its
+        // chrome. Re-assert the (non-resetting) open-time chrome here when we are
+        // actually open. Guard on the host's intended state, not view visibility,
+        // which lags the hide animation. Soft cast: this fires on every resume
+        // (not just from a MainActivity gesture like the other host calls), so a
+        // non-Host host — e.g. a Robolectric smoke-test activity — just skips.
+        if ((activity as? Host)?.isDrawerOpen() == true) {
+            showStatusBar()
+            handleAutoShowKeyboard()
+        }
     }
 
     /**
@@ -622,6 +643,12 @@ class AppDrawerFragment : Fragment() {
     /** Close-time work, driven explicitly by MainActivity.hideDrawer(). */
     fun onDrawerHidden() {
         hideKeyboard()
+        // Restore the home chrome. As a visibility-toggled overlay the drawer no
+        // longer changes HomeFragment's lifecycle, so HomeFragment.onResume() —
+        // which used to re-hide the status bar when the old nav model popped back
+        // to it — never re-runs on close. Symmetric to onDrawerShown()'s
+        // showStatusBar(): the drawer showed it, so the drawer hides it again.
+        hideStatusBar()
         viewModel.onAppDrawerClosed()
     }
 
@@ -634,6 +661,19 @@ class AppDrawerFragment : Fragment() {
         val window = activity?.window ?: return
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.show(WindowInsetsCompat.Type.statusBars())
+    }
+
+    /**
+     * Re-hide the status bar to the home-screen resting state. Mirrors
+     * HomeFragment.hideStatusBar() (hide + transient-bar-by-swipe behaviour) so
+     * closing the drawer returns to exactly the chrome HomeFragment maintains.
+     */
+    private fun hideStatusBar() {
+        val window = activity?.window ?: return
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     /**

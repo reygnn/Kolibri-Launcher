@@ -319,6 +319,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
+    // The intended open state, for the drawer/home fragments to coordinate
+    // status-bar ownership on a resume-while-open (both stay RESUMED under the
+    // overlay model). Reads the same source of truth as the show/hide guards.
+    override fun isDrawerOpen(): Boolean = drawerVisible
+
     override fun hideDrawer() {
         if (!drawerVisible) return
         drawerVisible = false

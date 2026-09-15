@@ -56,6 +56,7 @@ import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
+import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerFragment
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -1537,7 +1538,15 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        hideStatusBar()
+        // Skip while the app-drawer overlay is open: the drawer owns the status
+        // bar then (onDrawerShown shows it), and this fragment stays RESUMED
+        // behind the overlay under the visibility-toggle model — so an
+        // unconditional hide here would clobber the drawer's shown bar on a
+        // resume-while-open, regardless of fragment resume order. See
+        // AppDrawerFragment.onResume()/onDrawerHidden().
+        if ((activity as? AppDrawerFragment.Host)?.isDrawerOpen() != true) {
+            hideStatusBar()
+        }
     }
 
     override fun onPause() {
