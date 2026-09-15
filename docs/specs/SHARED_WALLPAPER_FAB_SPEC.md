@@ -1,6 +1,6 @@
 # SHARED_WALLPAPER_FAB_SPEC
 
-**Status:** ENTWURF v1.0 (2026-09-15)
+**Status:** v1.1 (2026-09-15) — **Phase 1 + 1b UMGESETZT; Phase 2/3 ZURÜCKGESTELLT** (siehe §9 Ergebnis).
 **Rolle:** Extraktion des Wallpaper-FAB/Edit-Clusters aus `kolibri` + `nyx` nach `common-ui`.
 **Motivation:** Drift-Reduktion. Folge-Arbeit im Sinne des `MONOREPO_MERGE_SPEC`-Leitprinzips
 („Architektur erben, produktneutrale Infra teilen"), analog zur bereits erfolgten
@@ -115,3 +115,33 @@ Controller-Zeilen, die bewusst app-spezifisch bleiben) **plus** die duplizierten
 `refactor/shared-drawer-overlay-controller` → `main`), auf eigenem Branch von `main`
 (Vorschlag `refactor/shared-wallpaper-fab`) — sonst stapeln sich zu viele ungemergte
 Branches auf demselben Code. Phase 1 ist risikofrei und liefert sofort sichtbaren Gewinn.
+
+## 9. Ergebnis (2026-09-15)
+
+**Phase 1 + 1b umgesetzt** (Branch `refactor/shared-wallpaper-fab`):
+- Phase 1 (`d796d75`): `FabPositionMath`, `FabDragHandler`, `WallpaperFabConstants`,
+  `LayerButtonsState` → `common.ui.wallpaperfab` (public); 8 Quell- + 6 Test-Kopien
+  entfernt; Tests nach common-ui konsolidiert.
+- Phase 1b (`dfefa0b`): `FabPosition` → `:core` (`core.wallpaper`); beide `:domain`/
+  `:data`/`:app` umgestellt; 2 Kopien entfernt.
+- Netto ~580 Zeilen dedupliziert, alle Tests + kolibri-Linter grün.
+
+**Phase 2/3 bewusst ZURÜCKGESTELLT.** Die Ressourcen-Analyse zeigte, dass §4 die Kopplung
+unterschätzt hat:
+- Die Layouts referenzieren **~26 Drawables** (nicht 13), **~18 lokalisierte Strings**
+  (× `values`/`values-de`), eine Farbe (`wallpaper_edit_foreground`), einen Style und
+  `spacing_medium` (dimen ist **app-generisch** → müsste in common-ui dupliziert werden).
+- **Blocker: Material.** Die Layouts nutzen `FloatingActionButton`/`MaterialButton`, aber
+  common-ui hat **bewusst keine Material-Dependency** (material-before-appcompat-force-Regel
+  lebt pro `:app`). Die Views zu teilen erzwingt Material in common-ui.
+- Nicht sauber teilbar: die Drawables hängen gleichzeitig am Layout (`@drawable/...`) und an
+  `SnapIconResolver` → alles-oder-nichts.
+
+Entscheidung des Maintainers: bei Phase 1/1b stoppen. Das Aufwand/Risiko der View-Extraktion
+(Material + großer Ressourcen-Schwanz in common-ui, gegen die dokumentierte Konvention)
+rechtfertigt die Deduplizierung von ~550 Zeilen View-Code nicht. Die Views bleiben pro App.
+
+**Falls Phase 2/3 je doch gewünscht:** entweder Material in common-ui aufnehmen (Force-Regel
+handhaben) **oder** ein neues Modul `:common-ui-wallpaper` mit Material anlegen, das common-ui
+Material-frei hält. `SnapMode`-Konsolidierung (§3) und der volle Ressourcen-Umzug (inkl.
+`values-de`-Parität in common-ui) gehören dann dazu.
