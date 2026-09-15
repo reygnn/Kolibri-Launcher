@@ -17,7 +17,6 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.doOnLayout
-import androidx.core.view.doOnAttach
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -262,15 +261,24 @@ class AppDrawerFragment : Fragment() {
         // because the drawer surface is solid and shadow exists for
         // wallpaper-legibility, which doesn't apply here.
         //
-        // Initial StateFlow value is `SolidColor(@color/app_drawer_surface_dark)`,
-        // matching the XML default — regression-safe.
+        // Initial StateFlow value is `SolidColor(@color/app_drawer_surface_dark)`;
+        // the XML default (@android:color/black) is the opaque dark equivalent for
+        // the first frame before this collector applies the (opaque-forced) colour.
         collectOnStarted(
             flow = viewModel.appDrawerSurfaceState,
             errorTag = "appDrawerSurfaceState",
             coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
         ) { surface ->
             if (_binding == null || !isAdded) return@collectOnStarted
-            binding.appDrawerRoot.setBackgroundColor(surface.color)
+            // Force full opacity. The surface resources carry a legacy alpha
+            // (app_drawer_surface_dark #DD, _light #F0) that was invisible while
+            // the drawer was a full nav destination over an opaque backdrop; as a
+            // visibility-toggled overlay it now composites over the live home and
+            // shows through. The drawer is meant to be opaque, so OR in FF alpha
+            // (keeps the light/dark hue). The shared resource is left untouched so
+            // the wallpaper-aware CustomAlertDialog surfaces keep their intended
+            // translucency.
+            binding.appDrawerRoot.setBackgroundColor(surface.color or (0xFF shl 24))
             appDrawerAdapter?.setUiColors(
                 textColor = surface.foregroundColor(),
                 shadowColor = 0,
@@ -469,12 +477,27 @@ class AppDrawerFragment : Fragment() {
      * call is needed here.
      */
     private fun setupSwipeToDismiss() {
-        // Pixel-style drag-to-dismiss (nested scrolling). dragTarget is the
-        // overlay container the host animates, so a released dismiss hands off
-        // to hideDrawer() from the current offset (no second animation).
-        val root = binding.appDrawerRoot
-        root.doOnAttach { root.dragTarget = root.parent as View }
-        root.onDismissDrag = { host.hideDrawer() }
+        // Pixel-style drag-to-dismiss (nested scrolling). The dragTarget (the
+        // overlay container the host animates) is ARMED per-open in onDrawerShown()
+        // and DISARMED in onDrawerHidden() — not once on attach — so the drag is
+        // dead while the drawer is closing. Otherwise a fresh pull during the
+        // ~180ms hide slide would run the core's settle-back, which cancels
+        // hideDrawer()'s animation on the shared ViewPropertyAnimator; that
+        // animation's withEndAction does not run on cancel, so the container would
+        // be left visible at rest while drawerVisible=false — a drawer stuck open
+        // and un-dismissable (hideDrawer early-returns on !drawerVisible).
+        binding.appDrawerRoot.onDismissDrag = { host.hideDrawer() }
+    }
+
+    /** Arm drag-to-dismiss for the currently-shown drawer (see setupSwipeToDismiss). */
+    private fun armDragToDismiss() {
+        val root = _binding?.appDrawerRoot ?: return
+        root.dragTarget = root.parent as? View
+    }
+
+    /** Disarm drag-to-dismiss while the drawer is closed/closing (null disables the core). */
+    private fun disarmDragToDismiss() {
+        _binding?.appDrawerRoot?.dragTarget = null
     }
 
     /**
@@ -629,6 +652,7 @@ class AppDrawerFragment : Fragment() {
      */
     fun onDrawerShown(resetContent: Boolean = true) {
         val b = _binding ?: return
+        armDragToDismiss()
         showStatusBar()
         if (resetContent) {
             // A fresh open starts with an empty query at the top of the list.
@@ -642,6 +666,10 @@ class AppDrawerFragment : Fragment() {
 
     /** Close-time work, driven explicitly by MainActivity.hideDrawer(). */
     fun onDrawerHidden() {
+        // Disarm the drag immediately (before the hide slide) so a fresh pull
+        // during the slide cannot cancel hideDrawer()'s animation and wedge the
+        // drawer visibly-open — see setupSwipeToDismiss().
+        disarmDragToDismiss()
         hideKeyboard()
         // Restore the home chrome. As a visibility-toggled overlay the drawer no
         // longer changes HomeFragment's lifecycle, so HomeFragment.onResume() —

@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.common.ui.gesture
 
+import android.animation.Animator
 import android.content.Context
 import android.view.View
 import android.view.ViewConfiguration
@@ -151,6 +152,48 @@ class DragToDismissCoreTest {
         // Fully collapsed now: a release neither dismisses nor settles.
         core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
         assertEquals("A fully re-collapsed sheet does not dismiss on release", 0, dismissCount)
+    }
+
+    @Test fun `settle-back end detaches the shared-VPA listeners and resets state`() {
+        // Positive pin for the shared-VPA fix: on natural end, animateSettleBack's
+        // AnimatorListener MUST detach both the update listener and itself from
+        // dragTarget's ViewPropertyAnimator (which the host also animates on
+        // show/hide) and reset settling/dragOffset. The relaxed mock never fires
+        // the listener on its own, so capture it and invoke onAnimationEnd here —
+        // otherwise dropping the detach/reset would leave every test green.
+        //
+        // The relaxed builder returns a fresh mock per chained call, so stub the
+        // chain to return the same animator and record the installed listener.
+        val installedListeners = mutableListOf<Animator.AnimatorListener?>()
+        every { settleAnimator.translationY(any()) } returns settleAnimator
+        every { settleAnimator.setDuration(any()) } returns settleAnimator
+        every { settleAnimator.setInterpolator(any()) } returns settleAnimator
+        every { settleAnimator.setUpdateListener(any()) } returns settleAnimator
+        every { settleAnimator.setListener(any()) } answers { installedListeners.add(firstArg()); settleAnimator }
+
+        // Below-threshold pull + release → animateSettleBack() (settling = true).
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -BELOW_THRESHOLD_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
+
+        val listener = installedListeners.firstOrNull { it != null }
+            ?: error("animateSettleBack must install an AnimatorListener on the settle animator")
+
+        listener.onAnimationEnd(mockk(relaxed = true))
+
+        // Both shared-VPA listeners detached (else the update listener keeps
+        // firing on the host's later slides and corrupts dragOffset).
+        verify { settleAnimator.setUpdateListener(null) }
+        verify { settleAnimator.setListener(null) }
+
+        // settling cleared + dragOffset reset to 0 — proven by a fresh fast
+        // downward fling now committing a dismiss (a stuck `settling` would gate it).
+        assertTrue(
+            "After settle-back end, settling must be cleared so a new fling can dismiss",
+            core.onNestedPreFling(listChild, velocityY = -FAST_DOWN_VELOCITY),
+        )
+        assertEquals(1, dismissCount)
     }
 
     @Test fun `onStartNestedScroll is rejected without a dragTarget`() {
