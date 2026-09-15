@@ -7,6 +7,7 @@ import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -18,6 +19,11 @@ import javax.inject.Inject
  * on a real device signals a failed/partial load, and collapsing it to
  * `Loaded(emptyList())` would let reconcile prune and persist the whole home
  * layout. [LauncherApps] is injected so the fail-closed policy is unit-testable.
+ *
+ * A thrown [CancellationException] is rethrown, never folded into an [Error]:
+ * `runCatching` would swallow cooperative cancellation (e.g. a cancelled drawer
+ * refresh) and report a phantom enumeration failure. This mirrors the house
+ * idiom used across Nyx (NyxResetManager, LaunchSafe, ...).
  */
 class InstalledAppsRepositoryImpl @Inject constructor(
     private val launcherApps: LauncherApps,
@@ -25,7 +31,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
 ) : InstalledAppsRepository {
 
     override suspend fun loadInstalledApps(): AppLoadResult = withContext(dispatcher) {
-        runCatching {
+        val apps = try {
             launcherApps.getActivityList(null, Process.myUserHandle()).map { info ->
                 LauncherApp(
                     key = ComponentKey(
@@ -36,15 +42,15 @@ class InstalledAppsRepositoryImpl @Inject constructor(
                     customName = null,
                 )
             }
-        }.fold(
-            onSuccess = { apps ->
-                if (apps.isEmpty()) {
-                    AppLoadResult.Error(AppLoadResult.Reason.ENUMERATION_EMPTY)
-                } else {
-                    AppLoadResult.Loaded(apps)
-                }
-            },
-            onFailure = { AppLoadResult.Error(AppLoadResult.Reason.ENUMERATION_FAILED) },
-        )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            return@withContext AppLoadResult.Error(AppLoadResult.Reason.ENUMERATION_FAILED)
+        }
+        if (apps.isEmpty()) {
+            AppLoadResult.Error(AppLoadResult.Reason.ENUMERATION_EMPTY)
+        } else {
+            AppLoadResult.Loaded(apps)
+        }
     }
 }

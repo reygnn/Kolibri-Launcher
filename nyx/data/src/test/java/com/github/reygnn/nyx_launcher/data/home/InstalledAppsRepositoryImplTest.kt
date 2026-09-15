@@ -8,9 +8,11 @@ import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlin.test.assertFailsWith
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,6 +43,14 @@ class InstalledAppsRepositoryImplTest {
         every { launcherApps.getActivityList(any(), any()) } throws RuntimeException("boom")
         assertThat(repo.loadInstalledApps())
             .isEqualTo(AppLoadResult.Error(AppLoadResult.Reason.ENUMERATION_FAILED))
+    }
+
+    @Test
+    fun cancellation_propagates_and_is_not_folded_into_error() = runTest(dispatcher) {
+        // Cooperative cancellation must escape as-is; a bare runCatching would
+        // swallow it and report a phantom ENUMERATION_FAILED.
+        every { launcherApps.getActivityList(any(), any()) } throws CancellationException("cancelled")
+        assertFailsWith<CancellationException> { repo.loadInstalledApps() }
     }
 
     @Test
