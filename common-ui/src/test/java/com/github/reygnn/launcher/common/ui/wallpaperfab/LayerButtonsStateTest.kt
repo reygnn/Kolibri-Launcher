@@ -1,16 +1,10 @@
-package com.github.reygnn.kolibri_launcher.ui
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.home.LayerButtonsState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
 
 class LayerButtonsStateTest {
-
-    @get:Rule
-    val timberRule = TimberRule()
 
     // ========== VISIBILITY ==========
 

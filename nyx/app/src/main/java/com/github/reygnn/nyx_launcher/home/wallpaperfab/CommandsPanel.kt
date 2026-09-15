@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.wallpaperfab
 
+import com.github.reygnn.launcher.common.ui.wallpaperfab.DISABLED_ALPHA
+
 import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater

@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

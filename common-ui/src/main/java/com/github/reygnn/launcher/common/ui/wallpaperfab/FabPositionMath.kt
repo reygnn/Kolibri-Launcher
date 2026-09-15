@@ -1,20 +1,19 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import kotlin.math.max
 
 /**
  * Pure fraction-vs-pixel math for the wallpaper-edit speed-dial FAB.
  *
- * A FAB position is persisted as a pair of fractions in `[0f, 1f]`
- * (see the persisted FAB position),
- * but laid out and dragged in pixels. This object is the single place
- * that converts between the two and clamps so the FAB never goes
- * off-screen.
+ * A FAB position is persisted as a pair of fractions in `[0f, 1f]` (the
+ * per-app FabPosition model), but laid out and dragged in pixels. This object
+ * is the single place that converts between the two and clamps so the FAB never
+ * goes off-screen.
  *
- * Everything here is pure — no Android imports — so the math is
- * exercised by [FabPositionMathTest] on the JVM.
+ * Everything here is pure — no Android imports — so the math is exercised by
+ * [FabPositionMathTest] on the JVM. Shared by kolibri and nyx via common-ui.
  */
-internal object FabPositionMath {
+object FabPositionMath {
 
     /**
      * Returns the FAB's top-left pixel coordinate given its center as a

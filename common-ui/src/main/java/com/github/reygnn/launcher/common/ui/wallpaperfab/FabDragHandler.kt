@@ -1,4 +1,4 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import kotlin.math.abs
 
@@ -19,8 +19,9 @@ import kotlin.math.abs
  * The handler is single-gesture: a new [onDown] resets state. No
  * multi-touch handling — the FAB is a single-finger control and the
  * caller is expected to forward only the primary pointer's events.
+ * Shared by kolibri and nyx via common-ui.
  */
-internal class FabDragHandler(private val touchSlopPx: Int) {
+class FabDragHandler(private val touchSlopPx: Int) {
 
     private var startX: Float = 0f
     private var startY: Float = 0f

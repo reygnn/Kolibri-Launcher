@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
+
 import android.view.View
 import android.view.ViewStub
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditState

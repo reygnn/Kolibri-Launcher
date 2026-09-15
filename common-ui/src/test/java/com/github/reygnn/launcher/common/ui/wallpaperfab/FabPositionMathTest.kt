@@ -1,4 +1,4 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

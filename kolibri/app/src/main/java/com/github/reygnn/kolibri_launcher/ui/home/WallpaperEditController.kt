@@ -1,4 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
+
+import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
 import android.view.View

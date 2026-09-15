@@ -1,9 +1,10 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 /**
  * Shared visual constants for the wallpaper-edit FAB cluster and its
  * sibling overflow panel. Live here so a single tweak (e.g. matching
- * a future Material disabled-emphasis value) reaches both surfaces.
+ * a future Material disabled-emphasis value) reaches both surfaces —
+ * and both apps (kolibri + nyx) via common-ui.
  */
 
 /**
@@ -12,4 +13,4 @@ package com.github.reygnn.nyx_launcher.home.wallpaperfab
  * appearance for layer-reorder buttons. Mirror of Material's
  * `material_emphasis_disabled` (0.38f).
  */
-internal const val DISABLED_ALPHA = 0.38f
+const val DISABLED_ALPHA = 0.38f

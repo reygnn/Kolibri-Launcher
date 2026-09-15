@@ -1,4 +1,4 @@
-package com.github.reygnn.nyx_launcher.home.wallpaper
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 /**
  * PURE LOGIC - Layer Buttons State
@@ -9,7 +9,8 @@ package com.github.reygnn.nyx_launcher.home.wallpaper
  *
  * Konsumiert wird das Ergebnis vom Fragment in `applyLayerButtonsState`, das die
  * Boolean-Felder auf Visibility/Enabled/Alpha der echten Buttons abbildet. Als
- * reine Datenklasse ist diese Berechnung isoliert per JUnit testbar.
+ * reine Datenklasse ist diese Berechnung isoliert per JUnit testbar. Shared by
+ * kolibri and nyx via common-ui.
  *
  * Regeln:
  *  - Add: immer sichtbar im Edit-Mode
