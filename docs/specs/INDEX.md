@@ -38,6 +38,9 @@ Keine mehr — alle Entscheidungen getroffen.
 
 ## Folge-Arbeit (kein offener Punkt, eigene künftige Specs)
 - `WALLPAPER_SHARE_SPEC` (Rendering/Compositing-Extraktion).
+- `SHARED_WALLPAPER_FAB_SPEC` (ENTWURF v1.0) — Extraktion des Wallpaper-FAB/Edit-Clusters
+  nach `common-ui`; adressiert ~90 % der per `jscpd` gemessenen cross-app Kotlin-Duplikate.
+  Nach der `DrawerOverlayController`-Extraktion der nächste Drift-Kandidat.
 - `MOVE_ITEM_SPEC`-Ergänzung: Trailing-Seiten-GC + `normalizePages()` als Transition-Schritt.
 - `DRAWER_FOLDERS_SPEC` (ENTWURF v1.0) — Folders im App-Drawer als abgeleitete
   Projektion; `FolderMembership` aus `HomeLayoutTransition` extrahiert und mit Home
