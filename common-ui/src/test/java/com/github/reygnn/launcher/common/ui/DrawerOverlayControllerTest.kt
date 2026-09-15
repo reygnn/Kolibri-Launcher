@@ -2,6 +2,7 @@ package com.github.reygnn.launcher.common.ui
 
 import android.os.Bundle
 import android.view.View
+import android.view.ViewPropertyAnimator
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -95,5 +96,56 @@ class DrawerOverlayControllerTest {
         c.show()
         c.onSaveInstanceState(out)
         verify { out.putBoolean("drawer_overlay_open", true) }
+    }
+
+    // Capture the hide animation's withEndAction so the (relaxed-mock) end action
+    // can be run deterministically — the cancel-safe visibility hand-off is the
+    // whole point of the controller and the relaxed VPA never fires it on its own.
+    private fun stubEndActionCapture(sink: MutableList<Runnable>) {
+        val animator = mockk<ViewPropertyAnimator>(relaxed = true)
+        every { container.animate() } returns animator
+        every { animator.translationY(any()) } returns animator
+        every { animator.setDuration(any()) } returns animator
+        every { animator.setInterpolator(any()) } returns animator
+        every { animator.withEndAction(capture(sink)) } returns animator
+    }
+
+    @Test fun `a completed hide commits the container to gone`() {
+        val endActions = mutableListOf<Runnable>()
+        stubEndActionCapture(endActions)
+
+        val c = newController()
+        c.show()
+        c.hide()
+        endActions.last().run() // simulate the slide finishing
+
+        verify { container.visibility = View.GONE }
+        verify { container.translationY = 0f }
+    }
+
+    @Test fun `a reopen during the hide slide is not clobbered to gone`() {
+        val endActions = mutableListOf<Runnable>()
+        stubEndActionCapture(endActions)
+
+        val c = newController()
+        c.show()
+        c.hide()
+        c.show() // reopen mid-hide → isOpen true again
+        endActions.last().run() // the superseded hide end action fires
+
+        assertTrue("A mid-hide reopen must stay open", c.isOpen)
+        verify(exactly = 0) { container.visibility = View.GONE }
+    }
+
+    @Test fun `a genuine open from a hidden container starts off-screen`() {
+        every { container.visibility } returns View.GONE // not visible
+        newController().show()
+        verify { container.translationY = 1000f } // slideDistancePx()
+    }
+
+    @Test fun `a reopen while still visible keeps the current offset`() {
+        every { container.visibility } returns View.VISIBLE // mid-hide, still visible
+        newController().show()
+        verify(exactly = 0) { container.translationY = 1000f }
     }
 }

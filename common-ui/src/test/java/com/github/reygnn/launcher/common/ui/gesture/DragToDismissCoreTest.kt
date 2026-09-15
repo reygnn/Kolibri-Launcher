@@ -196,6 +196,29 @@ class DragToDismissCoreTest {
         assertEquals(1, dismissCount)
     }
 
+    @Test fun `a target disarmed mid-drag does not strand dragOffset into the next open`() {
+        // A host hide (BACK / launch) can null dragTarget during an active pull,
+        // before the finger lifts. onStopNestedScroll then settles with no target;
+        // the drag state MUST reset, or the stranded offset carries into the next
+        // arm and can cross the dismiss threshold on the first pull.
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -BELOW_THRESHOLD_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+
+        core.dragTarget = null // disarmed mid-drag by a host hide
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH) // settle with no target → must reset
+
+        // Re-arm (next open) and do a fresh sub-threshold pull. Without the reset,
+        // the stranded 200px + this 100px would exceed the 280px threshold and
+        // dismiss the freshly-opened drawer.
+        core.dragTarget = dragTarget
+        assertTrue(core.onStartNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL, ViewCompat.TYPE_TOUCH))
+        core.onNestedScrollAccepted()
+        core.onNestedScroll(listChild, dyUnconsumed = -SMALL_PULL, type = ViewCompat.TYPE_TOUCH, consumed = null)
+        core.onStopNestedScroll(ViewCompat.TYPE_TOUCH)
+        assertEquals("A disarm-mid-drag must not strand dragOffset into the next open", 0, dismissCount)
+    }
+
     @Test fun `onStartNestedScroll is rejected without a dragTarget`() {
         core.dragTarget = null
         assertFalse(
@@ -235,6 +258,7 @@ class DragToDismissCoreTest {
     private companion object {
         const val HOST_HEIGHT = 1000
         const val BELOW_THRESHOLD_PULL = 200 // 200 < 0.28 * HOST_HEIGHT (280)
+        const val SMALL_PULL = 100           // 200 (stranded) + 100 would exceed 280
         const val PAST_THRESHOLD_PULL = 300  // 300 > 0.28 * HOST_HEIGHT (280)
         const val MIN_FLING_VELOCITY = 50    // → flingDismissVelocity = 150 px/s
         const val FAST_DOWN_VELOCITY = 100_000f

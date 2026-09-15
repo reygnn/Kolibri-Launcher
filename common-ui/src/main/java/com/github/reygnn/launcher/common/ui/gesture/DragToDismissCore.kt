@@ -178,7 +178,18 @@ class DragToDismissCore(private val host: ViewGroup) {
     }
 
     private fun animateSettleBack() {
-        val target = dragTarget ?: return
+        val target = dragTarget ?: run {
+            // Disarmed/detached mid-drag — e.g. the host hid the drawer (BACK,
+            // launch) via a separate event during an active below-threshold pull,
+            // nulling dragTarget before the finger lifts. There is no view to
+            // settle, but the drag state MUST be cleared here: a stranded
+            // dragOffset would carry into the next arm and offset the first pull,
+            // jumping the sheet and possibly committing a spurious dismiss.
+            dragOffset = 0f
+            settling = false
+            onDragProgress?.invoke(0f)
+            return
+        }
         settling = true
         target.animate()
             .translationY(0f)
