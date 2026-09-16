@@ -81,4 +81,5 @@ dependencies {
 
     // Shared fixtures from :domain (MainDispatcherRule, Fakes, Contracts).
     testImplementation(testFixtures(project(":nyx:domain")))
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
 }

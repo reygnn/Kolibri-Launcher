@@ -1,22 +1,14 @@
 package com.github.reygnn.kolibri_launcher.rule
 
-import kotlinx.coroutines.Dispatchers
+import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
 
-@ExperimentalCoroutinesApi
-class MainDispatcherRule : TestWatcher() {
-    val testDispatcher = UnconfinedTestDispatcher()
-
-    override fun starting(description: Description) {
-        Dispatchers.setMain(testDispatcher)
-    }
-
-    override fun finished(description: Description) {
-        Dispatchers.resetMain()
-    }
-}
+/**
+ * Kolibri's MainDispatcherRule — the shared [MainDispatcherRuleBase] plumbing with
+ * Kolibri's eager [UnconfinedTestDispatcher]. The dispatcher flavour is a
+ * deliberate per-module choice (see the base class); only this one line is
+ * Kolibri-specific.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class MainDispatcherRule : MainDispatcherRuleBase(UnconfinedTestDispatcher())

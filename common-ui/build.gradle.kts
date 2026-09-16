@@ -57,4 +57,5 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
 }

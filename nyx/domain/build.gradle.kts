@@ -54,6 +54,10 @@ dependencies {
     // consumed by :domain and :data test source sets.
     testFixturesImplementation(libs.junit)
     testFixturesImplementation(libs.kotlinx.coroutines.test)
+    // Shared MainDispatcherRuleBase (the MainDispatcherRule subclass lives in this
+    // module's testFixtures; consumers reach the inherited members via test).
+    testFixturesImplementation(testFixtures(project(":core")))
+    testImplementation(testFixtures(project(":core")))
     testFixturesImplementation(libs.turbine)
     testFixturesImplementation(libs.truth)
     testFixturesImplementation(libs.mockk)

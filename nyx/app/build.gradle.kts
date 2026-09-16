@@ -141,6 +141,7 @@ dependencies {
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
     testImplementation(testFixtures(project(":nyx:domain")))
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

@@ -11,6 +11,10 @@ plugins {
     kotlin("jvm")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    // Publishes the shared MainDispatcherRuleBase test fixture so all modules
+    // consume one copy of the TestWatcher plumbing (same JVM-testFixtures pattern
+    // as :domain). Each module keeps a tiny subclass picking its own dispatcher.
+    `java-test-fixtures`
 }
 
 kotlin {
@@ -32,4 +36,10 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // Shared test fixtures: MainDispatcherRuleBase (JUnit TestWatcher + swaps
+    // Dispatchers.Main for a TestDispatcher). Each module's tiny MainDispatcherRule
+    // subclass consumes it via `testFixtures(project(":core"))`.
+    testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.kotlinx.coroutines.test)
 }
