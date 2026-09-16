@@ -29,6 +29,7 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
@@ -77,6 +78,7 @@ import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -792,6 +794,32 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // Arm (menu + drag): the drawer is hidden only once a move promotes to a drag
         // (onArmedPromote); a plain long-press keeps the menu over the drawer.
         homeRoot.armDrag(DragPayload.NewApp(key), view)
+    }
+
+    // Held so a member tap can dismiss the 5b members sheet (5c replaces it with the
+    // shared in-drawer FolderOverlayController).
+    private var drawerFolderDialog: AlertDialog? = null
+
+    override fun openDrawerFolder(folder: DrawerEntry.Folder) {
+        // 5b: a z-order-safe members sheet — a dialog sits above the open drawer, unlike
+        // the home folder overlay which lives in the DragLayer beneath it. 5c replaces
+        // this with the shared in-drawer FolderOverlayController (title edit); 5d wires
+        // member extraction (onStartDrag is a no-op here).
+        val recycler = RecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@MainActivity, currentColumns())
+            adapter = FolderMemberAdapter(
+                iconLoader = iconLoader,
+                scope = lifecycleScope,
+                iconSizePx = gridIconPx,
+                onLaunch = { key -> launchApp(key); drawerFolderDialog?.dismiss() },
+                onStartDrag = { _, _ -> },
+            ).also { it.submit(folder.members) }
+        }
+        drawerFolderDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(folder.title.ifBlank { getString(R.string.folder_default_title) })
+            .setView(recycler)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     // ---- drag ----

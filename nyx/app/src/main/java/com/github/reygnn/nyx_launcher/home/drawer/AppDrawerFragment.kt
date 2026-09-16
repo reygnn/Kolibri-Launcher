@@ -15,8 +15,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.HomeViewModel
+import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -46,11 +48,16 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         /** Start a place-on-home drag for the long-pressed app and dismiss. */
         fun startDrawerDrag(view: View, key: ComponentKey)
 
+        /** Open the tapped drawer folder (show its members). */
+        fun openDrawerFolder(folder: DrawerEntry.Folder)
+
         /** Dismiss the drawer (swipe-down / back). */
         fun hideDrawer()
     }
 
     @Inject lateinit var iconLoader: IconLoader
+
+    @Inject lateinit var folderRenderer: FolderIconRenderer
 
     private val viewModel: HomeViewModel by activityViewModels()
 
@@ -87,17 +94,19 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         }
         val adapter = AppDrawerAdapter(
             iconLoader = iconLoader,
+            folderRenderer = folderRenderer,
             scope = viewLifecycleOwner.lifecycleScope,
             iconSizePx = (48 * resources.displayMetrics.density).toInt(),
-            onClick = { app -> host.launchFromDrawer(app.key) },
-            onItemLongPress = { v, app -> host.startDrawerDrag(v, app.key) },
+            onAppClick = { app -> host.launchFromDrawer(app.key) },
+            onAppLongPress = { v, app -> host.startDrawerDrag(v, app.key) },
+            onFolderClick = { folder -> host.openDrawerFolder(folder) },
         )
         list.layoutManager = GridLayoutManager(requireContext(), drawerColumns())
         list.adapter = adapter
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.drawerApps.collect(adapter::submit) }
+                launch { viewModel.drawerContent.collect(adapter::submit) }
                 // Re-render icons in the current variant when the theme toggle flips.
                 launch { viewModel.monochromeIcons.collect { adapter.notifyDataSetChanged() } }
             }
