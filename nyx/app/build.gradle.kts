@@ -197,3 +197,27 @@ tasks.register("uploadProguardMapping") {
 tasks.configureEach {
     if (name == "assembleRelease" || name == "bundleRelease") finalizedBy("uploadProguardMapping")
 }
+
+// --- Convention linters (reuse Kolibri's battle-tested detectors) ---
+// Nyx does not re-implement the checks: the detector logic lives once in
+// kolibri/tools/*.awk (+ the two generalized *.sh). This orchestrator runs those
+// detectors over Nyx's own sources, with Nyx's own scan roots / positive lists,
+// and only the checks that apply to Nyx. The per-check triage (what runs, what is
+// deliberately skipped and why) is documented at the top of the script.
+tasks.register<Exec>("checkConventions") {
+    group = "verification"
+    description = "Runs the project-convention linter (reuses Kolibri's detectors)."
+    workingDir = projectDir.parentFile // = nyx/ (scripts live in nyx/tools)
+    commandLine = listOf("bash", "tools/check-conventions.sh")
+}
+
+// Rule 13 — git-diff-aware German-comment linter. Reuses Kolibri's script + awk
+// with RULE13_SCAN_ROOT pointed at nyx/, so it flags only newly added German
+// comments in Nyx's own diff. Override the comparison base with CHECK_BASE.
+tasks.register<Exec>("checkRule13") {
+    group = "verification"
+    description = "Runs the Rule 13 (German comments) linter against Nyx's git diff."
+    workingDir = projectDir.parentFile // = nyx/
+    environment("RULE13_SCAN_ROOT", projectDir.parentFile.absolutePath)
+    commandLine = listOf("bash", "../kolibri/tools/check-rule13-german-comments.sh")
+}

@@ -57,6 +57,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private val host: Host
         get() = requireActivity() as Host
 
+    // Held so the adapter can be cleared in onDestroyView (shared adapter-nulling
+    // rule): the RecyclerView otherwise retains its item views across the
+    // view-recreation cycle.
+    private var drawerList: RecyclerView? = null
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val root = view as GestureFrameLayout
         // Pixel-style drag-to-dismiss (nested scrolling): the drawer follows the
@@ -70,7 +75,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         // shared via DrawerOverlayController.
         root.onDismissDrag = { host.hideDrawer() }
 
-        val list = view.findViewById<RecyclerView>(R.id.drawer_panel)
+        val list = view.findViewById<RecyclerView>(R.id.drawer_panel).also { drawerList = it }
         // The drawer scrim (root) fills edge-to-edge behind the system bars; the
         // list itself is inset so items clear the status/nav bars, with a small
         // base gap on top.
@@ -97,6 +102,16 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 launch { viewModel.monochromeIcons.collect { adapter.notifyDataSetChanged() } }
             }
         }
+    }
+
+    override fun onDestroyView() {
+        // Clear the adapter so the RecyclerView doesn't retain its item views
+        // across the view-recreation cycle (shared adapter-nulling rule; the
+        // adapter's icon-load scope is viewLifecycleOwner-bound and already
+        // cancelled here). The RecyclerView field is dropped with the view.
+        drawerList?.adapter = null
+        drawerList = null
+        super.onDestroyView()
     }
 
     /**

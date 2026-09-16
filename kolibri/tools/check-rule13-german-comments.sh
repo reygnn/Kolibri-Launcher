@@ -43,6 +43,12 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 awk_script="$script_dir/check-rule13-german-comments.awk"
 
+# Git-diff scope. Defaults to this script's own app dir (kolibri); a sibling app
+# (e.g. nyx) reuses this same script with RULE13_SCAN_ROOT set to its module dir,
+# so the `*.kt`/`*.kts` pathspec is anchored there. Same monorepo, so the base
+# ref (origin/main) resolves either way.
+scan_root="${RULE13_SCAN_ROOT:-$repo_root}"
+
 if [ ! -f "$awk_script" ]; then
   echo "ERROR: awk script not found: $awk_script" >&2
   exit 2
@@ -52,9 +58,9 @@ fi
 # remote-tracking ref is not present (e.g. fresh clone without fetch).
 base="${CHECK_BASE:-}"
 if [ -z "$base" ]; then
-  if git -C "$repo_root" rev-parse --verify --quiet origin/main >/dev/null; then
+  if git -C "$scan_root" rev-parse --verify --quiet origin/main >/dev/null; then
     base="origin/main"
-  elif git -C "$repo_root" rev-parse --verify --quiet main >/dev/null; then
+  elif git -C "$scan_root" rev-parse --verify --quiet main >/dev/null; then
     base="main"
   else
     echo "ERROR: no comparison base — set CHECK_BASE or fetch origin/main" >&2
@@ -62,7 +68,7 @@ if [ -z "$base" ]; then
   fi
 fi
 
-if ! git -C "$repo_root" rev-parse --verify --quiet "$base" >/dev/null; then
+if ! git -C "$scan_root" rev-parse --verify --quiet "$base" >/dev/null; then
   echo "ERROR: comparison base not resolvable: $base" >&2
   exit 2
 fi
@@ -70,8 +76,8 @@ fi
 # Two-stage diff: committed-since-base AND working-tree changes. The
 # concatenation gives full coverage for local dev; CI typically has a
 # clean working tree so the second stage is a no-op there.
-committed=$(git -C "$repo_root" diff "$base"...HEAD -- '*.kt' '*.kts')
-working=$(git -C "$repo_root" diff HEAD -- '*.kt' '*.kts')
+committed=$(git -C "$scan_root" diff "$base"...HEAD -- '*.kt' '*.kts')
+working=$(git -C "$scan_root" diff HEAD -- '*.kt' '*.kts')
 
 violations=$(printf "%s\n%s\n" "$committed" "$working" \
   | awk -f "$awk_script")

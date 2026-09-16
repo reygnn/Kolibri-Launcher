@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -17,6 +16,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
@@ -291,5 +291,5 @@ class SettingsFragment : PreferenceFragmentCompat() {
         if (ok) requireActivity().finish() // back to home, which re-renders from the saved state
     }
 
-    private fun toast(text: String) = Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show()
+    private fun toast(text: String) = showToastSafe(text)
 }

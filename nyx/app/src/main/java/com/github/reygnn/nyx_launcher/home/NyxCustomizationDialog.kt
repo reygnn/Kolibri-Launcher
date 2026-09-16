@@ -6,7 +6,6 @@ import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.DialogFragment
@@ -16,6 +15,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.github.reygnn.launcher.common.ui.configureLivePreviewWindow
 import com.github.reygnn.launcher.common.ui.enableDialogDrag
 import com.github.reygnn.launcher.common.ui.fadeTo
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.R
@@ -61,7 +61,7 @@ class NyxCustomizationDialog : DialogFragment() {
                 requireActivity().lifecycleScope.launchSafe("Error setting wallpaper") {
                     val ok = wallpaperImageSetter.setFromUri(uri)
                     if (!ok) activity?.let {
-                        Toast.makeText(it, R.string.wallpaper_set_failed_toast, Toast.LENGTH_SHORT).show()
+                        it.showToastSafe(R.string.wallpaper_set_failed_toast)
                     }
                     if (isAdded) dismissAllowingStateLoss()
                 }

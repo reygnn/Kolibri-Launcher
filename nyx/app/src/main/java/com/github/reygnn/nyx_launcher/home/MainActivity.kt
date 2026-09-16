@@ -26,7 +26,6 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -57,6 +56,7 @@ import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
@@ -1193,7 +1193,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             .onFailure {
                 if (it !is ActivityNotFoundException && it !is SecurityException) throw it
-                Toast.makeText(this, R.string.home_info_no_app, Toast.LENGTH_SHORT).show()
+                showToastSafe(R.string.home_info_no_app)
             }
     }
 }

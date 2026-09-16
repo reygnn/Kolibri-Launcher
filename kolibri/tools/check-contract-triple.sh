@@ -50,7 +50,10 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
+# repo_root defaults to this script's own app (kolibri). A sibling app reuses the
+# same battle-tested logic by exporting CONTRACT_REPO_ROOT to its own module root
+# (e.g. nyx sets it to <repo>/nyx); default keeps kolibri's behaviour identical.
+repo_root="${CONTRACT_REPO_ROOT:-$(cd "$script_dir/.." && pwd)}"
 
 domain_main="$repo_root/domain/src/main"
 if [ ! -d "$domain_main" ]; then
