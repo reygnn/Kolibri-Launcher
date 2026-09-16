@@ -188,8 +188,23 @@
         android:layout_height="64dp"
         android:layout_gravity="top"
         android:gravity="center"
-        android:background="#CCB00020"
         android:text="@string/remove_from_home"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:visibility="invisible" />
+
+    <!-- Add-to-home target: the bottom counterpart of remove_bar, shown only while
+         dragging a drawer app (NewApp) over the open drawer. Dropping here places the
+         app at the first free cell. INVISIBLE at rest; height + bottom padding set in
+         code so its fill covers the nav-bar region. Colors are Material 3 semantic
+         tokens (primaryContainer → primary on hover), set in code. -->
+    <TextView
+        android:id="@+id/add_to_home_bar"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:text="@string/menu_add_to_home"
         android:textColor="@android:color/white"
         android:textSize="16sp"
         android:visibility="invisible" />

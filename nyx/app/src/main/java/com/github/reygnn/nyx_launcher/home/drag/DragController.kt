@@ -21,8 +21,13 @@ class DragController(private val host: DragViewHost) {
     private var payload: DragPayload? = null
     private var currentZone: DropZone? = null
 
-    /** Notified once when a drag starts / ends (e.g. to show/hide the remove bar). */
-    var onDragStart: (() -> Unit)? = null
+    /**
+     * Notified once when a drag starts / ends (e.g. to show/hide the remove or
+     * add-to-home bar). [onDragStart] carries the payload so the host can pick the
+     * right affordance (a drawer-app [DragPayload.NewApp] → add-to-home bar, a home
+     * item → remove bar).
+     */
+    var onDragStart: ((payload: DragPayload) -> Unit)? = null
     var onDragEnd: (() -> Unit)? = null
 
     /** Notified on every drag move (DragLayer coords) — e.g. for pager edge-advance. */
@@ -46,7 +51,7 @@ class DragController(private val host: DragViewHost) {
         if (isDragging) return
         this.payload = payload
         host.addDragView(source, x, y)
-        onDragStart?.invoke()
+        onDragStart?.invoke(payload)
         updateZone(x, y)
     }
 

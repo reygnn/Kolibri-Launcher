@@ -75,6 +75,8 @@ import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
+import com.google.android.material.R as MaterialR
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
@@ -153,6 +155,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var drawerContainer: View
     private lateinit var drawerOverlay: DrawerOverlayController
     private lateinit var removeBar: TextView
+    private lateinit var addToHomeBar: TextView
 
     private val drawerFragment: AppDrawerFragment?
         get() = supportFragmentManager.findFragmentById(R.id.drawer_container) as? AppDrawerFragment
@@ -248,6 +251,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             onHidden = { drawerFragment?.onDrawerHidden() }, // disarm before the hide slide
         )
         removeBar = findViewById(R.id.remove_bar)
+        addToHomeBar = findViewById(R.id.add_to_home_bar)
         folderOverlay = findViewById(R.id.folder_overlay)
         folderTitle = findViewById(R.id.folder_title)
         folderMembers = findViewById(R.id.folder_members)
@@ -306,9 +310,18 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // top margin is what lets the fill run under the bar.
         ViewCompat.setOnApplyWindowInsetsListener(removeBar) { v, insets ->
             val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
-            val content = (REMOVE_BAR_CONTENT_DP * resources.displayMetrics.density).toInt()
+            val content = (DROP_BAR_CONTENT_DP * resources.displayMetrics.density).toInt()
             v.updateLayoutParams { height = top + content }
             v.updatePadding(top = top)
+            insets
+        }
+        // Add-to-home bar: the bottom mirror of removeBar — its fill covers the
+        // nav-bar region while the label stays above it.
+        ViewCompat.setOnApplyWindowInsetsListener(addToHomeBar) { v, insets ->
+            val bottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+            val content = (DROP_BAR_CONTENT_DP * resources.displayMetrics.density).toInt()
+            v.updateLayoutParams { height = bottom + content }
+            v.updatePadding(bottom = bottom)
             insets
         }
 
@@ -560,10 +573,22 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // NOT for a drawer-internal fold drag (drawer open): the remove zone rejects
         // NewApp, so the bar would be a misleading, non-functional affordance over the
         // open drawer.
-        controller.onDragStart = { if (!drawerOverlay.isOpen) removeBar.visibility = View.VISIBLE }
+        controller.onDragStart = { payload ->
+            if (drawerOverlay.isOpen) {
+                // Drawer-app drag over the open drawer → offer the add-to-home target
+                // (the fold zone still owns the rest of the drawer surface).
+                if (payload is DragPayload.NewApp) {
+                    tintAddToHomeBar(active = false)
+                    addToHomeBar.visibility = View.VISIBLE
+                }
+            } else {
+                tintRemoveBar(active = false)
+                removeBar.visibility = View.VISIBLE
+            }
+        }
         controller.onDragEnd = {
             removeBar.visibility = View.INVISIBLE
-            removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
+            addToHomeBar.visibility = View.INVISIBLE
             cancelEdgeAdvance()
         }
         // Hold a drag at the left/right pager edge to page across grids (incl. the
@@ -581,7 +606,25 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }, DRAG_SETTLE_FALLBACK_MS)
         }
 
-        // 0) Drawer-fold zone (highest priority, active ONLY while the drawer is open):
+        // Add-to-home zone — registered FIRST so it wins over the fold zone in its
+        // bottom strip. Active only while dragging a drawer app (NewApp) over the open
+        // drawer; a drop places the app at the first free cell and closes the drawer.
+        controller.addDropZone(object : DropZone {
+            override fun hitRect(out: Rect) {
+                if (drawerOverlay.isOpen) out.set(0, addToHomeBar.top, homeRoot.width, homeRoot.height)
+                else out.setEmpty()
+            }
+            override fun accepts(payload: DragPayload) =
+                drawerOverlay.isOpen && payload is DragPayload.NewApp
+            override fun onDragEnter() { tintAddToHomeBar(active = true) }
+            override fun onDragExit() { tintAddToHomeBar(active = false) }
+            override fun onDrop(payload: DragPayload, x: Int, y: Int) {
+                (payload as? DragPayload.NewApp)?.let { addToHome(it.key) }
+            }
+        })
+
+        // 0) Drawer-fold zone (active ONLY while the drawer is open; sits just below the
+        //    add-to-home zone above, which claims the bottom strip):
         // a drawer-app drag (NewApp) dropped onto another drawer app makes a folder, onto a
         // folder adds a member (§8). Empty drawer space → no-op (the app stays put). When the
         // drawer is closed the hit rect is empty, so home drags fall through to the zones below.
@@ -606,8 +649,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         controller.addDropZone(object : DropZone {
             override fun hitRect(out: Rect) = out.set(0, 0, homeRoot.width, removeBar.bottom)
             override fun accepts(payload: DragPayload) = payload is DragPayload.Existing
-            override fun onDragEnter() { removeBar.setBackgroundColor(REMOVE_BAR_ACTIVE_COLOR) }
-            override fun onDragExit() { removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR) }
+            override fun onDragEnter() { tintRemoveBar(active = true) }
+            override fun onDragExit() { tintRemoveBar(active = false) }
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
                 (payload as? DragPayload.Existing)?.let { viewModel.remove(it.id) }
             }
@@ -655,6 +698,28 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 resolveGridDrop(x.toFloat(), y.toFloat())?.let { applyDrop(payload, it) }
             }
         })
+    }
+
+    // Material 3 semantic tint for the two drop bars: the destructive remove target is
+    // the error role (idle errorContainer → error on hover), the constructive add target
+    // the primary role (idle primaryContainer → primary on hover). Text follows the
+    // matching on-role so it stays legible under Dynamic Color.
+    private fun tintRemoveBar(active: Boolean) {
+        removeBar.setBackgroundColor(
+            MaterialColors.getColor(removeBar, if (active) android.R.attr.colorError else MaterialR.attr.colorErrorContainer),
+        )
+        removeBar.setTextColor(
+            MaterialColors.getColor(removeBar, if (active) MaterialR.attr.colorOnError else MaterialR.attr.colorOnErrorContainer),
+        )
+    }
+
+    private fun tintAddToHomeBar(active: Boolean) {
+        addToHomeBar.setBackgroundColor(
+            MaterialColors.getColor(addToHomeBar, if (active) android.R.attr.colorPrimary else MaterialR.attr.colorPrimaryContainer),
+        )
+        addToHomeBar.setTextColor(
+            MaterialColors.getColor(addToHomeBar, if (active) MaterialR.attr.colorOnPrimary else MaterialR.attr.colorOnPrimaryContainer),
+        )
     }
 
     /** A descendant view's bounds in [homeRoot] (DragLayer) coordinates. */
@@ -1301,11 +1366,5 @@ private const val DRAWER_SLIDE_MS = 180L
 /** Fallback delay to clear a dropped drag view when no commit re-render arrives. */
 private const val DRAG_SETTLE_FALLBACK_MS = 300L
 
-/** Visible content height (below the status-bar inset) of the remove bar, in dp. */
-private const val REMOVE_BAR_CONTENT_DP = 64f
-
-/** Remove-bar background at rest — matches @id/remove_bar's XML background. */
-private const val REMOVE_BAR_IDLE_COLOR = 0xCCB00020.toInt()
-
-/** Remove-bar background while a drag hovers it (opaque, brighter red). */
-private const val REMOVE_BAR_ACTIVE_COLOR = 0xFFD50000.toInt()
+/** Visible content height (below the system-bar inset) of the drop bars, in dp. */
+private const val DROP_BAR_CONTENT_DP = 64f
