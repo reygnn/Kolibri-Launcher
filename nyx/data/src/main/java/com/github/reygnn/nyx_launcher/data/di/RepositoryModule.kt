@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.di
 
+import com.github.reygnn.nyx_launcher.data.home.DrawerFoldersRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
 import com.github.reygnn.nyx_launcher.data.home.InstalledAppsRepositoryImpl
@@ -10,6 +11,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
+import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
@@ -31,6 +33,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindHomeLayoutRepository(impl: HomeLayoutRepositoryImpl): HomeLayoutRepository
+
+    // Drawer folders (DRAWER_FOLDERS_SPEC §4 / D-5): own repository over the shared
+    // DataStore under its own key, independent of the home layout.
+    @Binds
+    @Singleton
+    abstract fun bindDrawerFoldersRepository(impl: DrawerFoldersRepositoryImpl): DrawerFoldersRepository
 
     @Binds
     abstract fun bindLayoutSerializer(impl: HomeLayoutSerializer): LayoutSerializer
