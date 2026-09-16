@@ -12,6 +12,7 @@ import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
+import com.github.reygnn.nyx_launcher.home.model.DrawerVendorGrouping
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
@@ -170,6 +171,22 @@ class HomeViewModel @Inject constructor(
         launchSafe {
             drawerFoldersRepository.update {
                 DrawerFoldersTransition.drop(it, source, DrawerDropTarget.OntoFolder(folderId), drawerFolderIdFactory::next)
+            }
+        }
+    }
+
+    /**
+     * Vendor groups (maker + its app keys) over the current flat drawer app list, for the
+     * folder overlay's "add all from maker" action (DrawerAppSearch flattens; this groups).
+     */
+    fun drawerVendorGroups(): List<DrawerVendorGrouping.VendorGroup> =
+        DrawerVendorGrouping.groups(drawerApps.value)
+
+    /** Bulk-add every app in [keys] to the drawer folder [folderId] (pulls them from any other folder). */
+    fun addAllToDrawerFolder(folderId: DrawerFolderId, keys: List<ComponentKey>) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.addAll(it, folderId, keys)
             }
         }
     }

@@ -18,6 +18,7 @@ class FolderOverlayController(
     private val overlay: View,
     private val titleField: EditText,
     private val members: RecyclerView,
+    private val addAppsButton: View,
     private val columns: () -> Int,
 ) {
     private var onClose: (() -> Unit)? = null
@@ -30,12 +31,14 @@ class FolderOverlayController(
     /**
      * Show a folder: [initialTitle] in the title field ([titleEditable] toggles editing),
      * [memberAdapter] in the member grid. [onClose] runs exactly once when the overlay is
-     * closed via [close].
+     * closed via [close]. [onAddApps], when non-null, reveals the "add apps by maker" button
+     * and runs on tap (drawer folders only); null hides it (home folders).
      */
     fun open(
         initialTitle: String,
         titleEditable: Boolean,
         memberAdapter: RecyclerView.Adapter<*>,
+        onAddApps: (() -> Unit)? = null,
         onClose: () -> Unit,
     ) {
         this.onClose = onClose
@@ -43,6 +46,8 @@ class FolderOverlayController(
         titleField.isEnabled = titleEditable
         members.layoutManager = GridLayoutManager(members.context, columns())
         members.adapter = memberAdapter
+        addAppsButton.isVisible = onAddApps != null
+        addAppsButton.setOnClickListener { onAddApps?.invoke() }
         overlay.isVisible = true
     }
 

@@ -80,6 +80,7 @@ import com.google.android.material.R as MaterialR
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -256,7 +257,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         folderOverlay = findViewById(R.id.folder_overlay)
         folderTitle = findViewById(R.id.folder_title)
         folderMembers = findViewById(R.id.folder_members)
-        folderOverlayController = FolderOverlayController(folderOverlay, folderTitle, folderMembers) { currentColumns() }
+        folderOverlayController = FolderOverlayController(
+            folderOverlay, folderTitle, folderMembers, findViewById(R.id.folder_add_apps),
+        ) { currentColumns() }
         // Tap the scrim (outside the card) closes; the card swallows its own taps.
         folderOverlay.setOnClickListener { closeFolderOverlay() }
         findViewById<View>(R.id.folder_card).setOnClickListener { /* swallow */ }
@@ -916,6 +919,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     override fun openDrawerFolder(folder: DrawerEntry.Folder) {
         // A drawer folder, not a home folder — keep the home onClose path inactive.
         openFolderId = null
+        // Latest known membership: the bulk-add path updates it optimistically so the overlay
+        // can stay open to add several makers in a row without a reopen. The drawer tile behind
+        // refreshes reactively from drawerContent regardless.
+        var members = folder.members
         val adapter = FolderMemberAdapter(
             iconLoader = iconLoader,
             scope = lifecycleScope,
@@ -928,16 +935,51 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 viewModel.extractFromDrawerFolder(folder.id, key)
                 folderOverlayController.close()
             },
-        ).also { it.submit(folder.members) }
+        ).also { it.submit(members) }
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,
             memberAdapter = adapter,
+            onAddApps = {
+                showAddByMakerDialog(folder.id, members) { added ->
+                    members = members + added
+                    adapter.submit(members)
+                }
+            },
             onClose = {
                 val newTitle = normalizeFolderTitle(folderOverlayController.title)
                 if (newTitle != folder.title) viewModel.renameDrawerFolder(folder.id, newTitle)
             },
         )
+    }
+
+    /**
+     * Vendor picker for the open drawer folder: list the makers (Google, Samsung, …) that
+     * still have apps NOT already in this folder, with the count that would be added; a tap
+     * bulk-adds them. Fully tap-operable (an accessible alternative to fold-dragging).
+     */
+    private fun showAddByMakerDialog(
+        folderId: DrawerFolderId,
+        currentMembers: List<ComponentKey>,
+        onAdded: (List<ComponentKey>) -> Unit,
+    ) {
+        val addable = viewModel.drawerVendorGroups()
+            .map { group -> group.label to group.keys.filter { it !in currentMembers } }
+            .filter { it.second.isNotEmpty() }
+        if (addable.isEmpty()) {
+            showToastSafe(R.string.folder_add_by_maker_none)
+            return
+        }
+        val labels = addable.map { (label, keys) -> "$label (${keys.size})" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.folder_add_by_maker)
+            .setItems(labels) { _, index ->
+                val keys = addable[index].second
+                viewModel.addAllToDrawerFolder(folderId, keys)
+                onAdded(keys)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     // ---- drag ----

@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Nyx</string>
     <string name="folder_default_title">Ordner</string>
+    <string name="folder_add_by_maker">Apps nach Hersteller</string>
+    <string name="folder_add_by_maker_none">Keine weiteren Apps</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, Ordner, %2$d App</item>

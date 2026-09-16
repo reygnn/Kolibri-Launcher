@@ -51,6 +51,19 @@
             android:paddingEnd="8dp"
             android:clipToPadding="false" />
 
+        <!-- Drawer folders only (GONE for home folders): bulk-add all apps of a maker.
+             Shown/wired by FolderOverlayController when an onAddApps hook is supplied. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/folder_add_apps"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/folder_add_by_maker"
+            android:textColor="@android:color/white"
+            android:visibility="gone" />
+
     </LinearLayout>
 
 </FrameLayout>

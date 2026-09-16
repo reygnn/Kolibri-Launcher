@@ -37,6 +37,22 @@ object DrawerFoldersTransition {
     }
 
     /**
+     * Bulk-add ALL of [keys] to the folder [folderId] at once (vendor "add all"). Each key
+     * is pulled from any OTHER drawer folder first (DFOLD-INV-3), dissolving one that thereby
+     * drops below two members (DFOLD-INV-1); keys already in this folder are skipped. Returns
+     * the new membership, or `null` if the folder is unknown or nothing would change.
+     */
+    fun addAll(folders: DrawerFolders, folderId: DrawerFolderId, keys: List<ComponentKey>): DrawerFolders? {
+        val folder = folders.folders.firstOrNull { it.id == folderId } ?: return null
+        val toAdd = keys.distinct().filter { it !in folder.members }
+        if (toAdd.isEmpty()) return null
+        // The target holds none of [toAdd] (filtered above), so stripping [toAdd] from every
+        // folder leaves the target's existing members intact; we then append them here.
+        val newMembers = toAdd.fold(folder.members) { acc, key -> FolderMembership.add(acc, key) }
+        return folders.without(toAdd.toSet()).replace(folderId) { it.copy(members = newMembers) }
+    }
+
+    /**
      * Extract [member] from the opened folder [folderId]: the folder shrinks, or — if it
      * would drop below two members — dissolves entirely (DFOLD-INV-1). Both the extracted
      * member and any dissolved-folder survivor become loose implicitly (they are simply no

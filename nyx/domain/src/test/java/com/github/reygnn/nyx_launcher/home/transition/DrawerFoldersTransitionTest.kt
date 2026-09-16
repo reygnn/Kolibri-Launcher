@@ -152,4 +152,55 @@ class DrawerFoldersTransitionTest {
         val before = folders(folder("f1", "a", "b"))
         assertThat(DrawerFoldersTransition.rename(before, DrawerFolderId("nope"), "X")).isNull()
     }
+
+    // ---- addAll (bulk vendor-add) ----
+
+    @Test
+    fun `addAll appends all new keys to the folder in order`() {
+        val before = folders(folder("f1", "a", "b"))
+        val result = DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("c"), key("d")))
+        assertThat(result).isEqualTo(folders(folder("f1", "a", "b", "c", "d")))
+    }
+
+    @Test
+    fun `addAll skips keys already in the target folder`() {
+        val before = folders(folder("f1", "a", "b"))
+        val result = DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("b"), key("c")))
+        assertThat(result).isEqualTo(folders(folder("f1", "a", "b", "c")))
+    }
+
+    @Test
+    fun `addAll of only already-present keys is a no-op`() {
+        val before = folders(folder("f1", "a", "b"))
+        assertThat(DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("a"), key("b")))).isNull()
+    }
+
+    @Test
+    fun `addAll de-duplicates the incoming keys`() {
+        val before = folders(folder("f1", "a", "b"))
+        val result = DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("c"), key("c")))
+        assertThat(result).isEqualTo(folders(folder("f1", "a", "b", "c")))
+    }
+
+    @Test
+    fun `addAll pulls keys out of other folders and dissolves one dropping below two (INV-3, INV-1)`() {
+        // f2 = [c, d]; adding c into f1 must strip c from f2, which then dissolves (d goes loose).
+        val before = folders(folder("f1", "a", "b"), folder("f2", "c", "d"))
+        val result = DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("c")))
+        assertThat(result).isEqualTo(folders(folder("f1", "a", "b", "c")))
+    }
+
+    @Test
+    fun `addAll strips from another folder that survives with two or more`() {
+        // f2 = [c, d, e]; adding c into f1 strips c from f2, which survives on [d, e].
+        val before = folders(folder("f1", "a", "b"), folder("f2", "c", "d", "e"))
+        val result = DrawerFoldersTransition.addAll(before, DrawerFolderId("f1"), listOf(key("c")))
+        assertThat(result).isEqualTo(folders(folder("f1", "a", "b", "c"), folder("f2", "d", "e")))
+    }
+
+    @Test
+    fun `addAll to an unknown folder is a no-op`() {
+        val before = folders(folder("f1", "a", "b"))
+        assertThat(DrawerFoldersTransition.addAll(before, DrawerFolderId("nope"), listOf(key("c")))).isNull()
+    }
 }
