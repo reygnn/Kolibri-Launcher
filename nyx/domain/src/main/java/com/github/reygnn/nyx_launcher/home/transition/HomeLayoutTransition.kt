@@ -4,6 +4,7 @@ import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.FolderEditResult
+import com.github.reygnn.nyx_launcher.home.model.FolderMembership
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
@@ -195,7 +196,7 @@ object HomeLayoutTransition {
             is HomeItem.App -> when (source) {
                 is HomeItem.App -> {
                     // §7-D1: target first, then the dragged app.
-                    val folder = HomeItem.Folder(newFolderId(), "", listOf(occupant.key, source.key))
+                    val folder = HomeItem.Folder(newFolderId(), "", FolderMembership.create(occupant.key, source.key))
                     val base = layout.removing(moving).removing(occupant.id)
                     MoveResult.FolderCreated(base.copy(items = base.items + PlacedItem(folder, pos)), folder.id)
                 }
@@ -204,8 +205,9 @@ object HomeLayoutTransition {
 
             is HomeItem.Folder -> when (source) {
                 is HomeItem.App -> {
-                    if (source.key in occupant.members) return MoveResult.NoOp // IHM-INV-7 guard
-                    val updated = occupant.copy(members = occupant.members + source.key)
+                    val newMembers = FolderMembership.add(occupant.members, source.key)
+                    if (newMembers === occupant.members) return MoveResult.NoOp // IHM-INV-7: already a member
+                    val updated = occupant.copy(members = newMembers)
                     MoveResult.AddedToFolder(layout.removing(moving).replacingItem(occupant.id, updated), occupant.id)
                 }
                 is HomeItem.Folder -> MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
@@ -270,15 +272,16 @@ object HomeLayoutTransition {
             is HomeItem.App -> when (source) {
                 is HomeItem.App -> {
                     // §7-D1: target first, then the dragged app — same order as the grid.
-                    val folder = HomeItem.Folder(newFolderId(), "", listOf(occupant.key, source.key))
+                    val folder = HomeItem.Folder(newFolderId(), "", FolderMembership.create(occupant.key, source.key))
                     MoveResult.FolderCreated(layout.removing(moving).replacingItem(occupant.id, folder), folder.id)
                 }
                 is HomeItem.Folder -> MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
             }
             is HomeItem.Folder -> when (source) {
                 is HomeItem.App -> {
-                    if (source.key in occupant.members) return MoveResult.NoOp // IHM-INV-7 (B-scope)
-                    val updated = occupant.copy(members = occupant.members + source.key)
+                    val newMembers = FolderMembership.add(occupant.members, source.key)
+                    if (newMembers === occupant.members) return MoveResult.NoOp // IHM-INV-7 (B-scope): already a member
+                    val updated = occupant.copy(members = newMembers)
                     MoveResult.AddedToFolder(layout.removing(moving).replacingItem(occupant.id, updated), occupant.id)
                 }
                 is HomeItem.Folder -> MoveResult.Rejected(MoveResult.Reason.TARGET_OCCUPIED_INCOMPATIBLE)
@@ -296,13 +299,14 @@ object HomeLayoutTransition {
         newId: () -> ItemId,
     ): FolderEditResult {
         val folderItem = layout.itemById(folder) as? HomeItem.Folder ?: return FolderEditResult.NoOp
-        if (member !in folderItem.members) return FolderEditResult.NoOp // RFF-INV-4
-        // IHM-INV-7 forbids duplicate members, but the total function must stay defined for an
-        // invariant-violating (imported/hand-edited) blob. A duplicated member makes "remove
-        // one" ambiguous: filterNot below strips EVERY copy, wrongly dissolving the folder and
-        // losing a copy. Treat it as structurally-impossible input → NoOp (the use-case fires
-        // silentError in DEBUG), leaving the layout untouched rather than mangling it.
-        if (folderItem.members.count { it == member } > 1) return FolderEditResult.NoOp
+        // Membership decision (shrink vs dissolve) is the shared FolderMembership rule; this
+        // function keeps only the PLACEMENT of the extracted member / survivor. NotAMember
+        // covers BOTH RFF-INV-4 (member not in folder) and the duplicate-member guard: an
+        // invariant-violating (imported/hand-edited) blob with a duplicated member makes
+        // "remove one" ambiguous, so the layout is left untouched (the use-case fires
+        // silentError in DEBUG) rather than mangled.
+        val membership = FolderMembership.remove(folderItem.members, member)
+        if (membership is FolderMembership.RemoveResult.NotAMember) return FolderEditResult.NoOp
         val placement = layout.placementOf(folder) ?: return FolderEditResult.NoOp
 
         // Scoped IHM-INV-7: a drop onto ANOTHER grid folder moves the member straight into
@@ -320,55 +324,61 @@ object HomeLayoutTransition {
         if (targetFolder != null && targetFolder.id != folder) {
             if (member in targetFolder.members) return FolderEditResult.NoOp // B-scope uniqueness
             val withB = layout.replacingItem(
-                targetFolder.id, targetFolder.copy(members = targetFolder.members + member),
+                targetFolder.id, targetFolder.copy(members = FolderMembership.add(targetFolder.members, member)),
             )
-            val remainingInA = folderItem.members.filterNot { it == member }
-            return if (remainingInA.size >= 2) {
-                val shrunk = withB.replacingItem(folder, folderItem.copy(members = remainingInA))
-                FolderEditResult.MovedBetweenFolders(shrunk, from = folder, to = targetFolder.id)
-            } else {
-                // A drops to one member → dissolves; survivor promoted to A's old placement
-                // (RFF-INV-1/-2). The moved member travels as a raw ComponentKey into B.
-                // Scoped IHM-INV-7: if the survivor is ALSO already a top-level tile, do NOT
-                // mint a duplicate — leave the existing tile in place and just retire A (so
-                // zero new ids), otherwise mint the one survivor id.
-                val (dissolved, survivorId) =
-                    promoteSurvivor(withB.removing(folder), remainingInA.single(), placement, newId)
-                FolderEditResult.MovedBetweenFoldersDissolve(
-                    dissolved, to = targetFolder.id, survivor = survivorId,
-                )
+            return when (membership) {
+                is FolderMembership.RemoveResult.Removed -> {
+                    val shrunk = withB.replacingItem(folder, folderItem.copy(members = membership.members))
+                    FolderEditResult.MovedBetweenFolders(shrunk, from = folder, to = targetFolder.id)
+                }
+                is FolderMembership.RemoveResult.Dissolved -> {
+                    // A drops to one member → dissolves; survivor promoted to A's old placement
+                    // (RFF-INV-1/-2). The moved member travels as a raw ComponentKey into B.
+                    // Scoped IHM-INV-7: if the survivor is ALSO already a top-level tile, do NOT
+                    // mint a duplicate — leave the existing tile in place and just retire A (so
+                    // zero new ids), otherwise mint the one survivor id.
+                    val (dissolved, survivorId) =
+                        promoteSurvivor(withB.removing(folder), membership.survivor, placement, newId)
+                    FolderEditResult.MovedBetweenFoldersDissolve(
+                        dissolved, to = targetFolder.id, survivor = survivorId,
+                    )
+                }
+                FolderMembership.RemoveResult.NotAMember -> FolderEditResult.NoOp // unreachable (guarded above)
             }
         }
 
         emptyTargetReason(layout, target)?.let { return FolderEditResult.Rejected(it) }
 
-        val remaining = folderItem.members.filterNot { it == member }
-        return if (remaining.size >= 2) {
-            // Scoped IHM-INV-7: if `member` is ALSO already a top-level tile, do NOT mint a
-            // second one — relocate the existing tile to the target (mirrors place()/HEU-INV-1).
-            // RFF-INV-5: one new id in the normal case, zero when an existing tile is reused.
-            val shrunk = layout.replacingItem(folder, folderItem.copy(members = remaining))
-            val (out, extractedId) = promoteToTarget(shrunk, member, target, newId)
-            FolderEditResult.Extracted(out, extractedId)
-        } else {
-            // remaining.size == 1 → dissolve. RFF-INV-5: extracted then survivor (id order).
-            // Scoped IHM-INV-7: either the extracted member or the survivor (or both) may
-            // already be top-level tiles — each reuses its existing tile instead of minting a
-            // duplicate. The extracted member is relocated to the target; the survivor is
-            // promoted to the folder's old cell only if it is not already a tile.
-            val withoutFolder = layout.removing(folder)
-            // RFF-INV-5 keeps id order "extracted then survivor", so the extracted id is minted
-            // FIRST. But the SURVIVOR is PLACED first, onto the folder's freed cell, so the
-            // extracted member's fallback (an out-of-range / fresh-page GridInsert resolves to
-            // "first free cell") can no longer reuse that very cell and collide with the
-            // survivor (IHM-INV-3). If the extracted member is already a top-level tile it
-            // reuses that id (no new one); likewise the survivor.
-            val existingExtracted = withoutFolder.topLevelIdOf(member)
-            val extractedId = existingExtracted ?: newId()
-            val (withSurvivor, survivorId) = promoteSurvivor(withoutFolder, remaining.single(), placement, newId)
-            val base = if (existingExtracted != null) withSurvivor.removing(existingExtracted) else withSurvivor
-            val out = placeNewAtTarget(base, HomeItem.App(extractedId, member), target)
-            FolderEditResult.FolderDissolved(out, extractedId, survivorId)
+        return when (membership) {
+            is FolderMembership.RemoveResult.Removed -> {
+                // Scoped IHM-INV-7: if `member` is ALSO already a top-level tile, do NOT mint a
+                // second one — relocate the existing tile to the target (mirrors place()/HEU-INV-1).
+                // RFF-INV-5: one new id in the normal case, zero when an existing tile is reused.
+                val shrunk = layout.replacingItem(folder, folderItem.copy(members = membership.members))
+                val (out, extractedId) = promoteToTarget(shrunk, member, target, newId)
+                FolderEditResult.Extracted(out, extractedId)
+            }
+            is FolderMembership.RemoveResult.Dissolved -> {
+                // remaining.size == 1 → dissolve. RFF-INV-5: extracted then survivor (id order).
+                // Scoped IHM-INV-7: either the extracted member or the survivor (or both) may
+                // already be top-level tiles — each reuses its existing tile instead of minting a
+                // duplicate. The extracted member is relocated to the target; the survivor is
+                // promoted to the folder's old cell only if it is not already a tile.
+                val withoutFolder = layout.removing(folder)
+                // RFF-INV-5 keeps id order "extracted then survivor", so the extracted id is minted
+                // FIRST. But the SURVIVOR is PLACED first, onto the folder's freed cell, so the
+                // extracted member's fallback (an out-of-range / fresh-page GridInsert resolves to
+                // "first free cell") can no longer reuse that very cell and collide with the
+                // survivor (IHM-INV-3). If the extracted member is already a top-level tile it
+                // reuses that id (no new one); likewise the survivor.
+                val existingExtracted = withoutFolder.topLevelIdOf(member)
+                val extractedId = existingExtracted ?: newId()
+                val (withSurvivor, survivorId) = promoteSurvivor(withoutFolder, membership.survivor, placement, newId)
+                val base = if (existingExtracted != null) withSurvivor.removing(existingExtracted) else withSurvivor
+                val out = placeNewAtTarget(base, HomeItem.App(extractedId, member), target)
+                FolderEditResult.FolderDissolved(out, extractedId, survivorId)
+            }
+            FolderMembership.RemoveResult.NotAMember -> FolderEditResult.NoOp // unreachable (guarded above)
         }
     }
 
