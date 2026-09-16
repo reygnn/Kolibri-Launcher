@@ -120,10 +120,12 @@ abstract class BaseViewModel<E>(
     }
 
     /**
-     * Logs the error and emits a generic error toast unless the error
+     * Logs the error and emits a generic error event unless the error
      * type is one the user can't act on (cancellation, OOM, stack
-     * overflow). Override `showErrorToastIfSupported` in child
-     * ViewModels where `E` is not `UiEvent`.
+     * overflow). Subclasses opt into a user-facing toast by overriding
+     * [errorEvent] with a concrete value; the default `null` emits nothing —
+     * the right behaviour for an event type `E` that has no error/toast
+     * variant.
      *
      * Handles `CancellationException` defensively even though the
      * in-class callers (launchSafe, executeSafe, coroutineExceptionHandler)
