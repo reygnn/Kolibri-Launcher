@@ -74,4 +74,8 @@ the reason encoded in the orchestrator header:
 
 Not the stack baseline, git workflow, release/signing, or test philosophy —
 those are the global `~/.claude/CLAUDE.md`. Not a re-statement of Kolibri's
-rules — those are referenced above, not duplicated (duplication drifts).
+rules — those are referenced above, not duplicated (duplication drifts). Not the
+place for intentional UX/behavioural limitations — those live in
+`ACCEPTED_LIMITATIONS.md` (sibling of Kolibri's; check it before "fixing" a
+perceived UX bug in an area it covers, e.g. drag-only home/drawer organisation
+not being TalkBack-operable).
