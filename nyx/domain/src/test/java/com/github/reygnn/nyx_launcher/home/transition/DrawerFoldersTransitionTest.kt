@@ -128,4 +128,28 @@ class DrawerFoldersTransitionTest {
         val result = DrawerFoldersTransition.extract(folders(folder("f1", "a", "b")), DrawerFolderId("f1"), key("c"))
         assertThat(result).isNull()
     }
+
+    // ---- rename ----
+
+    @Test
+    fun `rename sets a new title without touching id or members (INV-5)`() {
+        val before = folders(folder("f1", "a", "b"))
+        val result = DrawerFoldersTransition.rename(before, DrawerFolderId("f1"), "Work")
+        val renamed = result!!.folders.single()
+        assertThat(renamed.title).isEqualTo("Work")
+        assertThat(renamed.id).isEqualTo(DrawerFolderId("f1"))
+        assertThat(renamed.members).containsExactly(key("a"), key("b")).inOrder()
+    }
+
+    @Test
+    fun `rename to the same title is a no-op`() {
+        val before = folders(DrawerFolder(DrawerFolderId("f1"), "Work", listOf(key("a"), key("b"))))
+        assertThat(DrawerFoldersTransition.rename(before, DrawerFolderId("f1"), "Work")).isNull()
+    }
+
+    @Test
+    fun `rename of an unknown folder is a no-op`() {
+        val before = folders(folder("f1", "a", "b"))
+        assertThat(DrawerFoldersTransition.rename(before, DrawerFolderId("nope"), "X")).isNull()
+    }
 }

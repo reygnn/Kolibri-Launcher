@@ -243,6 +243,21 @@ class HomeViewModelTest {
                 .containsExactly(APP_A.key, SLOW.key).inOrder()
         }
 
+    @Test
+    fun rename_drawer_folder_forwards_setting_the_new_title() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            drawerFolders.update {
+                DrawerFolders(listOf(DrawerFolder(DrawerFolderId("f1"), "", listOf(APP_A.key, APP_B.key))))
+            }
+
+            viewModel.renameDrawerFolder(DrawerFolderId("f1"), title = "Work")
+            advanceUntilIdle()
+
+            assertThat(drawerFolders.current.folders.single().title).isEqualTo("Work")
+        }
+
     private companion object {
         val KEY = ComponentKey("pa", "pa.Main")
         val APP_A = LauncherApp(KEY, label = "A")

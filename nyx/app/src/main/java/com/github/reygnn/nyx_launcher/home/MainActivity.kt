@@ -29,7 +29,6 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
@@ -40,7 +39,6 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -163,6 +161,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private lateinit var folderOverlay: View
     private lateinit var folderTitle: EditText
     private lateinit var folderMembers: RecyclerView
+    private lateinit var folderOverlayController: FolderOverlayController
     private var openFolderId: ItemId? = null
     private var openFolderTitle: String = ""
 
@@ -252,6 +251,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         folderOverlay = findViewById(R.id.folder_overlay)
         folderTitle = findViewById(R.id.folder_title)
         folderMembers = findViewById(R.id.folder_members)
+        folderOverlayController = FolderOverlayController(folderOverlay, folderTitle, folderMembers) { currentColumns() }
         // Tap the scrim (outside the card) closes; the card swallows its own taps.
         folderOverlay.setOnClickListener { closeFolderOverlay() }
         findViewById<View>(R.id.folder_card).setOnClickListener { /* swallow */ }
@@ -796,30 +796,25 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         homeRoot.armDrag(DragPayload.NewApp(key), view)
     }
 
-    // Held so a member tap can dismiss the 5b members sheet (5c replaces it with the
-    // shared in-drawer FolderOverlayController).
-    private var drawerFolderDialog: AlertDialog? = null
-
     override fun openDrawerFolder(folder: DrawerEntry.Folder) {
-        // 5b: a z-order-safe members sheet — a dialog sits above the open drawer, unlike
-        // the home folder overlay which lives in the DragLayer beneath it. 5c replaces
-        // this with the shared in-drawer FolderOverlayController (title edit); 5d wires
-        // member extraction (onStartDrag is a no-op here).
-        val recycler = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@MainActivity, currentColumns())
-            adapter = FolderMemberAdapter(
-                iconLoader = iconLoader,
-                scope = lifecycleScope,
-                iconSizePx = gridIconPx,
-                onLaunch = { key -> launchApp(key); drawerFolderDialog?.dismiss() },
-                onStartDrag = { _, _ -> },
-            ).also { it.submit(folder.members) }
-        }
-        drawerFolderDialog = MaterialAlertDialogBuilder(this)
-            .setTitle(folder.title.ifBlank { getString(R.string.folder_default_title) })
-            .setView(recycler)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
+        // A drawer folder, not a home folder — keep the home onClose path inactive.
+        openFolderId = null
+        val adapter = FolderMemberAdapter(
+            iconLoader = iconLoader,
+            scope = lifecycleScope,
+            iconSizePx = gridIconPx,
+            onLaunch = { key -> launchApp(key); folderOverlayController.close() },
+            onStartDrag = { _, _ -> }, // member extract-drag is 5d
+        ).also { it.submit(folder.members) }
+        folderOverlayController.open(
+            initialTitle = folder.title,
+            titleEditable = true,
+            memberAdapter = adapter,
+            onClose = {
+                val newTitle = normalizeFolderTitle(folderOverlayController.title)
+                if (newTitle != folder.title) viewModel.renameDrawerFolder(folder.id, newTitle)
+            },
+        )
     }
 
     // ---- drag ----
@@ -927,16 +922,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
         openFolderId = folderId
         openFolderTitle = folder.title
-        folderTitle.setText(folder.title)
-        folderMembers.layoutManager = GridLayoutManager(this, currentColumns())
-        folderMembers.adapter = FolderMemberAdapter(
+        val adapter = FolderMemberAdapter(
             iconLoader = iconLoader,
             scope = lifecycleScope,
             iconSizePx = gridIconPx,
-            onLaunch = { key -> launchApp(key); closeFolderOverlay() },
+            onLaunch = { key -> launchApp(key); folderOverlayController.close() },
             onStartDrag = { view, key -> startFolderMemberDrag(view, key) },
         ).also { it.submit(folder.members) }
-        folderOverlay.isVisible = true
+        folderOverlayController.open(
+            initialTitle = folder.title,
+            titleEditable = true,
+            memberAdapter = adapter,
+            onClose = { applyFolderTitleEdit() },
+        )
     }
 
     /**
@@ -950,15 +948,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         applyFolderTitleEdit() // persist any rename before the folder may dissolve
         startDrag(view, DragPayload.FolderMember(folderId, key))
         openFolderId = null
-        folderOverlay.isVisible = false
+        folderOverlayController.dismiss() // title already committed; don't re-run onClose
     }
 
-    /** Closes the folder overlay (tap-outside / launch), applying any title edit. */
+    /** Closes the folder overlay (tap-outside / launch); its onClose commits the title. */
     private fun closeFolderOverlay() {
-        if (!folderOverlay.isVisible) return
-        applyFolderTitleEdit()
+        if (!folderOverlayController.isVisible) return
+        folderOverlayController.close() // onClose: home applyFolderTitleEdit / drawer rename
         openFolderId = null
-        folderOverlay.isVisible = false
     }
 
     private fun applyFolderTitleEdit() {

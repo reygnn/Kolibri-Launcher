@@ -158,6 +158,15 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /** Rename the drawer folder [folderId] to [title] (caller passes the normalized title). */
+    fun renameDrawerFolder(folderId: DrawerFolderId, title: String) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.rename(it, folderId, title)
+            }
+        }
+    }
+
     /**
      * Re-fit the layout onto the device grid the UI measured from the real home
      * area. Idempotent: a no-op when the grid already matches. Runs on every

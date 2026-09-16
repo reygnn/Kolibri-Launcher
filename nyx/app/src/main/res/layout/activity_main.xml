@@ -155,9 +155,6 @@
 
     </LinearLayout>
 
-    <!-- Folder overlay (in-DragLayer, so members can be finger-dragged out). -->
-    <include layout="@layout/folder_overlay" />
-
     <!-- Drawer overlay, revealed by swipe-up / long-press and toggled by
          visibility (no re-inflate per open). Hosts AppDrawerFragment, whose own
          root is a GestureFrameLayout owning the swipe-down dismiss. -->
@@ -171,6 +168,11 @@
     <!-- Long-press context menu (in-DragLayer, above the drawer so it shows over a
          long-pressed drawer app). -->
     <include layout="@layout/context_menu_overlay" />
+
+    <!-- Folder overlay (in-DragLayer, ABOVE the drawer so a drawer folder's overlay
+         shows over the open drawer too; a home member still finger-drags out to the
+         DragLayer). Shared by home + drawer via FolderOverlayController. -->
+    <include layout="@layout/folder_overlay" />
 
     <!-- Drop-to-delete target: a top overlay shown only during a drag. INVISIBLE
          at rest (not GONE) so it stays laid out and receives drag events, but

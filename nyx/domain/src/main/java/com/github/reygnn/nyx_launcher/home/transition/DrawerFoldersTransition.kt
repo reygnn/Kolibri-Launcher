@@ -53,6 +53,17 @@ object DrawerFoldersTransition {
         }
     }
 
+    /**
+     * Rename [folderId] to [title] (already normalized by the caller). `null` if the
+     * folder is unknown or the title is unchanged (= no write). Rename is not a
+     * membership op — the folder's [DrawerFolderId] and members are untouched (DFOLD-INV-5).
+     */
+    fun rename(folders: DrawerFolders, folderId: DrawerFolderId, title: String): DrawerFolders? {
+        val folder = folders.folders.firstOrNull { it.id == folderId } ?: return null
+        if (folder.title == title) return null
+        return folders.replace(folderId) { it.copy(title = title) }
+    }
+
     // ---- internals ----
 
     private fun createFolder(
