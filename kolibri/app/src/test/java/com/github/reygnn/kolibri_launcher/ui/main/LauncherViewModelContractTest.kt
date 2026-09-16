@@ -292,6 +292,7 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         vm.updateBatteryLevel(42, 100)
+        advanceUntilIdle()
 
         assertEquals("42%", vm.uiState.value.batteryString)
     }
@@ -310,6 +311,7 @@ class LauncherViewModelContractTest {
             every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
         vm.updateBatteryLevelFromIntent(intent)
+        advanceUntilIdle()
 
         assertEquals("95%", vm.uiState.value.batteryString)
     }

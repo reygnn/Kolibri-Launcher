@@ -352,30 +352,35 @@ class LauncherViewModelSecurityTest {
     @Test
     fun `attack - battery scale zero - no division by zero crash`() = runTest {
         viewModel.updateBatteryLevel(level = 50, scale = 0)
+        advanceUntilIdle()
         assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
     @Test
     fun `attack - battery negative scale - shows fallback`() = runTest {
         viewModel.updateBatteryLevel(level = 50, scale = -1)
+        advanceUntilIdle()
         assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
     @Test
     fun `attack - battery negative level - shows fallback`() = runTest {
         viewModel.updateBatteryLevel(level = -1, scale = 100)
+        advanceUntilIdle()
         assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
     @Test
     fun `attack - battery MAX_VALUE - no overflow`() = runTest {
         viewModel.updateBatteryLevel(level = Int.MAX_VALUE, scale = Int.MAX_VALUE)
+        advanceUntilIdle()
         assertEquals("100%", viewModel.uiState.value.batteryString)
     }
 
     @Test
     fun `attack - battery level greater than scale - shows over 100`() = runTest {
         viewModel.updateBatteryLevel(level = 150, scale = 100)
+        advanceUntilIdle()
         assertEquals("150%", viewModel.uiState.value.batteryString)
     }
 
@@ -386,6 +391,7 @@ class LauncherViewModelSecurityTest {
     @Test
     fun `attack - null intent - shows fallback battery`() = runTest {
         viewModel.updateBatteryLevelFromIntent(null)
+        advanceUntilIdle()
         assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
@@ -400,6 +406,7 @@ class LauncherViewModelSecurityTest {
             every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
         viewModel.updateBatteryLevelFromIntent(emptyIntent)
+        advanceUntilIdle()
         assertEquals("---%", viewModel.uiState.value.batteryString)
     }
 
@@ -414,6 +421,7 @@ class LauncherViewModelSecurityTest {
             every { getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) } returns 0
         }
         viewModel.updateBatteryLevelFromIntent(maliciousIntent)
+        advanceUntilIdle()
         assertTrue(viewModel.uiState.value.batteryString.isNotEmpty())
     }
 
@@ -644,6 +652,7 @@ class LauncherViewModelSecurityTest {
     @Test
     fun `edge case - updateTimeAndDate - no crash`() = runTest {
         viewModel.updateTimeAndDate()
+        advanceUntilIdle()
         assertTrue(viewModel.uiState.value.timeString.isNotEmpty())
     }
 }

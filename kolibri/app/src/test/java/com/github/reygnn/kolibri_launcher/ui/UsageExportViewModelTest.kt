@@ -13,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Before
@@ -41,7 +42,7 @@ class UsageExportViewModelTest {
     // ========== EXPORT TESTS ==========
 
     @Test
-    fun `exportToFile - success - emits ExportSuccess event`() = runTest {
+    fun `exportToFile - success - emits ExportSuccess event`() = runTest(mainDispatcherRule.testDispatcher) {
         // Arrange
         val uri = "content://test"
         coEvery { exportUseCase(uri) } returns Result.success(Unit)
@@ -55,6 +56,7 @@ class UsageExportViewModelTest {
 
         // Act
         viewModel.exportToFile(uri)
+        advanceUntilIdle()
 
         // Assert
         Assert.assertEquals(1, events.size)
@@ -64,7 +66,7 @@ class UsageExportViewModelTest {
     }
 
     @Test
-    fun `exportToFile - failure - emits ExportError event`() = runTest {
+    fun `exportToFile - failure - emits ExportError event`() = runTest(mainDispatcherRule.testDispatcher) {
         // Arrange
         val uri = "content://fail"
         val errorMsg = "Disk full"
@@ -77,6 +79,7 @@ class UsageExportViewModelTest {
 
         // Act
         viewModel.exportToFile(uri)
+        advanceUntilIdle()
 
         // Assert
         Assert.assertEquals(1, events.size)
@@ -89,7 +92,7 @@ class UsageExportViewModelTest {
     // ========== IMPORT TESTS ==========
 
     @Test
-    fun `importFromFile - success - emits ImportSuccess event`() = runTest {
+    fun `importFromFile - success - emits ImportSuccess event`() = runTest(mainDispatcherRule.testDispatcher) {
         // Arrange
         val uri = "content://import"
         val successResult = UsageImportResult.Success(10, 50, 0)
@@ -102,6 +105,7 @@ class UsageExportViewModelTest {
 
         // Act
         viewModel.importFromFile(uri, false)
+        advanceUntilIdle()
 
         // Assert
         Assert.assertEquals(1, events.size)
@@ -113,7 +117,7 @@ class UsageExportViewModelTest {
     }
 
     @Test
-    fun `importFromFile - invalid format - emits InvalidFormat event`() = runTest {
+    fun `importFromFile - invalid format - emits InvalidFormat event`() = runTest(mainDispatcherRule.testDispatcher) {
         // Arrange
         val uri = "content://bad_json"
         coEvery { importUseCase(uri, true) } returns UsageImportResult.InvalidFormat
@@ -125,6 +129,7 @@ class UsageExportViewModelTest {
 
         // Act
         viewModel.importFromFile(uri, true)
+        advanceUntilIdle()
 
         // Assert
         Assert.assertEquals(UsageExportUiEvent.InvalidFormat, events.first())
@@ -132,7 +137,7 @@ class UsageExportViewModelTest {
     }
 
     @Test
-    fun `importFromFile - unsupported version - emits UnsupportedVersion event`() = runTest {
+    fun `importFromFile - unsupported version - emits UnsupportedVersion event`() = runTest(mainDispatcherRule.testDispatcher) {
         // Arrange
         val uri = "content://old"
         coEvery { importUseCase(uri, false) } returns UsageImportResult.UnsupportedVersion("9.0")
@@ -144,6 +149,7 @@ class UsageExportViewModelTest {
 
         // Act
         viewModel.importFromFile(uri, false)
+        advanceUntilIdle()
 
         // Assert
         val event = events.first() as UsageExportUiEvent.UnsupportedVersion
@@ -152,7 +158,7 @@ class UsageExportViewModelTest {
     }
 
     @Test
-    fun `loading state - toggles correctly during operation`() = runTest {
+    fun `loading state - toggles correctly during operation`() = runTest(mainDispatcherRule.testDispatcher) {
         // Dieser Test ist tricky mit UnconfinedTestDispatcher, da alles sofort passiert.
         // Wir prüfen hier nur, dass es am Ende false ist.
         // Für exakte Prüfung "true -> false" bräuchte man StandardTestDispatcher und advanceUntilIdle().
@@ -161,6 +167,7 @@ class UsageExportViewModelTest {
         coEvery { exportUseCase(uri) } returns Result.success(Unit)
 
         viewModel.exportToFile(uri)
+        advanceUntilIdle()
 
         // Am Ende muss loading wieder aus sein
         Assert.assertTrue(viewModel.isLoading.value == false)

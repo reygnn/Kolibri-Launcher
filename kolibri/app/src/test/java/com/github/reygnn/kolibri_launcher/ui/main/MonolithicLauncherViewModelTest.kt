@@ -513,7 +513,9 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `updateTimeAndDate - updates time and date strings`() = runTest {
         setupViewModel()
+        advanceUntilIdle()
         viewModel.updateTimeAndDate()
+        advanceUntilIdle()
         val state = viewModel.uiState.value
         assertTrue(state.timeString.isNotEmpty())
         assertTrue(state.dateString.isNotEmpty())
@@ -523,7 +525,9 @@ class MonolithicLauncherViewModelTest {
     @Test
     fun `updateBatteryLevel - with valid data - updates battery percentage`() = runTest {
         setupViewModel()
+        advanceUntilIdle()
         viewModel.updateBatteryLevel(75, 100)
+        advanceUntilIdle()
         assertEquals("75%", viewModel.uiState.value.batteryString)
     }
 
@@ -1076,7 +1080,9 @@ class MonolithicLauncherViewModelTest {
     fun `updateBatteryLevel - with maximum values - handles correctly`() = runTest {
         setupViewModel()
 
+        advanceUntilIdle()
         viewModel.updateBatteryLevel(Int.MAX_VALUE, Int.MAX_VALUE)
+        advanceUntilIdle()
 
         // Sollte 100% sein
         assertEquals("100%", viewModel.uiState.value.batteryString)
@@ -1086,7 +1092,9 @@ class MonolithicLauncherViewModelTest {
     fun `updateBatteryLevel - with realistic maximum value - handles correctly`() = runTest {
         setupViewModel()
 
+        advanceUntilIdle()
         viewModel.updateBatteryLevel(100, 100)
+        advanceUntilIdle()
         assertEquals("100%", viewModel.uiState.value.batteryString)
     }
 
