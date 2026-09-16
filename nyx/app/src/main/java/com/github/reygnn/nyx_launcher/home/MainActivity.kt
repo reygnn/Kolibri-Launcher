@@ -514,6 +514,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     override fun onPause() {
         super.onPause()
+        // no suspension point — unregisterReceiver is a synchronous framework call.
         runCatching { unregisterReceiver(batteryReceiver) }
     }
 
@@ -1065,10 +1066,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 .take(4)
                 .mapNotNull { sc ->
                     val label = (sc.shortLabel ?: sc.longLabel)?.toString() ?: return@mapNotNull null
+                    // no suspension point — getShortcutIconDrawable is a synchronous IPC.
                     val icon = runCatching {
                         launcherApps.getShortcutIconDrawable(sc, resources.displayMetrics.densityDpi)
                     }.getOrNull()?.apply { setBounds(0, 0, sizePx, sizePx) }
                     ContextMenuItem(label, icon) {
+                        // no suspension point — the action runs on tap; startShortcut is synchronous.
                         runCatching { launcherApps.startShortcut(sc, null, null) }
                     }
                 }
@@ -1165,6 +1168,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setComponent(ComponentName(key.packageName, key.className))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // no suspension point — launchApp is synchronous (startActivity).
         runCatching { startActivity(intent) }
             .onFailure { if (it !is ActivityNotFoundException) throw it }
     }
@@ -1190,6 +1194,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
      * a programmer error and propagates.
      */
     private fun startActivitySafely(intent: Intent) {
+        // no suspension point — startActivitySafely is synchronous (startActivity).
         runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             .onFailure {
                 if (it !is ActivityNotFoundException && it !is SecurityException) throw it

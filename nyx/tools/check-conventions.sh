@@ -163,9 +163,14 @@ run_awk_list "$kol_tools/check-rule11-annotation.awk" \
 # ── Cancellation-rethrow discipline (positive list) ───────────────────────────
 # Opt-in, same growth model as kolibri: a file joins once its broad catches /
 # `runCatching` blocks are reviewed and each is either behind a
-# CancellationException arm or carries a `no suspension point` marker. Empty for
-# now; MainActivity (its runCatching sites) is the first review candidate.
+# CancellationException arm or carries a `no suspension point` marker.
+#   MainActivity — reviewed: the wallpaper bitmap loader's broad catch already
+#   sits behind a CancellationException arm; its five `runCatching` sites
+#   (unregisterReceiver, getShortcutIconDrawable, startShortcut, two startActivity)
+#   are all synchronous and carry `no suspension point` markers. Locks them
+#   against an invisible suspend-flip.
 cancel_files=(
+  "$app_root/com/github/reygnn/nyx_launcher/home/MainActivity.kt"
 )
 run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \
