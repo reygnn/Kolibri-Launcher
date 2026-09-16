@@ -56,6 +56,7 @@ class NyxBackupManagerTest {
     }
     private val preferences = mockk<PreferencesRepository>(relaxed = true) {
         every { monochromeIcons() } returns flowOf(true)
+        every { searchAutoLaunch() } returns flowOf(false)
         every { showAlarmFlow } returns flowOf(false)
         every { showCalendarEventFlow } returns flowOf(true)
     }
@@ -93,6 +94,7 @@ class NyxBackupManagerTest {
         assertThat(savedLayout.captured.grid.columns).isEqualTo(4)
         assertThat(savedLayout.captured.items).hasSize(1)
         coVerify { preferences.setMonochromeIcons(true) }
+        coVerify { preferences.setSearchAutoLaunch(false) }
         coVerify { preferences.setShowAlarm(false) }
         coVerify { preferences.setShowCalendarEvent(true) }
         coVerify { displaySettings.setWallpaperScrimAlpha(0.3f) }

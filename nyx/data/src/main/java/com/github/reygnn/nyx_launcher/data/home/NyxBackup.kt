@@ -43,6 +43,7 @@ data class NyxBackupOptions(
 @Serializable
 data class NyxBackupPrefs(
     val monochromeIcons: Boolean? = null,
+    val searchAutoLaunch: Boolean? = null,
     val showAlarm: Boolean? = null,
     val showCalendarEvent: Boolean? = null,
     val scrimAlpha: Float? = null,

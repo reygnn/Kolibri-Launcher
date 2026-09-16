@@ -1,6 +1,5 @@
 package com.github.reygnn.nyx_launcher.home.drawer
 
-import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -182,16 +181,20 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
      * flat filtered list. [allowAutoLaunch] gates the single-match auto-launch — it
      * is only true on a real keystroke (see [searchQueryChangeTracker]).
      */
-    private fun renderForQuery(query: String, allowAutoLaunch: Boolean) {
+    private suspend fun renderForQuery(query: String, allowAutoLaunch: Boolean) {
         val drawerAdapter = adapter ?: return
         if (query.isBlank()) {
             drawerAdapter.submit(viewModel.drawerContent.value)
             return
         }
+        // Read the setting fresh, and only when a genuine keystroke could auto-launch
+        // (allowAutoLaunch) — the VM exposes it as a suspend getter, not a hot flow, so
+        // there is no stale point-read.
+        val autoLaunch = allowAutoLaunch && viewModel.isSearchAutoLaunchEnabled()
         val result = DrawerAppSearch.filterAndDecide(
             allApps = viewModel.drawerApps.value,
             query = query,
-            isAutoLaunchEnabled = viewModel.searchAutoLaunch.value && allowAutoLaunch,
+            isAutoLaunchEnabled = autoLaunch,
         )
         when (result) {
             is DrawerSearchResult.ShowList ->

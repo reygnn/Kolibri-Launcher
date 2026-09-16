@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -58,7 +59,7 @@ class HomeViewModel @Inject constructor(
     private val removeItem: RemoveItemUseCase,
     private val renameFolderUseCase: RenameFolderUseCase,
     private val fitHomeGrid: FitHomeGridUseCase,
-    preferences: PreferencesRepository,
+    private val preferences: PreferencesRepository,
     getDrawerContent: GetDrawerContentUseCase,
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
@@ -71,9 +72,15 @@ class HomeViewModel @Inject constructor(
     val monochromeIcons: StateFlow<Boolean> = preferences.monochromeIcons()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /** User setting: auto-launch the single search match (DRAWER_FOLDERS_SPEC §10 D-3). */
-    val searchAutoLaunch: StateFlow<Boolean> = preferences.searchAutoLaunch()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /**
+     * User setting: auto-launch the single search match (DRAWER_FOLDERS_SPEC §10 D-3).
+     * Read fresh at decision time (mirrors kolibri's `isAutoLaunchEnabled`) rather than
+     * exposed as a `WhileSubscribed` StateFlow: the drawer only needs the value when it
+     * gates a keystroke, never continuously — and a hot flow read solely through `.value`
+     * has no collector, so its upstream never starts and `.value` would stay stuck on the
+     * seed (the stale hot-flow point-read anti-pattern).
+     */
+    suspend fun isSearchAutoLaunchEnabled(): Boolean = preferences.searchAutoLaunch().first()
 
     private val _searchQuery = MutableStateFlow("")
 
