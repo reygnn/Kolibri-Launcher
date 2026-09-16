@@ -261,9 +261,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         contextMenuCard.setOnClickListener { /* swallow */ }
         // Launcher3-style long-press: arm shows the menu; a move promotes to a drag.
         homeRoot.onArm = { payload, source -> showContextMenu(payload, source) }
-        homeRoot.onArmedPromote = {
+        homeRoot.onArmedPromote = { payload ->
             dismissContextMenu()
-            if (drawerOverlay.isOpen) hideDrawer()
+            // A drawer-app drag (NewApp) FOLDS within the drawer (§8), so keep the drawer
+            // open for the drop; any other drag targets home, so close it as before.
+            if (payload !is DragPayload.NewApp && drawerOverlay.isOpen) hideDrawer()
         }
         clockTime = findViewById(R.id.clock_time)
         clockDate = findViewById(R.id.clock_date)
@@ -573,6 +575,27 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }, DRAG_SETTLE_FALLBACK_MS)
         }
 
+        // 0) Drawer-fold zone (highest priority, active ONLY while the drawer is open):
+        // a drawer-app drag (NewApp) dropped onto another drawer app makes a folder, onto a
+        // folder adds a member (§8). Empty drawer space → no-op (the app stays put). When the
+        // drawer is closed the hit rect is empty, so home drags fall through to the zones below.
+        controller.addDropZone(object : DropZone {
+            override fun hitRect(out: Rect) {
+                if (drawerOverlay.isOpen) rectInDragLayer(drawerContainer, out) else out.setEmpty()
+            }
+            override fun accepts(payload: DragPayload) =
+                drawerOverlay.isOpen && payload is DragPayload.NewApp
+            override fun onDrop(payload: DragPayload, x: Int, y: Int) {
+                val source = (payload as? DragPayload.NewApp)?.key ?: return
+                when (val entry = drawerEntryAt(x, y)) {
+                    is DrawerEntry.App ->
+                        if (entry.app.key != source) viewModel.createDrawerFolder(source, entry.app.key)
+                    is DrawerEntry.Folder -> viewModel.addToDrawerFolder(source, entry.id)
+                    null -> Unit // dropped on empty drawer space — leave the app where it is
+                }
+            }
+        })
+
         // 1) Remove zone — the top strip, reaching y=0. Existing items only.
         controller.addDropZone(object : DropZone {
             override fun hitRect(out: Rect) = out.set(0, 0, homeRoot.width, removeBar.bottom)
@@ -632,6 +655,23 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     private fun rectInDragLayer(view: View, out: Rect) {
         out.set(0, 0, view.width, view.height)
         homeRoot.offsetDescendantRectToMyCoords(view, out)
+    }
+
+    /**
+     * The [DrawerEntry] under a drop point (in homeRoot coords) during a drawer-fold drag,
+     * or null if the finger is over empty drawer space. Resolves the drawer grid tile via
+     * the same homeRoot→child coordinate shift as [resolveGridDrop].
+     */
+    private fun drawerEntryAt(rootX: Int, rootY: Int): DrawerEntry? {
+        val list = findViewById<RecyclerView>(R.id.drawer_panel) ?: return null
+        val rootLoc = IntArray(2).also(homeRoot::getLocationOnScreen)
+        val listLoc = IntArray(2).also(list::getLocationOnScreen)
+        val localX = (rootX - (listLoc[0] - rootLoc[0])).toFloat()
+        val localY = (rootY - (listLoc[1] - rootLoc[1])).toFloat()
+        val child = list.findChildViewUnder(localX, localY) ?: return null
+        val pos = list.getChildAdapterPosition(child)
+        if (pos == RecyclerView.NO_POSITION) return null
+        return viewModel.drawerContent.value.getOrNull(pos)
     }
 
     private fun setupGestures() {
@@ -804,7 +844,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             scope = lifecycleScope,
             iconSizePx = gridIconPx,
             onLaunch = { key -> launchApp(key); folderOverlayController.close() },
-            onStartDrag = { _, _ -> }, // member extract-drag is 5d
+            // Extract: a drawer folder has no placement ("loose in the drawer" is implicit),
+            // so a member long-press just removes it — it reappears as a loose app via the
+            // projection, and the folder auto-dissolves below two members (DFOLD-INV-1).
+            onStartDrag = { _, key ->
+                viewModel.extractFromDrawerFolder(folder.id, key)
+                folderOverlayController.close()
+            },
         ).also { it.submit(folder.members) }
         folderOverlayController.open(
             initialTitle = folder.title,

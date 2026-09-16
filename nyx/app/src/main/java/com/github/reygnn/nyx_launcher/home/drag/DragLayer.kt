@@ -47,8 +47,11 @@ class DragLayer @JvmOverloads constructor(
 
     /** Called when a long-press arms: show the context menu for [payload] at [source]. */
     var onArm: ((payload: DragPayload, source: View) -> Unit)? = null
-    /** Called when an armed press promotes to a drag (dismiss the menu, hide the drawer). */
-    var onArmedPromote: (() -> Unit)? = null
+    /**
+     * Called when an armed press promotes to a drag (dismiss the menu; the host decides
+     * whether to hide the drawer based on [payload] — a drawer-app fold keeps it open).
+     */
+    var onArmedPromote: ((payload: DragPayload) -> Unit)? = null
 
     private var lastX = 0f
     private var lastY = 0f
@@ -147,7 +150,7 @@ class DragLayer @JvmOverloads constructor(
         val source = armedSource ?: return
         armedPayload = null
         armedSource = null
-        onArmedPromote?.invoke()
+        onArmedPromote?.invoke(payload)
         dragController.startDrag(payload, source, x, y)
     }
 
