@@ -53,6 +53,7 @@ import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
+import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerAdapter
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.showToastSafe
@@ -732,6 +733,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
      * The [DrawerEntry] under a drop point (in homeRoot coords) during a drawer-fold drag,
      * or null if the finger is over empty drawer space. Resolves the drawer grid tile via
      * the same homeRoot→child coordinate shift as [resolveGridDrop].
+     *
+     * Reads the entry from the ADAPTER (the list actually on screen), not from
+     * `drawerContent`: while a search is active the drawer shows the flat filtered list,
+     * which differs in length and order from the folder-view projection — indexing the
+     * wrong list would fold onto an unrelated app (silent membership corruption).
      */
     private fun drawerEntryAt(rootX: Int, rootY: Int): DrawerEntry? {
         val list = findViewById<RecyclerView>(R.id.drawer_panel) ?: return null
@@ -742,7 +748,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         val child = list.findChildViewUnder(localX, localY) ?: return null
         val pos = list.getChildAdapterPosition(child)
         if (pos == RecyclerView.NO_POSITION) return null
-        return viewModel.drawerContent.value.getOrNull(pos)
+        return (list.adapter as? AppDrawerAdapter)?.entryAt(pos)
     }
 
     private fun setupGestures() {

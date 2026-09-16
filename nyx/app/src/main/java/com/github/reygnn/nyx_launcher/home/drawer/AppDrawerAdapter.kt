@@ -41,6 +41,14 @@ class AppDrawerAdapter(
         notifyDataSetChanged()
     }
 
+    /**
+     * The entry currently shown at [position], or null if out of range. This is the
+     * list actually on screen — the folder view for a blank query, the flat filtered
+     * list during a search — so a drop's adapter position resolves against what the
+     * user sees, not a separate source flow.
+     */
+    fun entryAt(position: Int): DrawerEntry? = entries.getOrNull(position)
+
     override fun getItemCount(): Int = entries.size
 
     override fun getItemViewType(position: Int): Int = when (entries[position]) {
