@@ -8,6 +8,7 @@
 -->
 <com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/app_drawer_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -20,24 +21,35 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Drawer search: non-blank query flattens folders and filters the flat
-             app list (DRAWER_FOLDERS_SPEC §10 D-3); a blank query restores the
-             folder view. actionSearch IME so a single match can auto-launch. Top
-             system-bar inset applied in code. -->
-        <EditText
-            android:id="@+id/search_edit_text"
+        <!-- Drawer search (adopted from Kolibri): a Material TextInputLayout with a
+             clear_text end icon (the "X" to wipe the query). Light colors because the
+             drawer scrim is always dark, independent of the day/night theme. A non-blank
+             query flattens folders and filters the flat app list (DRAWER_FOLDERS_SPEC
+             §10 D-3); a blank query restores the folder view. Top system-bar inset applied
+             in code. -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/search_input_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
             android:hint="@string/drawer_search_hint"
-            android:inputType="text"
-            android:imeOptions="actionSearch"
-            android:maxLines="1"
-            android:textColor="@android:color/white"
             android:textColorHint="#80FFFFFF"
-            android:textSize="16sp"
-            android:autofillHints="" />
+            app:endIconMode="clear_text"
+            app:endIconTint="@android:color/white"
+            app:boxStrokeColor="@android:color/white"
+            app:hintTextColor="#80FFFFFF">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/search_edit_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:textColor="@android:color/white"
+                android:autofillHints="" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/drawer_panel"

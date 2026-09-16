@@ -105,13 +105,14 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         // shared via DrawerOverlayController.
         root.onDismissDrag = { host.hideDrawer() }
 
-        val search = view.findViewById<EditText>(R.id.search_edit_text).also { searchBox = it }
+        view.findViewById<EditText>(R.id.search_edit_text).also { searchBox = it }
+        val searchLayout = view.findViewById<View>(R.id.search_input_layout)
         val list = view.findViewById<RecyclerView>(R.id.drawer_panel).also { drawerList = it }
         // The drawer scrim (root) fills edge-to-edge behind the system bars; the
-        // search box clears the status bar (top inset) and the list clears the nav
+        // search field clears the status bar (top inset) and the list clears the nav
         // bar (bottom inset), each with a small base gap.
         val basePx = (16 * resources.displayMetrics.density).toInt()
-        ViewCompat.setOnApplyWindowInsetsListener(search) { v, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(searchLayout) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(top = bars.top + basePx)
             insets
@@ -136,7 +137,7 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         // Feed keystrokes into the ViewModel's query StateFlow; the collector below
         // debounces + renders. Text set programmatically (e.g. clear on hide) flows
         // through here too, which is fine — a blank query just restores folders.
-        search.doAfterTextChanged { viewModel.setSearchQuery(it?.toString().orEmpty()) }
+        searchBox?.doAfterTextChanged { viewModel.setSearchQuery(it?.toString().orEmpty()) }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {

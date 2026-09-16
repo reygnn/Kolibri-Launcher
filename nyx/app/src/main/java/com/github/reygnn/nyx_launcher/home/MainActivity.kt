@@ -319,13 +319,13 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             v.updatePadding(top = top)
             insets
         }
-        // Add-to-home bar: the bottom mirror of removeBar — its fill covers the
-        // nav-bar region while the label stays above it.
+        // Add-to-home bar: at the TOP, overlaying the drawer search field. Like removeBar,
+        // its fill covers the status-bar region while the label stays below the status icons.
         ViewCompat.setOnApplyWindowInsetsListener(addToHomeBar) { v, insets ->
-            val bottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+            val top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top
             val content = (DROP_BAR_CONTENT_DP * resources.displayMetrics.density).toInt()
-            v.updateLayoutParams { height = bottom + content }
-            v.updatePadding(bottom = bottom)
+            v.updateLayoutParams { height = top + content }
+            v.updatePadding(top = top)
             insets
         }
 
@@ -611,11 +611,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         }
 
         // Add-to-home zone — registered FIRST so it wins over the fold zone in its
-        // bottom strip. Active only while dragging a drawer app (NewApp) over the open
+        // top strip. Active only while dragging a drawer app (NewApp) over the open
         // drawer; a drop places the app at the first free cell and closes the drawer.
         controller.addDropZone(object : DropZone {
             override fun hitRect(out: Rect) {
-                if (drawerOverlay.isOpen) out.set(0, addToHomeBar.top, homeRoot.width, homeRoot.height)
+                if (drawerOverlay.isOpen) out.set(0, 0, homeRoot.width, addToHomeBar.bottom)
                 else out.setEmpty()
             }
             override fun accepts(payload: DragPayload) =
@@ -627,8 +627,8 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             }
         })
 
-        // 0) Drawer-fold zone (active ONLY while the drawer is open; sits just below the
-        //    add-to-home zone above, which claims the bottom strip):
+        // 0) Drawer-fold zone (active ONLY while the drawer is open; sits below the
+        //    add-to-home zone above, which claims the top strip):
         // a drawer-app drag (NewApp) dropped onto another drawer app makes a folder, onto a
         // folder adds a member (§8). Empty drawer space → no-op (the app stays put). When the
         // drawer is closed the hit rect is empty, so home drags fall through to the zones below.
