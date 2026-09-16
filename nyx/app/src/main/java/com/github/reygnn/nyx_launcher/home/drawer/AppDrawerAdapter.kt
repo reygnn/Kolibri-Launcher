@@ -72,6 +72,8 @@ class AppDrawerAdapter(
 
     private fun bindApp(holder: EntryHolder, app: LauncherApp) {
         holder.label.text = app.displayName
+        // App tile: TalkBack reads the label (the app name); no folder role/count.
+        holder.itemView.contentDescription = null
         holder.itemView.setOnClickListener { onAppClick(app) }
         holder.itemView.setOnLongClickListener { onAppLongPress(holder.itemView, app); true }
 
@@ -82,9 +84,16 @@ class AppDrawerAdapter(
     }
 
     private fun bindFolder(holder: EntryHolder, folder: DrawerEntry.Folder) {
-        holder.label.text = folder.title.ifBlank {
+        val title = folder.title.ifBlank {
             holder.itemView.context.getString(R.string.folder_default_title)
         }
+        holder.label.text = title
+        // The composed folder icon is decorative (contentDescription=@null), and the
+        // label alone reads identically to an app of the same name. Announce the role
+        // and member count so TalkBack distinguishes a folder from an app.
+        holder.itemView.contentDescription = holder.itemView.resources.getQuantityString(
+            R.plurals.drawer_folder_a11y, folder.members.size, title, folder.members.size,
+        )
         holder.itemView.setOnClickListener { onFolderClick(folder) }
         holder.itemView.setOnLongClickListener { false } // folder drag/reorder is v2 (§13)
 

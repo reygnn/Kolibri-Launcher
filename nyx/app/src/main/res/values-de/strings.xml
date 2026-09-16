@@ -2,6 +2,11 @@
 <resources>
     <string name="app_name">Nyx</string>
     <string name="folder_default_title">Ordner</string>
+    <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
+    <plurals name="drawer_folder_a11y">
+        <item quantity="one">%1$s, Ordner, %2$d App</item>
+        <item quantity="other">%1$s, Ordner, %2$d Apps</item>
+    </plurals>
     <string name="drawer_search_hint">Apps suchen</string>
     <string name="search_auto_launch_title">Auto-Start bei einem Treffer</string>
     <string name="search_auto_launch_summary">App sofort starten, wenn die Suche auf genau eine App eingrenzt</string>
