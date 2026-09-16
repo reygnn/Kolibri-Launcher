@@ -276,8 +276,9 @@ dependencies {
     // block in domain/build.gradle.kts. Brocken B.
     testImplementation(testFixtures(project(":kolibri:domain")))
     // Shared MainDispatcherRuleBase (base of the MainDispatcherRule subclass).
+    // androidTest deliberately omitted: its only MainDispatcherRule mention is a
+    // comment in INSTRUMENTED_TESTING_NOTES.kt (the rule deadlocks a real Main).
     testImplementation(testFixtures(project(":core")))
-    androidTestImplementation(testFixtures(project(":core")))
 
     // Shared test fixtures from :data (FakeDataStore). Unblocked
     // 2026-05-03 by setting `android.experimental.enableTestFixturesKotlinSupport=true`

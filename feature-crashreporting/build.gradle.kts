@@ -58,6 +58,7 @@ dependencies {
     // MainDispatcherRule to a shared :core testFixtures.
     testImplementation(testFixtures(project(":kolibri:domain")))
     testImplementation(testFixtures(project(":kolibri:data")))
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.turbine)
