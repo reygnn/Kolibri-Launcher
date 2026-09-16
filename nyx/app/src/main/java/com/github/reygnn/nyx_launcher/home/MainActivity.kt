@@ -557,15 +557,21 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         controller.clearDropZones()
 
         // The remove bar shows for the whole drag; the remove zone tints it on hover.
-        controller.onDragStart = { removeBar.visibility = View.VISIBLE }
+        // NOT for a drawer-internal fold drag (drawer open): the remove zone rejects
+        // NewApp, so the bar would be a misleading, non-functional affordance over the
+        // open drawer.
+        controller.onDragStart = { if (!drawerOverlay.isOpen) removeBar.visibility = View.VISIBLE }
         controller.onDragEnd = {
             removeBar.visibility = View.INVISIBLE
             removeBar.setBackgroundColor(REMOVE_BAR_IDLE_COLOR)
             cancelEdgeAdvance()
         }
         // Hold a drag at the left/right pager edge to page across grids (incl. the
-        // empty landing page), so an app can be carried to another page.
-        controller.onDragMove = { x, _ -> onDragEdge(x) }
+        // empty landing page), so an app can be carried to another page. Only for
+        // home-targeted drags: during a drawer-internal fold drag the drawer is open,
+        // and paging the hidden home grid behind it would silently leave home on the
+        // wrong page after the drawer is dismissed.
+        controller.onDragMove = { x, _ -> if (!drawerOverlay.isOpen) onDragEdge(x) }
         // The drag view is kept at the drop point until the commit's re-render
         // clears it (renderLayout). This fallback covers no-op drops (same cell)
         // and errors, where no re-render arrives.
