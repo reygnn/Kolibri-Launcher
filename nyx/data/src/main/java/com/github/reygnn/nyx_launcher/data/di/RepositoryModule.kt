@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.di
 
 import com.github.reygnn.nyx_launcher.data.home.DrawerFoldersRepositoryImpl
+import com.github.reygnn.nyx_launcher.data.home.UuidDrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
 import com.github.reygnn.nyx_launcher.data.home.InstalledAppsRepositoryImpl
@@ -11,6 +12,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
@@ -39,6 +41,9 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDrawerFoldersRepository(impl: DrawerFoldersRepositoryImpl): DrawerFoldersRepository
+
+    @Binds
+    abstract fun bindDrawerFolderIdFactory(impl: UuidDrawerFolderIdFactory): DrawerFolderIdFactory
 
     @Binds
     abstract fun bindLayoutSerializer(impl: HomeLayoutSerializer): LayoutSerializer

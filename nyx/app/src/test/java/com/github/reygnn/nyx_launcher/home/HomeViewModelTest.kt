@@ -2,13 +2,19 @@ package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.CellPos
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
+import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ObserveHomeLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.PlaceItemUseCase
@@ -55,6 +61,12 @@ class HomeViewModelTest {
         every { monochromeIcons() } returns flowOf(false)
     }
 
+    // Real fake repo + projection use case + a deterministic id stub, so the drawer-folder
+    // mutation methods can be asserted against the resulting membership state.
+    private val drawerFolders = FakeDrawerFoldersRepository()
+    private val getDrawerContent = GetDrawerContentUseCase(drawerFolders)
+    private val drawerFolderIdFactory = DrawerFolderIdFactory { DrawerFolderId("new-folder") }
+
     /** Build the VM after [getDrawerApps] is stubbed (init calls refreshDrawer). */
     private fun createViewModel(): HomeViewModel {
         every { observeHomeLayout() } returns emptyFlow()
@@ -68,6 +80,9 @@ class HomeViewModelTest {
             renameFolder,
             fitHomeGrid,
             preferences,
+            getDrawerContent,
+            drawerFolders,
+            drawerFolderIdFactory,
             mainDispatcherRule.dispatcher,
         )
     }
@@ -180,6 +195,52 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             coVerify { fitHomeGrid(GridSpec(columns = 5, rows = 7)) }
+        }
+
+    @Test
+    fun create_drawer_folder_forwards_creating_a_folder_from_target_then_source() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+
+            viewModel.createDrawerFolder(source = APP_A.key, target = APP_B.key)
+            advanceUntilIdle()
+
+            val folder = drawerFolders.current.folders.single()
+            assertThat(folder.id).isEqualTo(DrawerFolderId("new-folder"))
+            assertThat(folder.members).containsExactly(APP_B.key, APP_A.key).inOrder()
+        }
+
+    @Test
+    fun add_to_drawer_folder_forwards_adding_the_source_as_a_member() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            drawerFolders.update {
+                DrawerFolders(listOf(DrawerFolder(DrawerFolderId("f1"), "", listOf(APP_B.key, SLOW.key))))
+            }
+
+            viewModel.addToDrawerFolder(source = APP_A.key, folderId = DrawerFolderId("f1"))
+            advanceUntilIdle()
+
+            assertThat(drawerFolders.current.folders.single().members)
+                .containsExactly(APP_B.key, SLOW.key, APP_A.key).inOrder()
+        }
+
+    @Test
+    fun extract_from_drawer_folder_forwards_shrinking_the_folder() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            drawerFolders.update {
+                DrawerFolders(listOf(DrawerFolder(DrawerFolderId("f1"), "", listOf(APP_A.key, APP_B.key, SLOW.key))))
+            }
+
+            viewModel.extractFromDrawerFolder(DrawerFolderId("f1"), member = APP_B.key)
+            advanceUntilIdle()
+
+            assertThat(drawerFolders.current.folders.single().members)
+                .containsExactly(APP_A.key, SLOW.key).inOrder()
         }
 
     private companion object {

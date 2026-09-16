@@ -4,14 +4,21 @@ import androidx.lifecycle.viewModelScope
 import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.MainDispatcher
+import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
+import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.transition.DrawerFoldersTransition
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
+import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ObserveHomeLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.PlaceItemUseCase
@@ -30,9 +37,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Home + drawer state holder. [layout] and [drawerApps] are lifecycle-aware
- * StateFlows. Mutations run through the pure transitions + save; the layout flow
- * re-emits on success, so the UI re-renders itself.
+ * Home + drawer state holder. [layout], [drawerApps] and [drawerContent] are
+ * lifecycle-aware StateFlows. Mutations run through the pure transitions + save;
+ * the source flows re-emit on success, so the UI re-renders itself.
  *
  * Extends the shared [BaseViewModel] (:common-ui) purely for its coroutine
  * crash-safety: the fire-and-forget edit dispatches go through [launchSafe], so a
@@ -52,6 +59,9 @@ class HomeViewModel @Inject constructor(
     private val renameFolderUseCase: RenameFolderUseCase,
     private val fitHomeGrid: FitHomeGridUseCase,
     preferences: PreferencesRepository,
+    getDrawerContent: GetDrawerContentUseCase,
+    private val drawerFoldersRepository: DrawerFoldersRepository,
+    private val drawerFolderIdFactory: DrawerFolderIdFactory,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
@@ -63,6 +73,15 @@ class HomeViewModel @Inject constructor(
 
     private val _drawerApps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val drawerApps: StateFlow<List<LauncherApp>> = _drawerApps.asStateFlow()
+
+    /**
+     * The drawer's rendered content (DRAWER_FOLDERS_SPEC §5): the live apps projected
+     * through the persisted folder membership — a pinned folder block, then the loose
+     * apps. Re-emits when the apps refresh ([refreshDrawer]) or the membership changes.
+     */
+    val drawerContent: StateFlow<List<DrawerEntry>> =
+        getDrawerContent(drawerApps)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private var refreshJob: Job? = null
 
@@ -108,6 +127,35 @@ class HomeViewModel @Inject constructor(
 
     fun renameFolder(folder: ItemId, title: String) {
         launchSafe { renameFolderUseCase(folder, title) }
+    }
+
+    // ---- drawer folders (DRAWER_FOLDERS_SPEC §8) ----
+
+    /** Drop the loose app [source] onto [target] → create a drawer folder from the two. */
+    fun createDrawerFolder(source: ComponentKey, target: ComponentKey) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.drop(it, source, DrawerDropTarget.OntoApp(target), drawerFolderIdFactory::next)
+            }
+        }
+    }
+
+    /** Drop the loose app [source] onto the drawer folder [folderId] → add it as a member. */
+    fun addToDrawerFolder(source: ComponentKey, folderId: DrawerFolderId) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.drop(it, source, DrawerDropTarget.OntoFolder(folderId), drawerFolderIdFactory::next)
+            }
+        }
+    }
+
+    /** Extract [member] from the opened drawer folder [folderId] (shrink, or dissolve below two). */
+    fun extractFromDrawerFolder(folderId: DrawerFolderId, member: ComponentKey) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.extract(it, folderId, member)
+            }
+        }
     }
 
     /**
