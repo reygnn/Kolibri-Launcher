@@ -1,10 +1,10 @@
-package com.github.reygnn.kolibri_launcher.ui.appdrawer
+package com.github.reygnn.launcher.common.ui
 
 /**
  * PURE LOGIC — tells a genuine user keystroke apart from a `StateFlow` replay.
  *
- * The app-drawer search query is a `StateFlow`, and a `StateFlow` replays its
- * current value to every new collector. Because the drawer collects it inside
+ * An app-drawer search query is a `StateFlow`, and a `StateFlow` replays its
+ * current value to every new collector. Because a drawer collects it inside
  * `repeatOnLifecycle(STARTED)`, the collector re-subscribes on every STARTED
  * transition — returning from the App Info screen, rotation, process restore —
  * so the *current* query is re-delivered without the user typing anything.
@@ -15,9 +15,9 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
  * user never tapped. Only a value that actually differs from the previously
  * seen one counts as a real keystroke.
  *
- * Extracted from [AppDrawerFragment] so the decision is JVM-testable
- * (CLAUDE.md Rule 10). The fragment owns one instance and feeds every
- * `appDrawerSearchQuery` emission through [onQueryEmitted].
+ * Shared by the Kolibri and Nyx app-drawer search fragments so the decision lives
+ * once and stays JVM-testable (CLAUDE.md Rule 10). A fragment owns one instance
+ * and feeds every search-query emission through [onQueryEmitted].
  */
 class SearchQueryChangeTracker {
 

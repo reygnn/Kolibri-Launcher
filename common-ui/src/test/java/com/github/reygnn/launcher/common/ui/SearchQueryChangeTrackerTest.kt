@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.appdrawer
+package com.github.reygnn.launcher.common.ui
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
