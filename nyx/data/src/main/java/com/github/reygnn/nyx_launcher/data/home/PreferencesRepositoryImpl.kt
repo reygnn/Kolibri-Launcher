@@ -21,6 +21,13 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[MONOCHROME] = enabled }
     }
 
+    override fun searchAutoLaunch(): Flow<Boolean> =
+        dataStore.data.map { it[SEARCH_AUTO_LAUNCH] ?: false }
+
+    override suspend fun setSearchAutoLaunch(enabled: Boolean) {
+        dataStore.edit { it[SEARCH_AUTO_LAUNCH] = enabled }
+    }
+
     override val showAlarmFlow: Flow<Boolean> =
         dataStore.data.map { it[SHOW_ALARM] ?: false }
 
@@ -37,6 +44,7 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     private companion object {
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
+        val SEARCH_AUTO_LAUNCH = booleanPreferencesKey("search_auto_launch")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }

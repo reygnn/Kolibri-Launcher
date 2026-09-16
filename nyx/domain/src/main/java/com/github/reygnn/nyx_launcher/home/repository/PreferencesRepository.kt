@@ -13,6 +13,14 @@ interface PreferencesRepository : TimeInfoSettings {
     fun monochromeIcons(): Flow<Boolean>
     suspend fun setMonochromeIcons(enabled: Boolean)
 
+    /**
+     * When enabled, a drawer search that narrows to exactly one app launches it
+     * immediately (DRAWER_FOLDERS_SPEC §10 D-3, mirrors kolibri's auto-launch).
+     * Defaults to off.
+     */
+    fun searchAutoLaunch(): Flow<Boolean>
+    suspend fun setSearchAutoLaunch(enabled: Boolean)
+
     // TimeInfoSettings: showAlarmFlow, showCalendarEventFlow (read side).
     suspend fun setShowAlarm(enabled: Boolean)
     suspend fun setShowCalendarEvent(enabled: Boolean)

@@ -55,6 +55,31 @@ abstract class PreferencesRepositoryContract {
         }
     }
 
+    // --- search auto-launch flag ---
+
+    @Test
+    fun search_auto_launch_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().searchAutoLaunch().first()).isFalse()
+    }
+
+    @Test
+    fun setting_search_auto_launch_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.setSearchAutoLaunch(true)
+        assertThat(repo.searchAutoLaunch().first()).isTrue()
+    }
+
+    @Test
+    fun search_auto_launch_flow_emits_the_new_value_on_change() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.searchAutoLaunch().test {
+            assertThat(awaitItem()).isFalse() // initial
+            repo.setSearchAutoLaunch(true)
+            assertThat(awaitItem()).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // --- home-info flags (TimeInfoSettings port) ---
 
     @Test

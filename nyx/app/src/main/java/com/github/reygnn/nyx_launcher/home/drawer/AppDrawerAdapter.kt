@@ -13,6 +13,7 @@ import com.github.reygnn.nyx_launcher.home.loadIconGated
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.model.displayName
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -62,7 +63,7 @@ class AppDrawerAdapter(
     }
 
     private fun bindApp(holder: EntryHolder, app: LauncherApp) {
-        holder.label.text = app.customName ?: app.label
+        holder.label.text = app.displayName
         holder.itemView.setOnClickListener { onAppClick(app) }
         holder.itemView.setOnLongClickListener { onAppLongPress(holder.itemView, app); true }
 

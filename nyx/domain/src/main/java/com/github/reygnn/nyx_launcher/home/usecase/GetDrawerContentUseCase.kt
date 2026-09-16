@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.home.usecase
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -59,7 +60,7 @@ internal fun projectDrawerContent(
 
     val appEntries = apps
         .filterNot { it.key in memberKeys }
-        .sortedBy { (it.customName ?: it.label).lowercase() }
+        .sortedBy { it.displayName.lowercase() }
         .map { DrawerEntry.App(it) }
 
     return folderEntries + appEntries

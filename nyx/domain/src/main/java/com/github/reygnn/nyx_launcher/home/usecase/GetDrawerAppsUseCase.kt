@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.home.usecase
 import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -21,7 +22,7 @@ class GetDrawerAppsUseCase @Inject constructor(
     suspend operator fun invoke(): List<LauncherApp> = withContext(dispatcher) {
         when (val result = repository.loadInstalledApps()) {
             is AppLoadResult.Loaded ->
-                result.apps.sortedBy { (it.customName ?: it.label).lowercase() }
+                result.apps.sortedBy { it.displayName.lowercase() }
             is AppLoadResult.Error -> emptyList()
         }
     }

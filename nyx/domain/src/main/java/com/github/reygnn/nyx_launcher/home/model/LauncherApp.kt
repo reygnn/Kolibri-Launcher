@@ -14,3 +14,6 @@ data class LauncherApp(
     val label: String,
     val customName: String? = null,
 )
+
+/** The name shown to the user: the custom override if set, else the system label. */
+val LauncherApp.displayName: String get() = customName ?: label
