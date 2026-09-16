@@ -963,18 +963,16 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         currentMembers: List<ComponentKey>,
         onAdded: (List<ComponentKey>) -> Unit,
     ) {
-        val addable = viewModel.drawerVendorGroups()
-            .map { group -> group.label to group.keys.filter { it !in currentMembers } }
-            .filter { it.second.isNotEmpty() }
+        val addable = viewModel.addableVendorGroups(currentMembers.toSet())
         if (addable.isEmpty()) {
             showToastSafe(R.string.folder_add_by_maker_none)
             return
         }
-        val labels = addable.map { (label, keys) -> "$label (${keys.size})" }.toTypedArray()
+        val labels = addable.map { "${it.label} (${it.keys.size})" }.toTypedArray()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.folder_add_by_maker)
             .setItems(labels) { _, index ->
-                val keys = addable[index].second
+                val keys = addable[index].keys
                 viewModel.addAllToDrawerFolder(folderId, keys)
                 onAdded(keys)
             }

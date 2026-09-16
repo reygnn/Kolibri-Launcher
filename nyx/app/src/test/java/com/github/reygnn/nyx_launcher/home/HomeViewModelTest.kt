@@ -259,6 +259,54 @@ class HomeViewModelTest {
             assertThat(drawerFolders.current.folders.single().title).isEqualTo("Work")
         }
 
+    @Test
+    fun add_all_to_drawer_folder_forwards_bulk_membership() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            drawerFolders.update {
+                DrawerFolders(listOf(DrawerFolder(DrawerFolderId("f1"), "", listOf(APP_A.key, APP_B.key))))
+            }
+
+            viewModel.addAllToDrawerFolder(DrawerFolderId("f1"), listOf(SLOW.key))
+            advanceUntilIdle()
+
+            assertThat(drawerFolders.current.folders.single().members)
+                .containsExactly(APP_A.key, APP_B.key, SLOW.key).inOrder()
+        }
+
+    @Test
+    fun drawer_vendor_groups_group_the_flat_app_list_by_maker() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns listOf(
+                LauncherApp(ComponentKey("com.google.a", "com.google.a.M"), "GA"),
+                LauncherApp(ComponentKey("com.google.b", "com.google.b.M"), "GB"),
+                LauncherApp(ComponentKey("com.other", "com.other.M"), "O"), // single → dropped
+            )
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertThat(viewModel.drawerVendorGroups().map { it.label }).containsExactly("Google")
+        }
+
+    @Test
+    fun addable_vendor_groups_exclude_current_members_and_drop_emptied_groups() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val g1 = ComponentKey("com.google.a", "com.google.a.M")
+            val g2 = ComponentKey("com.google.b", "com.google.b.M")
+            coEvery { getDrawerApps() } returns listOf(LauncherApp(g1, "GA"), LauncherApp(g2, "GB"))
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // g1 already in the folder → only g2 remains addable.
+            val addable = viewModel.addableVendorGroups(setOf(g1))
+            assertThat(addable.single().label).isEqualTo("Google")
+            assertThat(addable.single().keys).containsExactly(g2)
+
+            // Every app already a member → the group drops out entirely.
+            assertThat(viewModel.addableVendorGroups(setOf(g1, g2))).isEmpty()
+        }
+
     private companion object {
         val KEY = ComponentKey("pa", "pa.Main")
         val APP_A = LauncherApp(KEY, label = "A")

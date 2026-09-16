@@ -10,7 +10,11 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
+import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
@@ -73,8 +77,10 @@ class NyxBackupManagerTest {
     }
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
 
+    private val drawerFoldersRepository = FakeDrawerFoldersRepository()
+
     private val manager = NyxBackupManager(
-        homeLayoutRepository, preferences, displaySettings, wallpaperRepository,
+        homeLayoutRepository, drawerFoldersRepository, preferences, displaySettings, wallpaperRepository,
         fabPositionStore, fileManager, NyxBackupSerializer(), mainDispatcherRule.dispatcher,
     )
 
@@ -101,6 +107,33 @@ class NyxBackupManagerTest {
         coVerify { displaySettings.setWallpaperBackdrop(WallpaperBackdrop.BLACK) }
         coVerify { displaySettings.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK) }
         coVerify { fabPositionStore.saveFabPosition(FabPosition(0.8f, 0.7f)) }
+    }
+
+    @Test
+    fun export_then_import_restores_drawer_folders() = runTest(mainDispatcherRule.dispatcher) {
+        drawerFoldersRepository.update {
+            DrawerFolders(
+                listOf(
+                    DrawerFolder(
+                        DrawerFolderId("f1"), "Work",
+                        listOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")),
+                    ),
+                ),
+            )
+        }
+        val out = ByteArrayOutputStream()
+        assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
+
+        // Wipe, then import must bring the folder back (separate DataStore blob, D-5).
+        drawerFoldersRepository.update { DrawerFolders.EMPTY }
+        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        val folders = drawerFoldersRepository.current.folders
+        assertThat(folders).hasSize(1)
+        assertThat(folders.single().title).isEqualTo("Work")
+        assertThat(folders.single().members)
+            .containsExactly(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")).inOrder()
     }
 
     @Test

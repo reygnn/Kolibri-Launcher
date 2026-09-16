@@ -182,6 +182,16 @@ class HomeViewModel @Inject constructor(
     fun drawerVendorGroups(): List<DrawerVendorGrouping.VendorGroup> =
         DrawerVendorGrouping.groups(drawerApps.value)
 
+    /**
+     * Vendor groups reduced to the apps NOT already in [exclude] (the open folder's current
+     * members), dropping any group left with none. This is the selection the "add by maker"
+     * dialog offers — kept here (not in the Activity) so the filter is JVM-testable (Rule 10).
+     */
+    fun addableVendorGroups(exclude: Set<ComponentKey>): List<DrawerVendorGrouping.VendorGroup> =
+        drawerVendorGroups().mapNotNull { group ->
+            group.keys.filterNot { it in exclude }.takeIf { it.isNotEmpty() }?.let { group.copy(keys = it) }
+        }
+
     /** Bulk-add every app in [keys] to the drawer folder [folderId] (pulls them from any other folder). */
     fun addAllToDrawerFolder(folderId: DrawerFolderId, keys: List<ComponentKey>) {
         launchSafe {

@@ -67,6 +67,11 @@ class FolderOverlayController(
     private fun detach() {
         onClose = null
         members.adapter = null
+        // Clear the add-apps lambda too: for a drawer folder it captures the just-closed
+        // folder's member adapter, so leaving it wired would defeat the adapter null-out
+        // above (the button would keep the adapter reachable until the next open()).
+        addAppsButton.setOnClickListener(null)
+        addAppsButton.isVisible = false
         overlay.isVisible = false
     }
 }

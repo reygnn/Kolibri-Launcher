@@ -23,6 +23,12 @@ data class NyxBackup(
     /** DataStore-backed preferences (null = not included). */
     val prefs: NyxBackupPrefs? = null,
     /**
+     * Drawer-folder membership (null = not included, e.g. an older backup). Persisted in
+     * its own DataStore blob (separate from [layout], D-5), so it must be carried here
+     * explicitly or it is lost on restore. Restored under the layout import toggle.
+     */
+    val drawerFolders: DrawerFoldersDto? = null,
+    /**
      * Wallpaper layers with per-layer transforms. Each [WallpaperLayerBackup.imageFileName]
      * points at a blob inside the ZIP's `wallpapers/` dir (restored to internal storage).
      */
