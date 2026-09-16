@@ -40,9 +40,12 @@ rethrow, Exception breadth — empty for now, grow as files are reviewed; the
 Deliberately **skipped** (Kolibri-specific — would only mis-fire on Nyx), with
 the reason encoded in the orchestrator header:
 
-- **`Manager`-naming in `data/`** — Nyx uses `*Manager` names on purpose
-  (`NyxBackupManager`, `NyxResetManager`, `WallpaperFileManager`). This is the
+- **`Manager`-naming in `data/`** — Nyx uses `*Manager` names on purpose for its
+  own `nyx/data/` classes (`NyxBackupManager`, `NyxResetManager`). This is the
   one naming delta from Kolibri; don't "fix" it to `*RepositoryImpl`.
+  (`WallpaperFileManager` also carries the name but lives in the shared
+  `:common-data`, not `nyx/data/`, and Kolibri already exempts it as a
+  file-helper — so it is neither Nyx-owned nor in this detector's scope.)
 - **`purgeRepository()` completeness** — Nyx has no `purgeRepository()`.
 - **Settings-store keep-list (`OwnsSettingsStoreKeys` / `@IntoSet`)** — hangs on
   Kolibri's storage-cleanup feature, which Nyx does not have.
