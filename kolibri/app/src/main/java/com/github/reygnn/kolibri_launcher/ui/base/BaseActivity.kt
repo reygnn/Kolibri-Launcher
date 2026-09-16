@@ -13,6 +13,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.common.ui.ErrorData
 import com.github.reygnn.launcher.common.ui.ErrorEventBus
 import com.github.reygnn.launcher.common.ui.Event
+import com.github.reygnn.launcher.common.ui.base.BaseViewModelInterface
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler

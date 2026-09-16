@@ -36,6 +36,9 @@ android {
 dependencies {
     api(project(":core"))
     implementation(libs.androidx.fragment.ktx)
+    // lifecycle-viewmodel-ktx: BaseViewModel (ui.base) extends androidx ViewModel
+    // and uses viewModelScope. Explicit rather than leaning on a transitive.
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     // appcompat: ZoomableImageView extends AppCompatImageView. material is NOT
     // pulled here (the FAB/edit-toolbar Views stay in kolibri); the

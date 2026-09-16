@@ -6,7 +6,7 @@ import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException

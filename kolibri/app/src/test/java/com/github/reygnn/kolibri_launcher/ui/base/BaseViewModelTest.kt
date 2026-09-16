@@ -4,6 +4,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

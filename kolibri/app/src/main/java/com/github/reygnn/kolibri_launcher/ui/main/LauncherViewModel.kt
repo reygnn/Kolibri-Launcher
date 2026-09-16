@@ -75,7 +75,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.ui.main.delegate.AppManagementDelegate

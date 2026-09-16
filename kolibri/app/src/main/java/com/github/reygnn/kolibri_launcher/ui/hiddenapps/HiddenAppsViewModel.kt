@@ -11,7 +11,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.filterByName
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingUiState
 import dagger.hilt.android.lifecycle.HiltViewModel

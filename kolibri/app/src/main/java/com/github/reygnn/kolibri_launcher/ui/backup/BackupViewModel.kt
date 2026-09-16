@@ -9,7 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.PreviewBackupUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher

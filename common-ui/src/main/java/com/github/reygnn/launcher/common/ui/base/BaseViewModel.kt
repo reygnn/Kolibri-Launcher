@@ -1,7 +1,8 @@
-package com.github.reygnn.kolibri_launcher.ui.base
+package com.github.reygnn.launcher.common.ui.base
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -11,12 +12,17 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 /**
  * Base ViewModel with coroutine-boundary exception handling.
  *
- * Catches at real boundaries only (per CLAUDE.md Rule 11):
+ * Product-neutral: lives in :common-ui and is shared by both launchers.
+ * Depends only on the shared :core logging façade ([TimberWrapper] /
+ * [KolibriLog]) and coroutines — no app-specific types. Diagnostics go
+ * through [KolibriLog] (not `timber.log.Timber` directly), the same
+ * convention :domain follows, so this module stays free of the Timber AAR.
+ *
+ * Catches at real boundaries only (per Kolibri CLAUDE.md Rule 11):
  * - `launchSafe` and `executeSafe` wrap caller-supplied blocks (EXTERNAL).
  * - `sendEvent` wraps `Channel.send` (suspend boundary).
  * - `coroutineExceptionHandler` is the last-resort backstop for coroutines
@@ -135,7 +141,7 @@ abstract class BaseViewModel<E>(
                 TimberWrapper.reportToAcra(throwable, "[$context] STACK OVERFLOW - Critical!")
             }
             is CancellationException -> {
-                Timber.d("[$context] Coroutine cancelled (normal)")
+                KolibriLog.d("[$context] Coroutine cancelled (normal)")
             }
             else -> {
                 TimberWrapper.reportToAcra(throwable, "[$context] Error in ViewModel")
@@ -180,6 +186,6 @@ abstract class BaseViewModel<E>(
 
     override fun onCleared() {
         super.onCleared()
-        Timber.d("${this::class.simpleName} cleared")
+        KolibriLog.d("${this::class.simpleName} cleared")
     }
 }

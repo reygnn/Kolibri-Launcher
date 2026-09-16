@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.base
+package com.github.reygnn.launcher.common.ui.base
 
 import kotlinx.coroutines.flow.Flow
 

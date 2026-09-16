@@ -10,7 +10,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException

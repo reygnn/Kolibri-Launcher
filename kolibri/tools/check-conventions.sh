@@ -251,7 +251,7 @@ cancel_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/PackageUpdateReceiver.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/DataStoreMaintenanceRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseActivity.kt"
-  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseViewModel.kt"
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseViewModel.kt" # extracted to :common-ui (shared with nyx); broad catches keep their CancellationException-first arms + no-suspension-point marker
   "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/timeinfo/ClockDelegate.kt" # shared to :common-ui (HIE Phase B); two non-suspend battery catches keep their markers
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/WallpaperDelegate.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/backup/BackupFragment.kt"

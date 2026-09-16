@@ -68,6 +68,7 @@ class HomeViewModelTest {
             renameFolder,
             fitHomeGrid,
             preferences,
+            mainDispatcherRule.dispatcher,
         )
     }
 

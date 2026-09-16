@@ -26,7 +26,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUs
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.MarkOnboardingCompletedUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

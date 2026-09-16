@@ -1,8 +1,9 @@
 package com.github.reygnn.nyx_launcher.home
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
@@ -18,6 +19,7 @@ import com.github.reygnn.nyx_launcher.home.usecase.RemoveFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RenameFolderUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,6 +33,13 @@ import javax.inject.Inject
  * Home + drawer state holder. [layout] and [drawerApps] are lifecycle-aware
  * StateFlows. Mutations run through the pure transitions + save; the layout flow
  * re-emits on success, so the UI re-renders itself.
+ *
+ * Extends the shared [BaseViewModel] (:common-ui) purely for its coroutine
+ * crash-safety: the fire-and-forget edit dispatches go through [launchSafe], so a
+ * throwing use case is reported instead of escaping to the global handler and
+ * crashing the HOME activity. The event type is [Nothing] — this ViewModel emits
+ * no one-shot UI events (all state is exposed as StateFlow), so the base's event
+ * channel is never used.
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -43,7 +52,8 @@ class HomeViewModel @Inject constructor(
     private val renameFolderUseCase: RenameFolderUseCase,
     private val fitHomeGrid: FitHomeGridUseCase,
     preferences: PreferencesRepository,
-) : ViewModel() {
+    @MainDispatcher mainDispatcher: CoroutineDispatcher,
+) : BaseViewModel<Nothing>(mainDispatcher) {
 
     val layout: StateFlow<HomeLayout?> = observeHomeLayout()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -81,23 +91,23 @@ class HomeViewModel @Inject constructor(
     }
 
     fun move(moving: ItemId, target: DropTarget) {
-        viewModelScope.launch { moveItem(moving, target) }
+        launchSafe { moveItem(moving, target) }
     }
 
     fun place(app: ComponentKey, target: DropTarget) {
-        viewModelScope.launch { placeItem(app, target) }
+        launchSafe { placeItem(app, target) }
     }
 
     fun extractFromFolder(folder: ItemId, member: ComponentKey, target: DropTarget) {
-        viewModelScope.launch { removeFromFolder(folder, member, target) }
+        launchSafe { removeFromFolder(folder, member, target) }
     }
 
     fun remove(id: ItemId) {
-        viewModelScope.launch { removeItem(id) }
+        launchSafe { removeItem(id) }
     }
 
     fun renameFolder(folder: ItemId, title: String) {
-        viewModelScope.launch { renameFolderUseCase(folder, title) }
+        launchSafe { renameFolderUseCase(folder, title) }
     }
 
     /**
@@ -106,6 +116,6 @@ class HomeViewModel @Inject constructor(
      * MainActivity layout, so a new device or an orientation change is absorbed.
      */
     fun applyDeviceGrid(columns: Int, rows: Int) {
-        viewModelScope.launch { fitHomeGrid(GridSpec(columns, rows)) }
+        launchSafe { fitHomeGrid(GridSpec(columns, rows)) }
     }
 }

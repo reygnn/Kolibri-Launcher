@@ -5,7 +5,7 @@ import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportUsageToFileUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportUsageFromFileUseCase
-import com.github.reygnn.kolibri_launcher.ui.base.BaseViewModel
+import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
