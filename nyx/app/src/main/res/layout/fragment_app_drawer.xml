@@ -15,11 +15,38 @@
     android:clickable="true"
     android:focusable="true">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/drawer_panel"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clipToPadding="false" />
+        android:orientation="vertical">
+
+        <!-- Drawer search: non-blank query flattens folders and filters the flat
+             app list (DRAWER_FOLDERS_SPEC §10 D-3); a blank query restores the
+             folder view. actionSearch IME so a single match can auto-launch. Top
+             system-bar inset applied in code. -->
+        <EditText
+            android:id="@+id/search_edit_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:hint="@string/drawer_search_hint"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:maxLines="1"
+            android:textColor="@android:color/white"
+            android:textColorHint="#80FFFFFF"
+            android:textSize="16sp"
+            android:autofillHints="" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/drawer_panel"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false" />
         <!-- top/bottom padding = system-bar insets + base, applied in code -->
+
+    </LinearLayout>
 
 </com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout>

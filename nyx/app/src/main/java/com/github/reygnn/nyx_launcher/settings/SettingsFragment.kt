@@ -53,6 +53,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
+    private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
     private var calendarSwitch: SwitchPreferenceCompat? = null
     private var alarmSwitch: SwitchPreferenceCompat? = null
 
@@ -92,6 +93,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
             isPersistent = false // DataStore is the source of truth, not SharedPreferences
             setOnPreferenceChangeListener { _, newValue ->
                 lifecycleScope.launch { preferences.setMonochromeIcons(newValue as Boolean) }
+                true
+            }
+        }
+
+        searchAutoLaunchSwitch = findPreference<SwitchPreferenceCompat>("search_auto_launch")?.apply {
+            isPersistent = false
+            setOnPreferenceChangeListener { _, newValue ->
+                lifecycleScope.launch { preferences.setSearchAutoLaunch(newValue as Boolean) }
                 true
             }
         }
@@ -156,6 +165,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 launch {
                     preferences.monochromeIcons().collect { enabled ->
                         if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                    }
+                }
+                launch {
+                    preferences.searchAutoLaunch().collect { enabled ->
+                        if (searchAutoLaunchSwitch?.isChecked != enabled) searchAutoLaunchSwitch?.isChecked = enabled
                     }
                 }
                 launch {

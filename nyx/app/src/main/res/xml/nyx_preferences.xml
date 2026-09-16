@@ -15,6 +15,18 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:title="@string/category_drawer_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="search_auto_launch"
+            android:title="@string/search_auto_launch_title"
+            android:summary="@string/search_auto_launch_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/category_wallpaper_title"
         app:iconSpaceReserved="false">
 

@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">Nyx</string>
     <string name="folder_default_title">Folder</string>
+    <string name="drawer_search_hint">Search apps</string>
+    <string name="search_auto_launch_title">Auto-launch on single match</string>
+    <string name="search_auto_launch_summary">Launch the app immediately when the search narrows to exactly one</string>
     <string name="remove_from_home">Remove from home</string>
     <string name="settings_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons">Monochrome icons</string>
@@ -32,6 +35,7 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="category_display_title">Display</string>
+    <string name="category_drawer_title">App drawer</string>
     <string name="category_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons_summary">Render app icons in monochrome</string>
     <string name="category_homeinfo_title">Home info</string>

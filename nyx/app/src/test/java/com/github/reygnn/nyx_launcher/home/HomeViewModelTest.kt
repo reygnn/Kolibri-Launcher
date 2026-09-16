@@ -59,6 +59,7 @@ class HomeViewModelTest {
     private val fitHomeGrid = mockk<FitHomeGridUseCase>(relaxed = true)
     private val preferences = mockk<PreferencesRepository> {
         every { monochromeIcons() } returns flowOf(false)
+        every { searchAutoLaunch() } returns flowOf(false)
     }
 
     // Real fake repo + projection use case + a deterministic id stub, so the drawer-folder

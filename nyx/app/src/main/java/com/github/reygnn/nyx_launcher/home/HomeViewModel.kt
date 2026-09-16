@@ -71,6 +71,24 @@ class HomeViewModel @Inject constructor(
     val monochromeIcons: StateFlow<Boolean> = preferences.monochromeIcons()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** User setting: auto-launch the single search match (DRAWER_FOLDERS_SPEC §10 D-3). */
+    val searchAutoLaunch: StateFlow<Boolean> = preferences.searchAutoLaunch()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _searchQuery = MutableStateFlow("")
+
+    /**
+     * The current drawer search query. Blank = folder view (drawerContent); a
+     * non-blank query flattens folders and filters [drawerApps]. Owned here so the
+     * value survives the fragment's view recreation, but the filter decision +
+     * replay-guard live at the fragment (SearchQueryChangeTracker).
+     */
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
     private val _drawerApps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val drawerApps: StateFlow<List<LauncherApp>> = _drawerApps.asStateFlow()
 
