@@ -21,35 +21,57 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Drawer search (adopted from Kolibri): a Material TextInputLayout with a
-             clear_text end icon (the "X" to wipe the query). Light colors because the
-             drawer scrim is always dark, independent of the day/night theme. A non-blank
-             query flattens folders and filters the flat app list (DRAWER_FOLDERS_SPEC
-             §10 D-3); a blank query restores the folder view. Top system-bar inset applied
-             in code. -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/search_input_layout"
+        <!-- Top bar: drawer search + overflow menu. Horizontal so the three-dot overflow
+             sits beside the search field; the top system-bar inset is applied to this row
+             in code so both children clear the status bar together. -->
+        <LinearLayout
+            android:id="@+id/drawer_top_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:hint="@string/drawer_search_hint"
-            android:textColorHint="#80FFFFFF"
-            app:endIconMode="clear_text"
-            app:endIconTint="@android:color/white"
-            app:boxStrokeColor="@android:color/white"
-            app:hintTextColor="#80FFFFFF">
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/search_edit_text"
-                android:layout_width="match_parent"
+            <!-- Drawer search (adopted from Kolibri): a Material TextInputLayout with a
+                 clear_text end icon (the "X" to wipe the query). Light colors because the
+                 drawer scrim is always dark, independent of the day/night theme. A non-blank
+                 query flattens folders and filters the flat app list (DRAWER_FOLDERS_SPEC
+                 §10 D-3); a blank query restores the folder view. -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/search_input_layout"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:imeOptions="actionSearch"
-                android:inputType="text"
-                android:maxLines="1"
-                android:textColor="@android:color/white"
-                android:autofillHints="" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_weight="1"
+                android:hint="@string/drawer_search_hint"
+                android:textColorHint="#80FFFFFF"
+                app:endIconMode="clear_text"
+                app:endIconTint="@android:color/white"
+                app:boxStrokeColor="@android:color/white"
+                app:hintTextColor="#80FFFFFF">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/search_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:textColor="@android:color/white"
+                    android:autofillHints="" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Overflow menu (three-dot): drawer-wide actions that aren't tied to one app,
+                 e.g. "create folder by maker". Wired in AppDrawerFragment → Host. -->
+            <ImageButton
+                android:id="@+id/drawer_overflow"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_more_vert"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/drawer_overflow" />
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/drawer_panel"

@@ -21,6 +21,7 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
+import android.view.Menu
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -30,6 +31,7 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -949,6 +951,45 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     }
 
     /**
+     * Drawer overflow menu (three-dot in the top bar): drawer-wide actions not tied to a
+     * single app. For now just "create folder by maker"; a PopupMenu so it can grow.
+     */
+    override fun showDrawerOverflowMenu(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            menu.add(Menu.NONE, MENU_CREATE_FOLDER_BY_MAKER, Menu.NONE, R.string.drawer_create_folder_by_maker)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    MENU_CREATE_FOLDER_BY_MAKER -> { showCreateFolderByMakerDialog(); true }
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    /**
+     * Maker picker that CREATES a new drawer folder: list every maker (Google, Samsung, …)
+     * with ≥ 2 drawer apps and the count; a tap makes a new folder titled after the maker
+     * holding all its apps — no need to hand-fold two apps first to then bulk-add the rest.
+     */
+    private fun showCreateFolderByMakerDialog() {
+        val groups = viewModel.drawerVendorGroups()
+        if (groups.isEmpty()) {
+            showToastSafe(R.string.drawer_create_folder_by_maker_none)
+            return
+        }
+        val labels = groups.map { "${it.label} (${it.keys.size})" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.drawer_create_folder_by_maker)
+            .setItems(labels) { _, index ->
+                val group = groups[index]
+                viewModel.createDrawerFolderFromMaker(group.label, group.keys)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
      * Vendor picker for the open drawer folder: list the makers (Google, Samsung, …) that
      * still have apps NOT already in this folder, with the count that would be added; a tap
      * bulk-adds them. Fully tap-operable (an accessible alternative to fold-dragging).
@@ -1393,6 +1434,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/** Drawer overflow menu item id: "create folder by maker". */
+private const val MENU_CREATE_FOLDER_BY_MAKER = 1
 
 /** Width of the left/right pager edge zone (dp) that triggers drag page-advance. */
 private const val EDGE_ADVANCE_DP = 36f

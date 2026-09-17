@@ -53,6 +53,28 @@ object DrawerFoldersTransition {
     }
 
     /**
+     * Create a NEW drawer folder titled [title] holding all of [keys] at once (the drawer
+     * overflow "create folder by maker" action). Each key is pulled from any other drawer
+     * folder first (DFOLD-INV-3), dissolving one that thereby drops below two members
+     * (DFOLD-INV-1). Returns the new membership, or `null` if fewer than two DISTINCT keys
+     * remain — a folder needs ≥ 2 members (DFOLD-INV-1), so a one-app "maker" is a no-op.
+     */
+    fun createFolderFrom(
+        folders: DrawerFolders,
+        title: String,
+        keys: List<ComponentKey>,
+        newFolderId: () -> DrawerFolderId,
+    ): DrawerFolders? {
+        val members = keys.distinct()
+        if (members.size < 2) return null
+        // DFOLD-INV-3: every member ends up in the new folder, so pull them out of any
+        // existing folder first (dissolving one that drops below two).
+        val stripped = folders.without(members.toSet())
+        val newFolder = DrawerFolder(newFolderId(), title = title, members = members)
+        return DrawerFolders(stripped.folders + newFolder)
+    }
+
+    /**
      * Extract [member] from the opened folder [folderId]: the folder shrinks, or — if it
      * would drop below two members — dissolves entirely (DFOLD-INV-1). Both the extracted
      * member and any dissolved-folder survivor become loose implicitly (they are simply no

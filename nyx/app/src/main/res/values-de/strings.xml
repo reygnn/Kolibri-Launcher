@@ -4,6 +4,9 @@
     <string name="folder_default_title">Ordner</string>
     <string name="folder_add_by_maker">Apps nach Hersteller</string>
     <string name="folder_add_by_maker_none">Keine weiteren Apps</string>
+    <string name="drawer_overflow">Weitere Optionen</string>
+    <string name="drawer_create_folder_by_maker">Ordner nach Hersteller</string>
+    <string name="drawer_create_folder_by_maker_none">Keine Hersteller zum Gruppieren</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, Ordner, %2$d App</item>

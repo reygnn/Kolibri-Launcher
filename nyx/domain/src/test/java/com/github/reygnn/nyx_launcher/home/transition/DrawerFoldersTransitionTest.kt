@@ -203,4 +203,44 @@ class DrawerFoldersTransitionTest {
         val before = folders(folder("f1", "a", "b"))
         assertThat(DrawerFoldersTransition.addAll(before, DrawerFolderId("nope"), listOf(key("c")))).isNull()
     }
+
+    // ---- createFolderFrom (overflow: create folder by maker) ----
+
+    @Test
+    fun `createFolderFrom builds a titled folder with all keys in order`() {
+        val result = DrawerFoldersTransition.createFolderFrom(
+            DrawerFolders.EMPTY, "Google", listOf(key("a"), key("b"), key("c")), newId,
+        )
+        assertThat(result).isEqualTo(
+            folders(DrawerFolder(DrawerFolderId("new"), "Google", listOf(key("a"), key("b"), key("c")))),
+        )
+    }
+
+    @Test
+    fun `createFolderFrom with fewer than two distinct keys is a no-op`() {
+        assertThat(DrawerFoldersTransition.createFolderFrom(DrawerFolders.EMPTY, "X", listOf(key("a")), newId)).isNull()
+        assertThat(
+            DrawerFoldersTransition.createFolderFrom(DrawerFolders.EMPTY, "X", listOf(key("a"), key("a")), newId),
+        ).isNull()
+    }
+
+    @Test
+    fun `createFolderFrom de-duplicates the incoming keys`() {
+        val result = DrawerFoldersTransition.createFolderFrom(
+            DrawerFolders.EMPTY, "Google", listOf(key("a"), key("b"), key("a")), newId,
+        )
+        assertThat(result).isEqualTo(
+            folders(DrawerFolder(DrawerFolderId("new"), "Google", listOf(key("a"), key("b")))),
+        )
+    }
+
+    @Test
+    fun `createFolderFrom pulls keys out of other folders, dissolving one dropping below two (INV-3, INV-1)`() {
+        // f1 = [a, b] dissolves when a leaves; f2 = [c, d, e] survives on [d, e] when c leaves.
+        val before = folders(folder("f1", "a", "b"), folder("f2", "c", "d", "e"))
+        val result = DrawerFoldersTransition.createFolderFrom(before, "Maker", listOf(key("a"), key("c")), newId)
+        assertThat(result).isEqualTo(
+            folders(folder("f2", "d", "e"), DrawerFolder(DrawerFolderId("new"), "Maker", listOf(key("a"), key("c")))),
+        )
+    }
 }

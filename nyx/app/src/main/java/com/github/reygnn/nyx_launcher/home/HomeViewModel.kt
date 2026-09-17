@@ -201,6 +201,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Create a new drawer folder [title] holding all of [keys] in one go (drawer overflow
+     * "create folder by maker") — no need to hand-fold two apps first. No-op below two members.
+     */
+    fun createDrawerFolderFromMaker(title: String, keys: List<ComponentKey>) {
+        launchSafe {
+            drawerFoldersRepository.update {
+                DrawerFoldersTransition.createFolderFrom(it, title, keys, drawerFolderIdFactory::next)
+            }
+        }
+    }
+
     /** Extract [member] from the opened drawer folder [folderId] (shrink, or dissolve below two). */
     fun extractFromDrawerFolder(folderId: DrawerFolderId, member: ComponentKey) {
         launchSafe {

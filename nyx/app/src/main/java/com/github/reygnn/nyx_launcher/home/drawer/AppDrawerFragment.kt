@@ -67,6 +67,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         /** Open the tapped drawer folder (show its members). */
         fun openDrawerFolder(folder: DrawerEntry.Folder)
 
+        /** Show the drawer overflow menu (e.g. "create folder by maker"), anchored to [anchor]. */
+        fun showDrawerOverflowMenu(anchor: View)
+
         /** Dismiss the drawer (swipe-down / back). */
         fun hideDrawer()
     }
@@ -106,13 +109,14 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         root.onDismissDrag = { host.hideDrawer() }
 
         view.findViewById<EditText>(R.id.search_edit_text).also { searchBox = it }
-        val searchLayout = view.findViewById<View>(R.id.search_input_layout)
+        val topBar = view.findViewById<View>(R.id.drawer_top_bar)
         val list = view.findViewById<RecyclerView>(R.id.drawer_panel).also { drawerList = it }
-        // The drawer scrim (root) fills edge-to-edge behind the system bars; the
-        // search field clears the status bar (top inset) and the list clears the nav
+        view.findViewById<View>(R.id.drawer_overflow).setOnClickListener { host.showDrawerOverflowMenu(it) }
+        // The drawer scrim (root) fills edge-to-edge behind the system bars; the top bar
+        // (search + overflow) clears the status bar (top inset) and the list clears the nav
         // bar (bottom inset), each with a small base gap.
         val basePx = (16 * resources.displayMetrics.density).toInt()
-        ViewCompat.setOnApplyWindowInsetsListener(searchLayout) { v, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(topBar) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(top = bars.top + basePx)
             insets

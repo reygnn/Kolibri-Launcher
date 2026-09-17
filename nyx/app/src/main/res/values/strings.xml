@@ -4,6 +4,9 @@
     <string name="folder_default_title">Folder</string>
     <string name="folder_add_by_maker">Add apps by maker</string>
     <string name="folder_add_by_maker_none">No more apps to add</string>
+    <string name="drawer_overflow">More options</string>
+    <string name="drawer_create_folder_by_maker">Create folder by maker</string>
+    <string name="drawer_create_folder_by_maker_none">No makers to group</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, folder, %2$d app</item>
