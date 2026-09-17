@@ -1419,11 +1419,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             .setComponent(ComponentName(key.packageName, key.className))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         // no suspension point — launchApp is synchronous (startActivity).
-        runCatching { startActivity(intent) }
+        val launched = runCatching { startActivity(intent) }
             .onFailure { if (it !is ActivityNotFoundException) throw it }
+            .isSuccess
         // Single launch choke-point (drawer, search, folder, home) — record usage so the
-        // drawer's optional usage sort can rank it. Fire-and-forget (VM coroutine).
-        viewModel.recordLaunch(key)
+        // drawer's optional usage sort can rank it. Only on a real launch: an
+        // ActivityNotFoundException (app uninstalled since the last refresh) must not bump
+        // usage for a package that never started. Fire-and-forget (VM coroutine).
+        if (launched) viewModel.recordLaunch(key)
     }
 
     // ---- home-info tap targets (mirror Kolibri's intents) ----

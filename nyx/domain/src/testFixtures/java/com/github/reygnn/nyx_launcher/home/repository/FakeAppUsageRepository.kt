@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.isValidUsageTimestamp
 import com.github.reygnn.launcher.core.timeWeightedUsageScore
@@ -32,7 +33,9 @@ class FakeAppUsageRepository(
         writeMutex.withLock {
             val now = nowProvider()
             val existing = state.value[packageName].orEmpty().filter { isValidUsageTimestamp(it, now) }
-            state.value = state.value + (packageName to (existing + now).sortedDescending())
+            // Match the impl exactly: distinct (the impl stores a Set), newest-first, capped.
+            val updated = (existing + now).distinct().sortedDescending().take(AppConstants.MAX_TIMESTAMPS_PER_APP)
+            state.value = state.value + (packageName to updated)
         }
     }
 
