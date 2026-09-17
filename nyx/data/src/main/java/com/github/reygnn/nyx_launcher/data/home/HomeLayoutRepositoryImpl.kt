@@ -6,10 +6,12 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
+import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import kotlinx.coroutines.flow.Flow
@@ -50,7 +52,10 @@ class HomeLayoutRepositoryImpl @Inject constructor(
             Unit
         }
 
-    override suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean =
+    override suspend fun seedInitialLayout(
+        resolveDockApps: suspend () -> List<ComponentKey>,
+        resolveGridApps: suspend () -> List<ComponentKey>,
+    ): Boolean =
         writeMutex.withLock {
             val prefs = dataStore.data.first()
             // One-shot: [SEEDED_KEY] records that the first-run decision was already
@@ -74,14 +79,27 @@ class HomeLayoutRepositoryImpl @Inject constructor(
             // is enforced later by the regridder against the REAL device grid, which
             // re-homes any overflow onto the grid (never drops it).
             val dockApps = resolveDockApps()
+            val gridApps = resolveGridApps()
             dataStore.edit {
                 it[SEEDED_KEY] = true
-                if (dockApps.isNotEmpty()) {
-                    val dock = dockApps.map { HomeItem.App(itemIdFactory.next(), it) }
-                    it[KEY] = serializer.serialize(current.copy(dock = dock))
+                if (dockApps.isNotEmpty() || gridApps.isNotEmpty()) {
+                    val dock = dockApps.map { key -> HomeItem.App(itemIdFactory.next(), key) }
+                    val items = placeOnGrid(gridApps, current.grid.columns)
+                    it[KEY] = serializer.serialize(current.copy(items = items, dock = dock))
                 }
             }
-            dockApps.isNotEmpty()
+            dockApps.isNotEmpty() || gridApps.isNotEmpty()
+        }
+
+    // Lay grid-seed apps out row-major from the top-left of page 0. The seed grid is
+    // usually DEFAULT (4×6) — FitHomeGridUseCase re-fits to the real device grid on
+    // start — so (0,0) is always valid and a small seed never overflows.
+    private fun placeOnGrid(apps: List<ComponentKey>, columns: Int): List<PlacedItem> =
+        apps.mapIndexed { index, key ->
+            PlacedItem(
+                HomeItem.App(itemIdFactory.next(), key),
+                CellPos(page = 0, x = index % columns, y = index / columns),
+            )
         }
 
     private suspend fun writeRaw(layout: HomeLayout) {
@@ -91,7 +109,7 @@ class HomeLayoutRepositoryImpl @Inject constructor(
     private companion object {
         val KEY = stringPreferencesKey("home_layout_v1")
 
-        // First-run seed one-shot (see seedInitialDock). Separate from KEY so a
+        // First-run seed one-shot (see seedInitialLayout). Separate from KEY so a
         // fit-only write doesn't read as "already seeded".
         val SEEDED_KEY = booleanPreferencesKey("home_dock_seeded_v1")
 

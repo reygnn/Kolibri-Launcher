@@ -44,7 +44,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.BuildConfig
-import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
@@ -85,7 +84,6 @@ import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
-import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
@@ -129,11 +127,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
     @Inject lateinit var fabPositionStore: NyxFabPositionStore
 
-    // First-run dock seed: resolve the device's default Phone/SMS/Email/Browser/Camera
-    // and place them in the dock so a fresh install isn't a blank screen (one-shot; the
-    // repo no-ops on a returning install).
-    @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
-    @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
+    // First-run defaults (dock apps + Play Store on the grid, and the Google drawer
+    // folder) so a fresh install isn't a blank screen. One-shot; each seed no-ops on a
+    // returning install (gated in its repository). See onCreate.
+    @Inject lateinit var firstRunSeeder: FirstRunSeeder
 
     // Dev builds report crashes automatically (no consent prompt); see onCreate.
     @Inject lateinit var consentController: ConsentController
@@ -380,21 +377,19 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // copy and save (the shared repo/file-manager split doesn't self-clean).
         lifecycleScope.launch { wallpaperImageSetter.reclaimOrphans() }
 
-        // One-shot on startup: seed the dock with the device's default apps on first
-        // run. Resolving hits PackageManager, so it's done off the main thread; the
-        // repo gates the write (SEEDED_KEY) so a returning install is a no-op.
+        // One-shot on startup: seed the first-run defaults. Each seed gates on its own
+        // flag and resolves apps (PackageManager IPCs) only on a real first run, so a
+        // returning install is a no-op.
         lifecycleScope.launch {
-            // The repo gates on its seed flag and invokes the resolver only on a real
-            // first run, so a returning install doesn't pay for the resolver's IPCs.
-            val seeded = homeLayoutRepository.seedInitialDock {
-                withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
-            }
+            val seeded = firstRunSeeder.seedHomeLayout()
             // The one-shot device-grid fit (pager.doOnLayout) runs against the pre-seed
             // empty layout, so a dock seeded above the device's column count wouldn't be
             // reconciled until the next cold start. Re-fit once seeding actually wrote, so
             // the regridder re-homes any over-capacity dock overflow in THIS session.
             if (seeded) pager.doOnLayout { applyDeviceGrid() }
         }
+        // Independent one-shot: seed the "Google" drawer folder from installed Google apps.
+        lifecycleScope.launch { firstRunSeeder.seedDrawerFolders() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {

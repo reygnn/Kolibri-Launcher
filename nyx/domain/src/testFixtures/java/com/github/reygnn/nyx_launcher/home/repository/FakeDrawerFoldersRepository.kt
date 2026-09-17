@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,10 @@ class FakeDrawerFoldersRepository(
     private val state = MutableStateFlow(initial)
     private val writeMutex = Mutex()
 
+    // First-run seed one-shot, mirroring the impl's SEEDED_KEY: set only by
+    // [seedInitialFolders], never by update.
+    private var seeded = false
+
     val current: DrawerFolders get() = state.value
 
     var updateCount = 0
@@ -34,5 +39,21 @@ class FakeDrawerFoldersRepository(
                 state.value = it
             }
             Unit
+        }
+
+    override suspend fun seedInitialFolders(resolveFolders: suspend () -> List<DrawerFolder>): Boolean =
+        writeMutex.withLock {
+            if (seeded) return@withLock false
+            if (state.value.folders.isNotEmpty()) {
+                seeded = true
+                return@withLock false
+            }
+            val seedFolders = resolveFolders().filter { it.members.size >= 2 }
+            seeded = true
+            if (seedFolders.isNotEmpty()) {
+                updateCount++
+                state.value = DrawerFolders(seedFolders)
+            }
+            seedFolders.isNotEmpty()
         }
 }

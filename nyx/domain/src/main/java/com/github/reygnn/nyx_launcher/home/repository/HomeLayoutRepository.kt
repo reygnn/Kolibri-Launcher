@@ -41,15 +41,19 @@ interface HomeLayoutRepository {
 
     /**
      * First-run seed: if no layout has ever been persisted, save one that places the
-     * apps from [resolveDockApps] in the dock (order preserved, capped at the grid
-     * width) on top of the default grid; if a layout already exists this is a no-op.
-     * Returns true only when it actually seeded. [resolveDockApps] is invoked ONLY
-     * when a seed will happen — so a returning install (or one whose layout is
-     * already established) never pays for resolving the apps (which does system IPCs).
+     * apps from [resolveDockApps] in the dock (order preserved) and the apps from
+     * [resolveGridApps] on the grid (row-major from the top-left, e.g. the Play Store),
+     * on top of the default grid; if a layout already exists this is a no-op. Returns
+     * true only when it actually seeded. Both resolvers are invoked ONLY when a seed
+     * will happen — so a returning install (or one whose layout is already established)
+     * never pays for resolving the apps (which does system IPCs).
      *
      * The first-run gate and the seeding write happen under the same writer lock, so
      * a concurrent [update] from a background reconcile can't slip a layout in between
      * the check and the write (AUDIT-1 A1-03).
      */
-    suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean
+    suspend fun seedInitialLayout(
+        resolveDockApps: suspend () -> List<ComponentKey>,
+        resolveGridApps: suspend () -> List<ComponentKey>,
+    ): Boolean
 }

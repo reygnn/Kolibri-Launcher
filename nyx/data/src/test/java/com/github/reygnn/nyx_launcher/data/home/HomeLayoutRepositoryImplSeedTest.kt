@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
+import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
@@ -15,7 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * First-run seeding ([HomeLayoutRepositoryImpl.seedInitialDock]). This can't live
+ * First-run seeding ([HomeLayoutRepositoryImpl.seedInitialLayout]). This can't live
  * in the shared behavioural contract: seeding is only meaningful over a DataStore
  * that has NEVER been written, and the seeded base grid is an impl-internal
  * default — the fake has no such notion. So it's pinned here, against a fresh
@@ -38,7 +39,7 @@ class HomeLayoutRepositoryImplSeedTest {
     fun seeds_the_dock_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
 
-        val seeded = repo.seedInitialDock { listOf(PHONE, SMS) }
+        val seeded = repo.seedInitialLayout({ listOf(PHONE, SMS) }, { emptyList() })
 
         assertThat(seeded).isTrue()
         val dock = repo.layout().first().dock
@@ -46,16 +47,41 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
+    fun seeds_grid_apps_top_left_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = newRepo()
+
+        val seeded = repo.seedInitialLayout({ emptyList() }, { listOf(PLAY_STORE) })
+
+        assertThat(seeded).isTrue()
+        val items = repo.layout().first().items
+        assertThat(items.map { (it.item as HomeItem.App).key }).containsExactly(PLAY_STORE)
+        assertThat(items.single().pos).isEqualTo(CellPos(0, 0, 0))
+    }
+
+    @Test
+    fun seeds_dock_and_grid_together() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = newRepo()
+
+        val seeded = repo.seedInitialLayout({ listOf(PHONE) }, { listOf(PLAY_STORE) })
+
+        assertThat(seeded).isTrue()
+        val layout = repo.layout().first()
+        assertThat(layout.dock.map { (it as HomeItem.App).key }).containsExactly(PHONE)
+        assertThat(layout.items.map { (it.item as HomeItem.App).key }).containsExactly(PLAY_STORE)
+    }
+
+    @Test
     fun seeds_only_once() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
-        assertThat(repo.seedInitialDock { listOf(PHONE) }).isTrue()
+        assertThat(repo.seedInitialLayout({ listOf(PHONE) }, { emptyList() })).isTrue()
 
         // A returning launch — even one that empties the layout — must not re-seed.
         repo.save(HomeLayout(grid = repo.layout().first().grid, pages = 1, items = emptyList(), dock = emptyList()))
-        val second = repo.seedInitialDock { listOf(SMS) }
+        val second = repo.seedInitialLayout({ listOf(SMS) }, { listOf(PLAY_STORE) })
 
         assertThat(second).isFalse()
         assertThat(repo.layout().first().dock).isEmpty()
+        assertThat(repo.layout().first().items).isEmpty()
     }
 
     @Test
@@ -65,7 +91,7 @@ class HomeLayoutRepositoryImplSeedTest {
         val deviceGrid = GridSpec(columns = 5, rows = 7)
         repo.save(HomeLayout(grid = deviceGrid, pages = 1, items = emptyList(), dock = emptyList()))
 
-        val seeded = repo.seedInitialDock { listOf(PHONE) }
+        val seeded = repo.seedInitialLayout({ listOf(PHONE) }, { emptyList() })
 
         assertThat(seeded).isTrue()
         val layout = repo.layout().first()
@@ -85,17 +111,18 @@ class HomeLayoutRepositoryImplSeedTest {
             ),
         )
 
-        val seeded = repo.seedInitialDock { listOf(PHONE) }
+        val seeded = repo.seedInitialLayout({ listOf(PHONE) }, { listOf(PLAY_STORE) })
 
         assertThat(seeded).isFalse()
         assertThat(repo.layout().first().dock.map { (it as HomeItem.App).key }).containsExactly(SMS)
+        assertThat(repo.layout().first().items).isEmpty()
     }
 
     @Test
     fun does_not_seed_with_no_apps() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
 
-        val seeded = repo.seedInitialDock { emptyList() }
+        val seeded = repo.seedInitialLayout({ emptyList() }, { emptyList() })
 
         assertThat(seeded).isFalse()
     }
@@ -103,18 +130,24 @@ class HomeLayoutRepositoryImplSeedTest {
     @Test
     fun does_not_resolve_apps_on_a_returning_install() = runTest(mainDispatcherRule.dispatcher) {
         val repo = newRepo()
-        assertThat(repo.seedInitialDock { listOf(PHONE) }).isTrue()
+        assertThat(repo.seedInitialLayout({ listOf(PHONE) }, { emptyList() })).isTrue()
 
-        // Second call: the gate is already set, so the resolver must never run.
-        var resolved = false
-        val second = repo.seedInitialDock { resolved = true; listOf(SMS) }
+        // Second call: the gate is already set, so neither resolver must run.
+        var resolvedDock = false
+        var resolvedGrid = false
+        val second = repo.seedInitialLayout(
+            { resolvedDock = true; listOf(SMS) },
+            { resolvedGrid = true; listOf(PLAY_STORE) },
+        )
 
         assertThat(second).isFalse()
-        assertThat(resolved).isFalse()
+        assertThat(resolvedDock).isFalse()
+        assertThat(resolvedGrid).isFalse()
     }
 
     private companion object {
         val PHONE = ComponentKey("com.phone", "com.phone.Main")
         val SMS = ComponentKey("com.sms", "com.sms.Main")
+        val PLAY_STORE = ComponentKey("com.android.vending", "com.android.vending.Main")
     }
 }

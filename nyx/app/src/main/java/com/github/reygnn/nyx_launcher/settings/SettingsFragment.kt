@@ -26,8 +26,7 @@ import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
 import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
-import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
-import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
+import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,8 +46,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     @Inject lateinit var backupManager: NyxBackupManager
     @Inject lateinit var resetManager: NyxResetManager
-    @Inject lateinit var defaultAppsResolver: DefaultAppsResolver
-    @Inject lateinit var homeLayoutRepository: HomeLayoutRepository
+    @Inject lateinit var firstRunSeeder: FirstRunSeeder
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
@@ -286,13 +284,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun doFactoryReset() = lifecycleScope.launch {
         val ok = resetManager.reset()
         if (ok) {
-            // Reset clears the seed flag, but the first-run seed only fires in
+            // Reset clears the seed flags, but the first-run seed only fires in
             // MainActivity.onCreate — which won't re-run on the way back to an already
-            // created home. So re-seed the default dock here, so "reset" lands on the
-            // default state (Phone/Messages/Email/Browser/Camera), not an empty screen.
-            homeLayoutRepository.seedInitialDock {
-                withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() }
-            }
+            // created home. So re-seed the defaults here, so "reset" lands on the default
+            // state (dock apps + Play Store on the grid, and the Google drawer folder),
+            // not an empty screen.
+            firstRunSeeder.seedHomeLayout()
+            firstRunSeeder.seedDrawerFolders()
         }
         toast(getString(if (ok) R.string.factory_reset_done else R.string.factory_reset_failed))
         // Back to home, which re-renders from the re-seeded default state.

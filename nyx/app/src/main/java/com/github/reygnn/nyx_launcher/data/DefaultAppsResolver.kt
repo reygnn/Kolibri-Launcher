@@ -37,6 +37,13 @@ class DefaultAppsResolver @Inject constructor(
         return packages.mapNotNull { launcherKeyFor(it) }.distinct()
     }
 
+    /**
+     * The apps to seed onto the home GRID on first run — currently just the Play Store —
+     * resolved to their launcher components. Omitted if not installed (e.g. a GMS-less
+     * device), so a fresh install without a store simply gets no store icon.
+     */
+    fun resolveGridApps(): List<ComponentKey> = listOfNotNull(launcherKeyFor(PLAY_STORE_PACKAGE))
+
     private fun defaultPackageFor(intent: Intent): String? = runCatching {
         context.packageManager.resolveActivity(intent, 0)
             ?.activityInfo?.packageName
@@ -53,5 +60,11 @@ class DefaultAppsResolver @Inject constructor(
             TimberWrapper.silentError(it, "Failed to resolve launcher component for $packageName")
             null
         }
+    }
+
+    private companion object {
+        // Google Play Store. Seeded onto the home grid on first run; resolved via its
+        // launcher intent (never a hardcoded component) so it works across OEM builds.
+        const val PLAY_STORE_PACKAGE = "com.android.vending"
     }
 }

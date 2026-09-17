@@ -1,9 +1,11 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
+import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -24,7 +26,7 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
     private val writeMutex = Mutex()
 
     // First-run seed one-shot, mirroring the impl's SEEDED_KEY: set only by
-    // [seedInitialDock], never by save/update/fit.
+    // [seedInitialLayout], never by save/update/fit.
     private var seeded = false
     private var seedCounter = 0
 
@@ -49,7 +51,10 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
             Unit
         }
 
-    override suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean =
+    override suspend fun seedInitialLayout(
+        resolveDockApps: suspend () -> List<ComponentKey>,
+        resolveGridApps: suspend () -> List<ComponentKey>,
+    ): Boolean =
         writeMutex.withLock {
             if (seeded) return@withLock false
             val current = state.value
@@ -58,13 +63,20 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
                 return@withLock false
             }
             val dockApps = resolveDockApps()
+            val gridApps = resolveGridApps()
             seeded = true
-            if (dockApps.isNotEmpty()) {
+            if (dockApps.isNotEmpty() || gridApps.isNotEmpty()) {
                 saveCount++
                 state.value = current.copy(
+                    items = gridApps.mapIndexed { index, key ->
+                        PlacedItem(
+                            HomeItem.App(ItemId("seed-${seedCounter++}"), key),
+                            CellPos(0, index % current.grid.columns, index / current.grid.columns),
+                        )
+                    },
                     dock = dockApps.map { HomeItem.App(ItemId("seed-${seedCounter++}"), it) },
                 )
             }
-            dockApps.isNotEmpty()
+            dockApps.isNotEmpty() || gridApps.isNotEmpty()
         }
 }

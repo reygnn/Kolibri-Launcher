@@ -2,8 +2,10 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import kotlinx.coroutines.flow.Flow
@@ -43,11 +45,42 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
             Unit
         }
 
+    override suspend fun seedInitialFolders(resolveFolders: suspend () -> List<DrawerFolder>): Boolean =
+        writeMutex.withLock {
+            val prefs = dataStore.data.first()
+            // One-shot, mirroring HomeLayoutRepositoryImpl's dock seed: [SEEDED_KEY]
+            // records that the first-run decision was made. Gated FIRST so a returning
+            // install never resolves the app list again. A blank KEY can't gate this —
+            // the user may legitimately have deleted all their folders — so the decision
+            // needs its own flag, never touched by update().
+            if (prefs[SEEDED_KEY] == true) return@withLock false
+            // Folders already exist (e.g. an import landed first): decision established,
+            // mark done and leave untouched (still without resolving).
+            val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DrawerFolders.EMPTY
+            if (current.folders.isNotEmpty()) {
+                dataStore.edit { it[SEEDED_KEY] = true }
+                return@withLock false
+            }
+            // Drop anything below the ≥ 2-member folder invariant (DFOLD-INV-1).
+            val seedFolders = resolveFolders().filter { it.members.size >= 2 }
+            dataStore.edit {
+                it[SEEDED_KEY] = true
+                if (seedFolders.isNotEmpty()) {
+                    it[KEY] = serializer.serialize(DrawerFolders(seedFolders))
+                }
+            }
+            seedFolders.isNotEmpty()
+        }
+
     private suspend fun writeRaw(folders: DrawerFolders) {
         dataStore.edit { it[KEY] = serializer.serialize(folders) }
     }
 
     private companion object {
         val KEY = stringPreferencesKey("drawer_folders_v1")
+
+        // First-run seed one-shot (see seedInitialFolders). Separate from KEY so a user
+        // who deleted all their folders doesn't read as "never seeded" and get re-seeded.
+        val SEEDED_KEY = booleanPreferencesKey("drawer_folders_seeded_v1")
     }
 }

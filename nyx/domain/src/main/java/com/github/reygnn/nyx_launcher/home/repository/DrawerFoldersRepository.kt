@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import kotlinx.coroutines.flow.Flow
 
@@ -30,4 +31,17 @@ interface DrawerFoldersRepository {
      * lock is non-reentrant); it already receives the current value as its argument.
      */
     suspend fun update(transform: suspend (DrawerFolders) -> DrawerFolders?)
+
+    /**
+     * First-run seed: if no drawer folders have ever been persisted, save the folders
+     * returned by [resolveFolders] (each must hold ≥ 2 members per DFOLD-INV-1, or it
+     * is dropped); if any folders already exist this is a no-op. Returns true only when
+     * it actually seeded. [resolveFolders] is invoked ONLY when a seed will happen — so
+     * a returning install (or one whose folders are already established, e.g. from an
+     * import) never pays for resolving the installed-app list.
+     *
+     * The first-run gate and the seeding write happen under the same writer lock, so a
+     * concurrent [update] can't slip folders in between the check and the write (A1-03).
+     */
+    suspend fun seedInitialFolders(resolveFolders: suspend () -> List<DrawerFolder>): Boolean
 }

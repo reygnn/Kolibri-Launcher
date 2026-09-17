@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.flowOf
  * change is computed) and throws only when the transform would actually write —
  * mirroring the impl, where a `null` transform result skips the write entirely.
  *
- * [layout] re-emits [current] once; [seedInitialDock] is unused by the write-path
+ * [layout] re-emits [current] once; [seedInitialLayout] is unused by the write-path
  * tests and throws if touched.
  */
 class ThrowingHomeLayoutRepository(
@@ -30,6 +30,8 @@ class ThrowingHomeLayoutRepository(
         if (transform(current) != null) throw error()
     }
 
-    override suspend fun seedInitialDock(resolveDockApps: suspend () -> List<ComponentKey>): Boolean =
-        throw error()
+    override suspend fun seedInitialLayout(
+        resolveDockApps: suspend () -> List<ComponentKey>,
+        resolveGridApps: suspend () -> List<ComponentKey>,
+    ): Boolean = throw error()
 }
