@@ -1,12 +1,18 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.io.IOException
 
 /**
  * Impl-specific behaviour not covered by the shared contract (which always seeds a valid
@@ -34,5 +40,31 @@ class HiddenAppsRepositoryImplTest {
         )
         val repo = HiddenAppsRepositoryImpl(store, HiddenAppsSerializer())
         assertThat(repo.hidden().first()).isEmpty()
+    }
+
+    @Test
+    fun update_propagates_read_failure_and_does_not_write() = runTest {
+        // The RMW read is fail-CLOSED: an IOException propagates and the write never runs, so a
+        // transient store failure can't clobber the real set. (A fail-open revert would read
+        // emptySet, not throw, and proceed to write.)
+        var wrote = false
+        val throwing = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("boom") }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                wrote = true
+                return transform(emptyPreferences())
+            }
+        }
+        val repo = HiddenAppsRepositoryImpl(throwing, HiddenAppsSerializer())
+
+        var thrown = false
+        try {
+            repo.update { it }
+        } catch (e: IOException) {
+            thrown = true
+        }
+
+        assertThat(thrown).isTrue()
+        assertThat(wrote).isFalse()
     }
 }

@@ -91,6 +91,32 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
+    fun update_propagates_read_failure_and_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+        // The RMW read is fail-CLOSED: an IOException propagates and the write never runs, so a
+        // transient store failure can't wipe existing folders. (A fail-open revert would read
+        // EMPTY, not throw, and proceed to write.)
+        var wrote = false
+        val throwing = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("boom") }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                wrote = true
+                return transform(emptyPreferences())
+            }
+        }
+        val repo = DrawerFoldersRepositoryImpl(throwing, DrawerFoldersSerializer())
+
+        var thrown = false
+        try {
+            repo.update { it }
+        } catch (e: IOException) {
+            thrown = true
+        }
+
+        assertThat(thrown).isTrue()
+        assertThat(wrote).isFalse()
+    }
+
+    @Test
     fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.dispatcher) {
         // Contained fail-closed: an IOException on the seed read is caught → no seed, no crash.
         val throwing = object : DataStore<Preferences> {

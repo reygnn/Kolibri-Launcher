@@ -118,10 +118,33 @@ class HomeViewModelTest {
             advanceUntilIdle()
             assertThat(hiddenApps.current).containsExactly(APP_A.key)
 
-            // unhide removes it again (the transform returns null / a smaller set).
+            // unhide takes the `it - key` branch and removes it.
             viewModel.unhideApp(APP_A.key)
             advanceUntilIdle()
             assertThat(hiddenApps.current).isEmpty()
+        }
+
+    @Test
+    fun hide_already_hidden_or_unhide_not_hidden_is_a_no_op_write() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns listOf(APP_A)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Unhiding an app that isn't hidden → transform returns null → no write.
+            viewModel.unhideApp(APP_A.key)
+            advanceUntilIdle()
+            assertThat(hiddenApps.updateCount).isEqualTo(0)
+
+            viewModel.hideApp(APP_A.key)
+            advanceUntilIdle()
+            val countAfterHide = hiddenApps.updateCount
+
+            // Hiding an already-hidden app → transform returns null → no second write.
+            viewModel.hideApp(APP_A.key)
+            advanceUntilIdle()
+            assertThat(hiddenApps.updateCount).isEqualTo(countAfterHide)
+            assertThat(hiddenApps.current).containsExactly(APP_A.key)
         }
 
     @Test
