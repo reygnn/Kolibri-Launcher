@@ -21,8 +21,11 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -32,6 +35,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -499,23 +504,92 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
     /** All upcoming events, grouped today/tomorrow via the shared formatter. */
     private fun showEventsDialog() {
+        if (isFinishing || isDestroyed) return
         val events = currentEvents
         if (events.isEmpty()) return
         val is24Hour = DateFormat.is24HourFormat(this)
         val allDay = getString(R.string.event_all_day)
         val zone = ZoneId.systemDefault()
-        val text = timeEventFormatter.buildEventRows(events, LocalDate.now(zone), zone)
-            .joinToString("\n") { row ->
-                when (row) {
-                    is TimeEventFormatter.EventRow.Item ->
-                        timeEventFormatter.formatEventRow(row.event, is24Hour, allDay)
-                    TimeEventFormatter.EventRow.TomorrowSeparator ->
-                        getString(R.string.events_tomorrow_separator)
+        // rows[] is the single source of truth for both rendering and click routing, so
+        // positions never drift. Labels resolved once; a blank title gets a localized fallback.
+        val rows = timeEventFormatter.buildEventRows(events, LocalDate.now(zone), zone)
+        val rowLabels = rows.map { row ->
+            when (row) {
+                is TimeEventFormatter.EventRow.Item -> {
+                    val event = row.event
+                    val titled = if (event.title.isBlank()) {
+                        event.copy(
+                            title = getString(
+                                when (event.type) {
+                                    TimeBasedEventType.ALARM -> R.string.events_fallback_alarm
+                                    TimeBasedEventType.CALENDAR -> R.string.events_fallback_calendar
+                                },
+                            ),
+                        )
+                    } else {
+                        event
+                    }
+                    timeEventFormatter.formatEventRow(titled, is24Hour, allDay)
+                }
+                TimeEventFormatter.EventRow.TomorrowSeparator -> null
+            }
+        }
+        val iconSize = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_size)
+        val iconPadding = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_padding)
+        val adapter = object : BaseAdapter() {
+            override fun getCount(): Int = rows.size
+            override fun getItem(position: Int): Any = rows[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+            override fun getViewTypeCount(): Int = 2
+            override fun getItemViewType(position: Int): Int =
+                if (rows[position] is TimeEventFormatter.EventRow.Item) 0 else 1
+
+            // The separator is not selectable, so a tap can never land on it.
+            override fun areAllItemsEnabled(): Boolean = false
+            override fun isEnabled(position: Int): Boolean =
+                rows[position] is TimeEventFormatter.EventRow.Item
+
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                // Inflate against the dialog's themed context (parent), so ?attr/colorOnSurface
+                // resolves against the dialog overlay, not the Activity theme.
+                val inflater = LayoutInflater.from(parent.context)
+                return when (val row = rows[position]) {
+                    is TimeEventFormatter.EventRow.Item -> {
+                        val label = (convertView ?: inflater.inflate(R.layout.item_event_row, parent, false)) as TextView
+                        label.text = rowLabels[position]
+                        val iconRes = when (row.event.type) {
+                            TimeBasedEventType.ALARM -> R.drawable.ic_alarm
+                            TimeBasedEventType.CALENDAR -> R.drawable.ic_event
+                        }
+                        val icon = ContextCompat.getDrawable(parent.context, iconRes)?.mutate()?.apply {
+                            setBounds(0, 0, iconSize, iconSize)
+                            setTint(label.currentTextColor)
+                        }
+                        label.setCompoundDrawablesRelative(icon, null, null, null)
+                        label.compoundDrawablePadding = iconPadding
+                        label
+                    }
+                    TimeEventFormatter.EventRow.TomorrowSeparator -> {
+                        val view = convertView ?: inflater.inflate(R.layout.item_events_divider, parent, false)
+                        val separatorColor = ColorUtils.setAlphaComponent(
+                            MaterialColors.getColor(parent.context, com.google.android.material.R.attr.colorOnSurface, Color.GRAY),
+                            EVENTS_SEPARATOR_ALPHA,
+                        )
+                        view.findViewById<View>(R.id.events_divider_line).setBackgroundColor(separatorColor)
+                        view
+                    }
                 }
             }
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.events_dialog_title)
-            .setMessage(text)
+            .setAdapter(adapter) { _, which ->
+                val row = rows[which] as? TimeEventFormatter.EventRow.Item ?: return@setAdapter
+                when (row.event.type) {
+                    TimeBasedEventType.ALARM -> openClockApp()
+                    TimeBasedEventType.CALENDAR -> openCalendarApp()
+                }
+            }
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
@@ -1461,6 +1535,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/** Alpha (0–255) for the events-dialog tomorrow separator: onSurface at reduced opacity. */
+private const val EVENTS_SEPARATOR_ALPHA = 90
 
 /** Drawer overflow menu item ids. */
 private const val MENU_CREATE_FOLDER_BY_MAKER = 1

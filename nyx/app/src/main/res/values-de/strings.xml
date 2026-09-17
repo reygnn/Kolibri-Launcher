@@ -80,7 +80,8 @@
     <string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert</string>
     <string name="event_all_day">Ganztägig</string>
     <string name="events_dialog_title">Anstehend</string>
-    <string name="events_tomorrow_separator">— Morgen —</string>
+    <string name="events_fallback_alarm">Wecker</string>
+    <string name="events_fallback_calendar">Termin</string>
     <string name="home_info_no_app">Keine passende App gefunden</string>
     <string name="backup_export_summary">Layout, Einstellungen und Hintergrund in eine Datei sichern</string>
     <string name="backup_import_summary">Layout, Einstellungen und Hintergrund aus einer Datei wiederherstellen</string>

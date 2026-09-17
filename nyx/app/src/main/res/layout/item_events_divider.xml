@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Separator row for the upcoming-events dialog: a thin line between today's and
+     tomorrow's events. The line colour is set programmatically in
+     MainActivity.showEventsDialog (dialog onSurface at reduced alpha). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <View
+        android:id="@+id/events_divider_line"
+        android:layout_width="match_parent"
+        android:layout_height="2dp" />
+
+</FrameLayout>
