@@ -19,10 +19,13 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.text.format.DateFormat
+import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.Menu
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
@@ -288,10 +291,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         wallpaperView = findViewById(R.id.wallpaper_view)
         wallpaperScrim = findViewById(R.id.wallpaper_scrim)
         // Home-info tap targets: time → alarms, date → calendar, battery → battery
-        // settings (mirrors Kolibri's intents).
-        clockTime.setOnClickListener { openClockApp() }
-        clockDate.setOnClickListener { openCalendarApp() }
-        clockBattery.setOnClickListener { openBatterySettings() }
+        // settings (mirrors Kolibri's intents). Double-tap, not single: a single tap on
+        // the clock is easy to trigger by accident, and the gesture consumes the stream so
+        // it never bubbles to the home double-tap (events dialog).
+        clockTime.setOnDoubleTap { openClockApp() }
+        clockDate.setOnDoubleTap { openCalendarApp() }
+        clockBattery.setOnDoubleTap { openBatterySettings() }
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
         clockDelegate = ClockDelegate(
@@ -1535,6 +1540,29 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
+
+/**
+ * Fire [action] on a double-tap of this view. Consumes the whole touch stream (returns
+ * true) so a single tap does nothing and the gesture never bubbles up to the home
+ * double-tap (events dialog).
+ */
+@SuppressLint("ClickableViewAccessibility")
+private fun View.setOnDoubleTap(action: () -> Unit) {
+    // Mark this view as its own touch pipeline so the home GestureDispatchCore suppresses
+    // its own double-tap over it (it keys on isLongClickable / hasOnClickListeners). Without
+    // this the tap would ALSO fall through to the home double-tap → events dialog double-fire.
+    isLongClickable = true
+    val detector = GestureDetector(
+        context,
+        object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                action()
+                return true
+            }
+        },
+    )
+    setOnTouchListener { _, event -> detector.onTouchEvent(event); true }
+}
 
 /** Alpha (0–255) for the events-dialog tomorrow separator: onSurface at reduced opacity. */
 private const val EVENTS_SEPARATOR_ALPHA = 90
