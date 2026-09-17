@@ -18,6 +18,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
   DataStore, geteilte `:core`-Scoring-Mathematik, Overflow-Toggle.
 - **First-Run-Seeding** — Play Store aufs Grid + Google-Apps in einen Drawer-Ordner.
 - **60%-Ordnerkappe** im Ordner-Overlay (leichter wegklickbar).
+- **HIE Phase C3 — Event-Indikatoren** — die Verdrahtung stand bereits (Indikatoren +
+  `ObserveTimeBasedEventsUseCase`-Collector + Settings-Toggles + READ_CALENDAR-
+  Permission + DI); ergänzt wurde der Doppel-Tipp-**Event-Dialog auf Kolibri-Parität**
+  (Icon-Zeilen, klickbar → Uhr/Kalender-App, gerenderte Trennzeile, Fallback-Titel,
+  isFinishing-Guard) plus ein 3dp-Indikator-Nudge. (Bewusst weggelassen: Kolibris
+  wallpaper-aware Fenster-Chrome — Kolibri-only-Infra.)
 - **DataStore-Reads fail-open (nyx-weit)** — alle Observe-Read-Flows laufen über den
   geteilten `:common-data readFlowFailOpen` (IOException → Defaults statt Crash); die
   First-Run-Seed-Point-Reads sind contained fail-closed (Fehler = Seed überspringen,
@@ -61,28 +67,6 @@ defensiv via `startActivitySafely` gelöst), aber ein sinnvoller Reife-Schritt.
 Eigener Architektur-Port — die Klassen hängen an Kolibris Crash-Infra-
 Konventionen (Rule 9/11). Anker (Kolibri): `ui/base/BaseActivity.kt`,
 `ui/base/BaseViewModel.kt`, `common/ui/ErrorEventBus.kt`.
-
-### HIE Phase C3 — Event-Indikator (Kalender/Alarm) in Nyx
-
-Phase A/B/C1/C2 sind durch: das Home-Info-Subsystem ist geteilt (`:core.timeinfo`,
-`:common-ui`, `:common-data`) und Nyx zeigt Uhr/Datum/Akku. Der Event-Pfad ist
-**verdrahtet aber ruhend** — `PreferencesRepository` implementiert `TimeInfoSettings`
-(Toggles default aus), der geteilte `ObserveTimeBasedEventsUseCase` ist gebunden,
-`ClockDelegate.timeBasedEvents` fließt, wird aber an keine View gebunden. Solange
-beide Toggles aus sind, gibt es kein Kalender/Alarm-IPC und kein `READ_CALENDAR`
-(HIE-INV-7).
-
-Offen für C3 (HOME_INFO_ELEMENTS_SPEC §5, eigene UX-Entscheidungen):
-1. `<uses-permission android:name="android.permission.READ_CALENDAR"/>` ins Nyx-Manifest.
-2. Runtime-Permission-Request beim Aktivieren des Kalender-Toggles.
-3. Zwei Toggles in `SettingsActivity` (Muster wie `monochrome_switch`) →
-   `preferences.setShowAlarm` / `setShowCalendarEvent`.
-4. Event-Indikator-View auf dem Home + Tap → Event-Dialog (`showTimeBasedEventsDialog`
-   neu: Dialog-Layout, `TimeEventFormatter.buildEventRows`/`formatEventRow`,
-   Event-Typ-Icons, Strings) + `clockDelegate.timeBasedEvents`-Binding.
-
-Anker: `MainActivity` (clock_container, clockDelegate), `PreferencesRepository`
-(showAlarm/showCalendarEvent), `TimeEventFormatter` (:core), `SettingsActivity`.
 
 ### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
 
