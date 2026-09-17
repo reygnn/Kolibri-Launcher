@@ -972,9 +972,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.folder_add_by_maker)
             .setItems(labels) { _, index ->
-                val keys = addable[index].keys
-                viewModel.addAllToDrawerFolder(folderId, keys)
-                onAdded(keys)
+                val group = addable[index]
+                viewModel.addAllToDrawerFolder(folderId, group.keys)
+                // Auto-name a still-unnamed folder after the maker just added; never clobber
+                // a title the user already set. Persisted via the overlay's rename-on-close.
+                if (folderOverlayController.title.isBlank()) {
+                    folderOverlayController.setTitle(group.label)
+                }
+                onAdded(group.keys)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

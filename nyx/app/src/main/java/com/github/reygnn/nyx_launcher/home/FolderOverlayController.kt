@@ -29,6 +29,12 @@ class FolderOverlayController(
     val title: String get() = titleField.text.toString()
 
     /**
+     * Pre-fill the title field (e.g. auto-name a still-unnamed folder after the maker just
+     * bulk-added). Committed like any manual edit by the caller's rename-on-close hook.
+     */
+    fun setTitle(value: String) = titleField.setText(value)
+
+    /**
      * Show a folder: [initialTitle] in the title field ([titleEditable] toggles editing),
      * [memberAdapter] in the member grid. [onClose] runs exactly once when the overlay is
      * closed via [close]. [onAddApps], when non-null, reveals the "add apps by maker" button
