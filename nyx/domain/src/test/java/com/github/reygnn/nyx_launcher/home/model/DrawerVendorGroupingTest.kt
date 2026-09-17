@@ -63,6 +63,27 @@ class DrawerVendorGroupingTest {
     }
 
     @Test
+    fun `github namespace groups by author, not by the shared github segment`() {
+        val groups = DrawerVendorGrouping.groups(
+            listOf(
+                app("com.github.reygnn.nyx_launcher"), app("com.github.reygnn.kolibri"),
+                app("com.github.someoneelse.tool"), app("com.github.someoneelse.other"),
+            ),
+        )
+        assertThat(groups.map { it.label })
+            .containsExactly("github.reygnn", "github.someoneelse")
+        assertThat(groups.first { it.label == "github.reygnn" }.keys).hasSize(2)
+    }
+
+    @Test
+    fun `io github namespace folds into the same github author labelling`() {
+        val groups = DrawerVendorGrouping.groups(
+            listOf(app("io.github.foo.a"), app("io.github.foo.b")),
+        )
+        assertThat(groups.map { it.label }).containsExactly("github.foo")
+    }
+
+    @Test
     fun `empty input yields no groups`() {
         assertThat(DrawerVendorGrouping.groups(emptyList())).isEmpty()
     }

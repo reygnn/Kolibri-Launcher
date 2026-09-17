@@ -9,7 +9,10 @@ import com.github.reygnn.launcher.core.ComponentKey
  * The vendor is derived from the package's first two segments (e.g. `com.google.android.gm`
  * → `com.google`) and mapped to a friendly label for common makers; `com.samsung.*` and
  * `com.sec.*` both fold into "Samsung" because the grouping key is the LABEL, not the raw
- * prefix. Unknown vendors fall back to the capitalised second segment (`com.spotify.music`
+ * prefix. Shared code-hosting namespaces (`com.github.*`, `io.github.*`) are grouped one
+ * segment deeper by their author segment (`com.github.reygnn.*` → "github.reygnn") so apps
+ * from different authors don't collapse into one bucket. Any other unknown vendor falls back
+ * to the capitalised second segment (`com.spotify.music`
  * → "Spotify"). Only vendors with ≥ 2 apps are returned — a one-app "vendor" is pointless
  * to bulk-add. This is a heuristic (package names are not a reliable authorship signal),
  * but a convenient, safe one: the worst case is a slightly odd grouping, never data loss.
@@ -36,6 +39,13 @@ object DrawerVendorGrouping {
         "org.mozilla" to "Mozilla",
     )
 
+    // Shared namespaces (not a single maker): the two-segment prefix identifies the hosting
+    // platform, and the real author is the *third* segment (e.g. `com.github.reygnn.*`,
+    // `io.github.foo.*` on F-Droid). Grouping these by the two-segment prefix would fold
+    // every author into one meaningless "Github" bucket, so we group one segment deeper and
+    // label by `github.<author>` to keep different authors apart.
+    private val NAMESPACE_PREFIXES = setOf("com.github", "io.github")
+
     fun groups(apps: List<LauncherApp>): List<VendorGroup> =
         apps.groupBy { labelFor(it.key.packageName) }
             .filterValues { it.size >= 2 }
@@ -45,8 +55,13 @@ object DrawerVendorGrouping {
     private fun labelFor(pkg: String): String {
         val segments = pkg.split('.')
         val prefix = segments.take(2).joinToString(".")
-        return CURATED[prefix]
-            ?: segments.getOrNull(1)?.replaceFirstChar { it.uppercase() }
+        CURATED[prefix]?.let { return it }
+        val author = segments.getOrNull(2)
+        if (prefix in NAMESPACE_PREFIXES && author != null) {
+            // e.g. com.github.reygnn.nyx_launcher -> "github.reygnn"
+            return "${segments[1]}.$author"
+        }
+        return segments.getOrNull(1)?.replaceFirstChar { it.uppercase() }
             ?: pkg
     }
 }
