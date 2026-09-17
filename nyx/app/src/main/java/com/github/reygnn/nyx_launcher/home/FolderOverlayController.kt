@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.home
 
 import android.view.View
 import android.widget.EditText
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -55,6 +56,26 @@ class FolderOverlayController(
         addAppsButton.isVisible = onAddApps != null
         addAppsButton.setOnClickListener { onAddApps?.invoke() }
         overlay.isVisible = true
+        capCardHeight()
+    }
+
+    /**
+     * Cap the card at [CARD_MAX_HEIGHT_FRACTION] of the overlay height so a folder with
+     * many members can't fill the screen — a scrim margin always stays tappable to
+     * dismiss it. Only the scrollable member grid absorbs the cap; a small folder stays
+     * wrap_content. Runs after layout (the overlay height is only known then); the card's
+     * non-grid chrome (title + button + padding) is grid-content-invariant, so
+     * `card - grid` yields it on any pass.
+     */
+    private fun capCardHeight() {
+        val grid = members as? MaxHeightRecyclerView ?: return
+        val card = members.parent as? View ?: return
+        overlay.doOnLayout {
+            val cap = (overlay.height * CARD_MAX_HEIGHT_FRACTION).toInt()
+            if (cap <= 0) return@doOnLayout
+            val chrome = (card.height - members.height).coerceAtLeast(0)
+            grid.maxHeightPx = (cap - chrome).coerceAtLeast(0)
+        }
     }
 
     /** Close (tap-outside / launch): run [onClose] (commit), then hide + detach the adapter. */
@@ -79,5 +100,11 @@ class FolderOverlayController(
         addAppsButton.setOnClickListener(null)
         addAppsButton.isVisible = false
         overlay.isVisible = false
+    }
+
+    private companion object {
+        // Folder card fills at most 60% of the overlay height; the rest stays as a
+        // tappable scrim so the folder is easy to dismiss.
+        const val CARD_MAX_HEIGHT_FRACTION = 0.60f
     }
 }

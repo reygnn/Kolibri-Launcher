@@ -43,7 +43,7 @@
             android:textSize="16sp"
             android:autofillHints="" />
 
-        <androidx.recyclerview.widget.RecyclerView
+        <com.github.reygnn.nyx_launcher.home.MaxHeightRecyclerView
             android:id="@+id/folder_members"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
