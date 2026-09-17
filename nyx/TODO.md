@@ -28,6 +28,11 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
   geteilten `:common-data readFlowFailOpen` (IOException → Defaults statt Crash); die
   First-Run-Seed-Point-Reads sind contained fail-closed (Fehler = Seed überspringen,
   Retry nächster Start, kein Clobber).
+- **ACRA-Consent-Dialog (wie Kolibri)** — die geteilte Consent-Infra
+  (`:feature-crashreporting`) war schon verdrahtet, aber ohne Prompt; ergänzt: First-Start-
+  Dialog in `MainActivity` (`resolveStartupAction` → ShowDialog/Reaffirm/Skip) für alle
+  Builds + Settings-Eintrag (Datenschutz → Absturzberichte); dev-only Auto-Consent entfernt.
+  Uhr/Datum/Akku zusätzlich auf Doppel-Tipp umgestellt.
 
 ---
 
