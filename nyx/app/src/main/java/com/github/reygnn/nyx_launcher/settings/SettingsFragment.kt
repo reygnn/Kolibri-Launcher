@@ -298,8 +298,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
             .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val newHidden = apps.filterIndexed { i, _ -> checked[i] }.map { it.key }.toSet()
-                lifecycleScope.launch { hiddenAppsRepository.update { if (it == newHidden) null else newHidden } }
+                val installedKeys = apps.map { it.key }.toSet()
+                val checkedInstalled = apps.filterIndexed { i, _ -> checked[i] }.map { it.key }.toSet()
+                lifecycleScope.launch {
+                    // Merge, don't replace: keep hidden keys for apps NOT in this list (uninstalled,
+                    // or restored from another device's backup) — the manager only toggles the apps it
+                    // actually shows. Computed inside the transform so it applies to the latest set.
+                    hiddenAppsRepository.update { current ->
+                        val merged = current.filterTo(mutableSetOf()) { it !in installedKeys } + checkedInstalled
+                        if (merged == current) null else merged
+                    }
+                }
             }
             .show()
     }

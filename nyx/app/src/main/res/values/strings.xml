@@ -14,6 +14,8 @@
     <string name="settings_hidden_apps_title">Hidden apps</string>
     <string name="settings_hidden_apps_summary">Choose which apps are hidden from the drawer</string>
     <string name="settings_hidden_apps_empty">No apps to manage</string>
+    <!-- TalkBack description for a revealed hidden app tile: app name + hidden role. -->
+    <string name="drawer_app_hidden_a11y">%1$s, hidden</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, folder, %2$d app</item>

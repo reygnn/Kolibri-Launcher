@@ -76,8 +76,13 @@ class AppDrawerAdapter(
         // Reveal mode only: a hidden app is shown dimmed so it reads as "hidden" at a glance.
         // In the normal view hidden apps are filtered out, so this is 1f there.
         holder.itemView.alpha = if (entry.hidden) HIDDEN_ALPHA else 1f
-        // App tile: TalkBack reads the label (the app name); no folder role/count.
-        holder.itemView.contentDescription = null
+        // App tile: TalkBack reads the label (the app name); a revealed hidden app also gets a
+        // "hidden" cue, since the dim alone is invisible to TalkBack.
+        holder.itemView.contentDescription = if (entry.hidden) {
+            holder.itemView.context.getString(R.string.drawer_app_hidden_a11y, app.displayName)
+        } else {
+            null
+        }
         holder.itemView.setOnClickListener { onAppClick(app) }
         holder.itemView.setOnLongClickListener { onAppLongPress(holder.itemView, app); true }
 

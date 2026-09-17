@@ -252,13 +252,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /** Set the drawer's hidden set exactly (settings multi-choice manager). No-op if unchanged. */
-    fun setHiddenApps(keys: Set<ComponentKey>) {
-        launchSafe {
-            hiddenAppsRepository.update { if (it == keys) null else keys }
-        }
-    }
-
     /** Extract [member] from the opened drawer folder [folderId] (shrink, or dissolve below two). */
     fun extractFromDrawerFolder(folderId: DrawerFolderId, member: ComponentKey) {
         launchSafe {

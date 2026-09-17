@@ -14,6 +14,8 @@
     <string name="settings_hidden_apps_title">Ausgeblendete Apps</string>
     <string name="settings_hidden_apps_summary">Auswählen, welche Apps im Drawer ausgeblendet sind</string>
     <string name="settings_hidden_apps_empty">Keine Apps zum Verwalten</string>
+    <!-- TalkBack description for a revealed hidden app tile: app name + hidden role. -->
+    <string name="drawer_app_hidden_a11y">%1$s, ausgeblendet</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, Ordner, %2$d App</item>

@@ -139,6 +139,21 @@ class NyxBackupManagerTest {
     }
 
     @Test
+    fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.dispatcher) {
+        hiddenAppsRepository.update { setOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")) }
+        val out = ByteArrayOutputStream()
+        assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
+
+        // Wipe, then import must bring the hidden set back (separate DataStore blob).
+        hiddenAppsRepository.update { emptySet() }
+        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(hiddenAppsRepository.current)
+            .containsExactly(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M"))
+    }
+
+    @Test
     fun malformed_zip_returns_invalid_data() = runTest(mainDispatcherRule.dispatcher) {
         val result = manager.import(ByteArrayInputStream("not a zip".toByteArray()), NyxBackupOptions())
         assertThat(result).isEqualTo(com.github.reygnn.nyx_launcher.home.model.ImportResult.InvalidData)
