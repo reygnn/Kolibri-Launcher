@@ -18,6 +18,10 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
   DataStore, geteilte `:core`-Scoring-Mathematik, Overflow-Toggle.
 - **First-Run-Seeding** — Play Store aufs Grid + Google-Apps in einen Drawer-Ordner.
 - **60%-Ordnerkappe** im Ordner-Overlay (leichter wegklickbar).
+- **DataStore-Reads fail-open (nyx-weit)** — alle Observe-Read-Flows laufen über den
+  geteilten `:common-data readFlowFailOpen` (IOException → Defaults statt Crash); die
+  First-Run-Seed-Point-Reads sind contained fail-closed (Fehler = Seed überspringen,
+  Retry nächster Start, kein Clobber).
 
 ---
 
@@ -79,22 +83,6 @@ Offen für C3 (HOME_INFO_ELEMENTS_SPEC §5, eigene UX-Entscheidungen):
 
 Anker: `MainActivity` (clock_container, clockDelegate), `PreferencesRepository`
 (showAlarm/showCalendarEvent), `TimeEventFormatter` (:core), `SettingsActivity`.
-
-### DataStore-Reads fail-open absichern (nyx-weit) — Robustheit
-
-Nyx' DataStore-gestützte Stores lesen überwiegend via `dataStore.data.map { … }`
-**ohne** `.catch`-Fallback: eine `IOException` beim Read (Store-Korruption)
-propagiert in den Collector → Crash. Kolibri kapselt das in einem geteilten
-Safe-Read-Helfer (`:common-data` `readFlowFailOpen`, fail-open auf Defaults).
-
-Teilweise erledigt: der neue `AppUsageRepositoryImpl` (Usage-Store) liest bereits
-über `readFlowFailOpen`. **Offen** bleiben die übrigen Read-Flows — sie sollten
-alle über den geteilten Helfer laufen, sonst driftet es. Niedrige
-Wahrscheinlichkeit (nur bei Store-Korruption), aber ein Crash-Pfad. Anker:
-`PreferencesRepositoryImpl`, `HomeLayoutRepositoryImpl`,
-`DrawerFoldersRepositoryImpl`, `HiddenAppsRepositoryImpl`,
-`NyxWallpaperDisplaySettings`, `NyxFabPositionStore`; Referenz
-`:common-data/…/readFlowFailOpen`.
 
 ### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
 
