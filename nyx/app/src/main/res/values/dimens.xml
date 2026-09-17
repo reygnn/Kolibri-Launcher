@@ -9,6 +9,9 @@
     <dimen name="text_size_secondary_info">18sp</dimen>
     <dimen name="events_icon_size">28dp</dimen>
     <dimen name="events_icon_padding">4dp</dimen>
+    <!-- Small downward nudge so the indicators sit against the clock's visible digits
+         rather than its font-padding-inflated line box. -->
+    <dimen name="events_indicators_top_nudge">3dp</dimen>
     <!-- Leading type icon in the upcoming-events dialog rows. -->
     <dimen name="events_dialog_icon_size">24dp</dimen>
     <dimen name="events_dialog_icon_padding">12dp</dimen>
