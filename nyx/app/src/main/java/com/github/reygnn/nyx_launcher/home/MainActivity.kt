@@ -957,6 +957,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     override fun showDrawerOverflowMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
             menu.add(Menu.NONE, MENU_CREATE_FOLDER_BY_MAKER, Menu.NONE, R.string.drawer_create_folder_by_maker)
+            // Sort toggle: label shows the mode you'd switch TO.
+            menu.add(
+                Menu.NONE, MENU_TOGGLE_USAGE_SORT, Menu.NONE,
+                if (viewModel.usageSortEnabled.value) R.string.drawer_sort_alphabetical else R.string.drawer_sort_usage,
+            )
             val revealing = viewModel.showHidden.value
             // Only offer the reveal toggle when there is something to reveal — or while already
             // revealing, so the user can always turn it back off.
@@ -969,6 +974,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     MENU_CREATE_FOLDER_BY_MAKER -> { showCreateFolderByMakerDialog(); true }
+                    MENU_TOGGLE_USAGE_SORT -> { viewModel.toggleUsageSort(); true }
                     MENU_TOGGLE_HIDDEN -> { viewModel.setShowHidden(!revealing); true }
                     else -> false
                 }
@@ -1415,6 +1421,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // no suspension point — launchApp is synchronous (startActivity).
         runCatching { startActivity(intent) }
             .onFailure { if (it !is ActivityNotFoundException) throw it }
+        // Single launch choke-point (drawer, search, folder, home) — record usage so the
+        // drawer's optional usage sort can rank it. Fire-and-forget (VM coroutine).
+        viewModel.recordLaunch(key)
     }
 
     // ---- home-info tap targets (mirror Kolibri's intents) ----
@@ -1453,6 +1462,7 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
 /** Drawer overflow menu item ids. */
 private const val MENU_CREATE_FOLDER_BY_MAKER = 1
 private const val MENU_TOGGLE_HIDDEN = 2
+private const val MENU_TOGGLE_USAGE_SORT = 3
 
 /** Width of the left/right pager edge zone (dp) that triggers drag page-advance. */
 private const val EDGE_ADVANCE_DP = 36f

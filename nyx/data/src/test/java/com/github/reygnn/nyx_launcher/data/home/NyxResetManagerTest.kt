@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
+import com.github.reygnn.nyx_launcher.home.repository.FakeAppUsageRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
@@ -21,9 +22,10 @@ class NyxResetManagerTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
+    private val usageRepository = FakeAppUsageRepository()
 
     @Test
-    fun reset_clears_every_datastore_key_and_deletes_wallpaper_files() =
+    fun reset_clears_every_datastore_key_purges_usage_and_deletes_wallpaper_files() =
         runTest(mainDispatcherRule.dispatcher) {
             val dataStore = FakeDataStore()
             dataStore.edit {
@@ -32,12 +34,15 @@ class NyxResetManagerTest {
                 it[stringPreferencesKey("wallpaper_layers_json")] = "[...]"
                 it[booleanPreferencesKey("home_dock_seeded_v1")] = true
             }
-            val manager = NyxResetManager(dataStore, fileManager, mainDispatcherRule.dispatcher)
+            usageRepository.recordPackageLaunch("com.a")
+            val manager = NyxResetManager(dataStore, usageRepository, fileManager, mainDispatcherRule.dispatcher)
 
             val ok = manager.reset()
 
             assertThat(ok).isTrue()
             assertThat(dataStore.data.first().asMap()).isEmpty()
+            // Usage lives in a separate store, so reset must purge it explicitly.
+            assertThat(usageRepository.current).isEmpty()
             verify(exactly = 1) { fileManager.clearAll() }
         }
 
@@ -48,7 +53,7 @@ class NyxResetManagerTest {
             val throwingFileManager = mockk<WallpaperFileManager> {
                 every { clearAll() } throws RuntimeException("disk error")
             }
-            val manager = NyxResetManager(dataStore, throwingFileManager, mainDispatcherRule.dispatcher)
+            val manager = NyxResetManager(dataStore, usageRepository, throwingFileManager, mainDispatcherRule.dispatcher)
 
             val ok = manager.reset()
 

@@ -28,6 +28,13 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[SEARCH_AUTO_LAUNCH] = enabled }
     }
 
+    override fun usageSortEnabled(): Flow<Boolean> =
+        dataStore.data.map { it[USAGE_SORT] ?: false }
+
+    override suspend fun setUsageSortEnabled(enabled: Boolean) {
+        dataStore.edit { it[USAGE_SORT] = enabled }
+    }
+
     override val showAlarmFlow: Flow<Boolean> =
         dataStore.data.map { it[SHOW_ALARM] ?: false }
 
@@ -45,6 +52,7 @@ class PreferencesRepositoryImpl @Inject constructor(
     private companion object {
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
         val SEARCH_AUTO_LAUNCH = booleanPreferencesKey("search_auto_launch")
+        val USAGE_SORT = booleanPreferencesKey("drawer_usage_sort")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }

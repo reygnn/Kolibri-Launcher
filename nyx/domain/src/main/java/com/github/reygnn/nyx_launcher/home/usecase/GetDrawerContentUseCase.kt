@@ -5,10 +5,14 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.model.displayName
+import com.github.reygnn.nyx_launcher.home.repository.AppUsageRepository
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
 
 /**
@@ -25,17 +29,48 @@ import javax.inject.Inject
 class GetDrawerContentUseCase @Inject constructor(
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
+    private val appUsageRepository: AppUsageRepository,
 ) {
     /**
-     * [apps] is the live drawer app source; [revealHidden] is the transient overflow toggle.
-     * With reveal off, hidden apps are filtered out; with reveal on, they stay (marked
-     * [DrawerEntry.App.hidden] so the UI can dim them). Re-emits on any source change.
+     * [apps] is the live drawer app source; [revealHidden] is the transient overflow toggle;
+     * [usageSortEnabled] is the drawer sort-mode setting (both supplied by the ViewModel, like
+     * [revealHidden]). With reveal off, hidden apps are filtered out; with reveal on, they stay
+     * (marked [DrawerEntry.App.hidden] so the UI can dim them). Loose apps are ordered
+     * alphabetically by default, or by time-weighted usage (most-used first) when
+     * [usageSortEnabled] — a launch ticks the usage snapshot and re-orders reactively.
+     *
+     * `flatMapLatest` on the sort setting keeps the usage snapshot flow collected ONLY in
+     * usage mode (mirrors kolibri): in alphabetical mode a per-launch usage tick must not
+     * re-run the projection just to emit an identical list.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     operator fun invoke(
         apps: Flow<List<LauncherApp>>,
         revealHidden: Flow<Boolean>,
+        usageSortEnabled: Flow<Boolean>,
     ): Flow<List<DrawerEntry>> =
-        combine(apps, drawerFoldersRepository.folders(), hiddenAppsRepository.hidden(), revealHidden, ::projectDrawerContent)
+        usageSortEnabled.distinctUntilChanged().flatMapLatest { usageSort ->
+            if (usageSort) {
+                combine(
+                    apps,
+                    drawerFoldersRepository.folders(),
+                    hiddenAppsRepository.hidden(),
+                    revealHidden,
+                    appUsageRepository.usageSnapshotFlow,
+                ) { a, folders, hidden, reveal, snapshot ->
+                    projectDrawerContent(a, folders, hidden, reveal, usageSort = true, usageScores = appUsageRepository.scoreApps(a, snapshot))
+                }
+            } else {
+                combine(
+                    apps,
+                    drawerFoldersRepository.folders(),
+                    hiddenAppsRepository.hidden(),
+                    revealHidden,
+                ) { a, folders, hidden, reveal ->
+                    projectDrawerContent(a, folders, hidden, reveal)
+                }
+            }
+        }
 }
 
 /**
@@ -57,12 +92,18 @@ class GetDrawerContentUseCase @Inject constructor(
  *   visible members re-appears when its members are unhidden). With [revealHidden] on
  *   (overflow "show hidden"), nothing is filtered and each revealed loose app is marked
  *   [DrawerEntry.App.hidden] so the UI dims it.
+ * - **Loose-app order** is alphabetical by display name by default. With [usageSort] on,
+ *   loose apps are ordered by [usageScores] descending (most-used first) with an
+ *   alphabetical tie-break. Folders always stay pinned first, alphabetically by title,
+ *   regardless of sort mode.
  */
 internal fun projectDrawerContent(
     apps: List<LauncherApp>,
     folders: DrawerFolders,
     hidden: Set<ComponentKey> = emptySet(),
     revealHidden: Boolean = false,
+    usageSort: Boolean = false,
+    usageScores: Map<ComponentKey, Double> = emptyMap(),
 ): List<DrawerEntry> {
     val byKey = apps.associateBy { it.key }
 
@@ -76,9 +117,14 @@ internal fun projectDrawerContent(
         .sortedBy { it.title.lowercase() }
         .map { DrawerEntry.Folder(it.id, it.title, it.members) }
 
+    val looseOrder = if (usageSort) {
+        compareByDescending<LauncherApp> { usageScores[it.key] ?: 0.0 }.thenBy { it.displayName.lowercase() }
+    } else {
+        compareBy { it.displayName.lowercase() }
+    }
     val appEntries = apps
         .filterNot { it.key in memberKeys || (!revealHidden && it.key in hidden) }
-        .sortedBy { it.displayName.lowercase() }
+        .sortedWith(looseOrder)
         .map { DrawerEntry.App(it, hidden = it.key in hidden) }
 
     return folderEntries + appEntries

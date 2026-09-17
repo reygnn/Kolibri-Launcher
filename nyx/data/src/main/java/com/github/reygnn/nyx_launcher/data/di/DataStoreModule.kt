@@ -16,6 +16,12 @@ private val Context.homeLayoutDataStore: DataStore<Preferences> by preferencesDa
     name = "home_layout",
 )
 
+// Separate store for app-usage timestamps (highest-frequency write; see [UsageDataStore]).
+// Its own name so it never aliases kolibri's "kolibri_usage" file when both apps are installed.
+private val Context.usageDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "nyx_usage",
+)
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DataStoreModule {
@@ -25,4 +31,11 @@ object DataStoreModule {
     fun provideHomeLayoutDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.homeLayoutDataStore
+
+    @Provides
+    @Singleton
+    @UsageDataStore
+    fun provideUsageDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = context.usageDataStore
 }

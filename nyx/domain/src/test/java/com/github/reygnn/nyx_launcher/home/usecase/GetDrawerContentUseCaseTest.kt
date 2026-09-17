@@ -6,6 +6,7 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.repository.FakeAppUsageRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
@@ -153,9 +154,9 @@ class GetDrawerContentUseCaseTest {
         runTest(mainDispatcherRule.dispatcher) {
             val a = app("a"); val b = app("b"); val c = app("c")
             val repo = FakeDrawerFoldersRepository(folders(folder("f1", "Stuff", a, b)))
-            val useCase = GetDrawerContentUseCase(repo, FakeHiddenAppsRepository())
+            val useCase = GetDrawerContentUseCase(repo, FakeHiddenAppsRepository(), FakeAppUsageRepository())
 
-            val content = useCase(flowOf(listOf(a, b, c)), flowOf(false)).first()
+            val content = useCase(flowOf(listOf(a, b, c)), flowOf(false), flowOf(false)).first()
 
             assertThat(content).isEqualTo(
                 listOf(
@@ -172,10 +173,31 @@ class GetDrawerContentUseCaseTest {
             val useCase = GetDrawerContentUseCase(
                 FakeDrawerFoldersRepository(),
                 FakeHiddenAppsRepository(setOf(a.key)),
+                FakeAppUsageRepository(),
             )
 
-            val content = useCase(flowOf(listOf(a, b)), flowOf(false)).first()
+            val content = useCase(flowOf(listOf(a, b)), flowOf(false), flowOf(false)).first()
 
             assertThat(content).isEqualTo(listOf(DrawerEntry.App(b)))
+        }
+
+    @Test
+    fun `use case orders loose apps by usage when usage sort is on`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val a = app("a"); val b = app("b"); val c = app("c")
+            // b was launched, a and c were not → b ranks first, then a, c alphabetically.
+            val usage = FakeAppUsageRepository()
+            usage.recordPackageLaunch("b")
+            val useCase = GetDrawerContentUseCase(
+                FakeDrawerFoldersRepository(),
+                FakeHiddenAppsRepository(),
+                usage,
+            )
+
+            val content = useCase(flowOf(listOf(a, b, c)), flowOf(false), flowOf(true)).first()
+
+            assertThat(content).isEqualTo(
+                listOf(DrawerEntry.App(b), DrawerEntry.App(a), DrawerEntry.App(c)),
+            )
         }
 }

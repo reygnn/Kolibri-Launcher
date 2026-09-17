@@ -10,9 +10,11 @@ import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
+import com.github.reygnn.nyx_launcher.home.repository.FakeAppUsageRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
@@ -61,13 +63,15 @@ class HomeViewModelTest {
     private val preferences = mockk<PreferencesRepository> {
         every { monochromeIcons() } returns flowOf(false)
         every { searchAutoLaunch() } returns flowOf(false)
+        every { usageSortEnabled() } returns flowOf(false)
     }
 
     // Real fake repo + projection use case + a deterministic id stub, so the drawer-folder
     // mutation methods can be asserted against the resulting membership state.
     private val drawerFolders = FakeDrawerFoldersRepository()
     private val hiddenApps = FakeHiddenAppsRepository()
-    private val getDrawerContent = GetDrawerContentUseCase(drawerFolders, hiddenApps)
+    private val appUsage = FakeAppUsageRepository()
+    private val getDrawerContent = GetDrawerContentUseCase(drawerFolders, hiddenApps, appUsage)
     private val drawerFolderIdFactory = DrawerFolderIdFactory { DrawerFolderId("new-folder") }
 
     /** Build the VM after [getDrawerApps] is stubbed (init calls refreshDrawer). */
@@ -87,6 +91,7 @@ class HomeViewModelTest {
             drawerFolders,
             drawerFolderIdFactory,
             hiddenApps,
+            RecordAppLaunchUseCase(appUsage),
             mainDispatcherRule.dispatcher,
         )
     }

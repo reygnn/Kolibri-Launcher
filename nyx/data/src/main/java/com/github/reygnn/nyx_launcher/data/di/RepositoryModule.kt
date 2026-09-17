@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.di
 
+import com.github.reygnn.nyx_launcher.data.home.AppUsageRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.DrawerFoldersRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HiddenAppsRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidDrawerFolderIdFactory
@@ -14,6 +15,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
+import com.github.reygnn.nyx_launcher.home.repository.AppUsageRepository
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
@@ -52,6 +54,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindHiddenAppsRepository(impl: HiddenAppsRepositoryImpl): HiddenAppsRepository
+
+    // App usage: own repository over a SEPARATE DataStore (highest-frequency write), drives
+    // the drawer's time-weighted usage sort.
+    @Binds
+    @Singleton
+    abstract fun bindAppUsageRepository(impl: AppUsageRepositoryImpl): AppUsageRepository
 
     @Binds
     abstract fun bindLayoutSerializer(impl: HomeLayoutSerializer): LayoutSerializer

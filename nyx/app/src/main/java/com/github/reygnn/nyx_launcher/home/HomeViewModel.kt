@@ -24,6 +24,7 @@ import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ObserveHomeLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.PlaceItemUseCase
+import com.github.reygnn.nyx_launcher.home.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RenameFolderUseCase
@@ -66,6 +67,7 @@ class HomeViewModel @Inject constructor(
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
     private val hiddenAppsRepository: HiddenAppsRepository,
+    private val recordAppLaunch: RecordAppLaunchUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
@@ -112,6 +114,23 @@ class HomeViewModel @Inject constructor(
     val hiddenApps: StateFlow<Set<ComponentKey>> = hiddenAppsRepository.hidden()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
+    /**
+     * Whether the drawer sorts loose apps by usage. Shared [SharingStarted.Eagerly] so it can
+     * be read synchronously via `.value` when building the overflow menu label (same posture
+     * as [hiddenApps]).
+     */
+    val usageSortEnabled: StateFlow<Boolean> = preferences.usageSortEnabled()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun toggleUsageSort() {
+        launchSafe { preferences.setUsageSortEnabled(!usageSortEnabled.value) }
+    }
+
+    /** Record an app launch so the usage sort can rank it (fire-and-forget; every launch path). */
+    fun recordLaunch(key: ComponentKey) {
+        launchSafe { recordAppLaunch(key.packageName) }
+    }
+
     private val _showHidden = MutableStateFlow(false)
 
     /**
@@ -131,7 +150,7 @@ class HomeViewModel @Inject constructor(
      * the hidden set, or the reveal toggle changes.
      */
     val drawerContent: StateFlow<List<DrawerEntry>> =
-        getDrawerContent(drawerApps, showHidden)
+        getDrawerContent(drawerApps, showHidden, usageSortEnabled)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private var refreshJob: Job? = null

@@ -9,6 +9,8 @@
     <string name="drawer_create_folder_by_maker_none">Keine Hersteller zum Gruppieren</string>
     <string name="drawer_show_hidden">Ausgeblendete anzeigen</string>
     <string name="drawer_hide_hidden">Ausgeblendete verbergen</string>
+    <string name="drawer_sort_usage">Nach Nutzung sortieren</string>
+    <string name="drawer_sort_alphabetical">Alphabetisch sortieren</string>
     <string name="menu_hide_app">App ausblenden</string>
     <string name="menu_unhide_app">App einblenden</string>
     <string name="settings_hidden_apps_title">Ausgeblendete Apps</string>

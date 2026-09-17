@@ -21,6 +21,14 @@ interface PreferencesRepository : TimeInfoSettings {
     fun searchAutoLaunch(): Flow<Boolean>
     suspend fun setSearchAutoLaunch(enabled: Boolean)
 
+    /**
+     * When enabled, the drawer's loose apps are ordered by time-weighted usage (most-used
+     * first) instead of alphabetically (mirrors kolibri's TIME_WEIGHTED_USAGE). Toggled from
+     * the drawer overflow menu. Defaults to off (alphabetical).
+     */
+    fun usageSortEnabled(): Flow<Boolean>
+    suspend fun setUsageSortEnabled(enabled: Boolean)
+
     // TimeInfoSettings: showAlarmFlow, showCalendarEventFlow (read side).
     suspend fun setShowAlarm(enabled: Boolean)
     suspend fun setShowCalendarEvent(enabled: Boolean)

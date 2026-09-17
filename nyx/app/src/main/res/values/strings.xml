@@ -9,6 +9,8 @@
     <string name="drawer_create_folder_by_maker_none">No makers to group</string>
     <string name="drawer_show_hidden">Show hidden apps</string>
     <string name="drawer_hide_hidden">Hide hidden apps</string>
+    <string name="drawer_sort_usage">Sort by usage</string>
+    <string name="drawer_sort_alphabetical">Sort alphabetically</string>
     <string name="menu_hide_app">Hide app</string>
     <string name="menu_unhide_app">Unhide app</string>
     <string name="settings_hidden_apps_title">Hidden apps</string>
