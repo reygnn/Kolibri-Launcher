@@ -6,13 +6,16 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -48,29 +51,40 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
 
     override suspend fun seedInitialFolders(resolveFolders: suspend () -> List<DrawerFolder>): Boolean =
         writeMutex.withLock {
-            val prefs = dataStore.data.first()
-            // One-shot, mirroring HomeLayoutRepositoryImpl's dock seed: [SEEDED_KEY]
-            // records that the first-run decision was made. Gated FIRST so a returning
-            // install never resolves the app list again. A blank KEY can't gate this —
-            // the user may legitimately have deleted all their folders — so the decision
-            // needs its own flag, never touched by update().
-            if (prefs[SEEDED_KEY] == true) return@withLock false
-            // Folders already exist (e.g. an import landed first): decision established,
-            // mark done and leave untouched (still without resolving).
-            val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DrawerFolders.EMPTY
-            if (current.folders.isNotEmpty()) {
-                dataStore.edit { it[SEEDED_KEY] = true }
-                return@withLock false
-            }
-            // Drop anything below the ≥ 2-member folder invariant (DFOLD-INV-1).
-            val seedFolders = resolveFolders().filter { it.members.size >= 2 }
-            dataStore.edit {
-                it[SEEDED_KEY] = true
-                if (seedFolders.isNotEmpty()) {
-                    it[KEY] = serializer.serialize(DrawerFolders(seedFolders))
+            // Contained fail-CLOSED (see HomeLayoutRepositoryImpl.seedInitialLayout): a store
+            // read/write failure skips the seed and leaves SEEDED_KEY unset for a retry next
+            // launch — never assume "no folders" (would seed over a transiently-unreadable
+            // store) and never crash the startup coroutine.
+            try {
+                val prefs = dataStore.data.first()
+                // One-shot, mirroring HomeLayoutRepositoryImpl's dock seed: [SEEDED_KEY]
+                // records that the first-run decision was made. Gated FIRST so a returning
+                // install never resolves the app list again. A blank KEY can't gate this —
+                // the user may legitimately have deleted all their folders — so the decision
+                // needs its own flag, never touched by update().
+                if (prefs[SEEDED_KEY] == true) return@withLock false
+                // Folders already exist (e.g. an import landed first): decision established,
+                // mark done and leave untouched (still without resolving).
+                val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DrawerFolders.EMPTY
+                if (current.folders.isNotEmpty()) {
+                    dataStore.edit { it[SEEDED_KEY] = true }
+                    return@withLock false
                 }
+                // Drop anything below the ≥ 2-member folder invariant (DFOLD-INV-1).
+                val seedFolders = resolveFolders().filter { it.members.size >= 2 }
+                dataStore.edit {
+                    it[SEEDED_KEY] = true
+                    if (seedFolders.isNotEmpty()) {
+                        it[KEY] = serializer.serialize(DrawerFolders(seedFolders))
+                    }
+                }
+                seedFolders.isNotEmpty()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                TimberWrapper.silentError(e, "Skipping first-run folder seed: store unavailable")
+                false
             }
-            seedFolders.isNotEmpty()
         }
 
     private suspend fun writeRaw(folders: DrawerFolders) {

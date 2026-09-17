@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -15,10 +16,12 @@ import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -58,38 +61,49 @@ class HomeLayoutRepositoryImpl @Inject constructor(
         resolveGridApps: suspend () -> List<ComponentKey>,
     ): Boolean =
         writeMutex.withLock {
-            val prefs = dataStore.data.first()
-            // One-shot: [SEEDED_KEY] records that the first-run decision was already
-            // made. Gated FIRST, before resolving apps, so a returning install never
-            // runs the resolver's system IPCs again. A plain KEY-presence gate can't be
-            // used because FitHomeGridUseCase writes an empty layout under KEY on the
-            // first layout pass. This flag is never touched by save/update/fit.
-            if (prefs[SEEDED_KEY] == true) return@withLock false
-            // Seed onto whatever is already there so a grid already stamped by fit is
-            // preserved (never reset to DEFAULT's grid). If content already exists —
-            // e.g. an import landed first — the layout is established: mark the decision
-            // done and leave it untouched (still without resolving apps).
-            val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DEFAULT
-            if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
-                dataStore.edit { it[SEEDED_KEY] = true }
-                return@withLock false
-            }
-            // Resolve only now that we know we will seed. No cap here: the seed-time
-            // grid is DEFAULT (before FitHomeGridUseCase stamps the real device grid),
-            // so capping on it would wrongly drop apps on a wider device. Dock capacity
-            // is enforced later by the regridder against the REAL device grid, which
-            // re-homes any overflow onto the grid (never drops it).
-            val dockApps = resolveDockApps()
-            val gridApps = resolveGridApps()
-            dataStore.edit {
-                it[SEEDED_KEY] = true
-                if (dockApps.isNotEmpty() || gridApps.isNotEmpty()) {
-                    val dock = dockApps.map { key -> HomeItem.App(itemIdFactory.next(), key) }
-                    val items = placeOnGrid(gridApps, current.grid.columns)
-                    it[KEY] = serializer.serialize(current.copy(items = items, dock = dock))
+            // Contained fail-CLOSED (not fail-open): if the store read/write throws, do
+            // nothing and leave SEEDED_KEY unset so the next launch retries — never assume
+            // "empty" (that would seed over a transiently-unreadable real layout) and never
+            // crash the startup coroutine that calls this.
+            try {
+                val prefs = dataStore.data.first()
+                // One-shot: [SEEDED_KEY] records that the first-run decision was already
+                // made. Gated FIRST, before resolving apps, so a returning install never
+                // runs the resolver's system IPCs again. A plain KEY-presence gate can't be
+                // used because FitHomeGridUseCase writes an empty layout under KEY on the
+                // first layout pass. This flag is never touched by save/update/fit.
+                if (prefs[SEEDED_KEY] == true) return@withLock false
+                // Seed onto whatever is already there so a grid already stamped by fit is
+                // preserved (never reset to DEFAULT's grid). If content already exists —
+                // e.g. an import landed first — the layout is established: mark the decision
+                // done and leave it untouched (still without resolving apps).
+                val current = prefs[KEY]?.let { serializer.deserialize(it) } ?: DEFAULT
+                if (current.items.isNotEmpty() || current.dock.isNotEmpty()) {
+                    dataStore.edit { it[SEEDED_KEY] = true }
+                    return@withLock false
                 }
+                // Resolve only now that we know we will seed. No cap here: the seed-time
+                // grid is DEFAULT (before FitHomeGridUseCase stamps the real device grid),
+                // so capping on it would wrongly drop apps on a wider device. Dock capacity
+                // is enforced later by the regridder against the REAL device grid, which
+                // re-homes any overflow onto the grid (never drops it).
+                val dockApps = resolveDockApps()
+                val gridApps = resolveGridApps()
+                dataStore.edit {
+                    it[SEEDED_KEY] = true
+                    if (dockApps.isNotEmpty() || gridApps.isNotEmpty()) {
+                        val dock = dockApps.map { key -> HomeItem.App(itemIdFactory.next(), key) }
+                        val items = placeOnGrid(gridApps, current.grid.columns)
+                        it[KEY] = serializer.serialize(current.copy(items = items, dock = dock))
+                    }
+                }
+                dockApps.isNotEmpty() || gridApps.isNotEmpty()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                TimberWrapper.silentError(e, "Skipping first-run layout seed: store unavailable")
+                false
             }
-            dockApps.isNotEmpty() || gridApps.isNotEmpty()
         }
 
     // Lay grid-seed apps out row-major from the top-left of page 0. The seed grid is
