@@ -337,6 +337,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
      */
     private fun showCrashReportConsentDialog() {
         lifecycleScope.launch {
+            // Dismiss any still-tracked dialog before showing a new one (mirrors Kolibri):
+            // ConsentDialog.show suspends before the modal appears, so a fast double-tap could
+            // otherwise stack two setCancelable(false) dialogs and leak the untracked first.
+            consentDialog?.dismiss()
             consentDialog = ConsentDialog.show(requireActivity()) { granted ->
                 consentController.applyConsent(granted)
                 toast(getString(if (granted) R.string.toast_crash_reports_enabled else R.string.toast_crash_reports_disabled))
