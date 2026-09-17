@@ -11,7 +11,12 @@ import com.github.reygnn.launcher.core.ComponentKey
  * set), so the UI renders the folder icon from apps that actually exist.
  */
 sealed interface DrawerEntry {
-    data class App(val app: LauncherApp) : DrawerEntry
+    /**
+     * A loose drawer app. [hidden] is a display-only flag set by the projection ONLY in
+     * reveal mode (overflow "show hidden") — normally a hidden app is filtered out entirely,
+     * so [hidden] is false; when revealed it is true so the UI can dim the tile.
+     */
+    data class App(val app: LauncherApp, val hidden: Boolean = false) : DrawerEntry
     data class Folder(
         val id: DrawerFolderId,
         val title: String,

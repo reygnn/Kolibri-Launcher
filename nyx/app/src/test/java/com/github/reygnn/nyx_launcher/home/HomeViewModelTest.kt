@@ -11,6 +11,7 @@ import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
@@ -65,7 +66,8 @@ class HomeViewModelTest {
     // Real fake repo + projection use case + a deterministic id stub, so the drawer-folder
     // mutation methods can be asserted against the resulting membership state.
     private val drawerFolders = FakeDrawerFoldersRepository()
-    private val getDrawerContent = GetDrawerContentUseCase(drawerFolders)
+    private val hiddenApps = FakeHiddenAppsRepository()
+    private val getDrawerContent = GetDrawerContentUseCase(drawerFolders, hiddenApps)
     private val drawerFolderIdFactory = DrawerFolderIdFactory { DrawerFolderId("new-folder") }
 
     /** Build the VM after [getDrawerApps] is stubbed (init calls refreshDrawer). */
@@ -84,6 +86,7 @@ class HomeViewModelTest {
             getDrawerContent,
             drawerFolders,
             drawerFolderIdFactory,
+            hiddenApps,
             mainDispatcherRule.dispatcher,
         )
     }

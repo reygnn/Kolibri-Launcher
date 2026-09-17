@@ -7,6 +7,13 @@
     <string name="drawer_overflow">Weitere Optionen</string>
     <string name="drawer_create_folder_by_maker">Ordner nach Hersteller</string>
     <string name="drawer_create_folder_by_maker_none">Keine Hersteller zum Gruppieren</string>
+    <string name="drawer_show_hidden">Ausgeblendete anzeigen</string>
+    <string name="drawer_hide_hidden">Ausgeblendete verbergen</string>
+    <string name="menu_hide_app">App ausblenden</string>
+    <string name="menu_unhide_app">App einblenden</string>
+    <string name="settings_hidden_apps_title">Ausgeblendete Apps</string>
+    <string name="settings_hidden_apps_summary">Auswählen, welche Apps im Drawer ausgeblendet sind</string>
+    <string name="settings_hidden_apps_empty">Keine Apps zum Verwalten</string>
     <!-- TalkBack description for a drawer folder tile: title + role + member count. -->
     <plurals name="drawer_folder_a11y">
         <item quantity="one">%1$s, Ordner, %2$d App</item>

@@ -15,6 +15,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.DrawerVendorGrouping
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.transition.DrawerFoldersTransition
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
@@ -64,6 +65,7 @@ class HomeViewModel @Inject constructor(
     getDrawerContent: GetDrawerContentUseCase,
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
+    private val hiddenAppsRepository: HiddenAppsRepository,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
@@ -101,12 +103,35 @@ class HomeViewModel @Inject constructor(
     val drawerApps: StateFlow<List<LauncherApp>> = _drawerApps.asStateFlow()
 
     /**
+     * The set of apps hidden from the drawer. Shared [SharingStarted.Eagerly] (not
+     * WhileSubscribed) because it is read synchronously via `.value` — by the context menu
+     * (hide vs unhide label) and the search filter — with no continuous collector; a lazy
+     * hot flow would leave `.value` stuck on the seed (the stale hot-flow point-read
+     * anti-pattern). The set is tiny, so eager sharing is cheap.
+     */
+    val hiddenApps: StateFlow<Set<ComponentKey>> = hiddenAppsRepository.hidden()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    private val _showHidden = MutableStateFlow(false)
+
+    /**
+     * Transient "reveal hidden apps" toggle (overflow menu). Not persisted — reset when the
+     * drawer closes (AppDrawerFragment.onDrawerHidden), so re-opening always starts clean.
+     */
+    val showHidden: StateFlow<Boolean> = _showHidden.asStateFlow()
+
+    fun setShowHidden(value: Boolean) {
+        _showHidden.value = value
+    }
+
+    /**
      * The drawer's rendered content (DRAWER_FOLDERS_SPEC §5): the live apps projected
-     * through the persisted folder membership — a pinned folder block, then the loose
-     * apps. Re-emits when the apps refresh ([refreshDrawer]) or the membership changes.
+     * through the persisted folder membership and the hidden set — a pinned folder block,
+     * then the loose apps. Re-emits when the apps refresh ([refreshDrawer]), the membership,
+     * the hidden set, or the reveal toggle changes.
      */
     val drawerContent: StateFlow<List<DrawerEntry>> =
-        getDrawerContent(drawerApps)
+        getDrawerContent(drawerApps, showHidden)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private var refreshJob: Job? = null
@@ -210,6 +235,27 @@ class HomeViewModel @Inject constructor(
             drawerFoldersRepository.update {
                 DrawerFoldersTransition.createFolderFrom(it, title, keys, drawerFolderIdFactory::next)
             }
+        }
+    }
+
+    /** Hide [key] from the drawer (context menu / settings manager). No-op if already hidden. */
+    fun hideApp(key: ComponentKey) {
+        launchSafe {
+            hiddenAppsRepository.update { if (key in it) null else it + key }
+        }
+    }
+
+    /** Un-hide [key] (reveal-mode context menu / settings manager). No-op if not hidden. */
+    fun unhideApp(key: ComponentKey) {
+        launchSafe {
+            hiddenAppsRepository.update { if (key in it) it - key else null }
+        }
+    }
+
+    /** Set the drawer's hidden set exactly (settings multi-choice manager). No-op if unchanged. */
+    fun setHiddenApps(keys: Set<ComponentKey>) {
+        launchSafe {
+            hiddenAppsRepository.update { if (it == keys) null else keys }
         }
     }
 

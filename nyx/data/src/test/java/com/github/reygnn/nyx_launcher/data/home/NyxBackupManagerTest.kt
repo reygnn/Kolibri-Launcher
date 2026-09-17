@@ -15,6 +15,7 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
@@ -78,10 +79,11 @@ class NyxBackupManagerTest {
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
 
     private val drawerFoldersRepository = FakeDrawerFoldersRepository()
+    private val hiddenAppsRepository = FakeHiddenAppsRepository()
 
     private val manager = NyxBackupManager(
-        homeLayoutRepository, drawerFoldersRepository, preferences, displaySettings, wallpaperRepository,
-        fabPositionStore, fileManager, NyxBackupSerializer(), mainDispatcherRule.dispatcher,
+        homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
+        wallpaperRepository, fabPositionStore, fileManager, NyxBackupSerializer(), mainDispatcherRule.dispatcher,
     )
 
 

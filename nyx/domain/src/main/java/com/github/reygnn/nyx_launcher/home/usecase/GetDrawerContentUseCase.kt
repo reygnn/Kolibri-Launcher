@@ -1,10 +1,12 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -22,9 +24,18 @@ import javax.inject.Inject
  */
 class GetDrawerContentUseCase @Inject constructor(
     private val drawerFoldersRepository: DrawerFoldersRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository,
 ) {
-    operator fun invoke(apps: Flow<List<LauncherApp>>): Flow<List<DrawerEntry>> =
-        combine(apps, drawerFoldersRepository.folders(), ::projectDrawerContent)
+    /**
+     * [apps] is the live drawer app source; [revealHidden] is the transient overflow toggle.
+     * With reveal off, hidden apps are filtered out; with reveal on, they stay (marked
+     * [DrawerEntry.App.hidden] so the UI can dim them). Re-emits on any source change.
+     */
+    operator fun invoke(
+        apps: Flow<List<LauncherApp>>,
+        revealHidden: Flow<Boolean>,
+    ): Flow<List<DrawerEntry>> =
+        combine(apps, drawerFoldersRepository.folders(), hiddenAppsRepository.hidden(), revealHidden, ::projectDrawerContent)
 }
 
 /**
@@ -41,15 +52,22 @@ class GetDrawerContentUseCase @Inject constructor(
  *   (those in no surviving folder), alphabetically by display name (`customName ?:
  *   label`). A blank folder title sorts as empty here — the localized default name is
  *   resolved in the UI (§10), so blank-titled folders cluster together.
+ * - **Hidden apps** ([hidden]) are removed from BOTH the loose pool and folder members
+ *   (display-only — the persisted membership is untouched, so a folder that drops below two
+ *   visible members re-appears when its members are unhidden). With [revealHidden] on
+ *   (overflow "show hidden"), nothing is filtered and each revealed loose app is marked
+ *   [DrawerEntry.App.hidden] so the UI dims it.
  */
 internal fun projectDrawerContent(
     apps: List<LauncherApp>,
     folders: DrawerFolders,
+    hidden: Set<ComponentKey> = emptySet(),
+    revealHidden: Boolean = false,
 ): List<DrawerEntry> {
     val byKey = apps.associateBy { it.key }
 
     val reconciled = folders.folders
-        .map { folder -> folder.copy(members = folder.members.filter { it in byKey }) }
+        .map { folder -> folder.copy(members = folder.members.filter { it in byKey && (revealHidden || it !in hidden) }) }
         .filter { it.members.size >= 2 }
 
     val memberKeys = reconciled.flatMapTo(HashSet()) { it.members }
@@ -59,9 +77,9 @@ internal fun projectDrawerContent(
         .map { DrawerEntry.Folder(it.id, it.title, it.members) }
 
     val appEntries = apps
-        .filterNot { it.key in memberKeys }
+        .filterNot { it.key in memberKeys || (!revealHidden && it.key in hidden) }
         .sortedBy { it.displayName.lowercase() }
-        .map { DrawerEntry.App(it) }
+        .map { DrawerEntry.App(it, hidden = it.key in hidden) }
 
     return folderEntries + appEntries
 }

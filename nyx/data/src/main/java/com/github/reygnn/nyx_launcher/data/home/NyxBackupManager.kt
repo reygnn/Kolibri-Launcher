@@ -14,6 +14,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.CancellationException
@@ -45,6 +46,7 @@ import javax.inject.Singleton
 class NyxBackupManager @Inject constructor(
     private val homeLayoutRepository: HomeLayoutRepository,
     private val drawerFoldersRepository: DrawerFoldersRepository,
+    private val hiddenAppsRepository: HiddenAppsRepository,
     private val preferences: PreferencesRepository,
     private val displaySettings: WallpaperDisplaySettings,
     private val wallpaperRepository: WallpaperRepository,
@@ -91,6 +93,7 @@ class NyxBackupManager @Inject constructor(
                     layout = layout,
                     prefs = prefs,
                     drawerFolders = drawerFoldersRepository.folders().first().toDto(),
+                    hiddenApps = hiddenAppsRepository.hidden().first().map { it.toDto() },
                     wallpaperLayers = layers,
                 )
 
@@ -152,6 +155,11 @@ class NyxBackupManager @Inject constructor(
                     // layout's save; a null field (older backup) leaves current folders intact.
                     backup.drawerFolders?.toDomain()?.let { restored ->
                         drawerFoldersRepository.update { restored }
+                    }
+                    // Hidden apps are drawer organisation too — restore under the layout toggle
+                    // (replace; a null field from an older backup leaves the current set intact).
+                    backup.hiddenApps?.let { dto ->
+                        hiddenAppsRepository.update { dto.map { it.toDomain() }.toSet() }
                     }
                     backup.layout?.toDomain()?.let { homeLayoutRepository.save(it) }
                 }

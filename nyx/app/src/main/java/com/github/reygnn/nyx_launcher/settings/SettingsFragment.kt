@@ -27,8 +27,12 @@ import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
 import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
 import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
+import com.github.reygnn.nyx_launcher.home.model.displayName
+import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
+import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -49,6 +53,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
+    @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
+    @Inject lateinit var hiddenAppsRepository: HiddenAppsRepository
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
     private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
@@ -137,6 +143,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 wallpaperImageSetter.clear()
                 toast(getString(R.string.wallpaper_cleared_toast))
             }
+            true
+        }
+
+        findPreference<Preference>("hidden_apps")?.setOnPreferenceClickListener {
+            showHiddenAppsManager()
             true
         }
 
@@ -266,6 +277,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
             ImportResult.InvalidData -> toast(getString(R.string.backup_import_invalid))
             null -> toast(getString(R.string.backup_import_failed))
         }
+    }
+
+    /**
+     * Hidden-apps manager: a multi-choice list of ALL apps, checked = hidden. Loads the app
+     * list + current hidden set off the current dispatcher, then applies the diff as one
+     * atomic write on OK. The drawer re-renders reactively (HomeViewModel.hiddenApps).
+     */
+    private fun showHiddenAppsManager() = lifecycleScope.launch {
+        val apps = getDrawerApps()
+        if (apps.isEmpty()) {
+            toast(getString(R.string.settings_hidden_apps_empty))
+            return@launch
+        }
+        val hidden = hiddenAppsRepository.hidden().first()
+        val labels = apps.map { it.displayName }.toTypedArray()
+        val checked = BooleanArray(apps.size) { apps[it].key in hidden }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_hidden_apps_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val newHidden = apps.filterIndexed { i, _ -> checked[i] }.map { it.key }.toSet()
+                lifecycleScope.launch { hiddenAppsRepository.update { if (it == newHidden) null else newHidden } }
+            }
+            .show()
     }
 
     /**

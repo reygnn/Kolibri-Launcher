@@ -29,6 +29,12 @@ data class NyxBackup(
      */
     val drawerFolders: DrawerFoldersDto? = null,
     /**
+     * Apps hidden from the drawer (null = not included, e.g. an older backup). Own DataStore
+     * blob, so carried here explicitly or it is lost on restore. Restored under the layout
+     * import toggle (drawer organisation, like [drawerFolders]).
+     */
+    val hiddenApps: List<ComponentKeyDto>? = null,
+    /**
      * Wallpaper layers with per-layer transforms. Each [WallpaperLayerBackup.imageFileName]
      * points at a blob inside the ZIP's `wallpapers/` dir (restored to internal storage).
      */

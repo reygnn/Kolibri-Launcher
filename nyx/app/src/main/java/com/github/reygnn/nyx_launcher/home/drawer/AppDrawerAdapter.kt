@@ -65,13 +65,17 @@ class AppDrawerAdapter(
 
     override fun onBindViewHolder(holder: EntryHolder, position: Int) {
         when (val entry = entries[position]) {
-            is DrawerEntry.App -> bindApp(holder, entry.app)
+            is DrawerEntry.App -> bindApp(holder, entry)
             is DrawerEntry.Folder -> bindFolder(holder, entry)
         }
     }
 
-    private fun bindApp(holder: EntryHolder, app: LauncherApp) {
+    private fun bindApp(holder: EntryHolder, entry: DrawerEntry.App) {
+        val app = entry.app
         holder.label.text = app.displayName
+        // Reveal mode only: a hidden app is shown dimmed so it reads as "hidden" at a glance.
+        // In the normal view hidden apps are filtered out, so this is 1f there.
+        holder.itemView.alpha = if (entry.hidden) HIDDEN_ALPHA else 1f
         // App tile: TalkBack reads the label (the app name); no folder role/count.
         holder.itemView.contentDescription = null
         holder.itemView.setOnClickListener { onAppClick(app) }
@@ -84,6 +88,7 @@ class AppDrawerAdapter(
     }
 
     private fun bindFolder(holder: EntryHolder, folder: DrawerEntry.Folder) {
+        holder.itemView.alpha = 1f // folders are never hidden; reset in case the view was recycled from a dimmed app
         val title = folder.title.ifBlank {
             holder.itemView.context.getString(R.string.folder_default_title)
         }
@@ -117,5 +122,8 @@ class AppDrawerAdapter(
     private companion object {
         const val TYPE_APP = 0
         const val TYPE_FOLDER = 1
+
+        // Dim factor for a revealed hidden app tile (overflow "show hidden").
+        const val HIDDEN_ALPHA = 0.4f
     }
 }

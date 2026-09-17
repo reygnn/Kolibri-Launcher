@@ -7,6 +7,7 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -110,16 +111,51 @@ class GetDrawerContentUseCaseTest {
         assertThat(result).isEqualTo(listOf(DrawerEntry.App(b), DrawerEntry.App(a)))
     }
 
-    // ---- Flow-level: the use case combines its two sources ----
+    // ---- hidden apps ----
+
+    @Test
+    fun `hidden loose app is filtered out when not revealing`() {
+        val a = app("a"); val b = app("b")
+        val result = projectDrawerContent(listOf(a, b), DrawerFolders.EMPTY, hidden = setOf(a.key))
+        assertThat(result).isEqualTo(listOf(DrawerEntry.App(b)))
+    }
+
+    @Test
+    fun `hidden loose app is shown marked when revealing`() {
+        val a = app("a"); val b = app("b")
+        val result = projectDrawerContent(listOf(a, b), DrawerFolders.EMPTY, hidden = setOf(a.key), revealHidden = true)
+        assertThat(result).isEqualTo(
+            listOf(DrawerEntry.App(a, hidden = true), DrawerEntry.App(b, hidden = false)),
+        )
+    }
+
+    @Test
+    fun `hidden member is removed from a folder, dissolving it below two (not revealing)`() {
+        val a = app("a"); val b = app("b"); val c = app("c")
+        // f1 = [a, b]; hiding a leaves one visible member, so the folder dissolves and b goes loose.
+        val result = projectDrawerContent(listOf(a, b, c), folders(folder("f1", "Stuff", a, b)), hidden = setOf(a.key))
+        assertThat(result).isEqualTo(listOf(DrawerEntry.App(b), DrawerEntry.App(c)))
+    }
+
+    @Test
+    fun `hidden member stays in its folder when revealing`() {
+        val a = app("a"); val b = app("b")
+        val result = projectDrawerContent(listOf(a, b), folders(folder("f1", "Stuff", a, b)), hidden = setOf(a.key), revealHidden = true)
+        assertThat(result).isEqualTo(
+            listOf(DrawerEntry.Folder(DrawerFolderId("f1"), "Stuff", listOf(a.key, b.key))),
+        )
+    }
+
+    // ---- Flow-level: the use case combines its sources ----
 
     @Test
     fun `use case combines the live apps with the folder membership`() =
         runTest(mainDispatcherRule.dispatcher) {
             val a = app("a"); val b = app("b"); val c = app("c")
             val repo = FakeDrawerFoldersRepository(folders(folder("f1", "Stuff", a, b)))
-            val useCase = GetDrawerContentUseCase(repo)
+            val useCase = GetDrawerContentUseCase(repo, FakeHiddenAppsRepository())
 
-            val content = useCase(flowOf(listOf(a, b, c))).first()
+            val content = useCase(flowOf(listOf(a, b, c)), flowOf(false)).first()
 
             assertThat(content).isEqualTo(
                 listOf(
@@ -127,5 +163,19 @@ class GetDrawerContentUseCaseTest {
                     DrawerEntry.App(c),
                 ),
             )
+        }
+
+    @Test
+    fun `use case filters the hidden set out of the loose apps`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val a = app("a"); val b = app("b")
+            val useCase = GetDrawerContentUseCase(
+                FakeDrawerFoldersRepository(),
+                FakeHiddenAppsRepository(setOf(a.key)),
+            )
+
+            val content = useCase(flowOf(listOf(a, b)), flowOf(false)).first()
+
+            assertThat(content).isEqualTo(listOf(DrawerEntry.App(b)))
         }
 }

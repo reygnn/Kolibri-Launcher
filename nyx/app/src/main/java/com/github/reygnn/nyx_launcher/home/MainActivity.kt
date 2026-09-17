@@ -957,9 +957,15 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     override fun showDrawerOverflowMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
             menu.add(Menu.NONE, MENU_CREATE_FOLDER_BY_MAKER, Menu.NONE, R.string.drawer_create_folder_by_maker)
+            val revealing = viewModel.showHidden.value
+            menu.add(
+                Menu.NONE, MENU_TOGGLE_HIDDEN, Menu.NONE,
+                if (revealing) R.string.drawer_hide_hidden else R.string.drawer_show_hidden,
+            )
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     MENU_CREATE_FOLDER_BY_MAKER -> { showCreateFolderByMakerDialog(); true }
+                    MENU_TOGGLE_HIDDEN -> { viewModel.setShowHidden(!revealing); true }
                     else -> false
                 }
             }
@@ -1326,6 +1332,11 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         is DragPayload.NewApp -> buildList {
             val pkg = payload.key.packageName
             add(ContextMenuItem(getString(R.string.menu_add_to_home)) { addToHome(payload.key) })
+            if (payload.key in viewModel.hiddenApps.value) {
+                add(ContextMenuItem(getString(R.string.menu_unhide_app)) { viewModel.unhideApp(payload.key) })
+            } else {
+                add(ContextMenuItem(getString(R.string.menu_hide_app)) { viewModel.hideApp(payload.key) })
+            }
             add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
             if (!isSystemApp(pkg)) add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
         }
@@ -1435,8 +1446,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
 /** Every top-level item across the grid and the dock. */
 private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + dock
 
-/** Drawer overflow menu item id: "create folder by maker". */
+/** Drawer overflow menu item ids. */
 private const val MENU_CREATE_FOLDER_BY_MAKER = 1
+private const val MENU_TOGGLE_HIDDEN = 2
 
 /** Width of the left/right pager edge zone (dp) that triggers drag page-advance. */
 private const val EDGE_ADVANCE_DP = 36f

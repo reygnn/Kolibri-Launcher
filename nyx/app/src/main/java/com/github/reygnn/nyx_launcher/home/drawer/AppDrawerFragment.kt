@@ -196,8 +196,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         // (allowAutoLaunch) — the VM exposes it as a suspend getter, not a hot flow, so
         // there is no stale point-read.
         val autoLaunch = allowAutoLaunch && viewModel.isSearchAutoLaunchEnabled()
+        // Hidden apps stay out of search results too (they are excluded from the folder view
+        // as well) — a hidden app is only reachable via reveal mode or the settings manager.
+        val hidden = viewModel.hiddenApps.value
         val result = DrawerAppSearch.filterAndDecide(
-            allApps = viewModel.drawerApps.value,
+            allApps = viewModel.drawerApps.value.filterNot { it.key in hidden },
             query = query,
             isAutoLaunchEnabled = autoLaunch,
         )
@@ -253,6 +256,8 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         searchBox?.let { if (it.text.isNotEmpty()) it.text = null }
         hideKeyboard()
         searchQueryChangeTracker.reset()
+        // Reveal mode is transient: a fresh open always starts on the normal (hidden-filtered) view.
+        viewModel.setShowHidden(false)
     }
 
     private fun drawerColumns(): Int {

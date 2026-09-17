@@ -24,6 +24,12 @@
             android:summary="@string/search_auto_launch_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="hidden_apps"
+            android:title="@string/settings_hidden_apps_title"
+            android:summary="@string/settings_hidden_apps_summary"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <PreferenceCategory

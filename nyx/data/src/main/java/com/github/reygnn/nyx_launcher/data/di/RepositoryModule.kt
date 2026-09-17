@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.di
 
 import com.github.reygnn.nyx_launcher.data.home.DrawerFoldersRepositoryImpl
+import com.github.reygnn.nyx_launcher.data.home.HiddenAppsRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidDrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
@@ -14,6 +15,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
+import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
@@ -44,6 +46,12 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindDrawerFolderIdFactory(impl: UuidDrawerFolderIdFactory): DrawerFolderIdFactory
+
+    // Hidden apps: own repository over the shared DataStore under its own key, filtered out
+    // of the drawer projection (display-only, independent of layout and folders).
+    @Binds
+    @Singleton
+    abstract fun bindHiddenAppsRepository(impl: HiddenAppsRepositoryImpl): HiddenAppsRepository
 
     @Binds
     abstract fun bindLayoutSerializer(impl: HomeLayoutSerializer): LayoutSerializer
