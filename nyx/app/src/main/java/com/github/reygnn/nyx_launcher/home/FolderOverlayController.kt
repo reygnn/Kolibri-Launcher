@@ -63,13 +63,22 @@ class FolderOverlayController(
      * Cap the card at [CARD_MAX_HEIGHT_FRACTION] of the overlay height so a folder with
      * many members can't fill the screen — a scrim margin always stays tappable to
      * dismiss it. Only the scrollable member grid absorbs the cap; a small folder stays
-     * wrap_content. Runs after layout (the overlay height is only known then); the card's
-     * non-grid chrome (title + button + padding) is grid-content-invariant, so
-     * `card - grid` yields it on any pass.
+     * wrap_content.
+     *
+     * The exact cap needs the overlay height, known only after layout. But the chrome
+     * (title + add-apps button + padding) is measured as `card - grid`, and that is only
+     * correct if the grid didn't already eat the whole card on the pre-cap pass: an
+     * uncapped `wrap_content` grid whose content overflows the overlay squeezes the button
+     * to ~0, so `card - grid` would miss the button height and the card would exceed the
+     * cap on first open. So pre-cap the grid from the screen height BEFORE that pass (the
+     * overlay is full-height, so screen height is a safe stand-in), then refine to the exact
+     * overlay height once laid out. Pre-capping every open also resets a stale cap from a
+     * previous, taller folder.
      */
     private fun capCardHeight() {
         val grid = members as? MaxHeightRecyclerView ?: return
         val card = members.parent as? View ?: return
+        grid.maxHeightPx = (grid.resources.displayMetrics.heightPixels * CARD_MAX_HEIGHT_FRACTION).toInt()
         overlay.doOnLayout {
             val cap = (overlay.height * CARD_MAX_HEIGHT_FRACTION).toInt()
             if (cap <= 0) return@doOnLayout
