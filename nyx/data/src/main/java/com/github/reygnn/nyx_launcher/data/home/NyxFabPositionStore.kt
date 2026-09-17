@@ -4,9 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,11 +18,12 @@ import javax.inject.Singleton
 class NyxFabPositionStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) {
-    val fabPositionFlow: Flow<FabPosition> = dataStore.data.map { prefs ->
-        val x = prefs[X]
-        val y = prefs[Y]
-        if (x != null && y != null) FabPosition(x, y) else FabPosition.DEFAULT
-    }
+    val fabPositionFlow: Flow<FabPosition> =
+        dataStore.readFlowFailOpen("Error reading FAB position") { prefs ->
+            val x = prefs[X]
+            val y = prefs[Y]
+            if (x != null && y != null) FabPosition(x, y) else FabPosition.DEFAULT
+        }
 
     suspend fun saveFabPosition(position: FabPosition) {
         dataStore.edit {

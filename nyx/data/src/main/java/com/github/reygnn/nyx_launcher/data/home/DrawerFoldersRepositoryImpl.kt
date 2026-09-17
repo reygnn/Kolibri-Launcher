@@ -5,12 +5,12 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -33,10 +33,11 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
     // clobber each other on a stale read (mirrors HomeLayoutRepositoryImpl, A1-03).
     private val writeMutex = Mutex()
 
-    override fun folders(): Flow<DrawerFolders> = dataStore.data.map { prefs ->
-        val raw = prefs[KEY] ?: return@map DrawerFolders.EMPTY
-        serializer.deserialize(raw) ?: DrawerFolders.EMPTY
-    }
+    override fun folders(): Flow<DrawerFolders> =
+        dataStore.readFlowFailOpen("Error reading drawer folders") { prefs ->
+            val raw = prefs[KEY] ?: return@readFlowFailOpen DrawerFolders.EMPTY
+            serializer.deserialize(raw) ?: DrawerFolders.EMPTY
+        }
 
     override suspend fun update(transform: suspend (DrawerFolders) -> DrawerFolders?) =
         writeMutex.withLock {

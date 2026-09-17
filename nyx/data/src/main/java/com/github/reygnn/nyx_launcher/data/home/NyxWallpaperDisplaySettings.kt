@@ -5,12 +5,12 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,14 +30,16 @@ class NyxWallpaperDisplaySettings @Inject constructor(
 ) : WallpaperDisplaySettings {
 
     override val wallpaperScrimAlphaStateFlow: Flow<Float> =
-        dataStore.data.map { it[SCRIM_ALPHA] ?: AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA }
+        dataStore.readFlowFailOpen("Error reading wallpaper scrim alpha") {
+            it[SCRIM_ALPHA] ?: AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA
+        }
 
     override suspend fun setWallpaperScrimAlpha(alpha: Float) {
         dataStore.edit { it[SCRIM_ALPHA] = alpha }
     }
 
     override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> =
-        dataStore.data.map { prefs ->
+        dataStore.readFlowFailOpen("Error reading wallpaper surface mode") { prefs ->
             prefs[SURFACE_MODE].toEnumOr(WallpaperSurfaceMode.AUTO)
         }
 
@@ -46,7 +48,7 @@ class NyxWallpaperDisplaySettings @Inject constructor(
     }
 
     override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
-        dataStore.data.map { prefs ->
+        dataStore.readFlowFailOpen("Error reading wallpaper backdrop") { prefs ->
             prefs[BACKDROP].toEnumOr(WallpaperBackdrop.SYSTEM_WALLPAPER)
         }
 

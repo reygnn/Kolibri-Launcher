@@ -14,9 +14,9 @@ import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
+import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -38,10 +38,11 @@ class HomeLayoutRepositoryImpl @Inject constructor(
     // both hold it, so concurrent writers can't clobber each other (A1-03).
     private val writeMutex = Mutex()
 
-    override fun layout(): Flow<HomeLayout> = dataStore.data.map { prefs ->
-        val raw = prefs[KEY] ?: return@map DEFAULT
-        serializer.deserialize(raw) ?: DEFAULT
-    }
+    override fun layout(): Flow<HomeLayout> =
+        dataStore.readFlowFailOpen("Error reading home layout") { prefs ->
+            val raw = prefs[KEY] ?: return@readFlowFailOpen DEFAULT
+            serializer.deserialize(raw) ?: DEFAULT
+        }
 
     override suspend fun save(layout: HomeLayout) = writeMutex.withLock { writeRaw(layout) }
 
