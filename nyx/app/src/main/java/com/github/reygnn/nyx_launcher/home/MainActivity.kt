@@ -958,10 +958,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         PopupMenu(this, anchor).apply {
             menu.add(Menu.NONE, MENU_CREATE_FOLDER_BY_MAKER, Menu.NONE, R.string.drawer_create_folder_by_maker)
             val revealing = viewModel.showHidden.value
-            menu.add(
-                Menu.NONE, MENU_TOGGLE_HIDDEN, Menu.NONE,
-                if (revealing) R.string.drawer_hide_hidden else R.string.drawer_show_hidden,
-            )
+            // Only offer the reveal toggle when there is something to reveal — or while already
+            // revealing, so the user can always turn it back off.
+            if (viewModel.hiddenApps.value.isNotEmpty() || revealing) {
+                menu.add(
+                    Menu.NONE, MENU_TOGGLE_HIDDEN, Menu.NONE,
+                    if (revealing) R.string.drawer_hide_hidden else R.string.drawer_show_hidden,
+                )
+            }
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     MENU_CREATE_FOLDER_BY_MAKER -> { showCreateFolderByMakerDialog(); true }
