@@ -5,6 +5,22 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ---
 
+## Kürzlich erledigt (2026-09-17)
+
+- **Drawer-Folder** — voll umgesetzt (`DrawerFoldersRepository`/
+  `DrawerFoldersTransition`, Ordner-Overlay), inkl. Overflow-„Ordner nach Hersteller"
+  und Auto-Ordnername beim Hersteller-Hinzufügen. (Ersetzt den früheren offenen
+  Punkt „Folder im App-Drawer".)
+- **Hidden Apps** — aus Kolibri portiert: `HiddenAppsRepository` (Contract-Trias),
+  Filter in der Drawer-Projektion, Reveal-Modus + Kontextmenü + Settings-Manager,
+  Backup/Restore. (Ersetzt den früheren offenen Punkt „Hidden Apps".)
+- **Usage-Sortierung** (opt-in) — `AppUsageRepository` über separaten `nyx_usage`-
+  DataStore, geteilte `:core`-Scoring-Mathematik, Overflow-Toggle.
+- **First-Run-Seeding** — Play Store aufs Grid + Google-Apps in einen Drawer-Ordner.
+- **60%-Ordnerkappe** im Ordner-Overlay (leichter wegklickbar).
+
+---
+
 ## Offen
 
 > **Launcher3/Pixel-Scope-Entscheid (2026-09-13):** Widgets (AppWidgetHost),
@@ -66,17 +82,19 @@ Anker: `MainActivity` (clock_container, clockDelegate), `PreferencesRepository`
 
 ### DataStore-Reads fail-open absichern (nyx-weit) — Robustheit
 
-Nyx' DataStore-gestützte Stores lesen via `dataStore.data.map { … }` **ohne**
-`.catch`-Fallback: eine `IOException` beim Read (Store-Korruption) propagiert in
-den Collector → Crash. Kolibri kapselt das in einem geteilten Safe-Read-Helfer
-(`:common-data` `DataStoreReadFlow.safeReadFlow`, fail-open auf Defaults). Nyx
-sollte einen analogen geteilten Helfer haben (oder `DataStoreReadFlow`
-wiederverwenden) und alle Read-Flows darüber leiten — nicht nur die Wallpaper-
-Stores, sonst driftet es. Aus dem WV5d-Deep-Review zurückgestellt (nyx-weite
-Lücke, eigener Task statt inkonsistenter Teilfix). Niedrige Wahrscheinlichkeit
-(nur bei Store-Korruption), aber ein Crash-Pfad. Anker:
-`PreferencesRepositoryImpl`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore`;
-Referenz `:common-data/…/DataStoreReadFlow.kt`.
+Nyx' DataStore-gestützte Stores lesen überwiegend via `dataStore.data.map { … }`
+**ohne** `.catch`-Fallback: eine `IOException` beim Read (Store-Korruption)
+propagiert in den Collector → Crash. Kolibri kapselt das in einem geteilten
+Safe-Read-Helfer (`:common-data` `readFlowFailOpen`, fail-open auf Defaults).
+
+Teilweise erledigt: der neue `AppUsageRepositoryImpl` (Usage-Store) liest bereits
+über `readFlowFailOpen`. **Offen** bleiben die übrigen Read-Flows — sie sollten
+alle über den geteilten Helfer laufen, sonst driftet es. Niedrige
+Wahrscheinlichkeit (nur bei Store-Korruption), aber ein Crash-Pfad. Anker:
+`PreferencesRepositoryImpl`, `HomeLayoutRepositoryImpl`,
+`DrawerFoldersRepositoryImpl`, `HiddenAppsRepositoryImpl`,
+`NyxWallpaperDisplaySettings`, `NyxFabPositionStore`; Referenz
+`:common-data/…/readFlowFailOpen`.
 
 ### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
 
@@ -119,58 +137,11 @@ aufgerufen werden.
 Anker: `MainActivity.applyDeviceGrid`, `HomeViewModel.applyDeviceGrid`,
 `FitHomeGridUseCase`, `HomeLayoutRegridder`.
 
-### Folder im App-Drawer — Feature (idealerweise Home-Struktur wiederverwenden)
+### Custom Names — Feature (aus Kolibri portieren)
 
-Der Drawer kennt aktuell **keine** Folder: `GetDrawerAppsUseCase` liefert eine
-flache `List<LauncherApp>` (nur `key/label/customName`, kein Children/Folder-
-Feld), `AppDrawerAdapter` bindet ausschließlich Einzel-App-ViewHolder (kein
-`getItemViewType`, keine Gruppen), und der einzige Interaktionspfad ist
-Tap = Launch / Long-Press = `DragPayload.NewApp(key)`. Folder sind bislang rein
-ein Home-/Dock-Konzept (`HomeItem.Folder`); die Specs führen den Drawer bewusst
-als „nur eine Liste" (`ICON_HOME_MODEL_SPEC.md:46`, `HOME_EDIT_USECASES_SPEC.md`
-Scope-Ausschluss).
-
-Ziel: Gruppieren von Apps zu Foldern **innerhalb** des Drawers. **Idealerweise
-die Home-Struktur übernehmen statt ein zweites Modell zu bauen** — d.h. den
-`HomeItem`/`HomeItem.Folder`-Typ und die reine Transitions-Logik
-(`HomeLayoutTransition`: app-onto-app → FolderCreated, app-onto-folder → member,
-`removeFromFolder`) für den Drawer wiederverwenden, inkl. der scoped IHM-INV-7-
-Uniqueness und der Invarianten-Absicherung (`HomeLayoutInvariants`). Zu klären:
-eigener Drawer-Layout-State (persistiert) vs. Ableitung, und wie sich das mit
-„Drawer zeigt *alle* Apps" verträgt (Folder als Gruppierungs-Overlay über der
-vollständigen Liste, nicht als exklusive Container).
-
-Braucht: einen persistierten Drawer-Layout-Zustand (Store in `:nyx:data`),
-`getItemViewType` + Folder-ViewHolder/-Öffnen im `AppDrawerAdapter`, einen
-Drag-to-Fold-Pfad im `AppDrawerFragment` und eine ViewModel-Verdrahtung auf die
-geteilte Transitions-Logik. Vorab **Produkt-/Scope-Entscheid** nötig (der
-Launcher3-Scope-Entscheid oben nennt Drawer-Folder nicht explizit).
-
-Anker: `home/usecase/GetDrawerAppsUseCase.kt`, `home/model/LauncherApp.kt`,
-`home/drawer/AppDrawerAdapter.kt`, `home/drawer/AppDrawerFragment.kt`,
-`DragPayload.kt`; Wiederverwendung aus `home/model/HomeItem.kt`,
-`home/transition/HomeLayoutTransition.kt`, `home/model/HomeLayoutInvariants.kt`.
-
-### Hidden Apps — Feature (aus Kolibri portieren)
-
-Der Drawer zeigt aktuell **alle** installierten Apps: `GetDrawerAppsUseCase`
-lädt `repository.loadInstalledApps()`, sortiert nach Anzeigename und gibt zurück
-— **kein Hidden-Filter** dazwischen. `HiddenAppsRepository` existiert nur in den
-Specs, nicht im nyx-Code.
-
-`ICON_HOME_MODEL_SPEC.md:47` (§0.1-Tabelle) führt Hidden Apps als **Übernahme
-aus dem großen Kolibri** (`HiddenAppsRepository`, „keine" Anpassung) — geplant,
-aber noch nicht portiert (gleiches Muster wie Custom Names / Backup/Restore in
-derselben Tabelle).
-
-Braucht: `HiddenAppsRepository` (Interface + DataStore-Impl in `:nyx:data`, Rule
-1/5), Einhängen des Hidden-Sets in `GetDrawerAppsUseCase` (rausfiltern; Sortieren
-bleibt Consumer-Job), einen Aus-/Einblenden-Pfad (Long-Press im Drawer bzw.
-Settings-Liste) und eine „versteckte Apps"-Verwaltungsansicht. Reconcile-
-Interaktion prüfen: eine versteckte App darf beim Reconcile nicht als
-deinstalliert gewertet und vom Home entfernt werden.
-
-Anker: `home/usecase/GetDrawerAppsUseCase.kt`,
-`home/repository/InstalledAppsRepository.kt`, `home/model/LauncherApp.kt`,
-`home/drawer/AppDrawerFragment.kt`, `settings/*`; Referenz (Kolibri):
-`HiddenAppsRepository`.
+Noch offen aus der Übernahme-Tabelle (`ICON_HOME_MODEL_SPEC.md` §0.1): frei
+umbenennbare App-Namen. `LauncherApp` trägt bereits ein `customName`-Feld und die
+Sortierung nutzt `displayName = customName ?: label`, aber es gibt keinen
+`CustomNamesRepository` und keinen Umbenennen-Pfad. Muster wie Hidden Apps (heute
+portiert): eigenes Repository + reaktives Einfalten in die Drawer-Projektion +
+Bearbeiten-UI. Referenz (Kolibri): `CustomNamesRepository`.
