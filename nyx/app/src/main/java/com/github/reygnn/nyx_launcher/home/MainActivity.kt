@@ -628,7 +628,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     }
 
     /**
-     * First-launch ACRA consent (public builds), mirroring Kolibri: show the shared dialog
+     * First-launch ACRA consent (all builds), mirroring Kolibri: show the shared dialog
      * once when the decision was never made, re-affirm ACRA from a stored decision, or skip
      * on an unreadable store. The dialog persists the choice via [ConsentController.applyConsent].
      */
@@ -1574,10 +1574,14 @@ private fun HomeLayout.allHomeItems(): List<HomeItem> = items.map { it.item } + 
  */
 @SuppressLint("ClickableViewAccessibility")
 private fun View.setOnDoubleTap(action: () -> Unit) {
-    // Mark this view as its own touch pipeline so the home GestureDispatchCore suppresses
-    // its own double-tap over it (it keys on isLongClickable / hasOnClickListeners). Without
-    // this the tap would ALSO fall through to the home double-tap → events dialog double-fire.
-    isLongClickable = true
+    // An OnClickListener is also set (not just the touch double-tap) for TWO reasons:
+    //  - Accessibility: TalkBack's activation gesture is a synthetic ACTION_CLICK that bypasses
+    //    onTouch, so without an OnClickListener the target would be unreachable via TalkBack.
+    //    A sighted single tap still does nothing — the onTouch listener below consumes the
+    //    stream (returns true) so onTouchEvent/performClick never runs for a physical tap.
+    //  - It marks this view as its own touch pipeline (hasOnClickListeners), so the home
+    //    GestureDispatchCore suppresses its own double-tap over it (no events-dialog double-fire).
+    setOnClickListener { action() }
     val detector = GestureDetector(
         context,
         object : GestureDetector.SimpleOnGestureListener() {

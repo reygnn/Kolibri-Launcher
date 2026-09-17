@@ -30,6 +30,7 @@ import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
 import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
 import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
+import com.github.reygnn.nyx_launcher.home.model.HiddenAppsSelection
 import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
@@ -315,14 +316,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
             .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val installedKeys = apps.map { it.key }.toSet()
-                val checkedInstalled = apps.filterIndexed { i, _ -> checked[i] }.map { it.key }.toSet()
+                val shownKeys = apps.map { it.key }.toSet()
+                val checkedShown = apps.filterIndexed { i, _ -> checked[i] }.map { it.key }.toSet()
                 lifecycleScope.launch {
-                    // Merge, don't replace: keep hidden keys for apps NOT in this list (uninstalled,
-                    // or restored from another device's backup) — the manager only toggles the apps it
-                    // actually shows. Computed inside the transform so it applies to the latest set.
+                    // Merge (not replace) via the pure HiddenAppsSelection so hidden keys for apps
+                    // not shown here (uninstalled / cross-device) are preserved. Computed inside the
+                    // transform so it applies to the latest persisted set.
                     hiddenAppsRepository.update { current ->
-                        val merged = current.filterTo(mutableSetOf()) { it !in installedKeys } + checkedInstalled
+                        val merged = HiddenAppsSelection.merge(current, shownKeys, checkedShown)
                         if (merged == current) null else merged
                     }
                 }

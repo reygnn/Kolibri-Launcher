@@ -224,7 +224,9 @@ class HomeViewModel @Inject constructor(
      * folder overlay's "add all from maker" action (DrawerAppSearch flattens; this groups).
      */
     fun drawerVendorGroups(): List<DrawerVendorGrouping.VendorGroup> =
-        DrawerVendorGrouping.groups(drawerApps.value)
+        // Exclude hidden apps: they are filtered out of the drawer projection, so the maker
+        // picker must not count them or fold them into a created/expanded folder.
+        DrawerVendorGrouping.groups(drawerApps.value.filterNot { it.key in hiddenApps.value })
 
     /**
      * Vendor groups reduced to the apps NOT already in [exclude] (the open folder's current

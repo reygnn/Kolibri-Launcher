@@ -108,6 +108,23 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun hideApp_then_unhideApp_updates_the_hidden_set() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns listOf(APP_A)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.hideApp(APP_A.key)
+            advanceUntilIdle()
+            assertThat(hiddenApps.current).containsExactly(APP_A.key)
+
+            // unhide removes it again (the transform returns null / a smaller set).
+            viewModel.unhideApp(APP_A.key)
+            advanceUntilIdle()
+            assertThat(hiddenApps.current).isEmpty()
+        }
+
+    @Test
     fun refresh_returning_empty_after_populated_keeps_previous_list() =
         runTest(mainDispatcherRule.dispatcher) {
             coEvery { getDrawerApps() } returns listOf(APP_A)

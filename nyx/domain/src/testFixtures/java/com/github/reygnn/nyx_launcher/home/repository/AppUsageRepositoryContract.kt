@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import app.cash.turbine.test
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
@@ -38,6 +39,19 @@ abstract class AppUsageRepositoryContract {
         val snapshot = repo.usageSnapshotFlow.first()
         assertThat(snapshot.keys).containsExactly("com.a")
         assertThat(snapshot.getValue("com.a")).hasSize(1)
+    }
+
+    @Test
+    fun snapshot_flow_re_emits_after_a_launch_within_one_collection() = runTest(mainDispatcherRule.dispatcher) {
+        // The drawer re-orders on launch by reacting to this flow, so a live re-emit is the
+        // repo's load-bearing behaviour — pin it for both fake and impl.
+        val repo = createRepository()
+        repo.usageSnapshotFlow.test {
+            assertThat(awaitItem()).isEmpty()
+            repo.recordPackageLaunch("com.a")
+            assertThat(awaitItem().keys).containsExactly("com.a")
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

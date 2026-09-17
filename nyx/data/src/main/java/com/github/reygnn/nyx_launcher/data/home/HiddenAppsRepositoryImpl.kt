@@ -32,14 +32,19 @@ class HiddenAppsRepositoryImpl @Inject constructor(
     private val writeMutex = Mutex()
 
     override fun hidden(): Flow<Set<ComponentKey>> =
-        dataStore.readFlowFailOpen("Error reading hidden apps") { prefs ->
-            val raw = prefs[KEY] ?: return@readFlowFailOpen emptySet()
-            serializer.deserialize(raw) ?: emptySet()
-        }
+        dataStore.readFlowFailOpen("Error reading hidden apps") { parseHidden(it) }
+
+    private fun parseHidden(prefs: Preferences): Set<ComponentKey> {
+        val raw = prefs[KEY] ?: return emptySet()
+        return serializer.deserialize(raw) ?: emptySet()
+    }
 
     override suspend fun update(transform: suspend (Set<ComponentKey>) -> Set<ComponentKey>?) =
         writeMutex.withLock {
-            val current = hidden().first()
+            // Fail-CLOSED read for the destructive RMW: read the raw store (IOException aborts the
+            // write) instead of the fail-open [hidden] flow, which would recover to emptySet and let
+            // the write drop previously hidden apps on a transient read failure.
+            val current = parseHidden(dataStore.data.first())
             transform(current)?.let { writeRaw(it) }
             Unit
         }

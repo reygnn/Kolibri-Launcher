@@ -38,6 +38,8 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Round-trips a backup through the ZIP container (export → import) with mocked repos,
@@ -62,6 +64,7 @@ class NyxBackupManagerTest {
     private val preferences = mockk<PreferencesRepository>(relaxed = true) {
         every { monochromeIcons() } returns flowOf(true)
         every { searchAutoLaunch() } returns flowOf(false)
+        every { usageSortEnabled() } returns flowOf(false)
         every { showAlarmFlow } returns flowOf(false)
         every { showCalendarEventFlow } returns flowOf(true)
     }
@@ -151,6 +154,24 @@ class NyxBackupManagerTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(hiddenAppsRepository.current)
             .containsExactly(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M"))
+    }
+
+    @Test
+    fun import_with_null_hidden_apps_leaves_current_set_intact() = runTest(mainDispatcherRule.dispatcher) {
+        // An older backup carries no hiddenApps field (null); restore must not clear the current set.
+        hiddenAppsRepository.update { setOf(ComponentKey("com.keep", "com.keep.M")) }
+        val backup = NyxBackup(timestamp = 1L, appVersion = "old", hiddenApps = null)
+        val zip = ByteArrayOutputStream()
+        ZipOutputStream(zip).use {
+            it.putNextEntry(ZipEntry("backup.json"))
+            it.write(NyxBackupSerializer().serialize(backup).toByteArray(Charsets.UTF_8))
+            it.closeEntry()
+        }
+
+        val result = manager.import(ByteArrayInputStream(zip.toByteArray()), NyxBackupOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(hiddenAppsRepository.current).containsExactly(ComponentKey("com.keep", "com.keep.M"))
     }
 
     @Test

@@ -1,12 +1,12 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -42,16 +42,22 @@ class HomeLayoutRepositoryImpl @Inject constructor(
     private val writeMutex = Mutex()
 
     override fun layout(): Flow<HomeLayout> =
-        dataStore.readFlowFailOpen("Error reading home layout") { prefs ->
-            val raw = prefs[KEY] ?: return@readFlowFailOpen DEFAULT
-            serializer.deserialize(raw) ?: DEFAULT
-        }
+        dataStore.readFlowFailOpen("Error reading home layout") { parseLayout(it) }
+
+    private fun parseLayout(prefs: Preferences): HomeLayout {
+        val raw = prefs[KEY] ?: return DEFAULT
+        return serializer.deserialize(raw) ?: DEFAULT
+    }
 
     override suspend fun save(layout: HomeLayout) = writeMutex.withLock { writeRaw(layout) }
 
     override suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?) =
         writeMutex.withLock {
-            val current = layout().first()
+            // Fail-CLOSED read for the destructive read-modify-write: read the raw store
+            // directly (an IOException propagates and aborts the write) rather than through the
+            // fail-open [layout] flow, which would recover to DEFAULT (empty) and let the write
+            // clobber the real layout on a transient read failure (DSR: snapshotFailClosed posture).
+            val current = parseLayout(dataStore.data.first())
             transform(current)?.let { writeRaw(it) }
             Unit
         }
@@ -101,7 +107,9 @@ class HomeLayoutRepositoryImpl @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
-                TimberWrapper.silentError(e, "Skipping first-run layout seed: store unavailable")
+                // A DataStore IOException is environmental, not a programmer error: log at WARN
+                // (never crash in DEBUG, unlike TimberWrapper.silentError) and skip the seed.
+                Log.w("HomeLayoutRepositoryImpl", "Skipping first-run layout seed: store unavailable", e)
                 false
             }
         }

@@ -1,5 +1,8 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
@@ -7,10 +10,13 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 /**
  * First-run seeding ([DrawerFoldersRepositoryImpl.seedInitialFolders]). Like the home
@@ -82,6 +88,21 @@ class DrawerFoldersRepositoryImplSeedTest {
 
         assertThat(second).isFalse()
         assertThat(resolved).isFalse()
+    }
+
+    @Test
+    fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.dispatcher) {
+        // Contained fail-closed: an IOException on the seed read is caught → no seed, no crash.
+        val throwing = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("boom") }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                emptyPreferences()
+        }
+        val repo = DrawerFoldersRepositoryImpl(throwing, DrawerFoldersSerializer())
+
+        val seeded = repo.seedInitialFolders { listOf(googleFolder(GMAIL, MAPS)) }
+
+        assertThat(seeded).isFalse()
     }
 
     private companion object {

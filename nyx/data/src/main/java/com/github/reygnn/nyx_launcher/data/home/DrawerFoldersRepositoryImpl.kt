@@ -1,12 +1,12 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
-import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
@@ -37,14 +37,19 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
     private val writeMutex = Mutex()
 
     override fun folders(): Flow<DrawerFolders> =
-        dataStore.readFlowFailOpen("Error reading drawer folders") { prefs ->
-            val raw = prefs[KEY] ?: return@readFlowFailOpen DrawerFolders.EMPTY
-            serializer.deserialize(raw) ?: DrawerFolders.EMPTY
-        }
+        dataStore.readFlowFailOpen("Error reading drawer folders") { parseFolders(it) }
+
+    private fun parseFolders(prefs: Preferences): DrawerFolders {
+        val raw = prefs[KEY] ?: return DrawerFolders.EMPTY
+        return serializer.deserialize(raw) ?: DrawerFolders.EMPTY
+    }
 
     override suspend fun update(transform: suspend (DrawerFolders) -> DrawerFolders?) =
         writeMutex.withLock {
-            val current = folders().first()
+            // Fail-CLOSED read for the destructive RMW: read the raw store (IOException aborts the
+            // write) instead of the fail-open [folders] flow, which would recover to EMPTY and let
+            // the write wipe all folders on a transient read failure.
+            val current = parseFolders(dataStore.data.first())
             transform(current)?.let { writeRaw(it) }
             Unit
         }
@@ -82,7 +87,8 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
-                TimberWrapper.silentError(e, "Skipping first-run folder seed: store unavailable")
+                // Environmental IOException, not a programmer error: WARN (never crash in DEBUG) + skip.
+                Log.w("DrawerFoldersRepositoryImpl", "Skipping first-run folder seed: store unavailable", e)
                 false
             }
         }
