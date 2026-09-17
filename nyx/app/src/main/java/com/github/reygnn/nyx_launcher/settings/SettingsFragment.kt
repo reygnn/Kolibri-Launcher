@@ -16,8 +16,11 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.appcompat.app.AlertDialog
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
@@ -55,6 +58,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
     @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
     @Inject lateinit var hiddenAppsRepository: HiddenAppsRepository
+    @Inject lateinit var consentController: ConsentController
+
+    private var crashReportPref: Preference? = null
+    // ConsentDialog is setCancelable(false); tracked so onDestroyView can dismiss it.
+    private var consentDialog: AlertDialog? = null
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
     private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
@@ -164,11 +172,20 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
+        crashReportPref = findPreference<Preference>("crash_reports")?.apply {
+            setOnPreferenceClickListener {
+                showCrashReportConsentDialog()
+                true
+            }
+        }
+
         setupDevCommands()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // Reflect the stored crash-report decision in the preference summary.
+        viewLifecycleOwner.lifecycleScope.launch { refreshCrashReportSummary() }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
@@ -314,6 +331,33 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     /**
+     * Crash-report consent (Settings entry, mirrors Kolibri): the shared [ConsentDialog]
+     * re-opened on demand; the choice is applied + persisted via [ConsentController] and the
+     * summary + a toast confirm it.
+     */
+    private fun showCrashReportConsentDialog() {
+        lifecycleScope.launch {
+            consentDialog = ConsentDialog.show(requireActivity()) { granted ->
+                consentController.applyConsent(granted)
+                toast(getString(if (granted) R.string.toast_crash_reports_enabled else R.string.toast_crash_reports_disabled))
+                crashReportPref?.summary = crashReportSummary(granted)
+            }
+        }
+    }
+
+    private suspend fun refreshCrashReportSummary() {
+        val granted = when (val action = consentController.resolveStartupAction()) {
+            is ConsentController.StartupAction.Reaffirm -> action.granted
+            // NeverAsked (ShowDialog) or unreadable (Skip): crash reporting is off.
+            else -> false
+        }
+        crashReportPref?.summary = crashReportSummary(granted)
+    }
+
+    private fun crashReportSummary(granted: Boolean): String =
+        getString(if (granted) R.string.crash_report_summary_enabled else R.string.crash_report_summary_disabled)
+
+    /**
      * Factory reset (mirrors Kolibri): confirm, then wipe all state. The positive
      * button is destructive, so it needs an explicit confirm; cancel is a no-op.
      */
@@ -349,4 +393,12 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun toast(text: String) = showToastSafe(text)
+
+    override fun onDestroyView() {
+        // ConsentDialog is setCancelable(false); dismiss it so its window doesn't leak.
+        consentDialog?.dismiss()
+        consentDialog = null
+        crashReportPref = null
+        super.onDestroyView()
+    }
 }

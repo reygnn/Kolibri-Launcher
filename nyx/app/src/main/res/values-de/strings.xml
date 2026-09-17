@@ -55,6 +55,12 @@
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
     <string name="category_homeinfo_title">Startbildschirm-Info</string>
+    <string name="category_privacy_title">Datenschutz</string>
+    <string name="crash_report_setting_title">Absturzberichte</string>
+    <string name="crash_report_summary_enabled">Anonyme Absturzberichte werden gesendet</string>
+    <string name="crash_report_summary_disabled">Absturzberichte aus</string>
+    <string name="toast_crash_reports_enabled">Absturzberichte aktiviert</string>
+    <string name="toast_crash_reports_disabled">Absturzberichte deaktiviert</string>
 
     <!-- Wallpaper (WV5) -->
     <string name="category_wallpaper_title">Hintergrund</string>

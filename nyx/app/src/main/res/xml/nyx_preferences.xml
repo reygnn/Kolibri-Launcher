@@ -91,6 +91,16 @@
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
+    <PreferenceCategory
+        android:title="@string/category_privacy_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="crash_reports"
+            android:title="@string/crash_report_setting_title"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
     <!-- ACRA dev commands: hidden at runtime unless BuildConfig.SHOW_DEV_COMMANDS
          (debug, or a personal -PdevCommands release). Mirrors Kolibri. -->
     <PreferenceCategory

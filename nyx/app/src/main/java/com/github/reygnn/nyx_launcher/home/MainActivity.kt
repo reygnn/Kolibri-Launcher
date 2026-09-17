@@ -36,6 +36,7 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
@@ -53,8 +54,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
-import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
+import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
@@ -142,8 +143,12 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
     // returning install (gated in its repository). See onCreate.
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
 
-    // Dev builds report crashes automatically (no consent prompt); see onCreate.
+    // Drives the shared first-launch ACRA consent dialog (see onCreate); all builds.
     @Inject lateinit var consentController: ConsentController
+
+    // The shared first-launch consent dialog (setCancelable(false)); tracked so onDestroy
+    // can dismiss it and not leak its window.
+    private var consentDialog: AlertDialog? = null
 
     // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
     // wallpaper state (mirrored from the repo), drives the transactional edit session.
@@ -380,10 +385,9 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             rerenderWallpaper = { renderWallpaper(wallpaperEditCoordinator.wallpaperState.value) },
         )
 
-        // Dev builds (SHOW_DEV_COMMANDS: debug / -PdailyDriver / -PdevCommands) hard-set
-        // ACRA consent to true so our own crashes always report — no first-launch prompt.
-        // Public release keeps consent opt-in (untouched here).
-        if (BuildConfig.SHOW_DEV_COMMANDS) consentController.applyConsent(true)
+        // First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
+        // the stored decision → show the dialog once / re-affirm ACRA / skip on unreadable.
+        lifecycleScope.launch { showCrashReportConsentIfNeeded() }
 
         // One-shot on startup: reclaim wallpaper files stranded by a crash between
         // copy and save (the shared repo/file-manager split doesn't self-clean).
@@ -613,6 +617,28 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         super.onPause()
         // no suspension point — unregisterReceiver is a synchronous framework call.
         runCatching { unregisterReceiver(batteryReceiver) }
+    }
+
+    override fun onDestroy() {
+        // ConsentDialog is setCancelable(false); dismiss the tracked instance so its window
+        // doesn't leak across a config change / teardown.
+        consentDialog?.dismiss()
+        consentDialog = null
+        super.onDestroy()
+    }
+
+    /**
+     * First-launch ACRA consent (public builds), mirroring Kolibri: show the shared dialog
+     * once when the decision was never made, re-affirm ACRA from a stored decision, or skip
+     * on an unreadable store. The dialog persists the choice via [ConsentController.applyConsent].
+     */
+    private suspend fun showCrashReportConsentIfNeeded() {
+        when (val action = consentController.resolveStartupAction()) {
+            ConsentController.StartupAction.ShowDialog ->
+                consentDialog = ConsentDialog.show(this) { consentController.applyConsent(it) }
+            is ConsentController.StartupAction.Reaffirm -> consentController.reaffirmConsent(action.granted)
+            ConsentController.StartupAction.Skip -> Unit
+        }
     }
 
     // ---- setup ----
