@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Nyx-Launcher</string>
+    <string name="app_name">Nyx Launcher</string>
     <string name="folder_default_title">Folder</string>
     <string name="folder_add_by_maker">Add apps by maker</string>
     <string name="folder_add_by_maker_none">No more apps to add</string>
@@ -61,8 +61,8 @@
     <string name="monochrome_icons_summary">Render app icons in monochrome</string>
     <string name="notification_dots_title">Notification dots</string>
     <string name="notification_dots_summary">Show a dot on app icons that have a notification</string>
-    <string name="notification_dots_service_label">Nyx-Launcher notification dots</string>
-    <string name="notification_dots_grant_toast">Grant notification access to Nyx-Launcher to show dots</string>
+    <string name="notification_dots_service_label">Nyx notification dots</string>
+    <string name="notification_dots_grant_toast">Grant notification access to Nyx to show dots</string>
     <string name="notification_dots_no_access_summary">Notification access not granted — dots won\'t show</string>
     <string name="category_homeinfo_title">Home info</string>
     <string name="category_privacy_title">Privacy</string>
@@ -92,7 +92,7 @@
     <string name="show_alarm_title">Show next alarm</string>
     <string name="show_alarm_summary">Show the next alarm on the home screen</string>
     <string name="calendar_permission_title">Calendar access</string>
-    <string name="calendar_permission_rationale">Nyx-Launcher needs calendar access to show your next event on the home screen.</string>
+    <string name="calendar_permission_rationale">Nyx needs calendar access to show your next event on the home screen.</string>
     <string name="calendar_permission_denied_toast">Calendar permission denied</string>
     <string name="event_all_day">All day</string>
     <string name="events_dialog_title">Upcoming</string>

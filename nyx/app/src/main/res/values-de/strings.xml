@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Nyx-Launcher</string>
+    <string name="app_name">Nyx Launcher</string>
     <string name="folder_default_title">Ordner</string>
     <string name="folder_add_by_maker">Apps nach Hersteller</string>
     <string name="folder_add_by_maker_none">Keine weiteren Apps</string>
@@ -56,8 +56,8 @@
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
     <string name="notification_dots_title">Benachrichtigungspunkte</string>
     <string name="notification_dots_summary">Punkt auf App-Icons mit einer Benachrichtigung anzeigen</string>
-    <string name="notification_dots_service_label">Nyx-Launcher Benachrichtigungspunkte</string>
-    <string name="notification_dots_grant_toast">Benachrichtigungszugriff für Nyx-Launcher erteilen, um Punkte zu zeigen</string>
+    <string name="notification_dots_service_label">Nyx Benachrichtigungspunkte</string>
+    <string name="notification_dots_grant_toast">Benachrichtigungszugriff für Nyx erteilen, um Punkte zu zeigen</string>
     <string name="notification_dots_no_access_summary">Benachrichtigungszugriff nicht erteilt — Punkte erscheinen nicht</string>
     <string name="category_homeinfo_title">Startbildschirm-Info</string>
     <string name="category_privacy_title">Datenschutz</string>
@@ -87,7 +87,7 @@
     <string name="show_alarm_title">Nächsten Wecker anzeigen</string>
     <string name="show_alarm_summary">Nächsten Wecker auf dem Startbildschirm anzeigen</string>
     <string name="calendar_permission_title">Kalenderzugriff</string>
-    <string name="calendar_permission_rationale">Nyx-Launcher braucht Kalenderzugriff, um deinen nächsten Termin auf dem Startbildschirm anzuzeigen.</string>
+    <string name="calendar_permission_rationale">Nyx braucht Kalenderzugriff, um deinen nächsten Termin auf dem Startbildschirm anzuzeigen.</string>
     <string name="calendar_permission_denied_toast">Kalenderberechtigung verweigert</string>
     <string name="event_all_day">Ganztägig</string>
     <string name="events_dialog_title">Anstehend</string>
