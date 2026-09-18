@@ -98,22 +98,6 @@
     <string name="backup_import_summary">Layout, Einstellungen und Hintergrund aus einer Datei wiederherstellen</string>
 
     <!-- Wallpaper edit (WV5d, copied from Kolibri) -->
-    <string name="cd_open_commands">Weitere Hintergrund-Steuerungen</string>
-    <string name="wallpaper_fit_width">An Breite anpassen</string>
-    <string name="wallpaper_original_size">Originalgröße (1:1)</string>
-    <string name="wallpaper_add_layer">Layer hinzufügen</string>
-    <string name="wallpaper_cancel">Abbrechen</string>
-    <string name="cd_fab_save_drag">Hintergrund-Änderungen speichern. Zum Verschieben halten und ziehen.</string>
-    <string name="wallpaper_snap_toggle">Snap an/aus</string>
-    <string name="wallpaper_snap_mode_toggle">Snap-Modus wechseln</string>
-    <string name="wallpaper_horizontal_snap_toggle">Horizontaler Snap ein/aus</string>
-    <string name="wallpaper_vertical_snap_toggle">Vertikaler Snap ein/aus</string>
-    <string name="wallpaper_delete_layer">Layer löschen</string>
-    <string name="wallpaper_move_layer_up">Layer nach vorne</string>
-    <string name="wallpaper_move_layer_down">Layer nach hinten</string>
-    <string name="cd_wallpaper_memory_info">Speicherverbrauch anzeigen</string>
-    <string name="cd_wallpaper_backdrop_toggle">Hintergrund umschalten: System-Wallpaper oder Schwarz</string>
-    <string name="cd_close_commands">Steuerungen schließen</string>
     <string name="wallpaper_edit_hint">Zoomen mit zwei Fingern, ziehen zum Verschieben</string>
     <string name="wallpaper_memory_title">Wallpaper-Speicher</string>
     <string name="wallpaper_memory_row">Layer %1$d: %2$s · %3$s  (%4$s)</string>

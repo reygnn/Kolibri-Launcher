@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab
 
 import com.github.reygnn.launcher.common.ui.wallpaperfab.FabDragHandler
 import com.github.reygnn.launcher.common.ui.wallpaperfab.FabPositionMath
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SpeedDialFabCluster
 
 import android.os.SystemClock
 import android.view.MotionEvent

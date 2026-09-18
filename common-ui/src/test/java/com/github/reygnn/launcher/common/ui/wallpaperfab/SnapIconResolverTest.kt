@@ -1,17 +1,10 @@
-package com.github.reygnn.kolibri_launcher.ui
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
-import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.kolibri_launcher.ui.home.SnapIconResolver
-import com.github.reygnn.kolibri_launcher.ui.home.SnapMode
+import com.github.reygnn.launcher.common.ui.R
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
 
 class SnapIconResolverTest {
-
-    @get:Rule
-    val timberRule = TimberRule()
 
     // ========== MAGNET ==========
 

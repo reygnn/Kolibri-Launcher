@@ -15,8 +15,10 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperSaveAction
 import com.github.reygnn.launcher.core.wallpaper.formatMegabytes
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
-import com.github.reygnn.nyx_launcher.home.wallpaperfab.CommandsPanel
-import com.github.reygnn.nyx_launcher.home.wallpaperfab.SpeedDialFabCluster
+import com.github.reygnn.launcher.common.ui.wallpaperfab.CommandsPanel
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SnapIconResolver
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SnapMode
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SpeedDialFabCluster
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**

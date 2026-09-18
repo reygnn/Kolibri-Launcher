@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Foreground tint for the wallpaper-edit controls (white icons/text over the
+  dimmed edit surface). Referenced by the shared view_commands_panel /
+  view_speed_dial_fab_cluster layouts, and by each app's edit-overlay layout
+  (which keeps its own identical copy; the app value overrides this one at merge).
+-->
+<resources>
+    <color name="wallpaper_edit_foreground">#FFFFFF</color>
+</resources>

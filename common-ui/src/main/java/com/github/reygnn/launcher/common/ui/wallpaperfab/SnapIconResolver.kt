@@ -1,7 +1,7 @@
-package com.github.reygnn.kolibri_launcher.ui.home
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import androidx.annotation.DrawableRes
-import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.common.ui.R
 
 /**
  * Pure Kotlin enum, frei von Android-View-Abhängigkeiten.

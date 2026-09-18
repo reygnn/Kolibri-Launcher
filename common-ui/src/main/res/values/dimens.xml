@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dimensions the shared wallpaper-edit Views reference. spacing_medium is a
+  generic 8dp used app-wide too (each app keeps its own copy; the app value
+  overrides this library one at merge — same value). wallpaper_panel_slide_distance
+  is specific to CommandsPanel and moved here with it.
+-->
+<resources>
+    <dimen name="spacing_medium">8dp</dimen>
+    <dimen name="wallpaper_panel_slide_distance">24dp</dimen>
+</resources>

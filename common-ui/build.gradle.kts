@@ -40,10 +40,13 @@ dependencies {
     // and uses viewModelScope. Explicit rather than leaning on a transitive.
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
-    // appcompat: ZoomableImageView extends AppCompatImageView. material is NOT
-    // pulled here (the FAB/edit-toolbar Views stay in kolibri); the
-    // material-before-appcompat force() rule lives in each :app that has both.
+    // appcompat: ZoomableImageView extends AppCompatImageView.
     implementation(libs.androidx.appcompat)
+    // material: the shared wallpaper-edit Views (SpeedDialFabCluster uses
+    // FloatingActionButton, CommandsPanel uses MaterialButton) live here now.
+    // Needs the same material-before-appcompat force() as the apps (see the
+    // configurations block below) — appcompat drags an older MaterialYou.
+    implementation(libs.material)
     // coroutines-android: WallpaperViewBinder's parallel-decode (async/awaitAll/
     // Semaphore) + Main dispatcher for view mutation.
     implementation(libs.kotlinx.coroutines.android)
@@ -58,4 +61,10 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
+}
+
+// `material` MUST resolve before `appcompat` (appcompat drags an older
+// MaterialYou) — same force() the apps carry.
+configurations.configureEach {
+    resolutionStrategy { force(libs.material) }
 }

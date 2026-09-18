@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wallpaper-edit UI strings, shared by both apps' wallpaper-edit surface
+  (SpeedDialFabCluster + CommandsPanel, which live in this module). The
+  per-app copies were removed when those Views moved here.
+-->
+<resources>
+    <string name="wallpaper_fit_width">Fit to width</string>
+    <string name="wallpaper_original_size">Original size (1:1)</string>
+    <string name="wallpaper_add_layer">Add layer</string>
+    <string name="wallpaper_cancel">Cancel</string>
+    <string name="cd_fab_save_drag">Save wallpaper edits. Drag to move this button.</string>
+    <string name="cd_open_commands">More wallpaper-edit controls</string>
+    <string name="cd_close_commands">Close controls</string>
+    <string name="wallpaper_snap_toggle">Snap on/off</string>
+    <string name="wallpaper_snap_mode_toggle">Toggle snap-mode</string>
+    <string name="wallpaper_horizontal_snap_toggle">Horizontal snap on/off</string>
+    <string name="wallpaper_vertical_snap_toggle">Vertical snap on/off</string>
+    <string name="wallpaper_delete_layer">Delete layer</string>
+    <string name="wallpaper_move_layer_up">Move layer forward</string>
+    <string name="wallpaper_move_layer_down">Move layer backward</string>
+    <string name="cd_wallpaper_memory_info">Show memory usage</string>
+    <string name="cd_wallpaper_backdrop_toggle">Toggle backdrop: system wallpaper or black</string>
+</resources>

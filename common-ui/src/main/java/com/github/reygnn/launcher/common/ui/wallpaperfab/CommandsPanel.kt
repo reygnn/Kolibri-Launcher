@@ -1,6 +1,4 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
-
-import com.github.reygnn.launcher.common.ui.wallpaperfab.DISABLED_ALPHA
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import android.content.Context
 import android.util.AttributeSet
@@ -10,7 +8,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.launcher.common.ui.R
 import com.google.android.material.button.MaterialButton
 
 /**

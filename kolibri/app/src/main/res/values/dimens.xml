@@ -58,7 +58,6 @@
     <!-- Wallpaper-edit overflow panel: slide-in distance for the
          show/hide animation. Density-aware so the offset is visible
          on high-dpi displays. -->
-    <dimen name="wallpaper_panel_slide_distance">24dp</dimen>
 
     <!-- Elevations -->
     <dimen name="elevation_card">4dp</dimen>

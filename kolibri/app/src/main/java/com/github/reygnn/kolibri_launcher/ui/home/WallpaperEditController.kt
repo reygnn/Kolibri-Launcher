@@ -10,7 +10,9 @@ import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.CommandsPanel
+import com.github.reygnn.launcher.common.ui.wallpaperfab.CommandsPanel
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SnapIconResolver
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SnapMode
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryReport
 import com.github.reygnn.launcher.core.wallpaper.formatMegabytes
@@ -18,7 +20,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditState
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditTransition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSaveAction
-import com.github.reygnn.kolibri_launcher.ui.home.wallpaperfab.SpeedDialFabCluster
+import com.github.reygnn.launcher.common.ui.wallpaperfab.SpeedDialFabCluster
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import timber.log.Timber

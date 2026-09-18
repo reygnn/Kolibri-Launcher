@@ -1,7 +1,4 @@
-package com.github.reygnn.nyx_launcher.home.wallpaperfab
-
-import com.github.reygnn.launcher.common.ui.wallpaperfab.FabDragHandler
-import com.github.reygnn.launcher.common.ui.wallpaperfab.FabPositionMath
+package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -15,7 +12,7 @@ import android.widget.LinearLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnLayout
-import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.launcher.common.ui.R
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 /**

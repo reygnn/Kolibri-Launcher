@@ -36,7 +36,7 @@
       Overflow panel for snap controls + layer-reorder. Hidden by
       default; the SpeedDialFabCluster's ☰ FAB toggles it.
     -->
-    <com.github.reygnn.nyx_launcher.home.wallpaperfab.CommandsPanel
+    <com.github.reygnn.launcher.common.ui.wallpaperfab.CommandsPanel
         android:id="@+id/wallpaperCommandsPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -50,7 +50,7 @@
       stacked above it. The user-dragged position persists via
       LauncherViewModel.fabPosition / onFabPositionChanged.
     -->
-    <com.github.reygnn.nyx_launcher.home.wallpaperfab.SpeedDialFabCluster
+    <com.github.reygnn.launcher.common.ui.wallpaperfab.SpeedDialFabCluster
         android:id="@+id/wallpaperFabCluster"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
