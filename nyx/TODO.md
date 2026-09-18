@@ -7,6 +7,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Kürzlich erledigt (2026-09-18)
 
+- **Dev-Fehler-Toasts in nyx** — der `ToastErrorTree` (Timber-Tree, ERROR-Logs →
+  globaler `ErrorEventBus`) wurde von Kolibri nach `:feature-crashreporting` gehoben
+  (product-neutral, dedupliziert — Kolibris Kopie gelöscht, Import umgebogen) und in
+  `NyxApplication` im DEBUG-Block gepflanzt. Der `BaseActivity`-Collector zeigt die
+  Toasts nun (DEBUG-only, `SILENT_ERROR`-Tags unterdrückt). Damit ist der optionale
+  Rest von #2 (BaseActivity) erledigt.
 - **Home ist portrait-only (Pixel-Default)** — die frühere #5-Orientierungsfrage ist
   entschieden: der Home-Screen rotiert NICHT (`MainActivity` mit
   `android:screenOrientation="portrait"` gelockt), wie der Pixel Launcher auf Phones.
@@ -93,18 +99,6 @@ Package-Präsenz halten, keine Titel/Texte/Counts persistieren. Rendern in Grid-
 Anker: neuer `NotificationListenerService` + Präsenz-Store (`:nyx:data` oder
 `:common-*`), `home/HomeGridAdapter.kt` (Icon-Bindung), Dock-Icon-Rendering in
 `MainActivity`, Manifest (`BIND_NOTIFICATION_LISTENER_SERVICE`).
-
-### Dev-Fehler-Toasts in nyx speisen (optional, Rest von BaseActivity)
-
-Die geteilte `BaseActivity` (erledigt, siehe oben) **sammelt** bereits den
-globalen `ErrorEventBus` und würde in DEBUG Dev-Fehler-Toasts zeigen — aber in
-nyx **postet niemand** auf den Bus: die einzige Quelle ist Kolibris
-`ToastErrorTree` (eine Timber-Tree), die nyx nicht pflanzt. Der Collector läuft
-also leer. Wenn Dev-Fehler-Toasts wie in Kolibri gewünscht sind: eine kleine
-`ToastErrorTree` nach `:common-ui` (oder `:feature-crashreporting`) heben und in
-`NyxLauncherApp` pflanzen. Rein optional/Dev-Komfort. Anker: Kolibri
-`ui/util/ToastErrorTree.kt`, `NyxLauncherApp` (Timber-Trees), `:common-ui`
-`ErrorEventBus`.
 
 ### Wallpaper-Edit-UI: Dedup gegen `:common-ui`
 

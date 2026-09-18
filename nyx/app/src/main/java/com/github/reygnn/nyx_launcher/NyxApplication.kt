@@ -7,6 +7,7 @@ import android.util.Log
 import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
 import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
 import dagger.hilt.android.HiltAndroidApp
@@ -79,6 +80,9 @@ class NyxApplication : Application() {
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
+            // Feed ERROR logs to the ErrorEventBus so BaseActivity surfaces a dev error
+            // toast (DEBUG only; SILENT_ERROR-tagged entries are suppressed there).
+            Timber.plant(ToastErrorTree())
         }
 
         try {
