@@ -37,7 +37,7 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
+import com.github.reygnn.launcher.common.ui.base.BaseActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -121,9 +121,9 @@ import javax.inject.Inject
  * payloads and the overlay container that lives in this activity's layout.
  */
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
+class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.Host {
 
-    private val viewModel: HomeViewModel by viewModels()
+    override val viewModel: HomeViewModel by viewModels()
 
     @Inject lateinit var iconLoader: IconLoader
     @Inject lateinit var folderRenderer: FolderIconRenderer
@@ -415,7 +415,10 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
         // Independent one-shot: seed the "Google" drawer folder from installed Google apps.
         lifecycleScope.launch { firstRunSeeder.seedDrawerFolders() }
 
-        lifecycleScope.launch {
+        // Run the UI collectors under the BaseActivity crash-net handler: a throwable
+        // in any render/collect (wallpaper, layout, scrim, clock, …) is reported
+        // instead of escaping to the global handler and crashing the launcher.
+        lifecycleScope.launch(coroutineExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.layout.collect(::renderLayout) }
                 launch { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }

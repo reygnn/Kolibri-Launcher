@@ -171,6 +171,9 @@ run_awk_list "$kol_tools/check-rule11-annotation.awk" \
 #   against an invisible suspend-flip.
 cancel_files=(
   "$app_root/com/github/reygnn/nyx_launcher/home/MainActivity.kt"
+  # Shared crash-net base adopted by nyx (highest blast radius): every broad
+  # Throwable catch sits behind a CancellationException-first arm.
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseActivity.kt"
 )
 run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \
