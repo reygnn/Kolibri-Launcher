@@ -94,3 +94,58 @@ build that reliably triggers it), escalate: file it, capture `dumpsys
 SurfaceFlinger` / `dumpsys activity` at the moment, and reconsider whether a
 narrow mitigation is warranted. A single non-reproducible sighting stays here as
 a recognition note only.
+
+---
+
+## 2. System wallpaper flashes through during the foreground-return transition
+
+- **Status:** 🟢 Reproducible, but platform-inherent — no code fix; user-config
+  mitigation only
+- **Context:** Returning to the Kolibri home *quickly* — swipe into another app
+  and back, tap into Overview / Recents and back, or press HOME from another app
+- **Affected:** Pixel 9a (observed); generic to any launcher whose home window is
+  transparent + `FLAG_SHOW_WALLPAPER`
+- **Reproducible:** Yes — a brief system-wallpaper flash for ~1–2 frames during
+  the return transition, independent of the app drawer (fires even when just
+  tapping into Overview and straight back)
+
+### Symptom
+
+On the fast return transition the **system** wallpaper is visible for a couple of
+frames before Kolibri's own window content re-composites. It reads as a quick
+"flash" only when something normally *hides* the system wallpaper — e.g. the open
+(opaque) app-drawer overlay, or a user's own opaque/near-opaque Kolibri wallpaper
+collage. With a plain transparent home the system wallpaper is on screen anyway,
+so there is nothing to notice.
+
+### Assessed cause
+
+A **system-transition compositing behaviour**: SystemUI / SurfaceFlinger uses the
+system wallpaper as the transition backdrop while the launcher window is being
+brought forward, before the app's own surface is fully drawn. This is *not* the
+app's `FLAG_SHOW_WALLPAPER` peek — confirmed with a throwaway diagnostic build
+(`spike/kolibri-diag-showwallpaper`) that **dropped** `FLAG_SHOW_WALLPAPER` and
+painted the window opaque black: the wallpaper *still* flashed on a quick
+Overview→back, so the reveal is driven by the system transition, not by Kolibri's
+window flags. Same window setup as glitch #1 (`MainActivity.setupWindow`:
+transparent + `FLAG_SHOW_WALLPAPER`) demasks it, but does not cause it.
+
+### Why no code workaround (but there IS a user mitigation)
+
+- **The reveal is the system's, not ours.** Removing `FLAG_SHOW_WALLPAPER` /
+  opaque window did not stop it (diagnostic above) — the app cannot suppress the
+  system's own transition backdrop. Nothing in the ordinary lifecycle signals
+  "the system is showing the wallpaper behind me right now" to react to.
+- **User-config mitigation makes it invisible.** Set the **system** wallpaper to
+  black and use Kolibri's own wallpaper machine (an opaque layer or a collage)
+  for the visible wallpaper. The transition then reveals *black* (or nothing
+  jarring) instead of a different system wallpaper — the flash is simply not
+  perceptible. This is the historical reason it went unnoticed for so long: a
+  black system wallpaper under transparent Kolibri collages already hid it.
+
+### Re-evaluation trigger
+
+If a future Android release changes the foreground-transition backdrop (e.g. no
+longer paints the system wallpaper during app→home), or if a launcher-facing API
+appears to opt out of the wallpaper-backed transition, revisit — but there is no
+Kolibri code to change here today.
