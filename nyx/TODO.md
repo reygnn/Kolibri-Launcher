@@ -7,6 +7,21 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Kürzlich erledigt (2026-09-18)
 
+- **Wallpaper-Edit-FAB-Views nach `:common-ui` dedupliziert** — die drei bis
+  dahin app-lokalen, byte-identischen Klassen (`SpeedDialFabCluster`,
+  `CommandsPanel`, `SnapIconResolver` + sein Top-Level-`SnapMode`) liegen jetzt
+  in `:common-ui` (`…common.ui.wallpaperfab`), zusammen mit ihren 2 internen
+  Layouts, 26 wallpaper-edit-only Drawables, 16 Strings (EN+DE) und der
+  `wallpaper_panel_slide_distance`-Dimen. App-Kopien gelöscht. Der frühere
+  Material-Blocker (`:common-ui` schloss Material bewusst aus) wurde getestet
+  und aufgelöst: Material + die material-vor-appcompat-`force()` bauen **beide**
+  Apps sauber (Release-Lint grün, `material:1.14.0` löst korrekt auf, kein
+  MaterialYou-Downgrade). `spacing_medium` + `wallpaper_edit_foreground` bleiben
+  zusätzlich app-lokal (generisch bzw. vom app-eigenen Edit-Overlay genutzt —
+  App-Wert überschreibt den Library-Wert beim Merge). Kolibris
+  `SnapIconResolverTest` zog nach `:common-ui` mit; sein
+  `SpeedDialFabClusterRobolectricTest` bleibt in Kolibri (Hilt-Test-Infra).
+  Netto −1382/+97 Zeilen.
 - **Notification-Dots (Pixel-faithful)** — kleiner Präsenz-Punkt oben-rechts an
   App-Icons in **Grid + Dock + Drawer**, plus Aggregat-Dots auf **Ordner**-Icons
   (Dot, wenn ein Mitglied eine Notification hat). Opt-in: `NyxNotificationListenerService`
@@ -94,31 +109,10 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > und Widget-Picker sind **out of scope — won't build.** Nyx bleibt ein schlanker,
 > kuratierter Grid-Launcher, kein Launcher3-Klon. Die Paritäts-Lücke ist
 > geschlossen: Page-Indicator und Notification-Dots sind umgesetzt. Was hier unter
-> „Offen" bleibt, sind nur noch **bewusste won't-build-Entscheide** (unten
-> dokumentiert), keine aktiven Kandidaten mehr.
-
-### Wallpaper-Edit-UI: Dedup gegen `:common-ui` — geprüft, bewusst NICHT umgesetzt (2026-09-18)
-
-Der **nicht-Material-Teil ist bereits geteilt**: `LayerButtonsState`, `ViewFade`,
-`DialogWindow`, `DialogDrag`, `FabDragHandler`, `FabPositionMath` liegen schon in
-`:common-ui`. Übrig sind nur die beiden **Material-View-Kopien**
-`SpeedDialFabCluster` + `CommandsPanel`.
-
-Prüfung (2026-09-18): die 3 restlichen Klassen sind byte-identisch zu Kolibri (bis
-auf `package` + `R`-Import), und alle 15 referenzierten Ressourcen sind byte-gleich.
-ABER ein sauberer Move ist **blockiert**: `SpeedDialFabCluster`/`CommandsPanel`
-brauchen Material (`MaterialButton`, `FloatingActionButton`), und `:common-ui`
-**schließt Material bewusst aus** — siehe `common-ui/build.gradle.kts`: „material is
-NOT pulled here (the FAB/edit-toolbar Views stay in kolibri); the material-before-
-appcompat force() rule lives in each :app that has both." Genau deshalb blieben die
-zwei Views app-lokal (WV5d), nicht wegen Ressourcen-Merge.
-
-Ein Move würde also erfordern, Material (+ die material-vor-appcompat-`force()`) in
-`:common-ui` aufzunehmen — die bewusste Ausschluss-Entscheidung umzukehren, mit dem
-Ordering-Risiko in **beiden** Apps. Daher: **won't build**, solange Material aus
-`:common-ui` draußen bleibt. (`SnapIconResolver` allein — kein Material — wäre
-ziehbar, aber zu wenig Wert für einen eigenen Schritt; sein `SnapMode`-Enum
-dupliziert zudem `ZoomableImageView.SnapMode`.)
+> „Offen" bleibt, ist nur noch ein **bewusster won't-build-Entscheid** (unten
+> dokumentiert), kein aktiver Kandidat mehr. (Die Wallpaper-Edit-UI-Dedup gegen
+> `:common-ui`, zuvor hier als won't-build geführt, wurde am 2026-09-18 doch
+> umgesetzt — der Material-Blocker war überwindbar; siehe „Kürzlich erledigt".)
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 
