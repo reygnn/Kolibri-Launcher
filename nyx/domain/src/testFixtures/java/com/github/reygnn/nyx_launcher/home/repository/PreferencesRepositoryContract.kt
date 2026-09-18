@@ -80,6 +80,31 @@ abstract class PreferencesRepositoryContract {
         }
     }
 
+    // --- notification dots flag ---
+
+    @Test
+    fun notification_dots_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().notificationDots().first()).isFalse()
+    }
+
+    @Test
+    fun setting_notification_dots_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.setNotificationDots(true)
+        assertThat(repo.notificationDots().first()).isTrue()
+    }
+
+    @Test
+    fun notification_dots_flow_emits_the_new_value_on_change() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.notificationDots().test {
+            assertThat(awaitItem()).isFalse() // initial
+            repo.setNotificationDots(true)
+            assertThat(awaitItem()).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     // --- home-info flags (TimeInfoSettings port) ---
 
     @Test

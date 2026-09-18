@@ -25,6 +25,7 @@ class HomeGridAdapter(
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
     private val rows: Int,
+    private val dotPackages: () -> Set<String>,
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onIconLongPress: (view: View, id: ItemId) -> Unit,
@@ -59,6 +60,7 @@ class HomeGridAdapter(
         val cell = cells[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+        holder.dot.visibility = View.GONE
         // A dragged cell is hidden during the drag; make sure a reused holder is
         // never left invisible (the source may land back in the recycle pool).
         holder.itemView.visibility = View.VISIBLE
@@ -88,7 +90,7 @@ class HomeGridAdapter(
             holder.itemView.isLongClickable = false
         } else {
             bindLaunchableCell(
-                holder.itemView, holder.icon, cell, scope, token, { holder.bindToken },
+                holder.itemView, holder.icon, holder.dot, cell, dotPackages(), scope, token, { holder.bindToken },
                 iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress,
             )
         }
@@ -101,6 +103,7 @@ class HomeGridAdapter(
 
     class CellHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.cell_icon)
+        val dot: View = view.findViewById(R.id.cell_dot)
         var bindToken: Int = 0
     }
 }

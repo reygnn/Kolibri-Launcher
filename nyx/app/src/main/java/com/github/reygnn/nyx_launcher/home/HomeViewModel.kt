@@ -34,8 +34,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.github.reygnn.nyx_launcher.home.notifications.NotificationPresenceStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -71,6 +73,7 @@ class HomeViewModel @Inject constructor(
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val recordAppLaunch: RecordAppLaunchUseCase,
     wallpaperDisplaySettings: WallpaperDisplaySettings,
+    notificationPresenceStore: NotificationPresenceStore,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
@@ -79,6 +82,18 @@ class HomeViewModel @Inject constructor(
 
     val monochromeIcons: StateFlow<Boolean> = preferences.monochromeIcons()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * Packages that should show a notification dot RIGHT NOW, gated by the user toggle:
+     * the listener service's live presence set when [PreferencesRepository.notificationDots]
+     * is on, else empty (so turning the toggle off clears every dot without touching the
+     * service). The UI (grid/dock/drawer adapters) collects this and re-binds.
+     */
+    val notificationDots: StateFlow<Set<String>> = combine(
+        notificationPresenceStore.packages,
+        preferences.notificationDots(),
+    ) { packages, enabled -> if (enabled) packages else emptySet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /**
      * User setting: auto-launch the single search match (DRAWER_FOLDERS_SPEC §10 D-3).

@@ -29,6 +29,14 @@ interface PreferencesRepository : TimeInfoSettings {
     fun usageSortEnabled(): Flow<Boolean>
     suspend fun setUsageSortEnabled(enabled: Boolean)
 
+    /**
+     * When enabled, app icons show a small dot when their app has an active
+     * (non-ongoing) notification (mirrors Pixel's notification dots). Requires the
+     * user to grant notification access; the toggle only gates rendering. Off by default.
+     */
+    fun notificationDots(): Flow<Boolean>
+    suspend fun setNotificationDots(enabled: Boolean)
+
     // TimeInfoSettings: showAlarmFlow, showCalendarEventFlow (read side).
     suspend fun setShowAlarm(enabled: Boolean)
     suspend fun setShowCalendarEvent(enabled: Boolean)

@@ -41,10 +41,23 @@ fun ImageView.loadIconGated(
  * [HomeCell.Empty] is a no-op — the dock never has empties, and the grid clears
  * its own listeners for empty cells before calling this.
  */
+/**
+ * Whether [this] cell should show a notification dot given [dotPackages] (the set of
+ * packages with a dot-worthy notification): an app matches its own package, a folder
+ * matches if any member does. Pure — unit-tested (see HomeCellDotTest).
+ */
+fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this) {
+    HomeCell.Empty -> false
+    is HomeCell.App -> key.packageName in dotPackages
+    is HomeCell.Folder -> members.any { it.packageName in dotPackages }
+}
+
 fun bindLaunchableCell(
     itemView: View,
     icon: ImageView,
+    dot: View,
     cell: HomeCell,
+    dotPackages: Set<String>,
     scope: CoroutineScope,
     tokenAtBind: Int,
     currentToken: () -> Int,
@@ -55,6 +68,7 @@ fun bindLaunchableCell(
     onOpenFolder: (id: ItemId) -> Unit,
     onIconLongPress: (view: View, id: ItemId) -> Unit,
 ) {
+    dot.visibility = if (cell.hasNotificationDot(dotPackages)) View.VISIBLE else View.GONE
     when (cell) {
         HomeCell.Empty -> Unit
         is HomeCell.App -> {

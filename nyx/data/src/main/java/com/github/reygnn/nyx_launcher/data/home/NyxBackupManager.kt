@@ -65,6 +65,7 @@ class NyxBackupManager @Inject constructor(
                     monochromeIcons = preferences.monochromeIcons().first(),
                     searchAutoLaunch = preferences.searchAutoLaunch().first(),
                     usageSortEnabled = preferences.usageSortEnabled().first(),
+                    notificationDots = preferences.notificationDots().first(),
                     showAlarm = preferences.showAlarmFlow.first(),
                     showCalendarEvent = preferences.showCalendarEventFlow.first(),
                     scrimAlpha = displaySettings.wallpaperScrimAlphaStateFlow.first(),
@@ -179,6 +180,7 @@ class NyxBackupManager @Inject constructor(
         prefs.monochromeIcons?.let { preferences.setMonochromeIcons(it) }
         prefs.searchAutoLaunch?.let { preferences.setSearchAutoLaunch(it) }
         prefs.usageSortEnabled?.let { preferences.setUsageSortEnabled(it) }
+        prefs.notificationDots?.let { preferences.setNotificationDots(it) }
         prefs.showAlarm?.let { preferences.setShowAlarm(it) }
         prefs.showCalendarEvent?.let { preferences.setShowCalendarEvent(it) }
         prefs.scrimAlpha?.let { displaySettings.setWallpaperScrimAlpha(it) }

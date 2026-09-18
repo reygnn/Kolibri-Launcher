@@ -46,6 +46,18 @@
             android:exported="false"
             android:label="@string/settings_title"
             android:theme="@style/Theme.Nyx.Settings" />
+
+        <!-- Notification dots: opt-in, the user grants access in system settings. The
+             service only reads package presence (no content) — see NyxNotificationListenerService. -->
+        <service
+            android:name=".home.notifications.NyxNotificationListenerService"
+            android:exported="false"
+            android:label="@string/notification_dots_service_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

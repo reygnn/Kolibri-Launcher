@@ -1,8 +1,11 @@
 package com.github.reygnn.nyx_launcher.settings
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import android.os.Bundle
 import android.view.View
 import androidx.activity.result.PickVisualMediaRequest
@@ -66,6 +69,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var consentDialog: AlertDialog? = null
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
+    private var notificationDotsSwitch: SwitchPreferenceCompat? = null
     private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
     private var calendarSwitch: SwitchPreferenceCompat? = null
     private var alarmSwitch: SwitchPreferenceCompat? = null
@@ -106,6 +110,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
             isPersistent = false // DataStore is the source of truth, not SharedPreferences
             setOnPreferenceChangeListener { _, newValue ->
                 lifecycleScope.launch { preferences.setMonochromeIcons(newValue as Boolean) }
+                true
+            }
+        }
+
+        notificationDotsSwitch = findPreference<SwitchPreferenceCompat>("notification_dots")?.apply {
+            isPersistent = false
+            setOnPreferenceChangeListener { _, newValue ->
+                val enabled = newValue as Boolean
+                lifecycleScope.launch { preferences.setNotificationDots(enabled) }
+                // Enabling only gates rendering — dots need notification access. If it's
+                // not granted yet, send the user to the system screen to grant it.
+                if (enabled && !hasNotificationAccess()) {
+                    toast(getString(R.string.notification_dots_grant_toast))
+                    openNotificationAccessSettings()
+                }
                 true
             }
         }
@@ -192,6 +211,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 launch {
                     preferences.monochromeIcons().collect { enabled ->
                         if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                    }
+                }
+                launch {
+                    preferences.notificationDots().collect { enabled ->
+                        if (notificationDotsSwitch?.isChecked != enabled) notificationDotsSwitch?.isChecked = enabled
                     }
                 }
                 launch {
@@ -395,6 +419,18 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val ok = wallpaperImageSetter.setFromUri(uri)
         toast(getString(if (ok) R.string.wallpaper_set_toast else R.string.wallpaper_set_failed_toast))
         if (ok) requireActivity().finish() // back to home, which re-renders from the saved state
+    }
+
+    /** Whether the user has granted Nyx notification-listener access (dots need it). */
+    private fun hasNotificationAccess(): Boolean =
+        NotificationManagerCompat.getEnabledListenerPackages(requireContext())
+            .contains(requireContext().packageName)
+
+    /** Open the system notification-access screen so the user can grant Nyx access. */
+    private fun openNotificationAccessSettings() {
+        // startActivity can throw ActivityNotFoundException on OEMs without this screen;
+        // the preceding toast already told the user what to do.
+        runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
     }
 
     private fun toast(text: String) = showToastSafe(text)

@@ -35,9 +35,16 @@ class AppDrawerAdapter(
 ) : RecyclerView.Adapter<AppDrawerAdapter.EntryHolder>() {
 
     private var entries: List<DrawerEntry> = emptyList()
+    private var dotPackages: Set<String> = emptySet()
 
     fun submit(newEntries: List<DrawerEntry>) {
         entries = newEntries
+        notifyDataSetChanged()
+    }
+
+    fun submitNotificationDots(newDots: Set<String>) {
+        if (dotPackages == newDots) return
+        dotPackages = newDots
         notifyDataSetChanged()
     }
 
@@ -73,6 +80,7 @@ class AppDrawerAdapter(
     private fun bindApp(holder: EntryHolder, entry: DrawerEntry.App) {
         val app = entry.app
         holder.label.text = app.displayName
+        holder.dot.visibility = if (app.key.packageName in dotPackages) View.VISIBLE else View.GONE
         // Reveal mode only: a hidden app is shown dimmed so it reads as "hidden" at a glance.
         // In the normal view hidden apps are filtered out, so this is 1f there.
         holder.itemView.alpha = if (entry.hidden) HIDDEN_ALPHA else 1f
@@ -94,6 +102,8 @@ class AppDrawerAdapter(
 
     private fun bindFolder(holder: EntryHolder, folder: DrawerEntry.Folder) {
         holder.itemView.alpha = 1f // folders are never hidden; reset in case the view was recycled from a dimmed app
+        holder.dot.visibility =
+            if (folder.members.any { it.packageName in dotPackages }) View.VISIBLE else View.GONE
         val title = folder.title.ifBlank {
             holder.itemView.context.getString(R.string.folder_default_title)
         }
@@ -120,6 +130,7 @@ class AppDrawerAdapter(
 
     class EntryHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.app_icon)
+        val dot: View = view.findViewById(R.id.app_dot)
         val label: TextView = view.findViewById(R.id.app_label)
         var bindToken: Int = 0
     }

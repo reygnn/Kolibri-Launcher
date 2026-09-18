@@ -3,12 +3,27 @@
     android:layout_width="match_parent"
     android:layout_height="84dp">
 
-    <ImageView
-        android:id="@+id/cell_icon"
+    <!-- Icon + its notification dot, sized to the icon so the dot sits at the icon's
+         top-right corner regardless of the (taller/wider) cell. -->
+    <FrameLayout
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="center"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
+        android:layout_gravity="center">
+
+        <ImageView
+            android:id="@+id/cell_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <View
+            android:id="@+id/cell_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/notification_dot"
+            android:visibility="gone" />
+    </FrameLayout>
 
 </FrameLayout>

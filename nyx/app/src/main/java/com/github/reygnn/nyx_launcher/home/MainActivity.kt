@@ -444,6 +444,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
                 launchGuarded { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
+                // Notification dots (gated by the toggle): push the package set into the
+                // grid pages + dock so their icons show/hide the dot reactively.
+                launchGuarded {
+                    viewModel.notificationDots.collect { dots ->
+                        pagerAdapter?.submitNotificationDots(dots)
+                        dockAdapter.submitNotificationDots(dots)
+                    }
+                }
                 launchGuarded { clockDelegate.timeString.collect { clockTime.text = it } }
                 launchGuarded { clockDelegate.dateString.collect { clockDate.text = it } }
                 launchGuarded { clockDelegate.batteryString.collect { clockBattery.text = it } }

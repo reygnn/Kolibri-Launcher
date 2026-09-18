@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
+import com.github.reygnn.nyx_launcher.home.notifications.NotificationPresenceStore
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
@@ -65,6 +66,7 @@ class HomeViewModelTest {
         every { monochromeIcons() } returns flowOf(false)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
+        every { notificationDots() } returns flowOf(false)
     }
     private val wallpaperDisplaySettings = mockk<WallpaperDisplaySettings> {
         every { wallpaperScrimAlphaStateFlow } returns flowOf(0f)
@@ -97,6 +99,7 @@ class HomeViewModelTest {
             hiddenApps,
             RecordAppLaunchUseCase(appUsage),
             wallpaperDisplaySettings,
+            NotificationPresenceStore(),
             mainDispatcherRule.dispatcher,
         )
     }

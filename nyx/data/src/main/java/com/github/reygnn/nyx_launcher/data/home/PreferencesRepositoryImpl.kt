@@ -40,6 +40,13 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[USAGE_SORT] = enabled }
     }
 
+    override fun notificationDots(): Flow<Boolean> =
+        dataStore.readFlowFailOpen("Error reading notificationDots") { it[NOTIFICATION_DOTS] ?: false }
+
+    override suspend fun setNotificationDots(enabled: Boolean) {
+        dataStore.edit { it[NOTIFICATION_DOTS] = enabled }
+    }
+
     override val showAlarmFlow: Flow<Boolean> =
         dataStore.readFlowFailOpen("Error reading showAlarm") { it[SHOW_ALARM] ?: false }
 
@@ -58,6 +65,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
         val SEARCH_AUTO_LAUNCH = booleanPreferencesKey("search_auto_launch")
         val USAGE_SORT = booleanPreferencesKey("drawer_usage_sort")
+        val NOTIFICATION_DOTS = booleanPreferencesKey("notification_dots")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }

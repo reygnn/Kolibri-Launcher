@@ -24,9 +24,16 @@ class DockAdapter(
 ) : RecyclerView.Adapter<DockAdapter.DockHolder>() {
 
     private var items: List<HomeCell> = emptyList()
+    private var dotPackages: Set<String> = emptySet()
 
     fun submit(newItems: List<HomeCell>) {
         items = newItems
+        notifyDataSetChanged()
+    }
+
+    fun submitNotificationDots(newDots: Set<String>) {
+        if (dotPackages == newDots) return
+        dotPackages = newDots
         notifyDataSetChanged()
     }
 
@@ -41,13 +48,14 @@ class DockAdapter(
         val cell = items[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+        holder.dot.visibility = View.GONE
         // A dragged dock item is hidden during the drag; never leave a reused
         // holder invisible.
         holder.itemView.visibility = View.VISIBLE
 
         // Dock has no empties; App/Folder wiring is shared with the grid (A1-06).
         bindLaunchableCell(
-            holder.itemView, holder.icon, cell, scope, token, { holder.bindToken },
+            holder.itemView, holder.icon, holder.dot, cell, dotPackages, scope, token, { holder.bindToken },
             iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress,
         )
     }
@@ -59,6 +67,7 @@ class DockAdapter(
 
     class DockHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.dock_icon)
+        val dot: View = view.findViewById(R.id.dock_dot)
         var bindToken: Int = 0
     }
 }

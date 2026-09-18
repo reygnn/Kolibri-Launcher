@@ -177,6 +177,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                 launch {
                     viewModel.monochromeIcons.collect { drawerAdapter.notifyDataSetChanged() }
                 }
+                // Notification dots (gated by the toggle): re-bind so drawer app + folder
+                // tiles show/hide the dot reactively.
+                launch {
+                    viewModel.notificationDots.collect { drawerAdapter.submitNotificationDots(it) }
+                }
             }
         }
     }

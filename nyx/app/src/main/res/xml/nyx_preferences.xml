@@ -12,6 +12,13 @@
             android:summary="@string/monochrome_icons_summary"
             android:defaultValue="false"
             app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="notification_dots"
+            android:title="@string/notification_dots_title"
+            android:summary="@string/notification_dots_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <PreferenceCategory

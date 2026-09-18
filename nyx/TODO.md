@@ -7,6 +7,18 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Kürzlich erledigt (2026-09-18)
 
+- **Notification-Dots (Pixel-faithful)** — kleiner Präsenz-Punkt oben-rechts an
+  App-Icons in **Grid + Dock + Drawer**, plus Aggregat-Dots auf **Ordner**-Icons
+  (Dot, wenn ein Mitglied eine Notification hat). Opt-in: `NyxNotificationListenerService`
+  (@AndroidEntryPoint) speist einen app-scoped `NotificationPresenceStore`
+  (`@Singleton`, nur Package-Präsenz — keine Titel/Texte/Counts, Privacy);
+  Filterlogik (ongoing/nicht-wegwischbar raus → Pixel-artig) als reiner, getesteter
+  `NotificationDotPolicy` in `:nyx:domain`. Settings-Toggle „Benachrichtigungspunkte"
+  (DataStore, im Backup) + Weiterleitung zu `ACTION_NOTIFICATION_LISTENER_SETTINGS`
+  beim Aktivieren ohne Zugriff. Reaktiv: `HomeViewModel.notificationDots` (gegatet =
+  Store ∧ Toggle) → Adapter (`submitNotificationDots`). Der reine
+  `HomeCell.hasNotificationDot` ist ebenfalls getestet. Manifest:
+  `BIND_NOTIFICATION_LISTENER_SERVICE`.
 - **Dev-Fehler-Toasts in nyx** — der `ToastErrorTree` (Timber-Tree, ERROR-Logs →
   globaler `ErrorEventBus`) wurde von Kolibri nach `:feature-crashreporting` gehoben
   (product-neutral, dedupliziert — Kolibris Kopie gelöscht, Import umgebogen) und in
@@ -82,23 +94,6 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > und Widget-Picker sind **out of scope — won't build.** Nyx bleibt ein schlanker,
 > kuratierter Grid-Launcher, kein Launcher3-Klon. Aus der Paritäts-Lücke ist der
 > Page-Indicator inzwischen umgesetzt; offen bleibt nur der folgende Kandidat.
-
-### Notification-Dots (nur Punkt, keine Zahlen)
-
-Bewusster Entscheid: **Dots ja (vielleicht), Zahlen-Badges nein** — Counts nerven.
-Also nur ein kleiner Präsenz-Punkt auf Icons mit aktiver Notification, kein Zähler,
-kein Inhalt.
-
-Braucht einen `NotificationListenerService` (User muss den Zugriff in den
-Systemeinstellungen erteilen — Opt-in, kein stiller Grant) plus einen leichten
-Store „Packages mit aktiver Notification", der bei `onNotificationPosted/Removed`
-aktualisiert und als Flow an die Icon-Bindung fließt. Privacy-Linie: nur
-Package-Präsenz halten, keine Titel/Texte/Counts persistieren. Rendern in Grid-
-**und** Dock-Icons; Drawer optional.
-
-Anker: neuer `NotificationListenerService` + Präsenz-Store (`:nyx:data` oder
-`:common-*`), `home/HomeGridAdapter.kt` (Icon-Bindung), Dock-Icon-Rendering in
-`MainActivity`, Manifest (`BIND_NOTIFICATION_LISTENER_SERVICE`).
 
 ### Wallpaper-Edit-UI: Dedup gegen `:common-ui`
 

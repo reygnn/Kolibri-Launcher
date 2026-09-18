@@ -30,8 +30,18 @@ class HomePagerAdapter(
 
     private var pages: List<List<HomeCell>> = emptyList()
 
+    // Current notification-dot packages, read by each page's HomeGridAdapter at bind
+    // via the provider below. A change rebinds all pages so dots refresh.
+    private var currentDots: Set<String> = emptySet()
+
     fun submit(pageCells: List<List<HomeCell>>) {
         pages = pageCells
+        notifyDataSetChanged()
+    }
+
+    fun submitNotificationDots(dotPackages: Set<String>) {
+        if (currentDots == dotPackages) return
+        currentDots = dotPackages
         notifyDataSetChanged()
     }
 
@@ -48,7 +58,7 @@ class HomePagerAdapter(
             }
             clipToPadding = false
         }
-        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, onLaunch, onOpenFolder, onStartDrag)
+        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, { currentDots }, onLaunch, onOpenFolder, onStartDrag)
         recycler.adapter = gridAdapter
         return PageHolder(recycler, gridAdapter)
     }

@@ -54,6 +54,10 @@
     <string name="category_drawer_title">App-Drawer</string>
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
+    <string name="notification_dots_title">Benachrichtigungspunkte</string>
+    <string name="notification_dots_summary">Punkt auf App-Icons mit einer Benachrichtigung anzeigen</string>
+    <string name="notification_dots_service_label">Nyx Benachrichtigungspunkte</string>
+    <string name="notification_dots_grant_toast">Benachrichtigungszugriff für Nyx erteilen, um Punkte zu zeigen</string>
     <string name="category_homeinfo_title">Startbildschirm-Info</string>
     <string name="category_privacy_title">Datenschutz</string>
     <string name="crash_report_setting_title">Absturzberichte</string>
