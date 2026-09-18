@@ -7,6 +7,17 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Kürzlich erledigt (2026-09-18)
 
+- **Home ist portrait-only (Pixel-Default)** — die frühere #5-Orientierungsfrage ist
+  entschieden: der Home-Screen rotiert NICHT (`MainActivity` mit
+  `android:screenOrientation="portrait"` gelockt), wie der Pixel Launcher auf Phones.
+  Grund: nyx' geräteabhängiges Grid re-packt bei Orientierungswechsel verlustbehaftet
+  (`HomeLayoutRegridder` behält Apps, nicht Positionen), und Launcher3-Qualität im
+  Landscape bräuchte ein eigenes orientierungs-invariantes DeviceProfile + Seiten-Dock
+  — zu viel für einen Nischen-Modus. Der zwischenzeitlich gebaute Rotationssperre-
+  Switch wurde daher wieder entfernt (3 Commits revertet): auf einer Single-Activity
+  ohne separat rotierende Screens hätte er nichts mehr gesteuert. (Landscape zeigte
+  sonst geclippte bzw. winzige Icons, weil der kurze Landscape-Streifen die
+  Portrait-Reihenzahl quetscht.)
 - **Geteilte `BaseActivity` (`:common-ui`)** — Activity-Pendant zur geteilten
   `BaseViewModel`: `BaseActivity<E, VM>` installiert einen
   `CoroutineExceptionHandler` und sammelt (je hinter einem CancellationException-
@@ -103,28 +114,6 @@ Kolibri kopiert** (Maintainer-Entscheid WV5d, kein Ressourcen-Merge-Risiko).
 Wenn Kolibri das nächste Mal angefasst wird: in `:common-ui` unifizieren (beide
 Apps teilen dann eine Implementierung). Anker: nyx `home/wallpaperfab/*`,
 `home/wallpaper/{SnapIconResolver,LayerButtonsState}`, `:common-ui`.
-
-### Grid bei Orientierungswechsel — Design-Frage (Mechanik erledigt)
-
-Das geräteabhängige Home-Grid (ICON_HOME_MODEL_SPEC §10) leitet `columns`/`rows`
-aus der real gemessenen Grid-Fläche ab (`MainActivity.applyDeviceGrid`, nach
-Layout) und re-fittet via `HomeLayoutRegridder`. Da `MainActivity` keinen
-`configChanges` deklariert, wird sie bei Rotation neu erzeugt → `applyDeviceGrid`
-läuft erneut → das Grid passt sich **live** an (verlustfreies Repack). Der
-Auslöser fehlt also nicht mehr.
-
-Offen ist nur die **Produkt**-Frage: soll Querformat ein **eigenes** Raster
-bekommen (aktuelles Verhalten: es rechnet für Landscape neu und packt um) oder
-soll ein orientierungsstabiles Portrait-Raster geteilt werden? Bis das
-entschieden ist, ist das aktuelle „pro Orientierung neu" ein vernünftiger
-Default.
-
-Caveat für später: wird `MainActivity` mal auf `configChanges` umgestellt (kein
-Recreate), muss `applyDeviceGrid` zusätzlich aus `onConfigurationChanged`
-aufgerufen werden.
-
-Anker: `MainActivity.applyDeviceGrid`, `HomeViewModel.applyDeviceGrid`,
-`FitHomeGridUseCase`, `HomeLayoutRegridder`.
 
 ### Custom Names — Feature (aus Kolibri portieren)
 
