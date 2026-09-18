@@ -145,7 +145,7 @@ class HomeViewModel @Inject constructor(
      * same retained-hot-flow posture as [wallpaperScrimAlpha].
      */
     val rotationLocked: StateFlow<Boolean> = preferences.rotationLocked()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_ROTATION_LOCKED)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PreferencesRepository.DEFAULT_ROTATION_LOCKED)
 
     fun toggleUsageSort() {
         launchSafe { preferences.setUsageSortEnabled(!usageSortEnabled.value) }

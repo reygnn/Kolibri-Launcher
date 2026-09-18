@@ -17,7 +17,7 @@
             android:key="rotation_locked"
             android:title="@string/rotation_lock_title"
             android:summary="@string/rotation_lock_summary"
-            android:defaultValue="false"
+            android:defaultValue="true"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>
 

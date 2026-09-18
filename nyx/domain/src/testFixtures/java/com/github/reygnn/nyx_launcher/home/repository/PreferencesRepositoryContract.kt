@@ -114,27 +114,29 @@ abstract class PreferencesRepositoryContract {
         assertThat(repo.showCalendarEventFlow.first()).isFalse() // unaffected
     }
 
-    // --- rotation lock ---
+    // --- rotation lock (nyx default is LOCKED, see PreferencesRepository.DEFAULT_ROTATION_LOCKED) ---
 
     @Test
-    fun rotation_locked_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
-        assertThat(createRepository().rotationLocked().first()).isFalse()
+    fun rotation_locked_defaults_to_true() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().rotationLocked().first())
+            .isEqualTo(PreferencesRepository.DEFAULT_ROTATION_LOCKED)
+        assertThat(createRepository().rotationLocked().first()).isTrue()
     }
 
     @Test
-    fun setting_rotation_locked_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun setting_rotation_locked_false_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        repo.setRotationLocked(true)
-        assertThat(repo.rotationLocked().first()).isTrue()
+        repo.setRotationLocked(false)
+        assertThat(repo.rotationLocked().first()).isFalse()
     }
 
     @Test
     fun rotation_locked_flow_emits_the_new_value_on_change() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
         repo.rotationLocked().test {
-            assertThat(awaitItem()).isFalse() // initial
-            repo.setRotationLocked(true)
-            assertThat(awaitItem()).isTrue()
+            assertThat(awaitItem()).isTrue() // initial = default (locked)
+            repo.setRotationLocked(false)
+            assertThat(awaitItem()).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
     }

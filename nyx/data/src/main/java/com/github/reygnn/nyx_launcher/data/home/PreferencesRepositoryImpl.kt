@@ -5,7 +5,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
-import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -43,7 +42,7 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override fun rotationLocked(): Flow<Boolean> =
         dataStore.readFlowFailOpen("Error reading rotationLocked") {
-            it[ROTATION_LOCKED] ?: AppConstants.DEFAULT_ROTATION_LOCKED
+            it[ROTATION_LOCKED] ?: PreferencesRepository.DEFAULT_ROTATION_LOCKED
         }
 
     override suspend fun setRotationLocked(enabled: Boolean) {

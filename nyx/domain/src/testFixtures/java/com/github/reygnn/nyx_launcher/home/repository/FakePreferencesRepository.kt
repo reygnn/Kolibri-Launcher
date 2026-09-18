@@ -10,7 +10,7 @@ class FakePreferencesRepository(
     showCalendarEvent: Boolean = false,
     searchAutoLaunch: Boolean = false,
     usageSort: Boolean = false,
-    rotationLocked: Boolean = false,
+    rotationLocked: Boolean = PreferencesRepository.DEFAULT_ROTATION_LOCKED,
 ) : PreferencesRepository {
     private val monochromeState = MutableStateFlow(monochrome)
     private val showAlarmState = MutableStateFlow(showAlarm)
