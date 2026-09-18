@@ -1,34 +1,51 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import androidx.annotation.VisibleForTesting
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Small multi-entry cache of decoded per-layer wallpaper bitmaps, keyed by the
  * layer's `file://` URI string.
  *
  * Nyx-local on purpose: the shared [com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache]
- * is SINGLE-entry (one composite / single-image texture) and cannot hold N layers,
- * and nyx has no drawer→home view-teardown seam to reattach a composite across —
- * so that cache buys nyx nothing. This one targets a different symptom.
+ * is SINGLE-entry (one composite / single-image texture) and cannot hold N layers —
+ * so that cache buys nyx's multi-layer collage nothing. This one targets nyx's
+ * symptoms directly.
  *
- * Purpose — kill the delete-a-layer flicker: removing one layer produces a
- * [com.github.reygnn.launcher.common.ui.wallpaper.RebuildPlan.FullRebuild] (the plan
- * has no partial-remove), which `clearLayers()` + re-decodes every REMAINING layer.
- * On a slower GPU (A17) that re-decode is a visible flash. With this cache the
- * surviving layers are instant hits, so only genuinely new images ever decode
- * (adds and single-image replacements likewise get faster). A transform-only edit
- * keeps the same `file://` key, so its bitmap is reused untouched.
+ * **Application-scoped** ([Singleton]): it survives `MainActivity` re-creation, which
+ * is what makes returning to a recreated home (config change while backgrounded, or
+ * the Activity reclaimed under memory pressure) cheap — the `FullRebuild` against a
+ * fresh empty view finds every layer in the cache and skips the decode. An
+ * Activity-field cache would be empty on the new instance and re-decode the whole
+ * collage. (Kolibri gets the same survival from its own `@Singleton`
+ * WallpaperCompositeCache; nyx keeps this per-layer one instead.)
+ *
+ * It also kills the delete-a-layer flicker WITHIN a live Activity: removing one
+ * layer produces a [com.github.reygnn.launcher.common.ui.wallpaper.RebuildPlan.FullRebuild]
+ * (the plan has no partial-remove), which `clearLayers()` + re-decodes every
+ * REMAINING layer; on a slower GPU (A17) that re-decode is a visible flash, and the
+ * cache turns it into instant hits. Adds and single-image replacements likewise get
+ * faster; a transform-only edit keeps the same `file://` key, so its bitmap is
+ * reused untouched.
  *
  * Bounded by total decoded bytes ([maxBytes], LRU eviction). On eviction it only
  * DROPS the reference — it never `recycle()`s — because an evicted bitmap may still
  * be on screen (the never-recycle invariant the shared cache also holds); GC
  * reclaims it once the view releases it too. A single oversized layer is kept
- * rather than evicted-to-empty.
+ * rather than evicted-to-empty. [clear] releases everything when the wallpaper is
+ * removed, so an app-scoped lifetime never means "held forever".
  *
  * Access is [Synchronized]: the binder calls [get]/[put] from its IO decode hop
  * (serial latest-wins render), and [clear] runs on the main thread.
  */
-class WallpaperLayerBitmapCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
+@Singleton
+class WallpaperLayerBitmapCache @VisibleForTesting internal constructor(
+    private val maxBytes: Long,
+) {
+    /** Hilt entry point — app default budget. Tests use the primary constructor. */
+    @Inject constructor() : this(DEFAULT_MAX_BYTES)
 
     // accessOrder = true → the map's iteration order runs least-recently-accessed
     // first, so eviction in trim() drops the true LRU entry. get() reorders on hit.

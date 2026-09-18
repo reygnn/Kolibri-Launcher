@@ -139,6 +139,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
     @Inject lateinit var fabPositionStore: NyxFabPositionStore
 
+    // App-scoped per-layer decode cache (@Singleton): survives MainActivity
+    // re-creation, so returning to a recreated home skips re-decoding the collage;
+    // also turns the delete-a-layer FullRebuild into cache hits. Cleared when the
+    // wallpaper is removed (see renderWallpaper).
+    @Inject lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
+
     // First-run defaults (dock apps + Play Store on the grid, and the Google drawer
     // folder) so a fresh install isn't a blank screen. One-shot; each seed no-ops on a
     // returning install (gated in its repository). See onCreate.
@@ -194,11 +200,6 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private lateinit var wallpaperContainer: View
     private lateinit var wallpaperView: ZoomableImageView
     private lateinit var wallpaperScrim: View
-
-    // Per-layer decode cache (delete-a-layer flicker fix): a FullRebuild re-decodes
-    // every surviving layer, so cache them by file:// URI and reuse on the next
-    // rebuild. Cleared when the wallpaper is removed (see renderWallpaper).
-    private val wallpaperLayerCache = WallpaperLayerBitmapCache()
 
     // Serial, latest-wins wallpaper render. The binder decodes off the main
     // thread; a single job at a time avoids overlapping rebuilds of the view.

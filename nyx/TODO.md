@@ -16,12 +16,16 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
   `UiEvent`/`BuildConfig`). `MainActivity` erbt davon und fährt den UI-Collector-
   Block unter dem Handler → ein Throwable im Render-/Collect-Coroutine crasht den
   Launcher nicht mehr. Kolibri behält vorerst seine eigene `UiEvent`-Base.
-- **Wallpaper Delete-Flicker** — Per-Layer-Decode-Cache
-  (`home/wallpaper/WallpaperLayerBitmapCache`, LRU nach Bytes, never-recycle) im
-  `bitmapLoader`: der `FullRebuild` beim Layer-Löschen re-dekodiert die
-  verbleibenden Layer nicht mehr (Cache-Hits), also kein Flackern auf langsamer
-  GPU (A17). Der geteilte single-entry `WallpaperCompositeCache` blieb bewusst
-  weg (er cached keine N Layer, und nyx hat keine drawer→home-Teardown-Naht).
+- **Wallpaper Delete-Flicker + Recreation-Re-Decode** — **app-scoped** (`@Singleton`)
+  Per-Layer-Decode-Cache (`home/wallpaper/WallpaperLayerBitmapCache`, LRU nach
+  Bytes, never-recycle), Hilt-injiziert in `MainActivity`, im `bitmapLoader`: der
+  `FullRebuild` beim Layer-Löschen re-dekodiert die verbleibenden Layer nicht mehr
+  (Cache-Hits) → kein Flackern auf langsamer GPU (A17). Da `@Singleton`, überlebt
+  er die `MainActivity`-Neuerstellung → auch das Zurückkehren aus einer anderen App
+  (recreate wegen Konfig-Wechsel / Speicherdruck) dekodiert die Collage nicht neu.
+  Bei lebender Activity (nur Resume) ist der Render ohnehin ein Diff-Noop. Der
+  geteilte single-entry `WallpaperCompositeCache` blieb bewusst weg (cached keine
+  N Layer). Cache wird beim Entfernen des Wallpapers geleert.
 
 ## Kürzlich erledigt (2026-09-17)
 
