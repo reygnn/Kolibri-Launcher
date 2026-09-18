@@ -156,6 +156,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // can dismiss it and not leak its window.
     private var consentDialog: AlertDialog? = null
 
+    /** The single tracked cancelable dialog (events + by-maker pickers); see [showTrackedDialog]. */
+    private var currentDialog: AlertDialog? = null
+
     // The wallpaper edit-session coordinator (ClockDelegate pattern): owns the live
     // wallpaper state (mirrored from the repo), drives the transactional edit session.
     private lateinit var wallpaperEditCoordinator: NyxWallpaperEditCoordinator
@@ -582,6 +585,21 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         calendarIndicator.visibility = if (hasCalendar) View.VISIBLE else View.INVISIBLE
     }
 
+    /**
+     * Show [dialog] as the single tracked cancelable dialog: dismiss any
+     * previously-tracked one, clear the reference on dismiss, and let [onDestroy]
+     * dismiss it so its window does not leak across a config change. Guards a
+     * finishing / destroyed Activity. Covers the events + by-maker pickers; the
+     * non-cancelable ConsentDialog stays tracked separately in [consentDialog].
+     */
+    private fun showTrackedDialog(dialog: AlertDialog) {
+        if (isFinishing || isDestroyed) return
+        currentDialog?.dismiss()
+        currentDialog = dialog
+        dialog.setOnDismissListener { if (currentDialog === dialog) currentDialog = null }
+        dialog.show()
+    }
+
     /** All upcoming events, grouped today/tomorrow via the shared formatter. */
     private fun showEventsDialog() {
         if (isFinishing || isDestroyed) return
@@ -610,7 +628,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             dividerLayout = R.layout.item_events_divider,
             dividerLineId = R.id.events_divider_line,
         )
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.events_dialog_title)
             .setAdapter(adapter) { _, which ->
                 val row = rows[which] as? TimeEventFormatter.EventRow.Item ?: return@setAdapter
@@ -620,7 +638,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 }
             }
             .setPositiveButton(android.R.string.ok, null)
-            .show()
+            .create()
+        showTrackedDialog(dialog)
     }
 
     override fun onResume() {
@@ -644,6 +663,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // doesn't leak across a config change / teardown.
         consentDialog?.dismiss()
         consentDialog = null
+        currentDialog?.dismiss()
+        currentDialog = null
         super.onDestroy()
     }
 
@@ -1125,14 +1146,15 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             return
         }
         val labels = groups.map { "${it.label} (${it.keys.size})" }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.drawer_create_folder_by_maker)
             .setItems(labels) { _, index ->
                 val group = groups[index]
                 viewModel.createDrawerFolderFromMaker(group.label, group.keys)
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        showTrackedDialog(dialog)
     }
 
     /**
@@ -1151,7 +1173,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             return
         }
         val labels = addable.map { "${it.label} (${it.keys.size})" }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.folder_add_by_maker)
             .setItems(labels) { _, index ->
                 val group = addable[index]
@@ -1164,7 +1186,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 onAdded(group.keys)
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        showTrackedDialog(dialog)
     }
 
     // ---- drag ----
