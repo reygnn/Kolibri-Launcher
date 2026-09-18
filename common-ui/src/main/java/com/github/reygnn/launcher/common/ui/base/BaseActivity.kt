@@ -118,18 +118,22 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
      * redundant; the two-tag asymmetry mirrors Kolibri's BaseActivity).
      */
     private fun handleErrorEvent(event: Event<ErrorData>) {
+        // Short-circuit before consuming the event so a release build does not mark it
+        // handled (getContentIfNotHandled is one-shot).
         if (!TimberWrapper.isDebugBuild) return
-        event.getContentIfNotHandled()?.let { errorData ->
-            if (isDevToastSuppressed(errorData.tag)) return@let
-            val now = System.currentTimeMillis()
-            if (now - lastErrorToastTime < TOAST_THROTTLE_MS) return@let
-            lastErrorToastTime = now
-            showToastSafe("Dev Error: ${errorData.message}", Toast.LENGTH_LONG)
-        }
+        val errorData = event.getContentIfNotHandled() ?: return
+        val now = System.currentTimeMillis()
+        // Pure decision (DEBUG gate + tag suppression + throttle) is extracted so it can
+        // be unit-tested without a live Activity — the collector wiring still needs
+        // Robolectric, but the load-bearing gate/throttle logic is pinned in JVM tests.
+        if (!shouldShowDevToast(TimberWrapper.isDebugBuild, errorData.tag, now, lastErrorToastTime)) return
+        lastErrorToastTime = now
+        showToastSafe("Dev Error: ${errorData.message}", Toast.LENGTH_LONG)
     }
 
     companion object {
-        private const val TOAST_THROTTLE_MS = 2000L
+        @VisibleForTesting
+        internal const val TOAST_THROTTLE_MS = 2000L
 
         /**
          * Whether an [ErrorEventBus] entry's tag suppresses the DEBUG dev-toast.
@@ -141,5 +145,21 @@ abstract class BaseActivity<E, VM> : AppCompatActivity()
         @VisibleForTesting
         internal fun isDevToastSuppressed(tag: String?): Boolean =
             tag == TimberWrapper.SILENT_LOG_TAG
+
+        /**
+         * Whether a dev error toast should surface now: DEBUG builds only, not a
+         * suppressed ([isDevToastSuppressed]) tag, and at least [TOAST_THROTTLE_MS]
+         * since [lastToastMs]. Pure so the gate + throttle are JVM-testable.
+         */
+        @VisibleForTesting
+        internal fun shouldShowDevToast(
+            isDebugBuild: Boolean,
+            tag: String?,
+            nowMs: Long,
+            lastToastMs: Long,
+        ): Boolean =
+            isDebugBuild &&
+                !isDevToastSuppressed(tag) &&
+                nowMs - lastToastMs >= TOAST_THROTTLE_MS
     }
 }

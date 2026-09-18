@@ -1,9 +1,11 @@
 package com.github.reygnn.nyx_launcher
 
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.util.Log
 import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
 import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
@@ -31,6 +33,12 @@ class NyxApplication : Application() {
 
     @Inject
     lateinit var packageEvents: PackageEventCoordinator
+
+    // App-scoped wallpaper layer bitmap cache (@Singleton). Released on memory
+    // pressure / backgrounding below, since it holds up to ~64 MB of HARDWARE bitmaps
+    // that are only needed while the home screen is visible.
+    @Inject
+    lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val anrDrainer = NoOpAnrDrainer()
@@ -85,5 +93,14 @@ class NyxApplication : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         packageEvents.onTrimMemory(level)
+        // Once the launcher is backgrounded (or the system is reclaiming), drop the
+        // wallpaper layer bitmaps: they are only needed while the home is visible, and
+        // clear() only releases references (never recycles), so a still-drawn bitmap is
+        // safe. A returning home re-decodes lazily. This is the counterpart the
+        // @Singleton cache needs so its process-lifetime scope never means "held
+        // through background".
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            wallpaperLayerCache.clear()
+        }
     }
 }

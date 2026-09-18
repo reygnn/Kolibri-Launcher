@@ -35,10 +35,13 @@ import javax.inject.Singleton
  * be on screen (the never-recycle invariant the shared cache also holds); GC
  * reclaims it once the view releases it too. A single oversized layer is kept
  * rather than evicted-to-empty. [clear] releases everything when the wallpaper is
- * removed, so an app-scoped lifetime never means "held forever".
+ * removed AND when the app is backgrounded / under memory pressure
+ * (`NyxApplication.onTrimMemory` >= TRIM_MEMORY_BACKGROUND), so an app-scoped
+ * lifetime never means "held forever" or "held through background".
  *
- * Access is [Synchronized]: the binder calls [get]/[put] from its IO decode hop
- * (serial latest-wins render), and [clear] runs on the main thread.
+ * Access is [Synchronized]: the binder calls [get] on the render (main) thread and
+ * [put]/[putIfCurrent] from its IO decode hop, while [clear] runs on the main
+ * thread — so every public method takes the monitor.
  */
 @Singleton
 class WallpaperLayerBitmapCache @VisibleForTesting internal constructor(
@@ -47,40 +50,72 @@ class WallpaperLayerBitmapCache @VisibleForTesting internal constructor(
     /** Hilt entry point — app default budget. Tests use the primary constructor. */
     @Inject constructor() : this(DEFAULT_MAX_BYTES)
 
+    // The byte size is captured ONCE at insertion and stored with the entry, so
+    // drop()/trim() never re-read Bitmap.allocationByteCount — which returns 0 for a
+    // recycled bitmap and would otherwise leave currentBytes permanently inflated.
+    private class Entry(val decoded: DecodedWallpaperBitmap, val bytes: Long)
+
     // accessOrder = true → the map's iteration order runs least-recently-accessed
     // first, so eviction in trim() drops the true LRU entry. get() reorders on hit.
-    private val entries = LinkedHashMap<String, DecodedWallpaperBitmap>(16, 0.75f, /* accessOrder = */ true)
+    private val entries = LinkedHashMap<String, Entry>(16, 0.75f, /* accessOrder = */ true)
     private var currentBytes = 0L
+
+    // Bumped on every clear(). A decode that captured an older generation (via
+    // [generation]) before a clear lands drops its result through [putIfCurrent]
+    // instead of stranding a bitmap in the now-cleared, app-scoped cache.
+    private var generation = 0L
 
     /** The cached decode for [key], or null on a miss / recycled bitmap. */
     @Synchronized
     fun get(key: String): DecodedWallpaperBitmap? {
         val hit = entries[key] ?: return null
-        if (hit.bitmap.isRecycled) {
+        if (hit.decoded.bitmap.isRecycled) {
             drop(key)
             return null
         }
-        return hit
+        return hit.decoded
     }
+
+    /**
+     * The current cache generation. Capture it BEFORE a decode and hand it to
+     * [putIfCurrent] so a decode that races a [clear] (wallpaper removed mid-flight)
+     * does not repopulate the cache.
+     */
+    @Synchronized
+    fun generation(): Long = generation
 
     @Synchronized
     fun put(key: String, decoded: DecodedWallpaperBitmap) {
         // Replace any existing entry's byte accounting before re-inserting.
         drop(key)
-        entries[key] = decoded
-        currentBytes += sizeOf(decoded)
+        val bytes = sizeOf(decoded)
+        entries[key] = Entry(decoded, bytes)
+        currentBytes += bytes
         trim()
     }
 
-    /** Drops all references (wallpaper removed / reset). Never recycles. */
+    /**
+     * [put], unless [expectedGeneration] no longer matches the current [generation] —
+     * i.e. a [clear] happened since the caller captured it, so the wallpaper this
+     * decode was for is gone. Returns true if stored, false if dropped as stale.
+     */
+    @Synchronized
+    fun putIfCurrent(key: String, decoded: DecodedWallpaperBitmap, expectedGeneration: Long): Boolean {
+        if (expectedGeneration != generation) return false
+        put(key, decoded)
+        return true
+    }
+
+    /** Drops all references (wallpaper removed / reset) and bumps [generation]. Never recycles. */
     @Synchronized
     fun clear() {
         entries.clear()
         currentBytes = 0L
+        generation++
     }
 
     private fun drop(key: String) {
-        entries.remove(key)?.let { currentBytes -= sizeOf(it) }
+        entries.remove(key)?.let { currentBytes -= it.bytes }
     }
 
     private fun trim() {
@@ -89,7 +124,7 @@ class WallpaperLayerBitmapCache @VisibleForTesting internal constructor(
         val iterator = entries.entries.iterator()
         while (currentBytes > maxBytes && entries.size > 1 && iterator.hasNext()) {
             val eldest = iterator.next()
-            currentBytes -= sizeOf(eldest.value)
+            currentBytes -= eldest.value.bytes
             // Reference-drop only — NEVER recycle: the bitmap may still be drawing.
             iterator.remove()
         }

@@ -101,6 +101,7 @@ import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -208,21 +209,27 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             // Cache hit → return the already-decoded layer instantly (no IO hop),
             // so deleting one layer doesn't re-decode the rest and flash.
             val key = uri.toString()
-            wallpaperLayerCache.get(key) ?: withContext(Dispatchers.IO) {
-                // BitmapLoader contract: return null on failure, let only cancellation
-                // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
-                // openInputStream can throw FileNotFoundException/SecurityException and
-                // decode can OOM (Throwable). Without this guard the throw would escape
-                // bind() → the unguarded collect/launch → crash the HOME activity
-                // (mirrors Kolibri's loadBitmapFromUri).
-                try {
-                    decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
-                        ?.also { wallpaperLayerCache.put(key, it) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
-                    null
+            wallpaperLayerCache.get(key) ?: run {
+                // Capture the cache generation BEFORE the decode: if a clear() lands
+                // during the IO hop (wallpaper removed mid-flight), putIfCurrent drops
+                // the result instead of stranding it in the app-scoped cache.
+                val generation = wallpaperLayerCache.generation()
+                withContext(Dispatchers.IO) {
+                    // BitmapLoader contract: return null on failure, let only cancellation
+                    // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
+                    // openInputStream can throw FileNotFoundException/SecurityException and
+                    // decode can OOM (Throwable). Without this guard the throw would escape
+                    // bind() → the unguarded collect/launch → crash the HOME activity
+                    // (mirrors Kolibri's loadBitmapFromUri).
+                    try {
+                        decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+                            ?.also { wallpaperLayerCache.putIfCurrent(key, it, generation) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
+                        null
+                    }
                 }
             }
         })
@@ -426,31 +433,35 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // Independent one-shot: seed the "Google" drawer folder from installed Google apps.
         lifecycleScope.launch { firstRunSeeder.seedDrawerFolders() }
 
-        // Run the UI collectors under the BaseActivity crash-net handler: a throwable
-        // in any render/collect (wallpaper, layout, scrim, clock, …) is reported
-        // instead of escaping to the global handler and crashing the launcher.
+        // Run the UI collectors under the BaseActivity crash-net handler AND guard each
+        // one individually via launchGuarded: a throwable in a single collector is
+        // reported without cancelling its siblings or tearing down repeatOnLifecycle.
+        // A bare `launch {}` here would let one throw cancel the whole block — the CEH
+        // then reports it (no crash) but repeatOnLifecycle never re-runs, silently
+        // freezing every collector until the Activity is recreated. Mirrors
+        // BaseActivity's own per-collector arms.
         lifecycleScope.launch(coroutineExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.layout.collect(::renderLayout) }
-                launch { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
-                launch { clockDelegate.timeString.collect { clockTime.text = it } }
-                launch { clockDelegate.dateString.collect { clockDate.text = it } }
-                launch { clockDelegate.batteryString.collect { clockBattery.text = it } }
-                launch { clockDelegate.timeBasedEvents.collect(::updateEventsIndicator) }
+                launchGuarded { viewModel.layout.collect(::renderLayout) }
+                launchGuarded { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
+                launchGuarded { clockDelegate.timeString.collect { clockTime.text = it } }
+                launchGuarded { clockDelegate.dateString.collect { clockDate.text = it } }
+                launchGuarded { clockDelegate.batteryString.collect { clockBattery.text = it } }
+                launchGuarded { clockDelegate.timeBasedEvents.collect(::updateEventsIndicator) }
                 // Wallpaper (WV5): render on every state change (latest-wins — the
                 // collector awaits each bind before the next emission). Scrim +
                 // backdrop react to their own settings flows.
-                launch {
+                launchGuarded {
                     wallpaperEditCoordinator.wallpaperState.collect { renderWallpaper(it) }
                 }
-                launch { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
-                launch {
+                launchGuarded { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
+                launchGuarded {
                     wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
                         applyBackdrop(it)
                         wallpaperEditController.applyBackdrop(it)
                     }
                 }
-                launch {
+                launchGuarded {
                     wallpaperEditCoordinator.isEditMode.collect {
                         wallpaperEditController.applyEditMode(it)
                         // Bypass home gesture detection while editing so pinch/pan reach
@@ -461,10 +472,28 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                         applyScrim()
                     }
                 }
-                launch { fabPositionStore.fabPositionFlow.collect { wallpaperEditController.applyFabPosition(it) } }
+                launchGuarded { fabPositionStore.fabPositionFlow.collect { wallpaperEditController.applyFabPosition(it) } }
             }
         }
     }
+
+    /**
+     * Launches a home-screen flow collector that CANNOT tear down its siblings: a
+     * non-cancellation throwable is reported (not rethrown), so one failing collector
+     * neither crashes the launcher nor kills the sibling collectors + the enclosing
+     * repeatOnLifecycle (which would silently freeze the whole home). Cancellation
+     * still propagates so STARTED-scope teardown works normally.
+     */
+    private fun CoroutineScope.launchGuarded(block: suspend CoroutineScope.() -> Unit) =
+        launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Home collector failed")
+            }
+        }
 
     /**
      * Single entry point to render a wallpaper [state] onto the view. Routed through
@@ -478,12 +507,23 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         if (!state.hasWallpaper) wallpaperLayerCache.clear()
         val focusId = wallpaperEditCoordinator.consumePendingFocusLayerId()
         wallpaperRenderScheduler.render(lifecycleScope) {
-            wallpaperBinder.bind(
-                wallpaperView,
-                state,
-                preferredActiveLayerId = focusId,
-                onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
-            )
+            // The scheduler launches this on the bare lifecycleScope, NOT under the
+            // collector's coroutineExceptionHandler, so guard the bind here: a throwable
+            // (e.g. a FullRebuild view/allocation error) would otherwise reach the global
+            // handler and crash the launcher. Cancellation (latest-wins supersede) still
+            // propagates, preserving the scheduler's single-slot semantics.
+            try {
+                wallpaperBinder.bind(
+                    wallpaperView,
+                    state,
+                    preferredActiveLayerId = focusId,
+                    onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                TimberWrapper.silentError(e, "Error rendering wallpaper")
+            }
         }
     }
 

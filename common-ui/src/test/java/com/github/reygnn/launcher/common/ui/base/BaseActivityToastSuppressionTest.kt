@@ -34,4 +34,40 @@ class BaseActivityToastSuppressionTest {
     fun `a null tag does NOT suppress`() {
         assertFalse(BaseActivity.isDevToastSuppressed(null))
     }
+
+    // --- shouldShowDevToast: DEBUG gate + tag suppression + throttle ---
+
+    private val throttle = BaseActivity.TOAST_THROTTLE_MS
+
+    @Test
+    fun `shows a normal-tag dev toast in debug after the throttle window`() {
+        assertTrue(BaseActivity.shouldShowDevToast(isDebugBuild = true, tag = null, nowMs = throttle, lastToastMs = 0L))
+    }
+
+    @Test
+    fun `never shows in a release build`() {
+        assertFalse(BaseActivity.shouldShowDevToast(isDebugBuild = false, tag = null, nowMs = 10 * throttle, lastToastMs = 0L))
+    }
+
+    @Test
+    fun `does not show for a suppressed SILENT_ERROR tag`() {
+        assertFalse(
+            BaseActivity.shouldShowDevToast(
+                isDebugBuild = true,
+                tag = TimberWrapper.SILENT_LOG_TAG,
+                nowMs = 10 * throttle,
+                lastToastMs = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun `throttles a second toast within the window`() {
+        assertFalse(BaseActivity.shouldShowDevToast(isDebugBuild = true, tag = null, nowMs = throttle - 1, lastToastMs = 0L))
+    }
+
+    @Test
+    fun `allows a toast exactly at the throttle boundary`() {
+        assertTrue(BaseActivity.shouldShowDevToast(isDebugBuild = true, tag = null, nowMs = throttle, lastToastMs = 0L))
+    }
 }

@@ -5,8 +5,10 @@ import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -97,6 +99,38 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache()
         cache.put("file:///a.png", decoded())
         cache.clear()
+        assertNull(cache.get("file:///a.png"))
+    }
+
+    @Test
+    fun `replacing a key does not inflate byte accounting and evict a sibling`() {
+        // Budget holds two 10-byte entries (20) but not three (30).
+        val cache = WallpaperLayerBitmapCache(maxBytes = 25)
+        val a = decoded(bytes = 10)
+        val b = decoded(bytes = 10)
+        cache.put("file:///a.png", a)
+        cache.put("file:///b.png", b) // total 20
+        // Replace A repeatedly. If put() failed to subtract the replaced entry's bytes,
+        // currentBytes would climb past the budget and evict the LRU sibling B.
+        repeat(5) { cache.put("file:///a.png", decoded(bytes = 10)) }
+        assertSame(b, cache.get("file:///b.png"))
+    }
+
+    @Test
+    fun `putIfCurrent stores while the generation is unchanged`() {
+        val cache = WallpaperLayerBitmapCache()
+        val gen = cache.generation()
+        val entry = decoded()
+        assertTrue(cache.putIfCurrent("file:///a.png", entry, gen))
+        assertSame(entry, cache.get("file:///a.png"))
+    }
+
+    @Test
+    fun `putIfCurrent drops a decode captured before a clear`() {
+        val cache = WallpaperLayerBitmapCache()
+        val gen = cache.generation()
+        cache.clear() // bumps generation — the wallpaper this decode was for is gone
+        assertFalse(cache.putIfCurrent("file:///a.png", decoded(), gen))
         assertNull(cache.get("file:///a.png"))
     }
 }
