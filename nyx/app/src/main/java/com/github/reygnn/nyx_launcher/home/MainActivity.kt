@@ -3,7 +3,6 @@ package com.github.reygnn.nyx_launcher.home
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.ComponentName
-import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -12,8 +11,6 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Process
-import android.provider.AlarmClock
-import android.provider.CalendarContract
 import android.provider.Settings
 import android.graphics.Color
 import android.graphics.Rect
@@ -66,6 +63,9 @@ import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerAdapter
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
+import com.github.reygnn.launcher.common.ui.openBatterySettings
+import com.github.reygnn.launcher.common.ui.openCalendarApp
+import com.github.reygnn.launcher.common.ui.openClockApp
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
@@ -317,9 +317,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // settings (mirrors Kolibri's intents). Double-tap, not single: a single tap on
         // the clock is easy to trigger by accident, and the gesture consumes the stream so
         // it never bubbles to the home double-tap (events dialog).
-        clockTime.setOnDoubleTap { openClockApp() }
-        clockDate.setOnDoubleTap { openCalendarApp() }
-        clockBattery.setOnDoubleTap { openBatterySettings() }
+        clockTime.setOnDoubleTap { openClockApp(R.string.home_info_no_app) }
+        clockDate.setOnDoubleTap { openCalendarApp(R.string.home_info_no_app) }
+        clockBattery.setOnDoubleTap { openBatterySettings(R.string.home_info_no_app) }
         gridIconPx = (48 * resources.displayMetrics.density).toInt()
 
         clockDelegate = ClockDelegate(
@@ -668,8 +668,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             .setAdapter(adapter) { _, which ->
                 val row = rows[which] as? TimeEventFormatter.EventRow.Item ?: return@setAdapter
                 when (row.event.type) {
-                    TimeBasedEventType.ALARM -> openClockApp()
-                    TimeBasedEventType.CALENDAR -> openCalendarApp()
+                    TimeBasedEventType.ALARM -> openClockApp(R.string.home_info_no_app)
+                    TimeBasedEventType.CALENDAR -> openCalendarApp(R.string.home_info_no_app)
                 }
             }
             .setPositiveButton(android.R.string.ok, null)
@@ -1612,34 +1612,6 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         if (launched) viewModel.recordLaunch(key)
     }
 
-    // ---- home-info tap targets (mirror Kolibri's intents) ----
-
-    private fun openClockApp() = startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
-
-    private fun openCalendarApp() {
-        val uri = CalendarContract.CONTENT_URI.buildUpon()
-            .appendPath("time")
-            .let { ContentUris.appendId(it, System.currentTimeMillis()); it.build() }
-        startActivitySafely(Intent(Intent.ACTION_VIEW).setData(uri))
-    }
-
-    private fun openBatterySettings() =
-        startActivitySafely(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
-
-    /**
-     * Launch an optional system intent; a launcher must never crash on a tap, so a
-     * missing handler (ActivityNotFoundException) or a denied one (SecurityException,
-     * e.g. an OEM alarm activity guarding SHOW_ALARMS) just toasts. Anything else is
-     * a programmer error and propagates.
-     */
-    private fun startActivitySafely(intent: Intent) {
-        // no suspension point — startActivitySafely is synchronous (startActivity).
-        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            .onFailure {
-                if (it !is ActivityNotFoundException && it !is SecurityException) throw it
-                showToastSafe(R.string.home_info_no_app)
-            }
-    }
 }
 
 /** Every top-level item across the grid and the dock. */

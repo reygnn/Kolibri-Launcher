@@ -182,8 +182,6 @@
     <string name="error_activity_not_found">Could not find an app to open this.</string>
 	
 	<string name="error_generic">Something went wrong. Please try again.</string>
-	<string name="error_starting_intent">Error starting intent: %1$s</string>
-    <string name="error_fallback_intent_failed">Fallback intent also failed</string>
     <string name="error_app_not_available">App is no longer available</string>
     <string name="error_loading_apps">Failed to load apps</string>
     <string name="error_loading_favorites">Could not load favorites.</string>

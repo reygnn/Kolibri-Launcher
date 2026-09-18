@@ -1,7 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.content.BroadcastReceiver
-import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -9,8 +8,6 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.provider.AlarmClock
-import android.provider.CalendarContract
 import android.text.format.DateFormat
 import android.view.ContextThemeWrapper
 import android.view.Gravity
@@ -54,6 +51,9 @@ import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.common.ui.collectOnStarted
+import com.github.reygnn.launcher.common.ui.openBatterySettings
+import com.github.reygnn.launcher.common.ui.openCalendarApp
+import com.github.reygnn.launcher.common.ui.openClockApp
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
@@ -921,15 +921,15 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 }
 
                 is UiEvent.OpenClock -> {
-                    openClockApp()
+                    openClockApp(R.string.error_activity_not_found)
                 }
 
                 is UiEvent.OpenCalendar -> {
-                    openCalendarApp()
+                    openCalendarApp(R.string.error_no_calendar_app)
                 }
 
                 is UiEvent.OpenBatterySettings -> {
-                    startActivitySafely(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
+                    openBatterySettings(R.string.error_activity_not_found)
                 }
 
                 is UiEvent.ShowRecentApps -> {
@@ -1069,25 +1069,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
-    private fun openClockApp() {
-        startActivitySafely(Intent(AlarmClock.ACTION_SHOW_ALARMS))
-    }
-
-    private fun openCalendarApp() {
-        try {
-            val builder = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
-            ContentUris.appendId(builder, System.currentTimeMillis())
-            startActivitySafely(Intent(Intent.ACTION_VIEW).setData(builder.build()))
-        } catch (e: Throwable) {
-            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-            // Inner catch kept (Expected error, four-category frame): the
-            // user-visible "no calendar app" recovery would be lost if this
-            // propagated to the outer Catchall, which logs but does not Toast.
-            TimberWrapper.silentError(e, "[MAIN] Error opening calendar")
-            showToastSafe(R.string.error_no_calendar_app)
-        }
-    }
-
     /**
      * Upcoming time-based events (alarms + calendar) dialog for the home
      * double-tap (the events indicator is a passive symbol, not a trigger). Same top-anchored, wallpaper-aware,
@@ -1204,8 +1185,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 val row = rows[which] as? TimeEventFormatter.EventRow.Item ?: return@setAdapter
                 runDialogAction("Error opening event target") {
                     when (row.event.type) {
-                        TimeBasedEventType.ALARM -> openClockApp()
-                        TimeBasedEventType.CALENDAR -> openCalendarApp()
+                        TimeBasedEventType.ALARM -> openClockApp(R.string.error_activity_not_found)
+                        TimeBasedEventType.CALENDAR -> openCalendarApp(R.string.error_no_calendar_app)
                     }
                 }
             }
@@ -1438,45 +1419,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // would be doubled defence.
         val intent = Intent(this, SettingsActivity::class.java)
         startActivity(intent)
-    }
-
-    private fun startActivitySafely(intent: Intent, fallbackIntent: Intent? = null) {
-        try {
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-        } catch (e: Throwable) {
-            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-            // Catch kept (Expected error, four-category frame):
-            // startActivity throws ActivityNotFoundException for
-            // optional system intents (clock app, calendar, battery
-            // settings) that may not exist on every ROM. The fallback-
-            // intent branch + final Toast give the user a recovery
-            // signal instead of a silent no-op.
-            //
-            // ORDER MATTERS: recovery runs before any silentError. silentError
-            // rethrows in DEBUG (Rule 9), so logging first made the whole
-            // fallback branch below dead code in debug builds and let the throw
-            // escape into whatever system callback invoked us.
-            if (fallbackIntent != null) {
-                try {
-                    fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(fallbackIntent)
-                    // Recovered — a missing optional handler on some ROM is not
-                    // a bug to be loud about, so no silentError on this path.
-                    Timber.w(e, "Primary intent failed, fallback succeeded: %s", intent)
-                    return
-                } catch (fallbackError: Throwable) {
-                    // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
-                    // Inner catch kept (Expected error, four-category
-                    // frame): even the fallback intent can fail. The
-                    // Toast below then handles the user-visible recovery.
-                    Timber.w(fallbackError, getString(R.string.error_fallback_intent_failed))
-                }
-            }
-
-            showToastSafe(R.string.error_activity_not_found)
-            TimberWrapper.silentError(e, getString(R.string.error_starting_intent, intent.toString()))
-        }
     }
 
 }

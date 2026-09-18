@@ -161,8 +161,6 @@
     <string name="error_activity_not_found">Es konnte keine App zum Öffnen gefunden werden.</string>
 	
 	<string name="error_generic">Ein Fehler ist aufgetreten. Bitte versuche es erneut.</string>
-	<string name="error_starting_intent">Fehler beim Starten des Intents: %1$s</string>
-    <string name="error_fallback_intent_failed">Auch der Fallback-Intent ist fehlgeschlagen</string>
     <string name="error_app_not_available">App ist nicht mehr verfügbar</string>
     <string name="error_loading_apps">Apps konnten nicht geladen werden</string>
     <string name="error_loading_favorites">Favoriten konnten nicht geladen werden.</string>
