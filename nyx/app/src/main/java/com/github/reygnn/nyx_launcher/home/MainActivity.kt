@@ -76,6 +76,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditCoordinator
+import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -194,19 +195,28 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private lateinit var wallpaperView: ZoomableImageView
     private lateinit var wallpaperScrim: View
 
+    // Per-layer decode cache (delete-a-layer flicker fix): a FullRebuild re-decodes
+    // every surviving layer, so cache them by file:// URI and reuse on the next
+    // rebuild. Cleared when the wallpaper is removed (see renderWallpaper).
+    private val wallpaperLayerCache = WallpaperLayerBitmapCache()
+
     // Serial, latest-wins wallpaper render. The binder decodes off the main
     // thread; a single job at a time avoids overlapping rebuilds of the view.
     private val wallpaperBinder by lazy {
         WallpaperViewBinder(bitmapLoader = { uri: Uri ->
-            // BitmapLoader contract: return null on failure, let only cancellation
-            // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
-            // openInputStream can throw FileNotFoundException/SecurityException and
-            // decode can OOM (Throwable). Without this guard the throw would escape
-            // bind() → the unguarded collect/launch → crash the HOME activity
-            // (mirrors Kolibri's loadBitmapFromUri).
-            withContext(Dispatchers.IO) {
+            // Cache hit → return the already-decoded layer instantly (no IO hop),
+            // so deleting one layer doesn't re-decode the rest and flash.
+            val key = uri.toString()
+            wallpaperLayerCache.get(key) ?: withContext(Dispatchers.IO) {
+                // BitmapLoader contract: return null on failure, let only cancellation
+                // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
+                // openInputStream can throw FileNotFoundException/SecurityException and
+                // decode can OOM (Throwable). Without this guard the throw would escape
+                // bind() → the unguarded collect/launch → crash the HOME activity
+                // (mirrors Kolibri's loadBitmapFromUri).
                 try {
                     decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+                        ?.also { wallpaperLayerCache.put(key, it) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
@@ -462,6 +472,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * Consumes the one-shot focus hint and re-syncs the edit toolbar after a rebuild.
      */
     private fun renderWallpaper(state: WallpaperState) {
+        // Wallpaper removed / reset → drop the cached layer bitmaps; nothing renders
+        // them again, so they would otherwise sit in memory until LRU eviction.
+        if (!state.hasWallpaper) wallpaperLayerCache.clear()
         val focusId = wallpaperEditCoordinator.consumePendingFocusLayerId()
         wallpaperRenderScheduler.render(lifecycleScope) {
             wallpaperBinder.bind(

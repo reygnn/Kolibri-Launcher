@@ -5,6 +5,24 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ---
 
+## Kürzlich erledigt (2026-09-18)
+
+- **Geteilte `BaseActivity` (`:common-ui`)** — Activity-Pendant zur geteilten
+  `BaseViewModel`: `BaseActivity<E, VM>` installiert einen
+  `CoroutineExceptionHandler` und sammelt (je hinter einem CancellationException-
+  Arm) den globalen `ErrorEventBus` (DEBUG-Dev-Toasts) + den VM-Event-Flow
+  (`handleEvent`-Hook, Default no-op → Event-Typ `Nothing` braucht kein Override).
+  Product-neutral via `TimberWrapper.isDebugBuild`/`SILENT_LOG_TAG` (kein hardcoded
+  `UiEvent`/`BuildConfig`). `MainActivity` erbt davon und fährt den UI-Collector-
+  Block unter dem Handler → ein Throwable im Render-/Collect-Coroutine crasht den
+  Launcher nicht mehr. Kolibri behält vorerst seine eigene `UiEvent`-Base.
+- **Wallpaper Delete-Flicker** — Per-Layer-Decode-Cache
+  (`home/wallpaper/WallpaperLayerBitmapCache`, LRU nach Bytes, never-recycle) im
+  `bitmapLoader`: der `FullRebuild` beim Layer-Löschen re-dekodiert die
+  verbleibenden Layer nicht mehr (Cache-Hits), also kein Flackern auf langsamer
+  GPU (A17). Der geteilte single-entry `WallpaperCompositeCache` blieb bewusst
+  weg (er cached keine N Layer, und nyx hat keine drawer→home-Teardown-Naht).
+
 ## Kürzlich erledigt (2026-09-17)
 
 - **Drawer-Folder** — voll umgesetzt (`DrawerFoldersRepository`/
@@ -61,36 +79,17 @@ Anker: neuer `NotificationListenerService` + Präsenz-Store (`:nyx:data` oder
 `:common-*`), `home/HomeGridAdapter.kt` (Icon-Bindung), Dock-Icon-Rendering in
 `MainActivity`, Manifest (`BIND_NOTIFICATION_LISTENER_SERVICE`).
 
-### BaseActivity + Fehler-Toast-Bus nachrüsten (Robustheit)
+### Dev-Fehler-Toasts in nyx speisen (optional, Rest von BaseActivity)
 
-Der ViewModel-Teil ist **erledigt**: `HomeViewModel` erweitert bereits das
-geteilte `BaseViewModel` (`:common-ui`, `base/BaseViewModel.kt`), das
-`launchSafe`/`executeSafe` (CoroutineExceptionHandler, Cancellation-Rethrow-
-Disziplin) mitbringt — ein throwender Use-Case wird geloggt statt zum Crash. Der
-`ErrorEventBus` liegt ebenfalls schon in `:common-ui`.
-
-Real **offen** bleibt nur:
-- **Kein geteiltes `BaseActivity`** — `MainActivity` ist eine schlichte
-  `AppCompatActivity`; ihr Coroutine-Crash-Netz ist die ad-hoc
-  `home/wallpaper/LaunchSafe.kt`-Extension statt eines gemeinsamen Basistyps.
-- **Toast-Bus nicht verdrahtet** — nyx nutzt den `ErrorEventBus`/`UiEvent`-Pfad
-  nicht (`HomeViewModel` hat Event-Typ `Nothing`), Fehler werden also nicht
-  benutzersichtbar getoastet.
-
-Kein Muss (der HIE-Uhr-Crash kam aus einem synchronen onClick und ist defensiv
-via `startActivitySafely` gelöst), aber ein sinnvoller Reife-Schritt. Anker:
-Kolibri `ui/base/BaseActivity.kt` als Vorlage; Ziel `:common-ui`
-(`base/BaseViewModel.kt`, `ErrorEventBus.kt` liegen dort bereits).
-
-### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
-
-Nyx lässt den geteilten `WallpaperCompositeCache` bewusst weg (keine
-drawer→home-Teardown-Naht wie bei Kolibri). Folge: beim Löschen eines Layers
-baut der Binder die verbleibenden Layer neu auf (Re-Decode) → kurzes Flackern,
-auf langsamerer GPU (A17) sichtbar, auf dem Pixel nicht. Kein Korrektheits-
-problem. Falls es stört: den geteilten `WallpaperCompositeCache` (`:common-ui`)
-für Warm-Reattach einhängen. Anker: `MainActivity` Render-Pfad
-(`renderWallpaper`/`wallpaperBinder`), `:common-ui` `WallpaperCompositeCache`.
+Die geteilte `BaseActivity` (erledigt, siehe oben) **sammelt** bereits den
+globalen `ErrorEventBus` und würde in DEBUG Dev-Fehler-Toasts zeigen — aber in
+nyx **postet niemand** auf den Bus: die einzige Quelle ist Kolibris
+`ToastErrorTree` (eine Timber-Tree), die nyx nicht pflanzt. Der Collector läuft
+also leer. Wenn Dev-Fehler-Toasts wie in Kolibri gewünscht sind: eine kleine
+`ToastErrorTree` nach `:common-ui` (oder `:feature-crashreporting`) heben und in
+`NyxLauncherApp` pflanzen. Rein optional/Dev-Komfort. Anker: Kolibri
+`ui/util/ToastErrorTree.kt`, `NyxLauncherApp` (Timber-Trees), `:common-ui`
+`ErrorEventBus`.
 
 ### Wallpaper-Edit-UI: Dedup gegen `:common-ui`
 
