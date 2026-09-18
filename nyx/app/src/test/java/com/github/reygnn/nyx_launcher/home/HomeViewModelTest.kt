@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
@@ -65,6 +66,9 @@ class HomeViewModelTest {
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
     }
+    private val wallpaperDisplaySettings = mockk<WallpaperDisplaySettings> {
+        every { wallpaperScrimAlphaStateFlow } returns flowOf(0f)
+    }
 
     // Real fake repo + projection use case + a deterministic id stub, so the drawer-folder
     // mutation methods can be asserted against the resulting membership state.
@@ -92,6 +96,7 @@ class HomeViewModelTest {
             drawerFolderIdFactory,
             hiddenApps,
             RecordAppLaunchUseCase(appUsage),
+            wallpaperDisplaySettings,
             mainDispatcherRule.dispatcher,
         )
     }

@@ -2,8 +2,10 @@ package com.github.reygnn.nyx_launcher.home
 
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.launcher.common.ui.base.BaseViewModel
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
@@ -68,6 +70,7 @@ class HomeViewModel @Inject constructor(
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val recordAppLaunch: RecordAppLaunchUseCase,
+    wallpaperDisplaySettings: WallpaperDisplaySettings,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
@@ -121,6 +124,19 @@ class HomeViewModel @Inject constructor(
      */
     val usageSortEnabled: StateFlow<Boolean> = preferences.usageSortEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * User-controlled home wallpaper scrim alpha (opt-in dim, default 0). Shared
+     * [SharingStarted.Eagerly] so its `.value` is readable synchronously the moment the
+     * home view is (re)created: MainActivity seeds the scrim overlay from it in onCreate,
+     * BEFORE the wallpaper is rendered, so a recreated/returning home shows the already
+     * scrimmed wallpaper instead of briefly flashing it un-scrimmed — the source flow is a
+     * cold DataStore read whose first emission used to lose the race to the hot wallpaper
+     * StateFlow. The collector in MainActivity keeps it in sync afterwards. Same retained
+     * hot-flow posture as [hiddenApps] / [usageSortEnabled].
+     */
+    val wallpaperScrimAlpha: StateFlow<Float> = wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
 
     fun toggleUsageSort() {
         launchSafe { preferences.setUsageSortEnabled(!usageSortEnabled.value) }

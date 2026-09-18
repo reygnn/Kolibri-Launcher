@@ -385,6 +385,14 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
             rerenderWallpaper = { renderWallpaper(wallpaperEditCoordinator.wallpaperState.value) },
         )
 
+        // Seed + paint the scrim NOW, before the first frame and before the wallpaper is
+        // rendered, from the retained (Eagerly) scrim-alpha value. On a recreated/returning
+        // home the hot wallpaper StateFlow renders (near-)immediately while the scrim's cold
+        // DataStore read lands a few frames later, so without this the user briefly saw the
+        // un-scrimmed wallpaper. The collector below keeps it in sync from here on.
+        currentScrimAlpha = viewModel.wallpaperScrimAlpha.value
+        applyScrim()
+
         // First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
         // the stored decision → show the dialog once / re-affirm ACRA / skip on unreadable.
         lifecycleScope.launch { showCrashReportConsentIfNeeded() }
@@ -421,7 +429,7 @@ class MainActivity : AppCompatActivity(), AppDrawerFragment.Host {
                 launch {
                     wallpaperEditCoordinator.wallpaperState.collect { renderWallpaper(it) }
                 }
-                launch { wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow.collect { currentScrimAlpha = it; applyScrim() } }
+                launch { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
                 launch {
                     wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
                         applyBackdrop(it)
