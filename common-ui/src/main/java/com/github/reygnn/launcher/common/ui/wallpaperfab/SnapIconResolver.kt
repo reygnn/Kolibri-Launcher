@@ -4,14 +4,12 @@ import androidx.annotation.DrawableRes
 import com.github.reygnn.launcher.common.ui.R
 
 /**
- * Pure Kotlin enum, frei von Android-View-Abhängigkeiten.
+ * Pure Kotlin enum, free of Android-View dependencies.
  *
- * ZoomableImageView.SnapMode ist weiterhin als nested Enum im View definiert.
- * HomeFragment konvertiert zwischen den beiden in einer kleinen when-Funktion
- * (siehe HomeFragment.toIconSnapMode). Längerfristig sollte ZoomableImageView
- * auf dieses Top-Level-Enum migriert werden.
- *
- * Separat gehalten, damit SnapIconResolver ohne Android-Class-Loading testbar ist.
+ * `ZoomableImageView.SnapMode` is a separate nested enum on the View itself;
+ * each app's wallpaper-edit controller bridges between the two via a small
+ * `toIconMode()` helper. Kept separate so [SnapIconResolver] stays testable
+ * without Android class loading.
  */
 enum class SnapMode { EDGE, CENTER }
 

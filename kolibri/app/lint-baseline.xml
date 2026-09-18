@@ -416,17 +416,6 @@
     </issue>
 
     <issue
-        id="UseKtx"
-        message="Use the KTX extension property `View.isVisible` instead?"
-        errorLine1="    val isPanelShown: Boolean get() = visibility == View.VISIBLE"
-        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/github/reygnn/kolibri_launcher/ui/home/wallpaperfab/CommandsPanel.kt"
-            line="107"
-            column="39"/>
-    </issue>
-
-    <issue
         id="ClickableViewAccessibility"
         message="`onTouch` lambda should call `View#performClick` when a click is detected"
         errorLine1="        touchInterceptor.setOnTouchListener { _, event ->"
