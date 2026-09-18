@@ -138,15 +138,6 @@ class HomeViewModel @Inject constructor(
     val wallpaperScrimAlpha: StateFlow<Float> = wallpaperDisplaySettings.wallpaperScrimAlphaStateFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
 
-    /**
-     * Whether the home is locked to portrait. Shared [SharingStarted.Eagerly] so
-     * MainActivity can read `.value` synchronously in onCreate to set
-     * requestedOrientation before the first frame (and collect it for live changes),
-     * same retained-hot-flow posture as [wallpaperScrimAlpha].
-     */
-    val rotationLocked: StateFlow<Boolean> = preferences.rotationLocked()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppConstants.DEFAULT_ROTATION_LOCKED)
-
     fun toggleUsageSort() {
         launchSafe { preferences.setUsageSortEnabled(!usageSortEnabled.value) }
     }

@@ -54,8 +54,6 @@
     <string name="category_drawer_title">App-Drawer</string>
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
-    <string name="rotation_lock_title">Bildschirmrotation sperren</string>
-    <string name="rotation_lock_summary">Display im Hochformat fixieren</string>
     <string name="category_homeinfo_title">Startbildschirm-Info</string>
     <string name="category_privacy_title">Datenschutz</string>
     <string name="crash_report_setting_title">Absturzberichte</string>

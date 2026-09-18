@@ -29,7 +29,6 @@ class NyxBackupSerializerTest {
             layout = sampleLayout(),
             prefs = NyxBackupPrefs(
                 monochromeIcons = true,
-                rotationLocked = true,
                 showAlarm = false,
                 showCalendarEvent = true,
                 scrimAlpha = 0.25f,

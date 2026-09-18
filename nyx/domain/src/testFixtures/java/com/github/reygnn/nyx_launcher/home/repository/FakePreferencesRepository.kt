@@ -10,14 +10,12 @@ class FakePreferencesRepository(
     showCalendarEvent: Boolean = false,
     searchAutoLaunch: Boolean = false,
     usageSort: Boolean = false,
-    rotationLocked: Boolean = false,
 ) : PreferencesRepository {
     private val monochromeState = MutableStateFlow(monochrome)
     private val showAlarmState = MutableStateFlow(showAlarm)
     private val showCalendarState = MutableStateFlow(showCalendarEvent)
     private val searchAutoLaunchState = MutableStateFlow(searchAutoLaunch)
     private val usageSortState = MutableStateFlow(usageSort)
-    private val rotationLockedState = MutableStateFlow(rotationLocked)
 
     override fun monochromeIcons(): Flow<Boolean> = monochromeState
     override suspend fun setMonochromeIcons(enabled: Boolean) { monochromeState.value = enabled }
@@ -27,9 +25,6 @@ class FakePreferencesRepository(
 
     override fun usageSortEnabled(): Flow<Boolean> = usageSortState
     override suspend fun setUsageSortEnabled(enabled: Boolean) { usageSortState.value = enabled }
-
-    override fun rotationLocked(): Flow<Boolean> = rotationLockedState
-    override suspend fun setRotationLocked(enabled: Boolean) { rotationLockedState.value = enabled }
 
     override val showAlarmFlow: Flow<Boolean> = showAlarmState
     override suspend fun setShowAlarm(enabled: Boolean) { showAlarmState.value = enabled }

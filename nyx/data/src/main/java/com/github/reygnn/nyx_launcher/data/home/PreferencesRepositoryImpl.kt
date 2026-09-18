@@ -5,7 +5,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
-import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -41,15 +40,6 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[USAGE_SORT] = enabled }
     }
 
-    override fun rotationLocked(): Flow<Boolean> =
-        dataStore.readFlowFailOpen("Error reading rotationLocked") {
-            it[ROTATION_LOCKED] ?: AppConstants.DEFAULT_ROTATION_LOCKED
-        }
-
-    override suspend fun setRotationLocked(enabled: Boolean) {
-        dataStore.edit { it[ROTATION_LOCKED] = enabled }
-    }
-
     override val showAlarmFlow: Flow<Boolean> =
         dataStore.readFlowFailOpen("Error reading showAlarm") { it[SHOW_ALARM] ?: false }
 
@@ -68,7 +58,6 @@ class PreferencesRepositoryImpl @Inject constructor(
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
         val SEARCH_AUTO_LAUNCH = booleanPreferencesKey("search_auto_launch")
         val USAGE_SORT = booleanPreferencesKey("drawer_usage_sort")
-        val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val SHOW_ALARM = booleanPreferencesKey("show_alarm")
         val SHOW_CALENDAR_EVENT = booleanPreferencesKey("show_calendar_event")
     }
