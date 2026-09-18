@@ -42,7 +42,16 @@ class HomePagerAdapter(
     fun submitNotificationDots(dotPackages: Set<String>) {
         if (currentDots == dotPackages) return
         currentDots = dotPackages
-        notifyDataSetChanged()
+        // Dot-only payload: rebind pages WITHOUT reloading their icons (see onBind below).
+        notifyItemRangeChanged(0, pages.size, NOTIFICATION_DOT_PAYLOAD)
+    }
+
+    override fun onBindViewHolder(holder: PageHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isDotOnlyPayload()) {
+            holder.gridAdapter.refreshDots()
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {

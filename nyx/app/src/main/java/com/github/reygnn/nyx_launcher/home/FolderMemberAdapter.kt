@@ -22,10 +22,26 @@ class FolderMemberAdapter(
 ) : RecyclerView.Adapter<FolderMemberAdapter.MemberHolder>() {
 
     private var members: List<ComponentKey> = emptyList()
+    private var dotPackages: Set<String> = emptySet()
 
     fun submit(newMembers: List<ComponentKey>) {
         members = newMembers
         notifyDataSetChanged()
+    }
+
+    fun submitNotificationDots(newDots: Set<String>) {
+        if (dotPackages == newDots) return
+        dotPackages = newDots
+        notifyItemRangeChanged(0, members.size, NOTIFICATION_DOT_PAYLOAD)
+    }
+
+    override fun onBindViewHolder(holder: MemberHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isDotOnlyPayload()) {
+            holder.dot.visibility =
+                if (members[position].packageName in dotPackages) View.VISIBLE else View.GONE
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MemberHolder {
@@ -40,6 +56,7 @@ class FolderMemberAdapter(
         val key = members[position]
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
+        holder.dot.visibility = if (key.packageName in dotPackages) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener { onLaunch(key) }
         holder.itemView.setOnLongClickListener { onStartDrag(holder.itemView, key); true }
         holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
@@ -54,6 +71,7 @@ class FolderMemberAdapter(
 
     class MemberHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.member_icon)
+        val dot: View = view.findViewById(R.id.member_dot)
         var bindToken: Int = 0
     }
 }

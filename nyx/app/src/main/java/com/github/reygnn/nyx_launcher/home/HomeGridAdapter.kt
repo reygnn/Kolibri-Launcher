@@ -56,6 +56,18 @@ class HomeGridAdapter(
 
     override fun getItemCount(): Int = cells.size
 
+    /** Refresh only the dots (payload bind) — no icon reload. Driven by the pager. */
+    fun refreshDots() = notifyItemRangeChanged(0, cells.size, NOTIFICATION_DOT_PAYLOAD)
+
+    override fun onBindViewHolder(holder: CellHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isDotOnlyPayload()) {
+            holder.dot.visibility =
+                if (cells[position].hasNotificationDot(dotPackages())) View.VISIBLE else View.GONE
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     override fun onBindViewHolder(holder: CellHolder, position: Int) {
         val cell = cells[position]
         val token = ++holder.bindToken

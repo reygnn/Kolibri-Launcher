@@ -9,6 +9,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.nyx_launcher.home.NOTIFICATION_DOT_PAYLOAD
+import com.github.reygnn.nyx_launcher.home.isDotOnlyPayload
 import com.github.reygnn.nyx_launcher.home.loadIconGated
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.IconRef
@@ -45,7 +47,13 @@ class AppDrawerAdapter(
     fun submitNotificationDots(newDots: Set<String>) {
         if (dotPackages == newDots) return
         dotPackages = newDots
-        notifyDataSetChanged()
+        // Dot-only payload: update dots without reloading drawer icons.
+        notifyItemRangeChanged(0, entries.size, NOTIFICATION_DOT_PAYLOAD)
+    }
+
+    private fun entryHasDot(entry: DrawerEntry): Boolean = when (entry) {
+        is DrawerEntry.App -> entry.app.key.packageName in dotPackages
+        is DrawerEntry.Folder -> entry.members.any { it.packageName in dotPackages }
     }
 
     /**
@@ -70,6 +78,14 @@ class AppDrawerAdapter(
         return EntryHolder(view)
     }
 
+    override fun onBindViewHolder(holder: EntryHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isDotOnlyPayload()) {
+            holder.dot.visibility = if (entryHasDot(entries[position])) View.VISIBLE else View.GONE
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     override fun onBindViewHolder(holder: EntryHolder, position: Int) {
         when (val entry = entries[position]) {
             is DrawerEntry.App -> bindApp(holder, entry)
@@ -80,7 +96,7 @@ class AppDrawerAdapter(
     private fun bindApp(holder: EntryHolder, entry: DrawerEntry.App) {
         val app = entry.app
         holder.label.text = app.displayName
-        holder.dot.visibility = if (app.key.packageName in dotPackages) View.VISIBLE else View.GONE
+        holder.dot.visibility = if (entryHasDot(entry)) View.VISIBLE else View.GONE
         // Reveal mode only: a hidden app is shown dimmed so it reads as "hidden" at a glance.
         // In the normal view hidden apps are filtered out, so this is 1f there.
         holder.itemView.alpha = if (entry.hidden) HIDDEN_ALPHA else 1f
@@ -102,8 +118,7 @@ class AppDrawerAdapter(
 
     private fun bindFolder(holder: EntryHolder, folder: DrawerEntry.Folder) {
         holder.itemView.alpha = 1f // folders are never hidden; reset in case the view was recycled from a dimmed app
-        holder.dot.visibility =
-            if (folder.members.any { it.packageName in dotPackages }) View.VISIBLE else View.GONE
+        holder.dot.visibility = if (entryHasDot(folder)) View.VISIBLE else View.GONE
         val title = folder.title.ifBlank {
             holder.itemView.context.getString(R.string.folder_default_title)
         }

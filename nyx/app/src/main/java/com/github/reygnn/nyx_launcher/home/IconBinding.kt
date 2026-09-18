@@ -42,6 +42,16 @@ fun ImageView.loadIconGated(
  * its own listeners for empty cells before calling this.
  */
 /**
+ * RecyclerView change payload meaning "only the notification dot changed" — an adapter
+ * rebinding with this must update the dot View only, never reload the icon (which would
+ * blank + re-decode it, causing visible flicker on every notification change).
+ */
+val NOTIFICATION_DOT_PAYLOAD = Any()
+
+/** True if a payload list is exactly a notification-dot-only refresh. */
+fun List<Any>.isDotOnlyPayload(): Boolean = isNotEmpty() && all { it === NOTIFICATION_DOT_PAYLOAD }
+
+/**
  * Whether [this] cell should show a notification dot given [dotPackages] (the set of
  * packages with a dot-worthy notification): an app matches its own package, a folder
  * matches if any member does. Pure — unit-tested (see HomeCellDotTest).

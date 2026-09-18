@@ -63,6 +63,7 @@
     <string name="notification_dots_summary">Show a dot on app icons that have a notification</string>
     <string name="notification_dots_service_label">Nyx notification dots</string>
     <string name="notification_dots_grant_toast">Grant notification access to Nyx to show dots</string>
+    <string name="notification_dots_no_access_summary">Notification access not granted — dots won\'t show</string>
     <string name="category_homeinfo_title">Home info</string>
     <string name="category_privacy_title">Privacy</string>
     <string name="crash_report_setting_title">Crash reports</string>

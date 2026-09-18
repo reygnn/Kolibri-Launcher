@@ -34,6 +34,8 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import app.cash.turbine.test
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -62,11 +64,17 @@ class HomeViewModelTest {
     private val removeItem = mockk<RemoveItemUseCase>(relaxed = true)
     private val renameFolder = mockk<RenameFolderUseCase>(relaxed = true)
     private val fitHomeGrid = mockk<FitHomeGridUseCase>(relaxed = true)
+
+    // Controllable notification-dots toggle + presence store, so the gating combine in
+    // HomeViewModel.notificationDots can be exercised in both branches.
+    private val notificationDotsEnabled = MutableStateFlow(false)
+    private val notificationPresenceStore = NotificationPresenceStore()
+
     private val preferences = mockk<PreferencesRepository> {
         every { monochromeIcons() } returns flowOf(false)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
-        every { notificationDots() } returns flowOf(false)
+        every { notificationDots() } returns notificationDotsEnabled
     }
     private val wallpaperDisplaySettings = mockk<WallpaperDisplaySettings> {
         every { wallpaperScrimAlphaStateFlow } returns flowOf(0f)
@@ -99,9 +107,24 @@ class HomeViewModelTest {
             hiddenApps,
             RecordAppLaunchUseCase(appUsage),
             wallpaperDisplaySettings,
-            NotificationPresenceStore(),
+            notificationPresenceStore,
             mainDispatcherRule.dispatcher,
         )
+    }
+
+    @Test
+    fun `notificationDots is gated by the toggle`() = runTest(mainDispatcherRule.dispatcher) {
+        coEvery { getDrawerApps() } returns emptyList()
+        notificationPresenceStore.update(setOf("com.a", "com.b"))
+        val vm = createViewModel()
+        vm.notificationDots.test {
+            assertThat(awaitItem()).isEmpty() // toggle off (default) -> gated to empty
+            notificationDotsEnabled.value = true
+            assertThat(awaitItem()).containsExactly("com.a", "com.b") // on -> store packages
+            notificationDotsEnabled.value = false
+            assertThat(awaitItem()).isEmpty() // back off -> empty again
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

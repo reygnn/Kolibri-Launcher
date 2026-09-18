@@ -975,6 +975,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 onOpenFolder = ::openFolder,
                 onStartDrag = { v, id -> homeRoot.armDrag(DragPayload.Existing(id), v) },
             ).also { pager.adapter = it }
+            // Seed the fresh adapter with the current dots: notificationDots is a
+            // StateFlow that won't re-emit its unchanged value for a new adapter, so
+            // without this a runtime grid change would drop the home-grid dots until
+            // the next notification event.
+            pagerAdapter?.submitNotificationDots(viewModel.notificationDots.value)
         }
         val currentPage = pager.currentItem
         // Render the occupied pages plus one empty landing page (see renderedPageCount).
@@ -1110,7 +1115,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 viewModel.extractFromDrawerFolder(folder.id, key)
                 folderOverlayController.close()
             },
-        ).also { it.submit(members) }
+        ).also { it.submit(members); it.submitNotificationDots(viewModel.notificationDots.value) }
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,
@@ -1326,7 +1331,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             iconSizePx = gridIconPx,
             onLaunch = { key -> launchApp(key); folderOverlayController.close() },
             onStartDrag = { view, key -> startFolderMemberDrag(view, key) },
-        ).also { it.submit(folder.members) }
+        ).also { it.submit(folder.members); it.submitNotificationDots(viewModel.notificationDots.value) }
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,

@@ -34,7 +34,17 @@ class DockAdapter(
     fun submitNotificationDots(newDots: Set<String>) {
         if (dotPackages == newDots) return
         dotPackages = newDots
-        notifyDataSetChanged()
+        // Dot-only payload: update dots without reloading dock icons.
+        notifyItemRangeChanged(0, items.size, NOTIFICATION_DOT_PAYLOAD)
+    }
+
+    override fun onBindViewHolder(holder: DockHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isDotOnlyPayload()) {
+            holder.dot.visibility =
+                if (items[position].hasNotificationDot(dotPackages)) View.VISIBLE else View.GONE
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DockHolder {

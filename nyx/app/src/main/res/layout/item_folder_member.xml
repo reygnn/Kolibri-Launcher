@@ -3,12 +3,25 @@
     android:layout_width="match_parent"
     android:layout_height="84dp">
 
-    <ImageView
-        android:id="@+id/member_icon"
+    <FrameLayout
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="center"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
+        android:layout_gravity="center">
+
+        <ImageView
+            android:id="@+id/member_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <View
+            android:id="@+id/member_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/notification_dot"
+            android:visibility="gone" />
+    </FrameLayout>
 
 </FrameLayout>

@@ -9,8 +9,8 @@ import org.junit.Test
  */
 class NotificationDotPolicyTest {
 
-    private fun n(pkg: String, ongoing: Boolean = false, clearable: Boolean = true) =
-        NotificationSummary(packageName = pkg, isOngoing = ongoing, isClearable = clearable)
+    private fun n(pkg: String, ongoing: Boolean = false, clearable: Boolean = true, canShowBadge: Boolean = true) =
+        NotificationSummary(packageName = pkg, isOngoing = ongoing, isClearable = clearable, canShowBadge = canShowBadge)
 
     @Test
     fun `a clearable non-ongoing notification produces a dot`() {
@@ -27,6 +27,12 @@ class NotificationDotPolicyTest {
     @Test
     fun `non-clearable notifications are excluded`() {
         assertThat(NotificationDotPolicy.dotPackages(listOf(n("com.persist", clearable = false))))
+            .isEmpty()
+    }
+
+    @Test
+    fun `notifications the user disabled the badge for are excluded`() {
+        assertThat(NotificationDotPolicy.dotPackages(listOf(n("com.silent", canShowBadge = false))))
             .isEmpty()
     }
 

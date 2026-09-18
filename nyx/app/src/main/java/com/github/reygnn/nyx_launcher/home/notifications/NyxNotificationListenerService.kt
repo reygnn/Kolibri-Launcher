@@ -1,6 +1,8 @@
 package com.github.reygnn.nyx_launcher.home.notifications
 
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.Ranking
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import com.github.reygnn.launcher.core.TimberWrapper
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,20 +39,32 @@ class NyxNotificationListenerService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = refresh()
 
     private fun refresh() {
-        // Catch kept: getActiveNotifications throws SecurityException when the listener
-        // is not (yet) connected, and system callbacks are a real failure boundary. No
-        // suspension point here, so no CancellationException concern.
+        // Catch kept: a system-callback boundary. getActiveNotifications can throw a
+        // SecurityException on a connect/disconnect race or a transient binder failure.
+        // reportToAcra (report in RELEASE, no DEBUG throw) tolerates the boundary rather
+        // than crashing development on a system race. No suspension point here.
         try {
-            val active = activeNotifications?.map { it.toSummary() }.orEmpty()
+            val ranking = currentRanking
+            val active = activeNotifications?.map { it.toSummary(ranking) }.orEmpty()
             store.update(NotificationDotPolicy.dotPackages(active))
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Failed to refresh notification dots")
+            TimberWrapper.reportToAcra(e, "Failed to refresh notification dots")
         }
     }
 }
 
-private fun StatusBarNotification.toSummary() = NotificationSummary(
-    packageName = packageName,
-    isOngoing = isOngoing,
-    isClearable = isClearable,
-)
+private fun StatusBarNotification.toSummary(ranking: RankingMap?): NotificationSummary {
+    // Badge eligibility honours the user's per-app/channel "notification dot" setting
+    // (and silent/low-importance channels); default true if the ranking is unavailable.
+    // Presence + flags only — never title/text/count.
+    val canBadge = ranking?.let {
+        val r = Ranking()
+        if (it.getRanking(key, r)) r.canShowBadge() else true
+    } ?: true
+    return NotificationSummary(
+        packageName = packageName,
+        isOngoing = isOngoing,
+        isClearable = isClearable,
+        canShowBadge = canBadge,
+    )
+}

@@ -216,6 +216,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 launch {
                     preferences.notificationDots().collect { enabled ->
                         if (notificationDotsSwitch?.isChecked != enabled) notificationDotsSwitch?.isChecked = enabled
+                        updateNotificationDotsSummary()
                     }
                 }
                 launch {
@@ -419,6 +420,23 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val ok = wallpaperImageSetter.setFromUri(uri)
         toast(getString(if (ok) R.string.wallpaper_set_toast else R.string.wallpaper_set_failed_toast))
         if (ok) requireActivity().finish() // back to home, which re-renders from the saved state
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-check access on return from the system settings screen (or a later revoke)
+        // so the toggle summary reflects reality instead of silently misleading.
+        updateNotificationDotsSummary()
+    }
+
+    /** Reflect the notification-access state in the dots toggle summary when it's on. */
+    private fun updateNotificationDotsSummary() {
+        val sw = notificationDotsSwitch ?: return
+        sw.summary = if (sw.isChecked && !hasNotificationAccess()) {
+            getString(R.string.notification_dots_no_access_summary)
+        } else {
+            getString(R.string.notification_dots_summary)
+        }
     }
 
     /** Whether the user has granted Nyx notification-listener access (dots need it). */
