@@ -7,21 +7,16 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 
 ## Kürzlich erledigt (2026-09-18)
 
-- **Rotationssperre + Grid bei Orientierungswechsel** — `rotation_locked`-Switch
-  (Display-Kategorie) über `PreferencesRepository` (Interface + Contract + Fake + Impl),
-  im Backup/Restore mitgeführt. **Default gesperrt** (`PreferencesRepository
-  .DEFAULT_ROTATION_LOCKED = true`, bewusst abweichend vom geteilten `:core`-Default
-  `false`): nyx' Grid re-packt bei Orientierungswechsel verlustbehaftet (Apps ja,
-  Positionen nein), also würde „entsperrt per Default" ein Portrait→Landscape→Portrait
-  einen kuratierten Layout verwürfeln. `MainActivity` setzt `requestedOrientation`
-  (PORTRAIT/UNSPECIFIED) aus einem Eagerly-`HomeViewModel.rotationLocked` (eager in
-  onCreate + Collector). Damit ist #5 entschieden: gesperrt (Default) → Hochformat,
-  Rotation ist Opt-in. Zusätzlich der bislang **fehlende** Trigger gefixt: das Manifest
-  hatte längst `configChanges=orientation` (kein Recreate), aber kein
+- **Rotationssperre + Grid bei Orientierungswechsel** — Kolibri-Parität: ein
+  `rotation_locked`-Switch (Display-Kategorie) über `PreferencesRepository`
+  (Interface + Contract + Fake + Impl, Default `AppConstants.DEFAULT_ROTATION_LOCKED
+  = false`), im Backup/Restore mitgeführt. `MainActivity` setzt `requestedOrientation`
+  (PORTRAIT vs UNSPECIFIED) aus einem Eagerly-`HomeViewModel.rotationLocked` (eager in
+  onCreate + Collector). Damit ist die frühere #5-Produktfrage entschieden: gesperrt →
+  Hochformat; entsperrt → Sensor. Zusätzlich der bislang **fehlende** Trigger gefixt:
+  das Manifest hatte längst `configChanges=orientation` (kein Recreate), aber kein
   `onConfigurationChanged` → das Grid adaptierte sich bei Rotation gar nicht; jetzt
   re-fittet `onConfigurationChanged` via `applyDeviceGrid`/`HomeLayoutRegridder`.
-  `applyDeviceGrid` überspringt einen Landscape-Fit im gesperrten Zustand, damit ein
-  transienter Landscape-Frame beim Kaltstart nie einen Repack persistiert.
 
 - **Geteilte `BaseActivity` (`:common-ui`)** — Activity-Pendant zur geteilten
   `BaseViewModel`: `BaseActivity<E, VM>` installiert einen

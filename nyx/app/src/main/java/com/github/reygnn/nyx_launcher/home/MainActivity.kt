@@ -413,12 +413,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         currentScrimAlpha = viewModel.wallpaperScrimAlpha.value
         applyScrim()
 
-        // Request the orientation from the current rotation-lock value now. On a cold start
-        // this is the Eagerly seed (nyx default = LOCKED), which is correct for the common
-        // (locked) case, so portrait is requested before the first frame; the collector
-        // below delivers the persisted value and corrects it for a user who unlocked. The
-        // applyDeviceGrid guard (not this read) is what protects a locked layout from a
-        // transient-landscape repack, so a late correction here cannot scramble it.
+        // Apply the rotation lock from the retained (Eagerly) value now, so the Activity
+        // requests the right orientation before the first frame; the collector below keeps
+        // it live when the user toggles the setting.
         applyRotationLock(viewModel.rotationLocked.value)
 
         // First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
@@ -465,15 +462,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     wallpaperEditCoordinator.wallpaperState.collect { renderWallpaper(it) }
                 }
                 launchGuarded { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
-                launchGuarded {
-                    viewModel.rotationLocked.collect {
-                        applyRotationLock(it)
-                        // Re-fit once the real value lands: an unlocked user who briefly saw
-                        // the default-locked seed may have had a landscape fit skipped by the
-                        // applyDeviceGrid guard; re-run so their landscape grid settles.
-                        pager.doOnLayout { applyDeviceGrid() }
-                    }
-                }
+                launchGuarded { viewModel.rotationLocked.collect { applyRotationLock(it) } }
                 launchGuarded {
                     wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
                         applyBackdrop(it)
@@ -1264,17 +1253,6 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * downstream, so running it on every layout (incl. rotation) is cheap.
      */
     private fun applyDeviceGrid() {
-        // Never re-fit (and persist) a landscape grid while the launcher is rotation-locked:
-        // a locked user keeps their portrait arrangement, and a transient landscape frame at
-        // cold start (before the orientation request settles) would otherwise scramble it
-        // irreversibly — HomeLayoutRegridder keeps the apps but NOT their positions. On a
-        // fresh cold start the value is the Eagerly seed (nyx default = LOCKED), so this
-        // guard is active for exactly the locked case it protects.
-        if (viewModel.rotationLocked.value &&
-            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        ) {
-            return
-        }
         val density = resources.displayMetrics.density
         val colTargetPx = HOME_COL_TARGET_DP * density
         val rowTargetPx = HOME_CELL_TARGET_DP * density
