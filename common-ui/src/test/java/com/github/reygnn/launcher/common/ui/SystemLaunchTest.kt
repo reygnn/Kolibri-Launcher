@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.common.ui
 
+import android.content.ActivityNotFoundException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,6 +11,12 @@ import org.junit.Test
  * errors, OOM) must be reported as "unexpected" so the caller rethrows it.
  */
 class SystemLaunchTest {
+
+    @Test
+    fun `ActivityNotFoundException is an expected optional-app failure`() {
+        // The primary case: no clock / calendar / battery app on this ROM.
+        assertTrue(isExpectedSystemLaunchFailure(ActivityNotFoundException("no handler")))
+    }
 
     @Test
     fun `SecurityException is an expected optional-app failure`() {

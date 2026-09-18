@@ -12,7 +12,6 @@ import android.text.format.DateFormat
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
@@ -916,7 +915,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 }
 
                 is UiEvent.OpenCalendar -> {
-                    openCalendarApp(R.string.error_no_calendar_app)
+                    openCalendarApp(R.string.error_activity_not_found)
                 }
 
                 is UiEvent.OpenBatterySettings -> {
@@ -1108,7 +1107,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 runDialogAction("Error opening event target") {
                     when (row.event.type) {
                         TimeBasedEventType.ALARM -> openClockApp(R.string.error_activity_not_found)
-                        TimeBasedEventType.CALENDAR -> openCalendarApp(R.string.error_no_calendar_app)
+                        TimeBasedEventType.CALENDAR -> openCalendarApp(R.string.error_activity_not_found)
                     }
                 }
             }

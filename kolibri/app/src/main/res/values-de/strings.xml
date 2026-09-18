@@ -21,7 +21,6 @@
     <!-- HomeFragment Error Messages -->
 
     <!-- Double Tap Actions -->
-    <string name="error_no_calendar_app">Keine Kalender-App gefunden</string>
 
     <!-- App Renaming Strings -->
     <string name="new_app_name_hint">Neuer App-Name</string>
