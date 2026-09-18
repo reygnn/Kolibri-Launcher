@@ -15,13 +15,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
-import android.widget.BaseAdapter
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.activity.OnBackPressedCallback
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -49,6 +45,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
+import com.github.reygnn.launcher.common.ui.EventRowsAdapter
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.launcher.common.ui.openBatterySettings
@@ -61,7 +58,6 @@ import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthMonitor
 import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthNotifier
 import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthState
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.LocalDate
@@ -107,10 +103,10 @@ import timber.log.Timber
  *   Expected errors (system API / external boundary) — caught with a
  *     specific exception type, or with `Throwable` where several specific
  *     types share the same recovery. User-facing recovery via Toast where
- *     it matters. Examples: `launchApp`'s
- *     ActivityNotFoundException + SecurityException + Throwable triple,
- *     `startActivitySafely`'s Intent-resolution catch with fallback,
- *     `OpenCalendar`'s Toast-recovery branch.
+ *     it matters. Example: `launchApp`'s
+ *     ActivityNotFoundException + SecurityException + Throwable triple.
+ *     (The optional-system-intent launches — clock / calendar / battery —
+ *     moved to the shared `Context.startActivitySafely` in :common-ui.)
  *
  *   Teardown races (Activity finishing / Window detached) — prevented
  *     structurally with `if (isFinishing || isDestroyed) return` guards
@@ -413,11 +409,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS. (Drawer-open
         // persistence now lives in DrawerOverlayController.onSaveInstanceState.)
         private const val DRAWER_SLIDE_MS = 180L
-
-        // Alpha (0-255) for the upcoming-events dialog today/tomorrow separator
-        // line, applied to the wallpaper-aware onSurface colour. ~35% reads as a
-        // clearly visible divider while staying short of a bold rule.
-        private const val SEPARATOR_ALPHA = 90
     }
 
     private val onboardingLauncher = registerForActivityResult(
@@ -1083,102 +1074,33 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         if (isFinishing || isDestroyed) return
         if (events.isEmpty()) return
 
-        val is24Hour = DateFormat.is24HourFormat(this)
-        val allDayLabel = getString(R.string.event_all_day)
-
         // Split into today's / tomorrow's groups with a separator row between them
         // (pure logic — TimeEventFormatter). rows[] is the single source of truth
         // for both rendering and click routing, so positions never drift.
         val rows = timeEventFormatter.buildEventRows(events, LocalDate.now(), ZoneId.systemDefault())
-
-        // Per-row label, resolved once. Null for the separator.
-        val rowLabels = rows.map { row ->
-            when (row) {
-                is TimeEventFormatter.EventRow.Item -> {
-                    // Untitled events carry an empty title from :data (which holds no
-                    // display strings); resolve the localized fallback here by type.
-                    val event = row.event
-                    val titled = if (event.title.isBlank()) {
-                        event.copy(
-                            title = getString(
-                                when (event.type) {
-                                    TimeBasedEventType.ALARM -> R.string.events_fallback_alarm
-                                    TimeBasedEventType.CALENDAR -> R.string.events_fallback_calendar
-                                }
-                            )
-                        )
-                    } else {
-                        event
-                    }
-                    timeEventFormatter.formatEventRow(titled, is24Hour, allDayLabel = allDayLabel)
-                }
-                TimeEventFormatter.EventRow.TomorrowSeparator -> null
-            }
-        }
-
-        // Same wallpaper-aware theming reasoning as showRecentAppsDialog: the row
-        // layout's ?attr/colorOnSurface must resolve against the dialog overlay,
-        // not the Activity theme, or text can vanish when wallpaper luminance and
-        // system night mode diverge.
-        val rowContext = ContextThemeWrapper(this, wallpaperAwareDialogStyle())
-        val rowInflater = layoutInflater.cloneInContext(rowContext)
-        // Each event row carries a leading monochrome vector icon (alarm /
-        // calendar); it is tinted to the row's already-resolved wallpaper-aware
-        // text colour so it tracks the same adaptive contrast as the label.
-        val iconSize = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_size)
-        val iconPadding = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_padding)
-        // The dialog theme overrides colorOnSurface (black/white per wallpaper
-        // luminance) but not colorOutline, so the separator colour is derived from
-        // onSurface at reduced alpha rather than a theme divider attr.
-        val separatorColor = ColorUtils.setAlphaComponent(
-            MaterialColors.getColor(
-                rowContext,
-                com.google.android.material.R.attr.colorOnSurface,
-                Color.GRAY
-            ),
-            SEPARATOR_ALPHA
+        val rowLabels = timeEventFormatter.buildRowLabels(
+            rows,
+            is24Hour = DateFormat.is24HourFormat(this),
+            allDayLabel = getString(R.string.event_all_day),
+            alarmFallbackLabel = getString(R.string.events_fallback_alarm),
+            calendarFallbackLabel = getString(R.string.events_fallback_calendar),
         )
-        val adapter = object : BaseAdapter() {
-            override fun getCount(): Int = rows.size
-            override fun getItem(position: Int): Any = rows[position]
-            override fun getItemId(position: Int): Long = position.toLong()
-            override fun getViewTypeCount(): Int = 2
-            override fun getItemViewType(position: Int): Int =
-                if (rows[position] is TimeEventFormatter.EventRow.Item) 0 else 1
-
-            // The separator is not selectable, so a tap can never land on it.
-            override fun areAllItemsEnabled(): Boolean = false
-            override fun isEnabled(position: Int): Boolean =
-                rows[position] is TimeEventFormatter.EventRow.Item
-
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                when (val row = rows[position]) {
-                    is TimeEventFormatter.EventRow.Item -> {
-                        val view = convertView
-                            ?: rowInflater.inflate(R.layout.item_recent_app, parent, false)
-                        val label = view.findViewById<TextView>(R.id.recent_app_name)
-                        label.text = rowLabels[position]
-                        val iconRes = when (row.event.type) {
-                            TimeBasedEventType.ALARM -> R.drawable.ic_alarm
-                            TimeBasedEventType.CALENDAR -> R.drawable.ic_calendar
-                        }
-                        val icon = ContextCompat.getDrawable(rowContext, iconRes)?.mutate()?.apply {
-                            setBounds(0, 0, iconSize, iconSize)
-                            setTint(label.currentTextColor)
-                        }
-                        label.setCompoundDrawablesRelative(icon, null, null, null)
-                        label.compoundDrawablePadding = iconPadding
-                        view
-                    }
-                    TimeEventFormatter.EventRow.TomorrowSeparator -> {
-                        val view = convertView
-                            ?: rowInflater.inflate(R.layout.item_events_divider, parent, false)
-                        view.findViewById<View>(R.id.events_divider_line)
-                            .setBackgroundColor(separatorColor)
-                        view
-                    }
-                }
-        }
+        // The rows inflate against the dialog's own context — the dialog below is
+        // built with wallpaperAwareDialogStyle(), so ?attr/colorOnSurface (label +
+        // icon tint) resolves against that wallpaper-aware overlay, not the Activity
+        // theme, exactly as the previous explicit rowContext did.
+        val adapter = EventRowsAdapter(
+            rows = rows,
+            rowLabels = rowLabels,
+            itemRowLayout = R.layout.item_recent_app,
+            itemLabelId = R.id.recent_app_name,
+            alarmIcon = R.drawable.ic_alarm,
+            calendarIcon = R.drawable.ic_calendar,
+            iconSizePx = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_size),
+            iconPaddingPx = resources.getDimensionPixelSize(R.dimen.events_dialog_icon_padding),
+            dividerLayout = R.layout.item_events_divider,
+            dividerLineId = R.id.events_divider_line,
+        )
         val dialog = MaterialAlertDialogBuilder(this, wallpaperAwareDialogStyle())
             .setTitle(getString(R.string.events_dialog_title))
             .setAdapter(adapter) { _, which ->

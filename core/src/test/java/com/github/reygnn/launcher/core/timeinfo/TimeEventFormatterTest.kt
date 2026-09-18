@@ -376,6 +376,51 @@ class TimeEventFormatterTest {
         }
     }
 
+    // --- buildRowLabels ---
+
+    @Test
+    fun `buildRowLabels - blank alarm title falls back to the alarm label`() {
+        val rows = listOf<TimeEventFormatter.EventRow>(
+            TimeEventFormatter.EventRow.Item(
+                TimeBasedEvent(createTime(7, 0, 0, 0), "", TimeBasedEventType.ALARM),
+            ),
+        )
+        val labels = formatter.buildRowLabels(
+            rows, is24Hour = true, allDayLabel = "All day",
+            alarmFallbackLabel = "Alarm", calendarFallbackLabel = "Event", locale = testLocale,
+        )
+        assertTrue(labels[0]!!.endsWith("Alarm"))
+    }
+
+    @Test
+    fun `buildRowLabels - blank calendar title falls back to the calendar label`() {
+        val rows = listOf<TimeEventFormatter.EventRow>(
+            TimeEventFormatter.EventRow.Item(
+                TimeBasedEvent(createTime(9, 30, 0, 0), "", TimeBasedEventType.CALENDAR),
+            ),
+        )
+        val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
+        assertTrue(labels[0]!!.endsWith("Event"))
+    }
+
+    @Test
+    fun `buildRowLabels - a real title is kept over the fallback`() {
+        val rows = listOf<TimeEventFormatter.EventRow>(
+            TimeEventFormatter.EventRow.Item(
+                TimeBasedEvent(createTime(9, 30, 0, 0), "Dentist", TimeBasedEventType.CALENDAR),
+            ),
+        )
+        val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
+        assertTrue(labels[0]!!.endsWith("Dentist"))
+    }
+
+    @Test
+    fun `buildRowLabels - the tomorrow separator maps to null`() {
+        val rows = listOf<TimeEventFormatter.EventRow>(TimeEventFormatter.EventRow.TomorrowSeparator)
+        val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
+        assertEquals(null, labels[0])
+    }
+
     // --- Helper ---
     private fun createTime(hour: Int, minute: Int, second: Int, millis: Int): Long {
         val c = Calendar.getInstance()

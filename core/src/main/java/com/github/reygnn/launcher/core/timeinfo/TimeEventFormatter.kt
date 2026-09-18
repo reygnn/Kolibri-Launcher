@@ -84,6 +84,41 @@ class TimeEventFormatter {
         return "$lead  ${event.title}"
     }
 
+    /**
+     * Display label per [EventRow]: `null` for the separator, otherwise the
+     * formatted row via [formatEventRow]. A blank-titled event (the `:data`
+     * layer carries no display strings) gets a localized fallback title by type.
+     * Pure — the caller resolves [allDayLabel] / [alarmFallbackLabel] /
+     * [calendarFallbackLabel] from its own resources. Shared by both launchers'
+     * upcoming-events dialog so the fallback + formatting cannot drift.
+     */
+    fun buildRowLabels(
+        rows: List<EventRow>,
+        is24Hour: Boolean,
+        allDayLabel: String,
+        alarmFallbackLabel: String,
+        calendarFallbackLabel: String,
+        locale: Locale = Locale.getDefault(),
+    ): List<String?> = rows.map { row ->
+        when (row) {
+            is EventRow.Item -> {
+                val event = row.event
+                val titled = if (event.title.isBlank()) {
+                    event.copy(
+                        title = when (event.type) {
+                            TimeBasedEventType.ALARM -> alarmFallbackLabel
+                            TimeBasedEventType.CALENDAR -> calendarFallbackLabel
+                        },
+                    )
+                } else {
+                    event
+                }
+                formatEventRow(titled, is24Hour, allDayLabel, locale)
+            }
+            EventRow.TomorrowSeparator -> null
+        }
+    }
+
     private fun formatTimeInternal(timeMillis: Long, is24Hour: Boolean, locale: Locale): String {
         val pattern = if (is24Hour) "HH:mm" else "h:mm a"
         val formatter = SimpleDateFormat(pattern, locale)
