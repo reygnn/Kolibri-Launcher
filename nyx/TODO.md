@@ -109,10 +109,25 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > und Widget-Picker sind **out of scope — won't build.** Nyx bleibt ein schlanker,
 > kuratierter Grid-Launcher, kein Launcher3-Klon. Die Paritäts-Lücke ist
 > geschlossen: Page-Indicator und Notification-Dots sind umgesetzt. Was hier unter
-> „Offen" bleibt, ist nur noch ein **bewusster won't-build-Entscheid** (unten
-> dokumentiert), kein aktiver Kandidat mehr. (Die Wallpaper-Edit-UI-Dedup gegen
-> `:common-ui`, zuvor hier als won't-build geführt, wurde am 2026-09-18 doch
-> umgesetzt — der Material-Blocker war überwindbar; siehe „Kürzlich erledigt".)
+> „Offen" bleibt, sind ein **bewusster won't-build-Entscheid** und ein **offener
+> Refactor-Kandidat** (Option B, App-Start-Ausführung teilen) — beide unten. (Die
+> Wallpaper-Edit-UI-Dedup gegen `:common-ui`, zuvor hier als won't-build geführt,
+> wurde am 2026-09-18 doch umgesetzt — der Material-Blocker war überwindbar; siehe
+> „Kürzlich erledigt".)
+
+### App-Start-Ausführung teilen (Option B — offener Refactor-Kandidat, 2026-09-18)
+
+Die **Launch-Taxonomie** (`AppLaunchResult` + `runLaunchCatching`) liegt seit
+2026-09-18 geteilt in `:common-ui` (Option A): nyx toastet jetzt bei Fehlschlag statt
+still zu schlucken (`ActivityNotFoundException`) bzw. bei `SecurityException` zu
+crashen — Pixel-/Kolibri-Parität. **Offen (Option B):** auch die *Ausführung* teilen —
+ein gemeinsames `AppLauncher` auf `LauncherApps.startMainActivity(ComponentName, user)`.
+nyx würde dann von seinem expliziten `startActivity(Intent(ACTION_MAIN/LAUNCHER,
+component))` auf die launcher-idiomatische API wechseln (work-profile-fähig, wie
+Launcher3/Kolibri; Kolibri nutzt sie bereits über `AppLauncherImpl`). Bewusst separat
+gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-Launch-
+Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
+Aufwand wert.
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 

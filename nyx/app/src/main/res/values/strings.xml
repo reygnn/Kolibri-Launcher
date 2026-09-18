@@ -99,6 +99,7 @@
     <string name="events_fallback_alarm">Alarm</string>
     <string name="events_fallback_calendar">Event</string>
     <string name="home_info_no_app">No app found for that</string>
+    <string name="app_launch_failed">Could not open the app</string>
     <string name="backup_export_summary">Save layout, settings and wallpaper to a file</string>
     <string name="backup_import_summary">Restore layout, settings and wallpaper from a file</string>
     <!-- Developer (ACRA) — debug / -PdevCommands only, not shown publicly -->

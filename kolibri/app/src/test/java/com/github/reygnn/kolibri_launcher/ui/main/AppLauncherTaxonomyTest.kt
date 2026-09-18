@@ -6,6 +6,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.common.ui.AppLaunchResult
+import com.github.reygnn.launcher.common.ui.runLaunchCatching
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just

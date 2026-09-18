@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.app.Activity
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.common.ui.AppLaunchResult
 
 /**
  * Launches another app's main activity and maps the system call's outcome to a

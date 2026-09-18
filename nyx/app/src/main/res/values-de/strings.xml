@@ -94,6 +94,7 @@
     <string name="events_fallback_alarm">Wecker</string>
     <string name="events_fallback_calendar">Termin</string>
     <string name="home_info_no_app">Keine passende App gefunden</string>
+    <string name="app_launch_failed">App konnte nicht geöffnet werden</string>
     <string name="backup_export_summary">Layout, Einstellungen und Hintergrund in eine Datei sichern</string>
     <string name="backup_import_summary">Layout, Einstellungen und Hintergrund aus einer Datei wiederherstellen</string>
 

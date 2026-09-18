@@ -47,7 +47,7 @@ object AppModule {
 
     /**
      * The app-launch seam. Behind an interface so tests can supply a fake that
-     * returns a chosen [com.github.reygnn.kolibri_launcher.ui.main.AppLaunchResult]
+     * returns a chosen [com.github.reygnn.launcher.common.ui.AppLaunchResult]
      * without the real `LauncherApps` (see [AppLauncher] KDoc).
      */
     @Provides

@@ -43,6 +43,7 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.launcher.common.ui.AppLaunchResult
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.EventRowsAdapter
 import com.github.reygnn.launcher.common.ui.LaunchTrace

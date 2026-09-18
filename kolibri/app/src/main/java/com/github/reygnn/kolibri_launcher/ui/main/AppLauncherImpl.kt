@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.pm.LauncherApps
 import android.os.Process
 import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.common.ui.AppLaunchResult
 import com.github.reygnn.launcher.common.ui.LaunchTrace
+import com.github.reygnn.launcher.common.ui.runLaunchCatching
 import javax.inject.Inject
 
 /**

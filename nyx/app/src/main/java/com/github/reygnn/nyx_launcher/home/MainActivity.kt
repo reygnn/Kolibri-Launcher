@@ -57,11 +57,13 @@ import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerAdapter
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
+import com.github.reygnn.launcher.common.ui.AppLaunchResult
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.EventRowsAdapter
 import com.github.reygnn.launcher.common.ui.openBatterySettings
 import com.github.reygnn.launcher.common.ui.openCalendarApp
 import com.github.reygnn.launcher.common.ui.openClockApp
+import com.github.reygnn.launcher.common.ui.runLaunchCatching
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
@@ -1570,14 +1572,20 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             .setComponent(ComponentName(key.packageName, key.className))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         // no suspension point — launchApp is synchronous (startActivity).
-        val launched = runCatching { startActivity(intent) }
-            .onFailure { if (it !is ActivityNotFoundException) throw it }
-            .isSuccess
-        // Single launch choke-point (drawer, search, folder, home) — record usage so the
-        // drawer's optional usage sort can rank it. Only on a real launch: an
-        // ActivityNotFoundException (app uninstalled since the last refresh) must not bump
-        // usage for a package that never started. Fire-and-forget (VM coroutine).
-        if (launched) viewModel.recordLaunch(key)
+        // Shared launch taxonomy (:common-ui): a failed tap now toasts instead of
+        // silently doing nothing (ActivityNotFoundException) or crashing
+        // (SecurityException) — Pixel / Kolibri parity. Usage is recorded only on a
+        // real launch, so an uninstalled-since-last-refresh package never bumps it.
+        // Component-gone cleanup is handled reactively by PackageEventCoordinator.
+        when (val result = runLaunchCatching { startActivity(intent) }) {
+            AppLaunchResult.Launched -> viewModel.recordLaunch(key)
+            AppLaunchResult.ComponentGone,
+            AppLaunchResult.PermissionDenied -> showToastSafe(R.string.app_launch_failed)
+            is AppLaunchResult.Failed -> {
+                TimberWrapper.silentError(result.cause, "app launch failed: ${key.packageName}")
+                showToastSafe(R.string.app_launch_failed)
+            }
+        }
     }
 
 }
