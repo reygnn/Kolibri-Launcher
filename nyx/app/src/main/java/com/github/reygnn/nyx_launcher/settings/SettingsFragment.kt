@@ -66,6 +66,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private var consentDialog: AlertDialog? = null
 
     private var monochromeSwitch: SwitchPreferenceCompat? = null
+    private var rotationLockedSwitch: SwitchPreferenceCompat? = null
     private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
     private var calendarSwitch: SwitchPreferenceCompat? = null
     private var alarmSwitch: SwitchPreferenceCompat? = null
@@ -106,6 +107,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
             isPersistent = false // DataStore is the source of truth, not SharedPreferences
             setOnPreferenceChangeListener { _, newValue ->
                 lifecycleScope.launch { preferences.setMonochromeIcons(newValue as Boolean) }
+                true
+            }
+        }
+
+        rotationLockedSwitch = findPreference<SwitchPreferenceCompat>("rotation_locked")?.apply {
+            isPersistent = false // DataStore is the source of truth, not SharedPreferences
+            setOnPreferenceChangeListener { _, newValue ->
+                lifecycleScope.launch { preferences.setRotationLocked(newValue as Boolean) }
                 true
             }
         }
@@ -192,6 +201,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 launch {
                     preferences.monochromeIcons().collect { enabled ->
                         if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                    }
+                }
+                launch {
+                    preferences.rotationLocked().collect { enabled ->
+                        if (rotationLockedSwitch?.isChecked != enabled) rotationLockedSwitch?.isChecked = enabled
                     }
                 }
                 launch {

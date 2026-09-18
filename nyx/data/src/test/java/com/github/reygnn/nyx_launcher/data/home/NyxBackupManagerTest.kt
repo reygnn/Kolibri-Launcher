@@ -65,6 +65,7 @@ class NyxBackupManagerTest {
         every { monochromeIcons() } returns flowOf(true)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
+        every { rotationLocked() } returns flowOf(true)
         every { showAlarmFlow } returns flowOf(false)
         every { showCalendarEventFlow } returns flowOf(true)
     }
@@ -106,6 +107,7 @@ class NyxBackupManagerTest {
         assertThat(savedLayout.captured.items).hasSize(1)
         coVerify { preferences.setMonochromeIcons(true) }
         coVerify { preferences.setSearchAutoLaunch(false) }
+        coVerify { preferences.setRotationLocked(true) }
         coVerify { preferences.setShowAlarm(false) }
         coVerify { preferences.setShowCalendarEvent(true) }
         coVerify { displaySettings.setWallpaperScrimAlpha(0.3f) }

@@ -7,8 +7,10 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Process
@@ -411,6 +413,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         currentScrimAlpha = viewModel.wallpaperScrimAlpha.value
         applyScrim()
 
+        // Apply the rotation lock from the retained (Eagerly) value now, so the Activity
+        // requests the right orientation before the first frame; the collector below keeps
+        // it live when the user toggles the setting.
+        applyRotationLock(viewModel.rotationLocked.value)
+
         // First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
         // the stored decision → show the dialog once / re-affirm ACRA / skip on unreadable.
         lifecycleScope.launch { showCrashReportConsentIfNeeded() }
@@ -455,6 +462,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     wallpaperEditCoordinator.wallpaperState.collect { renderWallpaper(it) }
                 }
                 launchGuarded { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
+                launchGuarded { viewModel.rotationLocked.collect { applyRotationLock(it) } }
                 launchGuarded {
                     wallpaperDisplaySettings.wallpaperBackdropFlow.collect {
                         applyBackdrop(it)
@@ -494,6 +502,30 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 TimberWrapper.silentError(e, "Home collector failed")
             }
         }
+
+    /**
+     * Locks the home to portrait when [locked], otherwise follows the sensor (mirrors
+     * Kolibri's rotation lock). When unlocked, a rotation re-fits the device grid via
+     * [onConfigurationChanged] (the Activity is not recreated — see the manifest's
+     * configChanges).
+     */
+    private fun applyRotationLock(locked: Boolean) {
+        requestedOrientation = if (locked) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // configChanges=orientation (manifest) means no Activity recreation on rotation,
+        // so the one-shot doOnLayout in onCreate never fires again — re-fit the device
+        // grid to the new measured area here. HomeLayoutRegridder repacks losslessly, and
+        // this is a no-op when the grid already matches (e.g. a non-orientation config
+        // change, or when rotation is locked so the orientation never actually changes).
+        pager.doOnLayout { applyDeviceGrid() }
+    }
 
     /**
      * Single entry point to render a wallpaper [state] onto the view. Routed through

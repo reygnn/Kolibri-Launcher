@@ -65,6 +65,7 @@ class HomeViewModelTest {
         every { monochromeIcons() } returns flowOf(false)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
+        every { rotationLocked() } returns flowOf(false)
     }
     private val wallpaperDisplaySettings = mockk<WallpaperDisplaySettings> {
         every { wallpaperScrimAlphaStateFlow } returns flowOf(0f)

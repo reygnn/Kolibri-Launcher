@@ -59,6 +59,8 @@
     <string name="category_drawer_title">App drawer</string>
     <string name="category_backup_title">Backup &amp; restore</string>
     <string name="monochrome_icons_summary">Render app icons in monochrome</string>
+    <string name="rotation_lock_title">Lock screen rotation</string>
+    <string name="rotation_lock_summary">Keep the display in portrait orientation</string>
     <string name="category_homeinfo_title">Home info</string>
     <string name="category_privacy_title">Privacy</string>
     <string name="crash_report_setting_title">Crash reports</string>
