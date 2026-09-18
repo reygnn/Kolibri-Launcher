@@ -466,15 +466,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 }
                 launchGuarded { viewModel.wallpaperScrimAlpha.collect { currentScrimAlpha = it; applyScrim() } }
                 launchGuarded {
-                    viewModel.rotationLocked.collect { locked ->
-                        applyRotationLock(locked)
-                        // Only when UNLOCKED: an unlocked user who briefly saw the default-
-                        // locked seed may have had a landscape fit skipped by the
-                        // applyDeviceGrid guard, so re-run once the real value lands to let
-                        // the landscape grid settle. When locked there is nothing to re-fit
-                        // (and onConfigurationChanged already covers real rotations), so this
-                        // avoids redundant work overlapping that path.
-                        if (!locked) pager.doOnLayout { applyDeviceGrid() }
+                    viewModel.rotationLocked.collect {
+                        applyRotationLock(it)
+                        // Re-fit once the real value lands: an unlocked user who briefly saw
+                        // the default-locked seed may have had a landscape fit skipped by the
+                        // applyDeviceGrid guard; re-run so their landscape grid settles.
+                        pager.doOnLayout { applyDeviceGrid() }
                     }
                 }
                 launchGuarded {
@@ -1267,14 +1264,17 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * downstream, so running it on every layout (incl. rotation) is cheap.
      */
     private fun applyDeviceGrid() {
-        // Skip a landscape fit while rotation-locked (pure rule in RotationGridPolicy,
-        // unit-tested): a locked user keeps their portrait arrangement, and a transient
-        // landscape frame at cold start would otherwise persist a repack that scrambles it
-        // irreversibly (HomeLayoutRegridder keeps apps, not positions). On a fresh cold start
-        // the value is the Eagerly seed (nyx default = LOCKED), so the guard is active for
-        // exactly the locked case it protects.
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        if (RotationGridPolicy.shouldSkipGridFit(viewModel.rotationLocked.value, isLandscape)) return
+        // Never re-fit (and persist) a landscape grid while the launcher is rotation-locked:
+        // a locked user keeps their portrait arrangement, and a transient landscape frame at
+        // cold start (before the orientation request settles) would otherwise scramble it
+        // irreversibly — HomeLayoutRegridder keeps the apps but NOT their positions. On a
+        // fresh cold start the value is the Eagerly seed (nyx default = LOCKED), so this
+        // guard is active for exactly the locked case it protects.
+        if (viewModel.rotationLocked.value &&
+            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        ) {
+            return
+        }
         val density = resources.displayMetrics.density
         val colTargetPx = HOME_COL_TARGET_DP * density
         val rowTargetPx = HOME_CELL_TARGET_DP * density

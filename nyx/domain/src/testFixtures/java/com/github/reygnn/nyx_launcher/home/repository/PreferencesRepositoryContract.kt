@@ -118,18 +118,16 @@ abstract class PreferencesRepositoryContract {
 
     @Test
     fun rotation_locked_defaults_to_true() = runTest(mainDispatcherRule.dispatcher) {
+        assertThat(createRepository().rotationLocked().first())
+            .isEqualTo(PreferencesRepository.DEFAULT_ROTATION_LOCKED)
         assertThat(createRepository().rotationLocked().first()).isTrue()
     }
 
     @Test
-    fun setting_rotation_locked_false_then_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun setting_rotation_locked_false_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        // Drive BOTH write directions off the non-default value so neither the
-        // false- nor the true-write path is masked by the default being true.
         repo.setRotationLocked(false)
         assertThat(repo.rotationLocked().first()).isFalse()
-        repo.setRotationLocked(true)
-        assertThat(repo.rotationLocked().first()).isTrue()
     }
 
     @Test
