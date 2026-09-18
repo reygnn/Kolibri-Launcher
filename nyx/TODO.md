@@ -61,17 +61,26 @@ Anker: neuer `NotificationListenerService` + Präsenz-Store (`:nyx:data` oder
 `:common-*`), `home/HomeGridAdapter.kt` (Icon-Bindung), Dock-Icon-Rendering in
 `MainActivity`, Manifest (`BIND_NOTIFICATION_LISTENER_SERVICE`).
 
-### BaseActivity / BaseViewModel aus Kolibri übernehmen (Robustheit)
+### BaseActivity + Fehler-Toast-Bus nachrüsten (Robustheit)
 
-Nyx hat kein gemeinsames Coroutine-Crash-Netz. Kolibris `BaseActivity`/
-`BaseViewModel` bündeln `launchSafe`/`executeSafe` (CoroutineExceptionHandler,
-Cancellation-Rethrow-Disziplin) + einen Fehler-Toast-Bus (`ErrorEventBus`/
-`UiEvent`), sodass ein Throwable in einer Coroutine geloggt/getoastet statt zum
-Crash wird. Kein Muss (der HIE-Uhr-Crash kam aus einem synchronen onClick und ist
-defensiv via `startActivitySafely` gelöst), aber ein sinnvoller Reife-Schritt.
-Eigener Architektur-Port — die Klassen hängen an Kolibris Crash-Infra-
-Konventionen (Rule 9/11). Anker (Kolibri): `ui/base/BaseActivity.kt`,
-`ui/base/BaseViewModel.kt`, `common/ui/ErrorEventBus.kt`.
+Der ViewModel-Teil ist **erledigt**: `HomeViewModel` erweitert bereits das
+geteilte `BaseViewModel` (`:common-ui`, `base/BaseViewModel.kt`), das
+`launchSafe`/`executeSafe` (CoroutineExceptionHandler, Cancellation-Rethrow-
+Disziplin) mitbringt — ein throwender Use-Case wird geloggt statt zum Crash. Der
+`ErrorEventBus` liegt ebenfalls schon in `:common-ui`.
+
+Real **offen** bleibt nur:
+- **Kein geteiltes `BaseActivity`** — `MainActivity` ist eine schlichte
+  `AppCompatActivity`; ihr Coroutine-Crash-Netz ist die ad-hoc
+  `home/wallpaper/LaunchSafe.kt`-Extension statt eines gemeinsamen Basistyps.
+- **Toast-Bus nicht verdrahtet** — nyx nutzt den `ErrorEventBus`/`UiEvent`-Pfad
+  nicht (`HomeViewModel` hat Event-Typ `Nothing`), Fehler werden also nicht
+  benutzersichtbar getoastet.
+
+Kein Muss (der HIE-Uhr-Crash kam aus einem synchronen onClick und ist defensiv
+via `startActivitySafely` gelöst), aber ein sinnvoller Reife-Schritt. Anker:
+Kolibri `ui/base/BaseActivity.kt` als Vorlage; Ziel `:common-ui`
+(`base/BaseViewModel.kt`, `ErrorEventBus.kt` liegen dort bereits).
 
 ### Wallpaper: Composite-Cache nachrüsten (Delete-Flicker) — optional
 
