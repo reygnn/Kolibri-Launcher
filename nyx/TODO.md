@@ -115,11 +115,12 @@ Wenn Kolibri das nächste Mal angefasst wird: in `:common-ui` unifizieren (beide
 Apps teilen dann eine Implementierung). Anker: nyx `home/wallpaperfab/*`,
 `home/wallpaper/{SnapIconResolver,LayerButtonsState}`, `:common-ui`.
 
-### Custom Names — Feature (aus Kolibri portieren)
+### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 
-Noch offen aus der Übernahme-Tabelle (`ICON_HOME_MODEL_SPEC.md` §0.1): frei
-umbenennbare App-Namen. `LauncherApp` trägt bereits ein `customName`-Feld und die
-Sortierung nutzt `displayName = customName ?: label`, aber es gibt keinen
-`CustomNamesRepository` und keinen Umbenennen-Pfad. Muster wie Hidden Apps (heute
-portiert): eigenes Repository + reaktives Einfalten in die Drawer-Projektion +
-Bearbeiten-UI. Referenz (Kolibri): `CustomNamesRepository`.
+Frei umbenennbare App-Namen sind ein Feature für **textbasierte** Launcher
+(Kolibri), wo der Name die einzige sichtbare App-Repräsentation ist. nyx ist ein
+Icon-/Grid-Launcher — dort ist das **Icon** die Identität, der Name spielt kaum
+eine Rolle. Daher kein `CustomNamesRepository` und keine Umbenennen-UI. Das
+`customName`-Feld auf `LauncherApp` (+ `displayName = customName ?: label`) bleibt
+harmlos bestehen — von der Sortierung genutzt, aber nie befüllt, also effektiv
+immer `label`. (Ersetzt den früheren offenen Punkt „Custom Names portieren".)
