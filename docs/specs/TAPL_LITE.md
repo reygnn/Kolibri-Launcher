@@ -125,6 +125,11 @@ Cross-Page-Drag (Kanten-Edge-Advance mitten im Drag). Neues geteiltes Primitive
 (App auf Folder), Drag-to-Remove (Item auf die Remove-Bar), Drawer-App auf Home
 (Kontextmenü-Route: Suche → Long-Press → „Aufs Home").
 
+**Phase 3 — device-grün (A17):** Drag-to-Dock (Grid-Item → Dock-Zone → DockSlot);
+Extract-from-Folder (Folder-Overlay öffnen → Member rausziehen aufs Grid →
+`extractFromFolder`, 2-Member-Folder dissolviert). Neues geteiltes Primitive
+`tap()` (Einzel-Tap für id-lose Views, z. B. eine Grid-Zelle öffnen).
+
 **nyx-Lessons (hart erarbeitet):**
 - `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
   re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
@@ -142,5 +147,5 @@ Cross-Page-Drag (Kanten-Edge-Advance mitten im Drag). Neues geteiltes Primitive
 - Drawer-App auf Home via **Drag** (Weg 2: Icon auf die `material.primary`-Bar
   ziehen) — der reine Gesten-Pfad; Weg 1 (Kontextmenü) ist abgedeckt. Der
   Weg-2-Versuch scheiterte am **Arm/Promote**, nicht am Drop (Bar reicht bis oben).
-- Folder öffnen (Tap → Member-Overlay), Reorder innerhalb Folder, Dock-Drag,
-  Edge-Auto-Scroll-Feinheiten.
+- Reorder innerhalb eines Folders, Dock-Reorder/Dock→Grid, Edge-Auto-Scroll-
+  Feinheiten. (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)
