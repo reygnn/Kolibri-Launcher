@@ -152,6 +152,9 @@ dependencies {
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
     androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestImplementation(libs.truth)
+    // Shared TAPL-lite test-support facade (BasePage / awaitUntil / drag / probe).
+    androidTestImplementation(project(":common-testing-android"))
 }
 
 // --- ACRA ProGuard mapping upload (mirrors Kolibri) ---
