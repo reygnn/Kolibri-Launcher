@@ -46,10 +46,11 @@ Keine mehr — alle Entscheidungen getroffen.
 - `DRAWER_FOLDERS_SPEC` (ENTWURF v1.0) — Folders im App-Drawer als abgeleitete
   Projektion; `FolderMembership` aus `HomeLayoutTransition` extrahiert und mit Home
   geteilt. Nyx-eigenes Feature, nicht Teil des Merge-Bundles.
-- `TAPL_LITE_PHASE1.md` — TAPL-lite Test-Facade: geteiltes `:common-testing-android`
-  (BasePage/awaitUntil), Kolibri-Page-Objekte, portierter AppDrawer-Swipe-Test.
-  **Phase 1 umgesetzt** auf `feature/tapl-lite-phase1` (androidTest kompiliert,
-  Port grün auf Gerät). Integrationsschritte im Dok sind bereits angewandt.
+- `TAPL_LITE.md` — TAPL-lite Instrumented-Test-Fassade: geteiltes
+  `:common-testing-android` (BasePage/awaitUntil/dragRecyclerItem/probeFloat),
+  Kolibri-Page-Objekte. **Phase 1 + 2 umgesetzt** (AppDrawer-Swipe-Port,
+  FavoritesSort-Drag, Layout-Slider-Live-Preview — alle device-grün auf A17).
+  Offen: Gap 3 (UsageExport-SAF), Facade-Stubs, nyx-Grid als Hauptabnehmer.
 
 ## Empfohlene Reihenfolge (Auszug MONOREPO_MERGE_SPEC §6/§3.5)
 `:core` → ACRA (`:feature-crashreporting`) → Info-Elemente → App-Usage →
