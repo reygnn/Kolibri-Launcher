@@ -144,6 +144,14 @@ Extract-from-Folder (Folder-Overlay öffnen → Member rausziehen aufs Grid →
 `extractFromFolder`, 2-Member-Folder dissolviert). Neues geteiltes Primitive
 `tap()` (Einzel-Tap für id-lose Views, z. B. eine Grid-Zelle öffnen).
 
+**Phase 5 — device-grün (A17):** Drawer-App auf Home via **Drag** (Weg 2):
+Drawer-Row-Long-Press → Arm → Move-Promote → Add-to-Home-Bar → Drop
+(`onDrop` → `addToHome`). Neuer minimaler read-only Hook `DragLayer.isDragArmed`
+— die **eine sanktionierte Ausnahme** von NyxLaunchers „no production test-hooks"
+(kein Prod-Write, spiegelt nur `armedPayload != null`), gelesen im ViewAction auf
+dem Main-Thread via `awaitUntil`. Das war der Hebel, der die zuvor am Arm/Promote
+gescheiterte Geste erst deterministisch machte.
+
 **nyx-Lessons (hart erarbeitet):**
 - `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
   re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
@@ -156,10 +164,11 @@ Extract-from-Folder (Folder-Overlay öffnen → Member rausziehen aufs Grid →
   nicht (`HiltTestRunner` ersetzt `NyxApplication`).
 - Such-Query aus `InstalledAppsRepository.displayName` ableiten (nicht
   `PackageManager.loadLabel` — divergiert); `replaceText` statt `typeText` (Unicode).
+- Der **Drawer-Drag (Weg 2)** brauchte den `isDragArmed`-Hook: festes Halte-Timing
+  traf das Arm/Promote nicht verlässlich. Im ViewAction (Main-Thread) `awaitUntil {
+  dragLayer.isDragArmed }` nach dem DOWN, DANN den Promote-Move — deterministisch.
+  Grid-/Dock-Items brauchen das nicht (fester Long-Press-Hold reicht dort).
 
 **Noch offen (nyx):**
-- Drawer-App auf Home via **Drag** (Weg 2: Icon auf die `material.primary`-Bar
-  ziehen) — der reine Gesten-Pfad; Weg 1 (Kontextmenü) ist abgedeckt. Der
-  Weg-2-Versuch scheiterte am **Arm/Promote**, nicht am Drop (Bar reicht bis oben).
 - Reorder innerhalb eines Folders, Dock-Reorder/Dock→Grid, Edge-Auto-Scroll-
   Feinheiten. (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)
