@@ -41,7 +41,7 @@ schwer sichtbarer Regressionen, nicht Sichtbarkeit der Änderung.
 | R2 | nyx: „minimal persistieren, maximal ableiten" (inkrementell) | S | S | M | — |
 | R3 | kolibri-LOC weiter in geteilte Module ziehen | M | S | M | — |
 | R4 | nyx: Layout-Pipeline → eine reine `normalize()` | M–L | **L** | **L** | — |
-| R5 | nyx God-Activity (`MainActivity`, 1647 Z.) auflösen | **L** | **L** | **L** | nach R4 |
+| R5 | nyx God-Activity (`MainActivity`) auflösen — *reine Logik erledigt, Orchestrierung offen* | **L** | **L** | **L** | Rest: nach R4 |
 | R6 | nyx DataStore aufsplitten (layout/prefs/wallpaper) | M | **L** | M | **Migrations-Policy** |
 | R7 | kolibri Serializer → versioniertes Schema + Migrationen | L | **L** | M | **Migrations-Policy** |
 | R8 | Backup als transaktionales Cross-Store-Framework | **L** | **L** | L | **Migrations-Policy** |
@@ -78,6 +78,29 @@ schwer sichtbarer Regressionen, nicht Sichtbarkeit der Änderung.
   testbar zu werden). Orchestrierung in ViewModels/Use-Cases ziehen, Activity auf
   View-Binding reduzieren. In Scheiben schneiden (eine Overlay-/Drag-Domäne nach der
   anderen), nicht in einem Rutsch.
+
+  **Fortschritt (2026-09-19) — die reine Entscheidungs-/Timing-Logik ist raus.**
+  Vier verhaltensneutrale Slices, jeder mit JVM-Tests, alle in `main`:
+  - Slice 1 (`e8116ce`): reine Helfer `computeDeviceGrid` / `contextMenuAnchor` /
+    `homeGesturesAllowed` (Truth-Table-Tests).
+  - Slice 2 (`f24da67`): `HomeContextMenuAction` + `buildHomeContextMenuActions`
+    nach Kolibri-Vorbild — die Kontextmenü-Zusammenstellung ist jetzt eine reine
+    Entscheidung (Truth-Table), nur der async Shortcut-Load bleibt zustandsbehaftet.
+  - Slice 3 (`8ab51f7`): `EdgeAdvanceController` (+ reine `pageEdgeDirection`) —
+    die Drag-Paging-Timing-Statemachine, mit Fake-Scheduler getestet.
+  - Slice 4 (`8e92f0e`): `HomeViewModel.onDrop` — Drop-Payload-Routing in die VM.
+
+  Zwei der von der Retro benannten Race-Kategorien (Kontextmenü, Drag-Paging) sind
+  damit reine, getestete Einheiten. Die Zeilenzahl sank nur moderat (1647 → 1612):
+  der Rest ist überwiegend irreduzibles View-Glue (Inflation, Koordinaten,
+  Overlay-Wiring, Lifecycle) — dieselbe Lehre wie kolibri
+  ([[kolibri-mainactivity-irreducible]]). Zeilenzahl ist hier ein falscher Proxy;
+  der Gewinn ist die aus der Activity gezogene Entscheidungs-/Timing-Logik.
+
+  **Noch offen (der schwere Rest von R5):** die zustandsbehaftete Overlay-/Drag-
+  *Orchestrierung* selbst (`onCreate`-Wiring, `setupDropZones`, Folder-State,
+  Seed→Fit-Reihenfolge). Die ist ohne die R4-Vorarbeit (Layout-`normalize()`)
+  riskanter — **also R4 zuerst**, dann diesen Rest angehen.
 
 ### Tier 3 — hinter Persistenz-Migration verriegelt (teuer, erst mit Policy-Entscheid)
 
