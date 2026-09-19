@@ -62,14 +62,16 @@ class FavoritesSortDragReorderTaplTest {
             ConsentBootstrap.seedDecision(ctx, ConsentDecision.Denied)
         }
 
-        // Three real launchable components — the reorder persists componentName
-        // strings, and this test only needs them to be self-consistent (the
-        // asserted order is compared against these same components).
+        // Three real, DISTINCT launchable components — the reorder persists
+        // componentName strings, so duplicate componentNames (two LAUNCHER entries
+        // can map to the same package/activity) would make the seeded list
+        // ambiguous. Dedup by componentName before taking three.
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val resolved = ctx.packageManager.queryIntentActivities(launcherIntent, 0)
-        assumeTrue("Need ≥3 launchable apps to seed the reorder list", resolved.size >= 3)
-        seededApps = resolved.take(3).mapIndexed { i, ri ->
-            val info = ri.activityInfo
+        val distinctInfos = ctx.packageManager.queryIntentActivities(launcherIntent, 0)
+            .map { it.activityInfo }
+            .distinctBy { "${it.packageName}/${it.name}" }
+        assumeTrue("Need ≥3 distinct launchable apps to seed the reorder list", distinctInfos.size >= 3)
+        seededApps = distinctInfos.take(3).mapIndexed { i, info ->
             AppInfo(
                 originalName = "App$i",
                 displayName = "App$i",
