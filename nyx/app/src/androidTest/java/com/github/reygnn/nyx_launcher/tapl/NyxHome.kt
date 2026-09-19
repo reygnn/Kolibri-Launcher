@@ -18,6 +18,7 @@ import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.launcher.testing.BasePage
 import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.launcher.testing.longPressDrag
+import com.github.reygnn.launcher.testing.tap
 import org.hamcrest.Matcher
 
 /**
@@ -47,6 +48,37 @@ internal class NyxHome : BasePage() {
      */
     fun dragCellToRemoveBar(from: Int) {
         onView(withId(R.id.home_root)).perform(dragToRemoveAction(from))
+    }
+
+    /**
+     * Long-press-drags the cell at [from] down onto the dock (R.id.dock), where a
+     * drop lands in a DockSlot — moving the item from the grid into the dock.
+     */
+    fun dragCellToDock(from: Int) {
+        onView(withId(R.id.home_root)).perform(dragToDockAction(from))
+    }
+
+    /**
+     * Taps the folder at grid cell [cellIndex] to open its overlay and waits for
+     * the member list to render. Returns the folder sub-page.
+     */
+    fun openFolderAtCell(cellIndex: Int): NyxFolder {
+        onView(withId(R.id.home_root)).perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "tap folder at cell $cellIndex"
+            override fun perform(uiController: UiController, view: View) {
+                val pager = view.findViewById<ViewPager2>(R.id.home_pager)
+                val c = cellCenterOnScreen(pager, pager.currentItem, cellIndex)
+                    ?: error("No cell at index $cellIndex")
+                tap(uiController, c.first, c.second)
+            }
+        })
+        awaitUntil(timeoutMs = 5_000, describe = { "folder overlay members never appeared" }) {
+            runCatching {
+                onView(withId(R.id.folder_members)).check(matches(isDisplayed()))
+            }.isSuccess
+        }
+        return NyxFolder()
     }
 
     /**
@@ -118,6 +150,23 @@ internal class NyxHome : BasePage() {
                     fromCenter.first, fromCenter.second,
                     waypoints = listOf(fromCenter.first to topY),
                 )
+            }
+        }
+
+    private fun dragToDockAction(from: Int): ViewAction =
+        object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "long-press-drag cell $from -> dock"
+            override fun perform(uiController: UiController, view: View) {
+                val pager = view.findViewById<ViewPager2>(R.id.home_pager)
+                val page = pager.currentItem
+                val fromCenter = cellCenterOnScreen(pager, page, from)
+                    ?: error("No cell at index $from on page $page")
+                val dock = view.findViewById<View>(R.id.dock)
+                val loc = IntArray(2)
+                dock.getLocationOnScreen(loc)
+                val dockCenter = (loc[0] + dock.width / 2f) to (loc[1] + dock.height / 2f)
+                longPressDrag(uiController, fromCenter.first, fromCenter.second, listOf(dockCenter))
             }
         }
 

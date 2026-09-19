@@ -72,3 +72,21 @@ public fun longPressDrag(
     send(MotionEvent.ACTION_UP, curX, curY)
     uiController.loopMainThreadUntilIdle()
 }
+
+/**
+ * Injects a single tap (DOWN + brief hold under the long-press timeout + UP) at
+ * the given screen coordinates through [uiController]. For tapping a view that
+ * has no stable id / isn't cleanly matchable (e.g. a specific grid cell).
+ */
+public fun tap(uiController: UiController, x: Float, y: Float) {
+    val downTime = SystemClock.uptimeMillis()
+    fun send(action: Int, eventTime: Long) {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
+        uiController.injectMotionEvent(event)
+        event.recycle()
+    }
+    send(MotionEvent.ACTION_DOWN, downTime)
+    uiController.loopMainThreadForAtLeast(80)
+    send(MotionEvent.ACTION_UP, SystemClock.uptimeMillis())
+    uiController.loopMainThreadUntilIdle()
+}
