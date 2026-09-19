@@ -136,6 +136,16 @@ internal class NyxHome : BasePage() {
         onView(withId(R.id.home_root)).perform(dragToNextPageAction(from, to, dwellMs))
     }
 
+    /**
+     * Like [dragCellToNextPage] but dwells at the edge long enough for the
+     * edge-advance to RE-ARM and flip across MULTIPLE pages in one continuous
+     * gesture, then drops on cell [to] of the final page. Exercises the continuous
+     * multi-page edge-auto-scroll the single-page cross-page drag doesn't reach.
+     */
+    fun dragCellAcrossPages(from: Int, to: Int, dwellMs: Long) {
+        onView(withId(R.id.home_root)).perform(dragToNextPageAction(from, to, dwellMs))
+    }
+
     /** Within-page: one straight leg from source to target cell centre. */
     private fun dragCellsAction(from: Int, to: Int): ViewAction =
         object : ViewAction {

@@ -162,6 +162,13 @@ wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
 (Einfügen zwischen Icons), nicht die zentrale `DockItem`-Bande (Folder). Reihenfolge
 `[A, B]` → `[B, A]`. Neues Primitive `dragDockItemAfter`.
 
+**Phase 8 — device-grün (A17):** Edge-Auto-Scroll über **mehrere** Seiten: einen
+Drag an der Pager-Kante halten, bis das Edge-Advance **re-armt** und 0→1→2 in EINER
+Geste durchschaltet, dann auf Seite 2 droppen. Seed X@Seite 0 + Y@Seite 1
+(`renderedPageCount = maxPage+2 = 3`). Neues Primitive `dragCellAcrossPages`
+(langer Edge-Dwell). Die Controller-Logik selbst ist in `EdgeAdvanceControllerTest`
+JVM-abgedeckt; dieser Test pinnt das echte ViewPager2-Settle über zwei Advances.
+
 **nyx-Lessons (hart erarbeitet):**
 - `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
   re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
@@ -179,9 +186,10 @@ wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
   dragLayer.isDragArmed }` nach dem DOWN, DANN den Promote-Move — deterministisch.
   Grid-/Dock-Items brauchen das nicht (fester Long-Press-Hold reicht dort).
 
-**Noch offen (nyx):**
-- Edge-Auto-Scroll-Feinheiten. (Folder-Öffnen selbst ist über
-  Extract-from-Folder mit abgedeckt.)
+**Noch offen (nyx):** Keine bekannten Device-Gaps mehr — die Home-/Drawer-/
+Favoriten-/Dock-/Folder-/Swipe-/Edge-Advance-Nähte sind abgedeckt. (Folder-Öffnen
+ist über Extract-from-Folder mit abgedeckt.) Neue Device-Tests nur, wenn ein neues
+Feature eine neue geräteechte Naht einführt.
 
 **Kein Gap (nachgeprüft 2026-09-19):** „Reorder innerhalb eines Folders" ist
 **kein Feature** — `FolderMemberAdapter` armiert per Long-Press nur einen
