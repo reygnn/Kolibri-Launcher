@@ -35,6 +35,14 @@ internal class NyxHome : BasePage() {
     }
 
     /**
+     * Long-press-drags the cell at [from] straight up to the remove bar (the top
+     * strip drop zone, which reaches y=0), where a home item is removed.
+     */
+    fun dragCellToRemoveBar(from: Int) {
+        onView(withId(R.id.home_root)).perform(dragToRemoveAction(from))
+    }
+
+    /**
      * Long-press-drags the cell at [from] on the current page toward the right
      * edge (dwelling so the pager edge-advance fires), then onto cell [to] on the
      * next page — all in ONE continuous gesture (lifting would end the drag).
@@ -60,6 +68,27 @@ internal class NyxHome : BasePage() {
                 val toCenter = cellCenterOnScreen(pager, page, to)
                     ?: error("No cell at index $to on page $page")
                 longPressDrag(uiController, fromCenter.first, fromCenter.second, listOf(toCenter))
+            }
+        }
+
+    private fun dragToRemoveAction(from: Int): ViewAction =
+        object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "long-press-drag cell $from -> remove bar (top edge)"
+            override fun perform(uiController: UiController, view: View) {
+                val pager = view.findViewById<ViewPager2>(R.id.home_pager)
+                val page = pager.currentItem
+                val fromCenter = cellCenterOnScreen(pager, page, from)
+                    ?: error("No cell at index $from on page $page")
+                val loc = IntArray(2)
+                view.getLocationOnScreen(loc)
+                // Aim high into the top strip (the remove zone reaches y=0).
+                val topY = (loc[1] + 24).toFloat()
+                longPressDrag(
+                    uiController,
+                    fromCenter.first, fromCenter.second,
+                    waypoints = listOf(fromCenter.first to topY),
+                )
             }
         }
 
