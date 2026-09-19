@@ -68,7 +68,7 @@ package com.github.reygnn.kolibri_launcher
  * 7. Cache-lag polling pattern. Some Android subsystems (notably
  *    RoleManager's UID-side cache after a `cmd role` change) update with
  *    a small delay relative to the ground truth. Don't `Thread.sleep` to
- *    wait for them — use `support/awaitUntil(timeoutMs, describe) { ... }`
+ *    wait for them — use `awaitUntil(timeoutMs, describe) { ... }`
  *    which polls the condition until satisfied OR raises an AssertionError
  *    with the last-observed state. The returned elapsed-millis value can
  *    itself be asserted against a budget, turning the polling into a
@@ -187,7 +187,7 @@ package com.github.reygnn.kolibri_launcher
  *    populated through a StateFlow can be empty when
  *    `RecyclerViewActions.actionOnItemAtPosition` fires →
  *    "No view holder at position: 0". Wrap with
- *    `support/awaitUntil { try { onView(...).check(matches(
+ *    `awaitUntil { try { onView(...).check(matches(
  *    hasMinimumChildCount(N))); true } catch { false } }`.
  *    See OnboardingToHomeSmokeTest.
  *

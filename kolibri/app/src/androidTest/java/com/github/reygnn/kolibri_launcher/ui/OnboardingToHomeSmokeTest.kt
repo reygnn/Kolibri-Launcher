@@ -13,7 +13,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.support.awaitUntil
+import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import dagger.hilt.android.testing.HiltAndroidRule

@@ -8,7 +8,7 @@ import androidx.test.runner.lifecycle.Stage
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.support.DefaultHomeRoleHelper
 import com.github.reygnn.kolibri_launcher.support.ShellCommand
-import com.github.reygnn.kolibri_launcher.support.awaitUntil
+import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap

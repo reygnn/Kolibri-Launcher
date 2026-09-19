@@ -21,7 +21,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.support.awaitUntil
+import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.google.common.truth.Truth.assertThat
