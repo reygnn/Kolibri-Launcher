@@ -52,9 +52,11 @@ class HomeGridDragAddToFolderTaplTest {
         val resolved = ctx.packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
-        assumeTrue("Need ≥3 launchable apps", resolved.size >= 3)
-        fun key(i: Int) = ComponentKey(resolved[i].activityInfo.packageName, resolved[i].activityInfo.name)
-        member0 = key(0); member1 = key(1); loose = key(2)
+        // Distinct components — duplicate folder members / a loose app equal to a
+        // member would make the add a no-op (two LAUNCHER entries can share a key).
+        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        assumeTrue("Need ≥3 distinct launchable apps", keys.size >= 3)
+        member0 = keys[0]; member1 = keys[1]; loose = keys[2]
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

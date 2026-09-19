@@ -51,9 +51,12 @@ class HomeGridDragCreateFolderTaplTest {
         val resolved = ctx.packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
-        assumeTrue("Need ≥2 launchable apps", resolved.size >= 2)
-        key0 = ComponentKey(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
-        key1 = ComponentKey(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
+        // Distinct components — two top-level tiles with the same ComponentKey would
+        // violate items∪dock uniqueness (two LAUNCHER entries can share a key).
+        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        assumeTrue("Need ≥2 distinct launchable apps", keys.size >= 2)
+        key0 = keys[0]
+        key1 = keys[1]
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

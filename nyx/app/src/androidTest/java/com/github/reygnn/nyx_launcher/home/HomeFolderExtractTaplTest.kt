@@ -57,9 +57,13 @@ class HomeFolderExtractTaplTest {
         val resolved = ctx.packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
-        assumeTrue("Need ≥2 launchable apps", resolved.size >= 2)
-        member0 = ComponentKey(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
-        member1 = ComponentKey(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
+        // Distinct components: two LAUNCHER ResolveInfos can map to the same
+        // ComponentKey; a duplicate-member folder wouldn't extract (removeFromFolder
+        // no-ops), so dedup before picking.
+        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        assumeTrue("Need ≥2 distinct launchable apps", keys.size >= 2)
+        member0 = keys[0]
+        member1 = keys[1]
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)
