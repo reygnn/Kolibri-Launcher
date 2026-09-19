@@ -1204,13 +1204,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * downstream, so running it on every layout (incl. rotation) is cheap.
      */
     private fun applyDeviceGrid() {
-        val density = resources.displayMetrics.density
-        val colTargetPx = HOME_COL_TARGET_DP * density
-        val rowTargetPx = HOME_CELL_TARGET_DP * density
-        if (pager.width <= 0 || pager.height <= 0 || colTargetPx <= 0f || rowTargetPx <= 0f) return
-        val columns = (pager.width / colTargetPx).toInt().coerceIn(HOME_MIN_COLUMNS, HOME_MAX_COLUMNS)
-        val rows = (pager.height / rowTargetPx).toInt().coerceIn(HOME_MIN_ROWS, HOME_MAX_ROWS)
-        viewModel.applyDeviceGrid(columns, rows)
+        val grid = computeDeviceGrid(pager.width, pager.height, resources.displayMetrics.density) ?: return
+        viewModel.applyDeviceGrid(grid.columns, grid.rows)
     }
 
     /**
@@ -1345,10 +1340,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * (These overlays keep gesturesEnabled=true so drags still capture, so the
      * gesture core would otherwise still run the callbacks over them.)
      */
-    private fun homeGesturesAllowed(): Boolean =
-        !wallpaperEditCoordinator.isEditMode.value &&
-            !folderOverlay.isVisible &&
-            !contextMenuOverlay.isVisible
+    private fun homeGesturesAllowed(): Boolean = homeGesturesAllowed(
+        editMode = wallpaperEditCoordinator.isEditMode.value,
+        folderVisible = folderOverlay.isVisible,
+        contextMenuVisible = contextMenuOverlay.isVisible,
+    )
 
     // ---- long-press context menu ----
 
@@ -1390,20 +1386,19 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         contextMenuCard.doOnLayout {
             val icon = IntArray(2).also(source::getLocationInWindow)
             val root = IntArray(2).also(homeRoot::getLocationInWindow)
-            val ix = icon[0] - root[0]
-            val iy = icon[1] - root[1]
-            val margin = (12 * resources.displayMetrics.density).toInt()
-            val cw = contextMenuCard.width
-            val ch = contextMenuCard.height
-            // coerceAtLeast guards the case where the card is as wide/tall as the
-            // screen (max would fall below min → IllegalArgumentException).
-            val maxX = (homeRoot.width - cw - margin).coerceAtLeast(margin)
-            val maxY = (homeRoot.height - ch - margin).coerceAtLeast(margin)
-            val x = (ix + source.width / 2 - cw / 2).coerceIn(margin, maxX)
-            val y = (if (iy - ch - margin >= margin) iy - ch - margin else iy + source.height + margin)
-                .coerceIn(margin, maxY)
-            contextMenuCard.translationX = x.toFloat()
-            contextMenuCard.translationY = y.toFloat()
+            val anchor = contextMenuAnchor(
+                iconX = icon[0] - root[0],
+                iconY = icon[1] - root[1],
+                sourceWidth = source.width,
+                sourceHeight = source.height,
+                cardWidth = contextMenuCard.width,
+                cardHeight = contextMenuCard.height,
+                rootWidth = homeRoot.width,
+                rootHeight = homeRoot.height,
+                margin = (12 * resources.displayMetrics.density).toInt(),
+            )
+            contextMenuCard.translationX = anchor.x.toFloat()
+            contextMenuCard.translationY = anchor.y.toFloat()
         }
     }
 
