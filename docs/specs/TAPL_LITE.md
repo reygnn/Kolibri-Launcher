@@ -157,6 +157,11 @@ long-press → Drag → Grid-Zelle → Drop (`resolveGridDrop` → `DropTarget.C
 `move`). Neues Primitive `dragDockItemToCell`. Dock-Items armieren via `armDrag`
 wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
 
+**Phase 7 — device-grün (A17):** Dock-Reorder: Dock-Item 0 auf die **Außenkante**
+(fx ~0.85 > `1 - GRID_INSERT_EDGE_FRACTION`) von Dock-Item 1 → `DropTarget.DockSlot`
+(Einfügen zwischen Icons), nicht die zentrale `DockItem`-Bande (Folder). Reihenfolge
+`[A, B]` → `[B, A]`. Neues Primitive `dragDockItemAfter`.
+
 **nyx-Lessons (hart erarbeitet):**
 - `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
   re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
@@ -175,5 +180,5 @@ wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
   Grid-/Dock-Items brauchen das nicht (fester Long-Press-Hold reicht dort).
 
 **Noch offen (nyx):**
-- Reorder innerhalb eines Folders, Dock-Reorder, Edge-Auto-Scroll-Feinheiten.
+- Reorder innerhalb eines Folders, Edge-Auto-Scroll-Feinheiten.
   (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)

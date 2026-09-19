@@ -69,6 +69,16 @@ internal class NyxHome : BasePage() {
     }
 
     /**
+     * Long-press-drags the dock item at [fromIndex] onto the RIGHT outer edge of
+     * the dock item at [ontoIndex] — a DockSlot insert AFTER it (reorder within the
+     * dock). The outer edge, not the centre: the central band would be a
+     * DockItem drop (folder create / add-to-folder), not a reorder.
+     */
+    fun dragDockItemAfter(fromIndex: Int, ontoIndex: Int) {
+        onView(withId(R.id.home_root)).perform(dragDockReorderAction(fromIndex, ontoIndex))
+    }
+
+    /**
      * Taps the folder at grid cell [cellIndex] to open its overlay and waits for
      * the member list to render. Returns the folder sub-page.
      */
@@ -195,6 +205,26 @@ internal class NyxHome : BasePage() {
                 val toCenter = cellCenterOnScreen(pager, pager.currentItem, toCell)
                     ?: error("No cell at index $toCell")
                 longPressDrag(uiController, start.first, start.second, listOf(toCenter))
+            }
+        }
+
+    private fun dragDockReorderAction(fromIndex: Int, ontoIndex: Int): ViewAction =
+        object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "long-press-drag dock item $fromIndex after dock item $ontoIndex"
+            override fun perform(uiController: UiController, view: View) {
+                val dock = view.findViewById<RecyclerView>(R.id.dock)
+                fun dockItemView(i: Int) = dock.findViewHolderForAdapterPosition(i)?.itemView
+                    ?: error("No dock item at index $i")
+                val from = dockItemView(fromIndex)
+                val onto = dockItemView(ontoIndex)
+                val fromLoc = IntArray(2).also(from::getLocationOnScreen)
+                val start = (fromLoc[0] + from.width / 2f) to (fromLoc[1] + from.height / 2f)
+                val ontoLoc = IntArray(2).also(onto::getLocationOnScreen)
+                // fx ~0.85 of the onto icon → outer band → DockSlot AFTER it (a reorder),
+                // not the central DockItem band (which would create/enter a folder).
+                val target = (ontoLoc[0] + onto.width * 0.85f) to (ontoLoc[1] + onto.height / 2f)
+                longPressDrag(uiController, start.first, start.second, listOf(target))
             }
         }
 
