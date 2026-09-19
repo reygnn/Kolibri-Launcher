@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageView
+import androidx.annotation.VisibleForTesting
 import androidx.core.view.drawToBitmap
 import com.github.reygnn.launcher.common.ui.gesture.GestureDispatchCore
 import com.github.reygnn.nyx_launcher.home.DragPayload
@@ -44,6 +45,16 @@ class DragLayer @JvmOverloads constructor(
     private var armedSource: View? = null
     private var armX = 0f
     private var armY = 0f
+
+    /**
+     * Test-observation hook: true between a long-press arming a drag and its
+     * promotion/disarm. Read-only reflection of [armedPayload]; production never
+     * reads it. Lets androidTest await the arm→promote transition deterministically
+     * (the arm/promote timing is the drawer-drag seam that plain gesture timing
+     * couldn't hit reliably) instead of guessing a hold duration.
+     */
+    @get:VisibleForTesting
+    internal val isDragArmed: Boolean get() = armedPayload != null
 
     /** Called when a long-press arms: show the context menu for [payload] at [source]. */
     var onArm: ((payload: DragPayload, source: View) -> Unit)? = null
