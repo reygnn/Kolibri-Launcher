@@ -29,16 +29,6 @@ plugins {
     alias(libs.plugins.androidx.baselineprofile)
 }
 
-// Loads the sensitive data from the keystore.properties file.
-// This file should sit in the project root and be listed in .gitignore.
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = Properties()
-
-// Only load if the file exists (CI builds may not have it).
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-}
-
 android {
     namespace = "com.github.reygnn.kolibri_launcher"
     compileSdk = 37 // DO NOT CHANGE !!!
@@ -87,17 +77,6 @@ android {
 
     sourceSets {
         getByName("androidTest").resources.directories.add("src/androidTest/resources")
-    }
-
-    signingConfigs {
-        if (keystorePropertiesFile.exists()) {
-            create("release") {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-            }
-        }
     }
 
     // A personal-build release toggle: true if its own `-P<name>` (bare or
@@ -154,17 +133,17 @@ android {
             ndk {
                 debugSymbolLevel = "FULL"
             }
-            // Nur setzen wenn keystore.properties existiert
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            // No Gradle signingConfig: per the family convention Gradle emits an
+            // UNSIGNED release AAB/APK and install-aab.sh signs it with the shared
+            // family key at install time. Don't reintroduce a signingConfig here.
         }
         // NOTE: the :macrobenchmark module measures the `release` build type
         // directly (its test variant matches via matchingFallbacks = ["release"]).
         // No dedicated benchmark build type is needed here: release is already
-        // non-debuggable + profileable (<profileable> in the manifest) and is
-        // signed locally with the family key, so the on-device benchmark gets
-        // the true ship build. See macrobenchmark/build.gradle.kts.
+        // non-debuggable + profileable (<profileable> in the manifest). The
+        // on-device benchmark variant supplies its own debug signingConfig
+        // (see macrobenchmark/build.gradle.kts), so the unsigned app release
+        // still installs for the benchmark run.
     }
 
     androidResources {
