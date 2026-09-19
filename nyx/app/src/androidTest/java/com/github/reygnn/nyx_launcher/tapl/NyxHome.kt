@@ -5,11 +5,18 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
+import androidx.test.espresso.action.GeneralLocation
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
+import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.launcher.testing.BasePage
+import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.launcher.testing.longPressDrag
 import org.hamcrest.Matcher
 
@@ -40,6 +47,28 @@ internal class NyxHome : BasePage() {
      */
     fun dragCellToRemoveBar(from: Int) {
         onView(withId(R.id.home_root)).perform(dragToRemoveAction(from))
+    }
+
+    /**
+     * Opens the app drawer via the production swipe-up gesture (home_root's
+     * GestureDispatchCore -> onSwipeUp -> showDrawer) and waits for the drawer
+     * list to render. Returns the drawer sub-page.
+     */
+    fun openDrawer(): NyxDrawer {
+        view(R.id.home_root).perform(
+            GeneralSwipeAction(
+                Swipe.FAST,
+                GeneralLocation.CENTER,
+                GeneralLocation.TOP_CENTER,
+                Press.FINGER,
+            )
+        )
+        awaitUntil(timeoutMs = 5_000, describe = { "drawer never opened after swipe-up" }) {
+            runCatching {
+                onView(withId(R.id.drawer_panel)).check(matches(isDisplayed()))
+            }.isSuccess
+        }
+        return NyxDrawer()
     }
 
     /**
