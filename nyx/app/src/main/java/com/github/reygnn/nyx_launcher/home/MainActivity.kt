@@ -1360,8 +1360,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private var contextMenuGeneration = 0
 
     private fun showContextMenu(payload: DragPayload, source: View) {
-        val standard = buildContextMenuItems(payload)
         val pkg = payloadPackage(payload)
+        val newAppKey = (payload as? DragPayload.NewApp)?.key
+        val standard = buildHomeContextMenuActions(
+            payload = payload,
+            packageName = pkg,
+            isHidden = newAppKey != null && newAppKey in viewModel.hiddenApps.value,
+            isSystemApp = pkg != null && isSystemApp(pkg),
+        ).map(::contextMenuItemFor)
         if (standard.isEmpty() && pkg == null) return
         val generation = ++contextMenuGeneration
         contextMenuCard.removeAllViews()
@@ -1475,30 +1481,20 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         }
     }
 
-    private fun buildContextMenuItems(payload: DragPayload): List<ContextMenuItem> = when (payload) {
-        is DragPayload.Existing -> {
-            val item = viewModel.layout.value?.allHomeItems()?.firstOrNull { it.id == payload.id }
-            val pkg = (item as? HomeItem.App)?.key?.packageName
-            buildList {
-                if (pkg != null) add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
-                add(ContextMenuItem(getString(R.string.menu_remove_from_home)) { viewModel.remove(payload.id) })
-                if (pkg != null && !isSystemApp(pkg)) {
-                    add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
-                }
-            }
-        }
-        is DragPayload.NewApp -> buildList {
-            val pkg = payload.key.packageName
-            add(ContextMenuItem(getString(R.string.menu_add_to_home)) { addToHome(payload.key) })
-            if (payload.key in viewModel.hiddenApps.value) {
-                add(ContextMenuItem(getString(R.string.menu_unhide_app)) { viewModel.unhideApp(payload.key) })
-            } else {
-                add(ContextMenuItem(getString(R.string.menu_hide_app)) { viewModel.hideApp(payload.key) })
-            }
-            add(ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(pkg) })
-            if (!isSystemApp(pkg)) add(ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(pkg) })
-        }
-        is DragPayload.FolderMember -> emptyList() // folder members extract by drag only
+    /** Renders one pure [HomeContextMenuAction] into its tappable menu row. */
+    private fun contextMenuItemFor(action: HomeContextMenuAction): ContextMenuItem = when (action) {
+        is HomeContextMenuAction.AppInfo ->
+            ContextMenuItem(getString(R.string.menu_app_info)) { openAppInfo(action.packageName) }
+        is HomeContextMenuAction.RemoveFromHome ->
+            ContextMenuItem(getString(R.string.menu_remove_from_home)) { viewModel.remove(action.id) }
+        is HomeContextMenuAction.Uninstall ->
+            ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(action.packageName) }
+        is HomeContextMenuAction.AddToHome ->
+            ContextMenuItem(getString(R.string.menu_add_to_home)) { addToHome(action.key) }
+        is HomeContextMenuAction.HideApp ->
+            ContextMenuItem(getString(R.string.menu_hide_app)) { viewModel.hideApp(action.key) }
+        is HomeContextMenuAction.UnhideApp ->
+            ContextMenuItem(getString(R.string.menu_unhide_app)) { viewModel.unhideApp(action.key) }
     }
 
     private fun dismissContextMenu() {
