@@ -67,6 +67,12 @@ the reason encoded in the orchestrator header:
 - `MainActivity` is the HOME activity (grid pager + dock + drawer overlay +
   drag engine + wallpaper edit). Keep testable logic in use cases / the
   `HomeViewModel`, per the shared Rule 10.
+- **Instrumented device tests go through the TAPL-lite facade** — shared
+  `:common-testing-android` (`BasePage`/`awaitUntil`/`longPressDrag`/`tap`/
+  `probeFloat`) + Nyx's own `androidTest/.../tapl/` pages (`NyxLauncher`,
+  `NyxHome`, `NyxDrawer`, `NyxFolder`). Grid reorder / cross-page / folders /
+  dock / drawer→home are already covered; see `docs/specs/TAPL_LITE.md` for the
+  pattern, coverage and the Nyx drag-engine lessons.
 
 ---
 

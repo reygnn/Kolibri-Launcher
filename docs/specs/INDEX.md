@@ -48,8 +48,8 @@ Keine mehr — alle Entscheidungen getroffen.
   geteilt. Nyx-eigenes Feature, nicht Teil des Merge-Bundles.
 - `TAPL_LITE.md` — TAPL-lite Instrumented-Test-Fassade: geteiltes
   `:common-testing-android` (BasePage/awaitUntil/dragRecyclerItem/probeFloat/
-  longPressDrag/tap) + Page-Objekte pro App. **Kolibri Phase 1+2** (AppDrawer-Swipe,
-  FavoritesSort-Drag, Layout-Slider-Preview) und **nyx Phase 1–3** (Grid-Reorder,
+  longPressDrag/tap) + Page-Objekte pro App. **Kolibri** (AppDrawer-Swipe,
+  FavoritesSort-Drag, Layout-Slider-Preview, Swipe-Slot→Aktion) und **nyx Phase 1–3** (Grid-Reorder,
   Cross-Page-Drag, Folder-create/add, Drag-to-Remove, Drawer→Home, Drag-to-Dock,
   Extract-from-Folder) — alle device-grün auf A17. Offen: Kolibri Gap 3
   (UsageExport-SAF), nyx Drawer→Home per Drag (Weg 2) + Dock-/Folder-Reorder.

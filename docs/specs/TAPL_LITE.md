@@ -52,6 +52,20 @@ hatten. Beide **device-verifiziert grün (A17)**.
 - Neu in der Fassade: `dragRecyclerItem`, `probeFloat`, Page-Objekte
   `FavoritesSort` + `LayoutCustomization`, `Launcher.openLayoutCustomization()`.
 
+## Phase 4 — Swipe-Slot-Geste (device-grün, A17)
+
+- **`SwipeSlotActionTaplTest`** — echter Links-nach-Rechts-Swipe auf
+  `homeGestureRoot` (`HomeGestureLayout` → `onSwipeRight` →
+  `onSwipeFromLeftToRight` → `HandleSwipeActionUseCase` → `LaunchApp`) feuert die
+  dem Slot zugewiesene App. `Home.swipeLeftToRight()` (Swipe auf 15–85 % Breite,
+  um den System-Back-Gesten-Streifen zu meiden).
+- **Lesson / Produktions-Delta:** der echte App-Launch nutzt
+  `LauncherApps.startMainActivity` — ein System-Call, den Espresso-`Intents`
+  **nicht** abfangen kann und der eine echte App in den Vordergrund holen würde.
+  Deshalb: `provideAppLauncher` in ein eigenes `AppLauncherModule` extrahiert, im
+  Test per `@UninstallModules` + `@BindValue` durch einen Recording-Fake ersetzt.
+  Muster für „Launch/System-Seam verifizieren ohne echten Launch".
+
 ## Lessons aus den Geräteläufen
 
 Hart erarbeitet — beim Erweitern beachten:

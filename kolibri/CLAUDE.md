@@ -460,6 +460,15 @@ activities.
     Robolectric (already used in `test/` for `android.net.Uri`-touching
     code) remains the first stop when leaving the JVM.
 
+    When a device test IS warranted, write it through the **TAPL-lite
+    facade**, not raw Espresso from scratch: the shared
+    `:common-testing-android` module (`BasePage`, `awaitUntil`,
+    `dragRecyclerItem`, `longPressDrag`, `tap`, `probeFloat`) plus this
+    app's `androidTest/.../tapl/` page objects (`Launcher`, `Home`,
+    `AppDrawer`, …). It already covers the main home/drawer/favorites/
+    swipe-slot seams and carries hard-won device lessons. Pattern, coverage
+    and lessons: `docs/specs/TAPL_LITE.md`.
+
     Applies to both new code and existing classes; if you spot a
     violation, lift the logic out.
 
