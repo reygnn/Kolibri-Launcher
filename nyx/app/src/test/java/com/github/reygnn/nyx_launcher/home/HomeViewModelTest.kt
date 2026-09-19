@@ -254,6 +254,43 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun onDrop_existing_routes_to_move_item_use_case() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+
+            viewModel.onDrop(DragPayload.Existing(ITEM), TARGET)
+            advanceUntilIdle()
+
+            coVerify { moveItem(ITEM, TARGET) }
+        }
+
+    @Test
+    fun onDrop_new_app_routes_to_place_item_use_case() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+
+            viewModel.onDrop(DragPayload.NewApp(KEY), TARGET)
+            advanceUntilIdle()
+
+            coVerify { placeItem(KEY, TARGET) }
+        }
+
+    @Test
+    fun onDrop_folder_member_routes_to_remove_from_folder_use_case() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+
+            val folder = ItemId("f")
+            viewModel.onDrop(DragPayload.FolderMember(folder, KEY), TARGET)
+            advanceUntilIdle()
+
+            coVerify { removeFromFolder(folder, KEY, TARGET) }
+        }
+
+    @Test
     fun remove_forwards_to_remove_item_use_case() =
         runTest(mainDispatcherRule.dispatcher) {
             coEvery { getDrawerApps() } returns emptyList()

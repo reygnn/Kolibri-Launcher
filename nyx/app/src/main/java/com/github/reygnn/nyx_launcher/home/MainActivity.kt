@@ -827,12 +827,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     if (adapterPos == RecyclerView.NO_POSITION) continue
                     val fx = (localX - child.left) / child.width.toFloat()
                     if (fx in GRID_INSERT_EDGE_FRACTION..(1f - GRID_INSERT_EDGE_FRACTION)) {
-                        applyDrop(payload, DropTarget.DockItem(adapterPos)) // land ON this icon
+                        viewModel.onDrop(payload, DropTarget.DockItem(adapterPos)) // land ON this icon
                         return
                     }
                     if (child.left + child.width / 2f < localX) index++
                 }
-                applyDrop(payload, DropTarget.DockSlot(index)) // insert between icons
+                viewModel.onDrop(payload, DropTarget.DockSlot(index)) // insert between icons
             }
         })
 
@@ -842,7 +842,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             override fun hitRect(out: Rect) = rectInDragLayer(pager, out)
             override fun accepts(payload: DragPayload) = true
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
-                resolveGridDrop(x.toFloat(), y.toFloat())?.let { applyDrop(payload, it) }
+                resolveGridDrop(x.toFloat(), y.toFloat())?.let { viewModel.onDrop(payload, it) }
             }
         })
     }
@@ -1226,12 +1226,6 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         val localY = rootY - (pageLoc[1] - rootLoc[1])
 
         return gridDropAt(page, localX, localY, pageView.width, pageView.height, grid, resources.displayMetrics.density)
-    }
-
-    private fun applyDrop(payload: DragPayload, target: DropTarget) = when (payload) {
-        is DragPayload.Existing -> viewModel.move(payload.id, target)
-        is DragPayload.NewApp -> viewModel.place(payload.key, target)
-        is DragPayload.FolderMember -> viewModel.extractFromFolder(payload.folderId, payload.key, target)
     }
 
     // ---- pager edge auto-advance during a drag ----

@@ -222,6 +222,18 @@ class HomeViewModel @Inject constructor(
         launchSafe { removeFromFolder(folder, member, target) }
     }
 
+    /**
+     * Routes a completed home drag to the matching mutation at [target]: move an
+     * existing item, place a fresh drawer app, or extract a folder member.
+     * Centralizes the payload→mutation decision (formerly MainActivity.applyDrop)
+     * so the drop zones just forward here, and it stays unit-testable.
+     */
+    fun onDrop(payload: DragPayload, target: DropTarget) = when (payload) {
+        is DragPayload.Existing -> move(payload.id, target)
+        is DragPayload.NewApp -> place(payload.key, target)
+        is DragPayload.FolderMember -> extractFromFolder(payload.folderId, payload.key, target)
+    }
+
     fun remove(id: ItemId) {
         launchSafe { removeItem(id) }
     }
