@@ -125,6 +125,18 @@ class EdgeAdvanceControllerTest {
         assertThat(page).isEqualTo(0)
     }
 
+    @Test fun move_off_the_edge_never_schedules() {
+        direction = 0
+        controller.onDragMove(x = 300)
+        assertThat(scheduler.hasPending).isFalse()
+    }
+
+    @Test fun drag_end_without_a_pending_flip_is_a_no_op() {
+        // No prior onDragMove at an edge → nothing scheduled; onDragEnd must not throw.
+        controller.onDragEnd()
+        assertThat(scheduler.hasPending).isFalse()
+    }
+
     @Test fun re_arming_is_idempotent_while_already_scheduled() {
         direction = 1
         controller.onDragMove(x = 999)

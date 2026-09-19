@@ -42,6 +42,17 @@ class HomeContextMenuTest {
         )
     }
 
+    @Test fun existing_app_ignores_hidden_state() {
+        // hide/unhide is a drawer-only action; an existing home item never offers it,
+        // even when the app happens to be in the hidden set. Pins that isHidden is
+        // deliberately not consulted for Existing.
+        assertThat(actions(DragPayload.Existing(id), isHidden = true)).containsExactly(
+            HomeContextMenuAction.AppInfo(key.packageName),
+            HomeContextMenuAction.RemoveFromHome(id),
+            HomeContextMenuAction.Uninstall(key.packageName),
+        ).inOrder()
+    }
+
     // ---- New app from the drawer ----
 
     @Test fun new_app_offers_add_hide_info_uninstall_in_order() {
