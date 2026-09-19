@@ -33,6 +33,7 @@ rootProject.name = "unity-launcher"
 include(":core")
 include(":common-ui")
 include(":common-data")
+include(":common-testing-android")
 include(":feature-crashreporting")
 include(":kolibri:app")
 include(":kolibri:domain")

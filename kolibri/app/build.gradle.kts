@@ -358,6 +358,10 @@ dependencies {
     // --- INSTRUMENTED TESTS (run on emulator / device) ---
     androidTestUtil(libs.androidx.test.orchestrator)
 
+    // Shared TAPL-lite test-support fassade (BasePage/awaitUntil/page objects).
+    // src/main of the library, pulled in ONLY on the androidTest classpath.
+    androidTestImplementation(project(":common-testing-android"))
+
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.ext.junit)
