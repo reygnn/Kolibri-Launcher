@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.tapl
 import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.main.MainActivity
 import com.github.reygnn.launcher.testing.currentResumed
 import com.github.reygnn.launcher.testing.onMainSync
@@ -40,6 +41,29 @@ internal class Launcher private constructor(
                 .viewModel.onFlingUp()
         }
         return AppDrawer(this)
+    }
+
+    /**
+     * Shows the layout-customization dialog on the live MainActivity — the exact
+     * `LayoutCustomizationDialogFragment().show(...)` call
+     * `MainActivity.showLayoutCustomizationDialog()` makes when the customize
+     * menu's "Customize layout" item is picked. The menu dispatch in between is
+     * pure logic already pinned by CustomizationDialogModelTest (JVM); driving it
+     * through Espresso would only add AdapterView-list-item flakiness, so the
+     * facade opens the dialog directly and keeps the device test on the
+     * slider -> live-preview seam that actually needs a device.
+     */
+    fun openLayoutCustomization(): LayoutCustomization {
+        onMainSync {
+            val activity = currentResumed<MainActivity>()
+                ?: error("MainActivity not RESUMED — cannot open layout customization")
+            LayoutCustomizationDialogFragment()
+                .show(activity.supportFragmentManager, "LayoutCustomizationDialog")
+            // Force the show() transaction to run now so the dialog window is
+            // attached before the page starts polling for its slider.
+            activity.supportFragmentManager.executePendingTransactions()
+        }
+        return LayoutCustomization()
     }
 
     override fun close(): Unit = scenario.close()
