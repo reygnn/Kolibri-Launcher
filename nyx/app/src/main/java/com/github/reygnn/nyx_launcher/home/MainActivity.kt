@@ -736,14 +736,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         controller.onDragEnd = {
             removeBar.visibility = View.INVISIBLE
             addToHomeBar.visibility = View.INVISIBLE
-            cancelEdgeAdvance()
+            edgeAdvance.onDragEnd()
         }
         // Hold a drag at the left/right pager edge to page across grids (incl. the
         // empty landing page), so an app can be carried to another page. Only for
         // home-targeted drags: during a drawer-internal fold drag the drawer is open,
         // and paging the hidden home grid behind it would silently leave home on the
         // wrong page after the drawer is dismissed.
-        controller.onDragMove = { x, _ -> if (!drawerOverlay.isOpen) onDragEdge(x) }
+        controller.onDragMove = { x, _ -> if (!drawerOverlay.isOpen) edgeAdvance.onDragMove(x) }
         // The drag view is kept at the drop point until the commit's re-render
         // clears it (renderLayout). This fallback covers no-op drops (same cell)
         // and errors, where no re-render arrives.
@@ -1236,50 +1236,30 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
 
     // ---- pager edge auto-advance during a drag ----
 
-    private var lastDragX = 0
-    private var edgeAdvanceScheduled = false
+    // The dwell/re-arm state machine lives in EdgeAdvanceController (JVM-tested);
+    // this only supplies the view/runtime glue.
+    private val edgeAdvance = EdgeAdvanceController(
+        dwellMs = EDGE_ADVANCE_DWELL_MS,
+        scheduler = object : EdgeAdvanceController.Scheduler {
+            override fun postDelayed(delayMs: Long, action: Runnable) {
+                homeRoot.postDelayed(action, delayMs)
+            }
+            override fun cancel(action: Runnable) {
+                homeRoot.removeCallbacks(action)
+            }
+        },
+        isDragging = { homeRoot.dragController.isDragging },
+        direction = ::edgeDirection,
+        currentPage = { pager.currentItem },
+        maxPage = { (viewModel.layout.value?.renderedPageCount() ?: 1) - 1 },
+        goToPage = { pager.setCurrentItem(it, true) },
+    )
 
-    // Fires after a dwell at the edge: flip one page toward the edge, then re-arm
-    // while the finger is still held there (continuous paging).
-    private val edgeAdvanceRunnable = object : Runnable {
-        override fun run() {
-            edgeAdvanceScheduled = false
-            if (!homeRoot.dragController.isDragging) return
-            val dir = edgeDirection(lastDragX)
-            if (dir == 0) return
-            val maxPage = (viewModel.layout.value?.renderedPageCount() ?: 1) - 1
-            val target = (pager.currentItem + dir).coerceIn(0, maxPage)
-            if (target != pager.currentItem) pager.setCurrentItem(target, true)
-            scheduleEdgeAdvance() // keep paging while held at the edge
-        }
-    }
-
-    /** -1 near the left pager edge, +1 near the right, 0 otherwise. */
+    /** View glue for [pageEdgeDirection]: reads the pager rect + density. */
     private fun edgeDirection(x: Int): Int {
         val rect = Rect().also { rectInDragLayer(pager, it) }
         val edge = (EDGE_ADVANCE_DP * resources.displayMetrics.density).toInt()
-        return when {
-            x <= rect.left + edge -> -1
-            x >= rect.right - edge -> 1
-            else -> 0
-        }
-    }
-
-    private fun onDragEdge(x: Int) {
-        lastDragX = x
-        if (edgeDirection(x) != 0) scheduleEdgeAdvance() else cancelEdgeAdvance()
-    }
-
-    private fun scheduleEdgeAdvance() {
-        if (edgeAdvanceScheduled) return
-        edgeAdvanceScheduled = true
-        homeRoot.postDelayed(edgeAdvanceRunnable, EDGE_ADVANCE_DWELL_MS)
-    }
-
-    private fun cancelEdgeAdvance() {
-        if (!edgeAdvanceScheduled) return
-        homeRoot.removeCallbacks(edgeAdvanceRunnable)
-        edgeAdvanceScheduled = false
+        return pageEdgeDirection(x, rect.left, rect.right, edge)
     }
 
     // ---- folder sheet ----
