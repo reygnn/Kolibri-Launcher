@@ -108,17 +108,39 @@ Hart erarbeitet — beim Erweitern beachten:
   Config-UI → Robolectric ist die richtige Ebene), AppContextMenu-Dispatch
   (Rule-10-Redundanz).
 
-## nyx — die größere Fundgrube
+## nyx — Grid-/Drawer-Drag (umgesetzt)
 
-Der icon-/grid-basierte Launcher ist praktisch nur Touch-Nähte und wird der
-Hauptabnehmer für TAPL-Tests, sobald nyx-Flows anstehen. Kandidaten:
+Der icon-/grid-Launcher ist die größere Fundgrube (fast nur Touch-Nähte). Eigenes
+`nyx/.../tapl/`-Set (`NyxLauncher`/`NyxHome`/`NyxDrawer`) gegen dieselbe geteilte
+`BasePage`/`awaitUntil`; die konkreten Page-Objekte bleiben pro App getrennt.
+Infra-Bootstrap: nyx-`HiltTestRunner` (das im Build referenzierte, zuvor fehlende
+File) + `:common-testing-android`-Wiring.
 
-- **Icon-Drag-and-Drop** übers Grid, inkl. **über Seitengrenzen** (ViewPager2-Paging
-  während des Drags) — `dragRecyclerItem` ist der Keim, die Cross-Page-Variante die
-  Erweiterung.
-- **Seiten-Swipes** + Trailing-Page-GC / `normalizePages`.
-- **Folders** (`DRAWER_FOLDERS_SPEC`): Drag-into-Folder, Öffnen, Reorder innerhalb.
-- Drop-Targets, Long-Press-Aufnahme, Edge-Auto-Scroll.
+**Phase 1 — device-grün (A17):** Grid-Drag-Reorder innerhalb einer Seite;
+Cross-Page-Drag (Kanten-Edge-Advance mitten im Drag). Neues geteiltes Primitive
+`longPressDrag` (kontinuierlicher Long-Press-Drag-MotionEvent-Stream mit Waypoints
++ Edge-Dwell) + `probeFloat`.
 
-Umsetzung: eigenes `nyx/.../tapl/`-Set gegen dieselbe `BasePage`/`awaitUntil`, die
-konkreten Page-Objekte pro App getrennt.
+**Phase 2 — device-grün (A17):** Folder erzeugen (App auf App), App in Folder
+(App auf Folder), Drag-to-Remove (Item auf die Remove-Bar), Drawer-App auf Home
+(Kontextmenü-Route: Suche → Long-Press → „Aufs Home").
+
+**nyx-Lessons (hart erarbeitet):**
+- `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
+  re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
+- Drawer-**Ordner**-Long-Press armiert nicht (`onLongClickListener` → `false`); die
+  **Suche flacht Ordner zu App-Zeilen ab** → Zeile 0 ist verlässlich eine App.
+- Add-to-Home-Bar (`material.primary`) reicht **ohne Insets** bis oben.
+- `HomeLayoutRepositoryImpl` seedet Default-Apps **nur wenn `items` UND `dock` leer**
+  → für ein „leeres" Home einen **unresolvable Placeholder** seeden (nie eine
+  Drawer-Zeile → keine `items∪dock`-Kollision). Der Startup-Reconcile läuft im Test
+  nicht (`HiltTestRunner` ersetzt `NyxApplication`).
+- Such-Query aus `InstalledAppsRepository.displayName` ableiten (nicht
+  `PackageManager.loadLabel` — divergiert); `replaceText` statt `typeText` (Unicode).
+
+**Noch offen (nyx):**
+- Drawer-App auf Home via **Drag** (Weg 2: Icon auf die `material.primary`-Bar
+  ziehen) — der reine Gesten-Pfad; Weg 1 (Kontextmenü) ist abgedeckt. Der
+  Weg-2-Versuch scheiterte am **Arm/Promote**, nicht am Drop (Bar reicht bis oben).
+- Folder öffnen (Tap → Member-Overlay), Reorder innerhalb Folder, Dock-Drag,
+  Edge-Auto-Scroll-Feinheiten.

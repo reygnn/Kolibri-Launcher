@@ -47,10 +47,12 @@ Keine mehr — alle Entscheidungen getroffen.
   Projektion; `FolderMembership` aus `HomeLayoutTransition` extrahiert und mit Home
   geteilt. Nyx-eigenes Feature, nicht Teil des Merge-Bundles.
 - `TAPL_LITE.md` — TAPL-lite Instrumented-Test-Fassade: geteiltes
-  `:common-testing-android` (BasePage/awaitUntil/dragRecyclerItem/probeFloat),
-  Kolibri-Page-Objekte. **Phase 1 + 2 umgesetzt** (AppDrawer-Swipe-Port,
-  FavoritesSort-Drag, Layout-Slider-Live-Preview — alle device-grün auf A17).
-  Offen: Gap 3 (UsageExport-SAF), Facade-Stubs, nyx-Grid als Hauptabnehmer.
+  `:common-testing-android` (BasePage/awaitUntil/dragRecyclerItem/probeFloat/
+  longPressDrag) + Page-Objekte pro App. **Kolibri Phase 1+2** (AppDrawer-Swipe,
+  FavoritesSort-Drag, Layout-Slider-Preview) und **nyx Phase 1+2** (Grid-Reorder,
+  Cross-Page-Drag, Folder-create/add, Drag-to-Remove, Drawer→Home) — alle
+  device-grün auf A17. Offen: Kolibri Gap 3 (UsageExport-SAF), nyx Drawer→Home
+  per Drag (Weg 2) + Folder-Öffnen/Dock.
 
 ## Empfohlene Reihenfolge (Auszug MONOREPO_MERGE_SPEC §6/§3.5)
 `:core` → ACRA (`:feature-crashreporting`) → Info-Elemente → App-Usage →
