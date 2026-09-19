@@ -180,5 +180,12 @@ wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
   Grid-/Dock-Items brauchen das nicht (fester Long-Press-Hold reicht dort).
 
 **Noch offen (nyx):**
-- Reorder innerhalb eines Folders, Edge-Auto-Scroll-Feinheiten.
-  (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)
+- Edge-Auto-Scroll-Feinheiten. (Folder-Öffnen selbst ist über
+  Extract-from-Folder mit abgedeckt.)
+
+**Kein Gap (nachgeprüft 2026-09-19):** „Reorder innerhalb eines Folders" ist
+**kein Feature** — `FolderMemberAdapter` armiert per Long-Press nur einen
+Home-Drag zum *Extrahieren* des Members (`onStartDrag`); es gibt keinen
+`ItemTouchHelper` und keinen `reorder`/`moveFolderMember`-Pfad. Also nichts zu
+testen, bis (falls) internes Reorder als Feature gebaut wird. Der Extract-Pfad ist
+über `HomeFolderExtractTaplTest` abgedeckt.
