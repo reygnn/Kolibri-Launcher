@@ -152,6 +152,11 @@ Drawer-Row-Long-Press → Arm → Move-Promote → Add-to-Home-Bar → Drop
 dem Main-Thread via `awaitUntil`. Das war der Hebel, der die zuvor am Arm/Promote
 gescheiterte Geste erst deterministisch machte.
 
+**Phase 6 — device-grün (A17):** Dock→Grid (Umkehrung von Grid→Dock): Dock-Item
+long-press → Drag → Grid-Zelle → Drop (`resolveGridDrop` → `DropTarget.Cell` →
+`move`). Neues Primitive `dragDockItemToCell`. Dock-Items armieren via `armDrag`
+wie Grid-Items → fester Long-Press-Hold reicht (kein Hook nötig).
+
 **nyx-Lessons (hart erarbeitet):**
 - `longPressDrag` dwellt **nur an Zwischen-Waypoints, nie am Drop** — sonst
   re-triggert ein Edge-Advance den Ziel-Drop von der Seite (Phase-1-Review-Fix).
@@ -170,5 +175,5 @@ gescheiterte Geste erst deterministisch machte.
   Grid-/Dock-Items brauchen das nicht (fester Long-Press-Hold reicht dort).
 
 **Noch offen (nyx):**
-- Reorder innerhalb eines Folders, Dock-Reorder/Dock→Grid, Edge-Auto-Scroll-
-  Feinheiten. (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)
+- Reorder innerhalb eines Folders, Dock-Reorder, Edge-Auto-Scroll-Feinheiten.
+  (Folder-Öffnen selbst ist über Extract-from-Folder mit abgedeckt.)

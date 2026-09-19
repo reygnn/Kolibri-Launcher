@@ -59,6 +59,16 @@ internal class NyxHome : BasePage() {
     }
 
     /**
+     * Long-press-drags the dock item at [dockIndex] up onto grid cell [toCell] on
+     * the current page — the reverse of [dragCellToDock]. A drop over the (empty)
+     * grid cell moves the item from the dock back onto the grid
+     * (DropTarget.Cell -> HomeViewModel.move).
+     */
+    fun dragDockItemToCell(dockIndex: Int, toCell: Int) {
+        onView(withId(R.id.home_root)).perform(dragDockToCellAction(dockIndex, toCell))
+    }
+
+    /**
      * Taps the folder at grid cell [cellIndex] to open its overlay and waits for
      * the member list to render. Returns the folder sub-page.
      */
@@ -167,6 +177,24 @@ internal class NyxHome : BasePage() {
                 dock.getLocationOnScreen(loc)
                 val dockCenter = (loc[0] + dock.width / 2f) to (loc[1] + dock.height / 2f)
                 longPressDrag(uiController, fromCenter.first, fromCenter.second, listOf(dockCenter))
+            }
+        }
+
+    private fun dragDockToCellAction(dockIndex: Int, toCell: Int): ViewAction =
+        object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "long-press-drag dock item $dockIndex -> grid cell $toCell"
+            override fun perform(uiController: UiController, view: View) {
+                val dock = view.findViewById<RecyclerView>(R.id.dock)
+                val dockItem = dock.findViewHolderForAdapterPosition(dockIndex)?.itemView
+                    ?: error("No dock item at index $dockIndex")
+                val loc = IntArray(2)
+                dockItem.getLocationOnScreen(loc)
+                val start = (loc[0] + dockItem.width / 2f) to (loc[1] + dockItem.height / 2f)
+                val pager = view.findViewById<ViewPager2>(R.id.home_pager)
+                val toCenter = cellCenterOnScreen(pager, pager.currentItem, toCell)
+                    ?: error("No cell at index $toCell")
+                longPressDrag(uiController, start.first, start.second, listOf(toCenter))
             }
         }
 
