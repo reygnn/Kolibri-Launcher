@@ -1,5 +1,10 @@
 package com.github.reygnn.kolibri_launcher.tapl
 
+import android.view.View
+import androidx.test.espresso.action.CoordinatesProvider
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.testing.BasePage
 
@@ -17,6 +22,38 @@ internal class Home : BasePage() {
     override val name: String = "Home"
 
     init { assertOnPage() }
+
+    /**
+     * A real left-to-right horizontal swipe across the home wrapper
+     * ([R.id.homeGestureRoot]) — the gesture HomeGestureLayout maps to
+     * onSwipeRight -> viewModel.onSwipeFromLeftToRight (the SWIPE_FROM_LEFT_TO_RIGHT
+     * slot). Swipe on empty home space (seed no favourites) so the favourites list
+     * doesn't intercept the horizontal touch.
+     *
+     * Insets the endpoints to 15%..85% of the width rather than edge-to-edge: a
+     * touch starting at x≈0 lands in the system back-gesture exclusion band on
+     * gesture-nav devices, where SystemUI can pilfer the pointer before the
+     * analyzer sees it (same edge-avoidance rationale as VISIBLE_CENTER for the
+     * status bar, INSTRUMENTED_TESTING_NOTES §11). 70% of the width still clears
+     * touch-slop and the FAST fling threshold comfortably.
+     */
+    fun swipeLeftToRight() {
+        view(R.id.homeGestureRoot).perform(
+            GeneralSwipeAction(
+                Swipe.FAST,
+                horizontalFraction(0.15f),
+                horizontalFraction(0.85f),
+                Press.FINGER,
+            )
+        )
+    }
+
+    /** Screen-space point at [fraction] of the view's width, vertically centred. */
+    private fun horizontalFraction(fraction: Float) = CoordinatesProvider { v: View ->
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        floatArrayOf(loc[0] + v.width * fraction, loc[1] + v.height / 2f)
+    }
 
     // ── Phase 2 (stubs) ─────────────────────────────────────────────────────
 

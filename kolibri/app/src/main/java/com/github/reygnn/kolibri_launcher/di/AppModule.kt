@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import com.github.reygnn.kolibri_launcher.BuildConfig
-import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
-import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
 import com.github.reygnn.kolibri_launcher.R
@@ -45,14 +43,9 @@ object AppModule {
     @WallpaperFlattenTheme
     fun provideWallpaperFlattenTheme(): Int = R.style.AppTheme
 
-    /**
-     * The app-launch seam. Behind an interface so tests can supply a fake that
-     * returns a chosen [com.github.reygnn.launcher.common.ui.AppLaunchResult]
-     * without the real `LauncherApps` (see [AppLauncher] KDoc).
-     */
-    @Provides
-    @Singleton
-    fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
+    // The app-launch seam (provideAppLauncher) moved to AppLauncherModule so an
+    // instrumented test can replace just that binding without uninstalling the
+    // rest of AppModule.
 
     /**
      * Monotonic clock seam ([SystemClock.elapsedRealtime]) so the app-launch
