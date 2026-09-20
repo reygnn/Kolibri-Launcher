@@ -42,6 +42,8 @@ committed.
 
 Pre-release and evolving. Expect breaking changes.
 
+> A synthetic once reviewed it — see [REVIEWS.md](REVIEWS.md).
+
 ## License
 
 GPL-3.0-or-later — see [LICENSE](LICENSE).
