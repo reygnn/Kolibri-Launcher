@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![API](https://img.shields.io/badge/API-36-brightgreen.svg?style=flat-square)](https://source.android.com/docs/setup/about/build-numbers)
 
-A minimalist Android home-screen launcher. Early days — `0.1.0-dev`.
+A minimalist Android home-screen launcher. Early days — `0.2`.
 
 ## What it is
 
@@ -34,7 +34,7 @@ edits, folder membership, reconciliation against installed apps) lives in
 ./gradlew bundleRelease        # unsigned release AAB (the deliverable)
 ```
 
-Requires JDK 21 and the Android SDK (`compileSdk = targetSdk = minSdk = 36`).
+Requires JDK 21 and the Android SDK (`minSdk = 36`, `compileSdk = targetSdk = 37`).
 Point `local.properties` at your SDK (`sdk.dir=…`); it is intentionally not
 committed.
 
