@@ -1,26 +1,27 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** In-memory [PreferencesRepository] test double. */
 class FakePreferencesRepository(
-    monochrome: Boolean = false,
+    iconStyle: IconStyle = IconStyle.COLOR,
     showAlarm: Boolean = false,
     showCalendarEvent: Boolean = false,
     searchAutoLaunch: Boolean = false,
     usageSort: Boolean = false,
     notificationDots: Boolean = false,
 ) : PreferencesRepository {
-    private val monochromeState = MutableStateFlow(monochrome)
+    private val iconStyleState = MutableStateFlow(iconStyle)
     private val showAlarmState = MutableStateFlow(showAlarm)
     private val showCalendarState = MutableStateFlow(showCalendarEvent)
     private val searchAutoLaunchState = MutableStateFlow(searchAutoLaunch)
     private val usageSortState = MutableStateFlow(usageSort)
     private val notificationDotsState = MutableStateFlow(notificationDots)
 
-    override fun monochromeIcons(): Flow<Boolean> = monochromeState
-    override suspend fun setMonochromeIcons(enabled: Boolean) { monochromeState.value = enabled }
+    override fun iconStyle(): Flow<IconStyle> = iconStyleState
+    override suspend fun setIconStyle(style: IconStyle) { iconStyleState.value = style }
 
     override fun searchAutoLaunch(): Flow<Boolean> = searchAutoLaunchState
     override suspend fun setSearchAutoLaunch(enabled: Boolean) { searchAutoLaunchState.value = enabled }

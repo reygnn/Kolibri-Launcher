@@ -28,7 +28,10 @@
     <string name="search_auto_launch_summary">App sofort starten, wenn die Suche auf genau eine App eingrenzt</string>
     <string name="remove_from_home">Vom Startbildschirm entfernen</string>
     <string name="settings_backup_title">Sichern &amp; Wiederherstellen</string>
-    <string name="monochrome_icons">Monochrome Symbole</string>
+    <string name="icon_style_title">Icon-Stil</string>
+    <string name="icon_style_color">Farbig</string>
+    <string name="icon_style_monochrome">Monochrom</string>
+    <string name="icon_style_grayscale">Graustufen</string>
     <string name="backup_export">Backup exportieren</string>
     <string name="backup_import">Backup importieren</string>
     <string name="backup_export_done">Layout exportiert</string>
@@ -53,7 +56,6 @@
     <string name="category_display_title">Anzeige</string>
     <string name="category_drawer_title">App-Drawer</string>
     <string name="category_backup_title">Sichern &amp; Wiederherstellen</string>
-    <string name="monochrome_icons_summary">App-Symbole monochrom darstellen</string>
     <string name="notification_dots_title">Benachrichtigungspunkte</string>
     <string name="notification_dots_summary">Punkt auf App-Icons mit einer Benachrichtigung anzeigen</string>
     <string name="notification_dots_service_label">Nyx Benachrichtigungspunkte</string>

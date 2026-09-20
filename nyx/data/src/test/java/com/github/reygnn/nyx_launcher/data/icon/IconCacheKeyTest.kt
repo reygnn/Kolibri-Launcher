@@ -28,6 +28,13 @@ class IconCacheKeyTest {
         assertThat(a).isNotEqualTo(b)
     }
 
+    @Test fun adaptive_themed_and_grayscale_variants_are_all_distinct() {
+        val adaptive = IconCacheKey.of(sys("com.foo"), 128, IconVariant.ADAPTIVE)
+        val themed = IconCacheKey.of(sys("com.foo"), 128, IconVariant.THEMED)
+        val grayscale = IconCacheKey.of(sys("com.foo"), 128, IconVariant.GRAYSCALE)
+        assertThat(setOf(adaptive, themed, grayscale)).hasSize(3)
+    }
+
     @Test fun file_name_is_key_plus_webp() {
         val k = IconCacheKey.of(sys("com.foo"), 128, IconVariant.ADAPTIVE)
         assertThat(IconCacheKey.fileName(k)).isEqualTo("${k.raw}.webp")

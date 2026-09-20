@@ -6,11 +6,14 @@
         android:title="@string/category_display_title"
         app:iconSpaceReserved="false">
 
-        <SwitchPreferenceCompat
-            android:key="monochrome_icons"
-            android:title="@string/monochrome_icons"
-            android:summary="@string/monochrome_icons_summary"
-            android:defaultValue="false"
+        <ListPreference
+            android:key="icon_style"
+            android:title="@string/icon_style_title"
+            android:dialogTitle="@string/icon_style_title"
+            android:entries="@array/icon_style_entries"
+            android:entryValues="@array/icon_style_values"
+            android:defaultValue="COLOR"
+            app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
 
         <SwitchPreferenceCompat

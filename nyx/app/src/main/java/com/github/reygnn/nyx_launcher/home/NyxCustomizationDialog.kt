@@ -20,11 +20,12 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -85,7 +86,10 @@ class NyxCustomizationDialog : DialogFragment() {
         super.onViewCreated(view, savedInstanceState)
         val card = view.findViewById<View>(R.id.card_root)
         val scrimSlider = view.findViewById<Slider>(R.id.slider_scrim)
-        val monochromeSwitch = view.findViewById<MaterialSwitch>(R.id.switch_monochrome)
+        val iconStyleToggle = view.findViewById<MaterialButtonToggleGroup>(R.id.toggle_icon_style)
+        // Guards the toggle listener while we seed/sync it from the flow, so a
+        // programmatic check() doesn't write the same value straight back.
+        var applyingIconStyle = false
 
         // Drag handle moves the whole sheet up/down so it can be shifted off a
         // spot the user wants to see (Kolibri parity).
@@ -108,10 +112,14 @@ class NyxCustomizationDialog : DialogFragment() {
             }
         })
 
-        monochromeSwitch.setOnCheckedChangeListener { button, isChecked ->
-            if (button.isPressed) {
-                lifecycleScope.launchSafe("Error saving monochrome") { preferences.setMonochromeIcons(isChecked) }
+        iconStyleToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || applyingIconStyle) return@addOnButtonCheckedListener
+            val style = when (checkedId) {
+                R.id.btn_style_mono -> IconStyle.MONOCHROME
+                R.id.btn_style_grey -> IconStyle.GRAYSCALE
+                else -> IconStyle.COLOR
             }
+            lifecycleScope.launchSafe("Error saving icon style") { preferences.setIconStyle(style) }
         }
 
         view.findViewById<MaterialButton>(R.id.btn_choose_wallpaper).setOnClickListener {
@@ -152,8 +160,17 @@ class NyxCustomizationDialog : DialogFragment() {
                     }
                 }
                 launch {
-                    preferences.monochromeIcons().collect { enabled ->
-                        if (monochromeSwitch.isChecked != enabled) monochromeSwitch.isChecked = enabled
+                    preferences.iconStyle().collect { style ->
+                        val target = when (style) {
+                            IconStyle.MONOCHROME -> R.id.btn_style_mono
+                            IconStyle.GRAYSCALE -> R.id.btn_style_grey
+                            IconStyle.COLOR -> R.id.btn_style_color
+                        }
+                        if (iconStyleToggle.checkedButtonId != target) {
+                            applyingIconStyle = true
+                            iconStyleToggle.check(target)
+                            applyingIconStyle = false
+                        }
                     }
                 }
             }

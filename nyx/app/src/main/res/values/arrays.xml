@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Icon-style ListPreference. Entries are localized (via @string); values are
+         the IconStyle enum names and must NOT be translated. -->
+    <string-array name="icon_style_entries">
+        <item>@string/icon_style_color</item>
+        <item>@string/icon_style_grayscale</item>
+        <item>@string/icon_style_monochrome</item>
+    </string-array>
+    <string-array name="icon_style_values" translatable="false">
+        <item>COLOR</item>
+        <item>GRAYSCALE</item>
+        <item>MONOCHROME</item>
+    </string-array>
+</resources>

@@ -7,6 +7,7 @@ import android.graphics.RectF
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -33,11 +34,14 @@ class FolderIconRenderer @Inject constructor(
     preferences: PreferencesRepository,
 ) {
     @Volatile
-    private var monochrome = false
+    private var style = IconStyle.COLOR
 
     init {
-        preferences.monochromeIcons()
-            .onEach { monochrome = it }
+        // Drop cached previews when the style changes: the composed bitmap's member
+        // icons come from IconLoader's own style snapshot, so without clearing, a
+        // switch could leave a preview mis-keyed under the previous style.
+        preferences.iconStyle()
+            .onEach { style = it; clear() }
             .launchIn(CoroutineScope(SupervisorJob() + dispatcher))
     }
     private val lock = Any()
@@ -47,7 +51,7 @@ class FolderIconRenderer @Inject constructor(
     }
 
     suspend fun render(members: List<ComponentKey>, sizePx: Int): Bitmap {
-        val key = IconCacheKey.folder(members, sizePx, monochrome)
+        val key = IconCacheKey.folder(members, sizePx, style)
         synchronized(lock) { cache[key]?.let { return it } }
         val composed = compose(members, sizePx)
         synchronized(lock) { cache[key] = composed }

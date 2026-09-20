@@ -54,6 +54,9 @@ data class NyxBackupOptions(
 
 @Serializable
 data class NyxBackupPrefs(
+    /** [com.github.reygnn.nyx_launcher.home.model.IconStyle] name (COLOR/MONOCHROME/GRAYSCALE). */
+    val iconStyle: String? = null,
+    /** Legacy pre-tri-state flag; kept so older backups still restore (maps to MONOCHROME). */
     val monochromeIcons: Boolean? = null,
     val searchAutoLaunch: Boolean? = null,
     val usageSortEnabled: Boolean? = null,

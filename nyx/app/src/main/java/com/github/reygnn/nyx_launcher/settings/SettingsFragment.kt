@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
@@ -27,6 +28,7 @@ import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
@@ -68,7 +70,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     // ConsentDialog is setCancelable(false); tracked so onDestroyView can dismiss it.
     private var consentDialog: AlertDialog? = null
 
-    private var monochromeSwitch: SwitchPreferenceCompat? = null
+    private var iconStylePref: ListPreference? = null
     private var notificationDotsSwitch: SwitchPreferenceCompat? = null
     private var searchAutoLaunchSwitch: SwitchPreferenceCompat? = null
     private var calendarSwitch: SwitchPreferenceCompat? = null
@@ -106,10 +108,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.nyx_preferences, rootKey)
 
-        monochromeSwitch = findPreference<SwitchPreferenceCompat>("monochrome_icons")?.apply {
+        iconStylePref = findPreference<ListPreference>("icon_style")?.apply {
             isPersistent = false // DataStore is the source of truth, not SharedPreferences
             setOnPreferenceChangeListener { _, newValue ->
-                lifecycleScope.launch { preferences.setMonochromeIcons(newValue as Boolean) }
+                val style = runCatching { IconStyle.valueOf(newValue as String) }.getOrDefault(IconStyle.COLOR)
+                lifecycleScope.launch { preferences.setIconStyle(style) }
                 true
             }
         }
@@ -209,8 +212,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    preferences.monochromeIcons().collect { enabled ->
-                        if (monochromeSwitch?.isChecked != enabled) monochromeSwitch?.isChecked = enabled
+                    preferences.iconStyle().collect { style ->
+                        if (iconStylePref?.value != style.name) iconStylePref?.value = style.name
                     }
                 }
                 launch {

@@ -28,7 +28,10 @@
     <string name="search_auto_launch_summary">Launch the app immediately when the search narrows to exactly one</string>
     <string name="remove_from_home">Remove from home</string>
     <string name="settings_backup_title">Backup &amp; restore</string>
-    <string name="monochrome_icons">Monochrome icons</string>
+    <string name="icon_style_title">Icon style</string>
+    <string name="icon_style_color">Color</string>
+    <string name="icon_style_monochrome">Monochrome</string>
+    <string name="icon_style_grayscale">Grayscale</string>
     <string name="backup_export">Export backup</string>
     <string name="backup_import">Import backup</string>
     <string name="backup_export_done">Layout exported</string>
@@ -58,7 +61,6 @@
     <string name="category_display_title">Display</string>
     <string name="category_drawer_title">App drawer</string>
     <string name="category_backup_title">Backup &amp; restore</string>
-    <string name="monochrome_icons_summary">Render app icons in monochrome</string>
     <string name="notification_dots_title">Notification dots</string>
     <string name="notification_dots_summary">Show a dot on app icons that have a notification</string>
     <string name="notification_dots_service_label">Nyx notification dots</string>

@@ -11,6 +11,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -52,10 +53,11 @@ class LauncherAppsIconSourceTest {
             listOf(activityInfo("com.foo", "com.foo.Main", activityIcon))
         every { rasterizer.rasterize(activityIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, monochrome = false)
+        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { rasterizer.rasterize(activityIcon, 64) }
         verify(exactly = 0) { rasterizer.rasterizeMonochrome(any(), any(), any(), any()) }
+        verify(exactly = 0) { rasterizer.rasterizeGrayscale(any(), any()) }
     }
 
     @Test
@@ -67,12 +69,26 @@ class LauncherAppsIconSourceTest {
             rasterizer.rasterizeMonochrome(activityIcon, 64, 0xFF1C1B22.toInt(), 0xFFE6E1E5.toInt())
         } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, monochrome = true)
+        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.MONOCHROME)
 
         verify(exactly = 1) {
             rasterizer.rasterizeMonochrome(activityIcon, 64, 0xFF1C1B22.toInt(), 0xFFE6E1E5.toInt())
         }
         verify(exactly = 0) { rasterizer.rasterize(any(), any()) }
+    }
+
+    @Test
+    fun grayscale_request_rasterizes_grayscale() = runTest {
+        val activityIcon = ColorDrawable(Color.RED)
+        every { launcherApps.getActivityList("com.foo", any()) } returns
+            listOf(activityInfo("com.foo", "com.foo.Main", activityIcon))
+        every { rasterizer.rasterizeGrayscale(activityIcon, 64) } returns output
+
+        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.GRAYSCALE)
+
+        verify(exactly = 1) { rasterizer.rasterizeGrayscale(activityIcon, 64) }
+        verify(exactly = 0) { rasterizer.rasterize(any(), any()) }
+        verify(exactly = 0) { rasterizer.rasterizeMonochrome(any(), any(), any(), any()) }
     }
 
     @Test
@@ -83,7 +99,7 @@ class LauncherAppsIconSourceTest {
         every { packageManager.getApplicationIcon("com.foo") } returns appIcon
         every { rasterizer.rasterize(appIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, monochrome = false)
+        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { packageManager.getApplicationIcon("com.foo") }
         verify(exactly = 1) { rasterizer.rasterize(appIcon, 64) }
@@ -97,7 +113,7 @@ class LauncherAppsIconSourceTest {
         every { packageManager.getApplicationIcon("com.foo") } returns appIcon
         every { rasterizer.rasterize(appIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, monochrome = false)
+        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { rasterizer.rasterize(appIcon, 64) }
     }
@@ -112,7 +128,7 @@ class LauncherAppsIconSourceTest {
         source.load(
             IconRef.Pack(ComponentKey("com.pack", "com.pack.Main"), packId = "some.pack"),
             sizePx = 96,
-            monochrome = false,
+            style = IconStyle.COLOR,
         )
 
         verify(exactly = 1) { rasterizer.rasterize(activityIcon, 96) }

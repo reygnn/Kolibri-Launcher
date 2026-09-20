@@ -1,17 +1,19 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import kotlinx.coroutines.flow.Flow
 
 /**
- * User preferences (DataStore-backed): the monochrome-icons toggle plus the two
+ * User preferences (DataStore-backed): the icon-style mode plus the two
  * home-info flags. Implements the shared [TimeInfoSettings] port (HIE-INV-2) so
  * the shared ObserveTimeBasedEventsUseCase reads Nyx's toggles without importing
  * this product interface.
  */
 interface PreferencesRepository : TimeInfoSettings {
-    fun monochromeIcons(): Flow<Boolean>
-    suspend fun setMonochromeIcons(enabled: Boolean)
+    /** How app icons are rendered (colour / monochrome / grayscale). Defaults to [IconStyle.COLOR]. */
+    fun iconStyle(): Flow<IconStyle>
+    suspend fun setIconStyle(style: IconStyle)
 
     /**
      * When enabled, a drawer search that narrows to exactly one app launches it

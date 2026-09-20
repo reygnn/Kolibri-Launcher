@@ -6,6 +6,7 @@ import com.github.reygnn.nyx_launcher.home.notifications.NotificationPresenceSto
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
@@ -71,7 +72,7 @@ class HomeViewModelTest {
     private val notificationPresenceStore = NotificationPresenceStore()
 
     private val preferences = mockk<PreferencesRepository> {
-        every { monochromeIcons() } returns flowOf(false)
+        every { iconStyle() } returns flowOf(IconStyle.COLOR)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
         every { notificationDots() } returns notificationDotsEnabled

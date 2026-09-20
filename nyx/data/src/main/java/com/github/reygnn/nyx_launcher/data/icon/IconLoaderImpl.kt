@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -61,16 +62,20 @@ class IconLoaderImpl @Inject constructor(
     private val pruneScheduled = AtomicBoolean(false)
 
     @Volatile
-    private var monochrome = false
+    private var style = IconStyle.COLOR
 
     init {
-        preferences.monochromeIcons().onEach { monochrome = it }.launchIn(scope)
+        preferences.iconStyle().onEach { style = it }.launchIn(scope)
         schedulePrune() // cold-start sweep of files accumulated across runs
     }
 
     override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
-        val mono = monochrome
-        val variant = if (mono) IconVariant.THEMED else IconVariant.ADAPTIVE
+        val currentStyle = style
+        val variant = when (currentStyle) {
+            IconStyle.COLOR -> IconVariant.ADAPTIVE
+            IconStyle.MONOCHROME -> IconVariant.THEMED
+            IconStyle.GRAYSCALE -> IconVariant.GRAYSCALE
+        }
         val key = IconCacheKey.of(ref, sizePx, variant)
 
         synchronized(lock) {
@@ -83,7 +88,7 @@ class IconLoaderImpl @Inject constructor(
         val deferred: Deferred<Bitmap> = synchronized(lock) {
             memory[key]?.let { return it }
             inFlight[key] ?: scope.async(dispatcher) {
-                loadFromDiskOrResolve(key, ref, sizePx, mono)
+                loadFromDiskOrResolve(key, ref, sizePx, currentStyle)
             }.also { inFlight[key] = it }
         }
 
@@ -127,7 +132,7 @@ class IconLoaderImpl @Inject constructor(
         }
     }
 
-    private suspend fun loadFromDiskOrResolve(key: CacheKey, ref: IconRef, sizePx: Int, monochrome: Boolean): Bitmap {
+    private suspend fun loadFromDiskOrResolve(key: CacheKey, ref: IconRef, sizePx: Int, style: IconStyle): Bitmap {
         val file = File(diskDir, IconCacheKey.fileName(key))
         if (file.exists()) {
             BitmapFactory.decodeFile(file.absolutePath)?.let {
@@ -137,7 +142,7 @@ class IconLoaderImpl @Inject constructor(
                 return it
             }
         }
-        val bitmap = source.load(ref, sizePx, monochrome)
+        val bitmap = source.load(ref, sizePx, style)
         runCatching { writeDisk(file, bitmap) }.onSuccess { schedulePrune() } // best-effort
         return bitmap
     }

@@ -173,9 +173,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                         if (q.isNotBlank()) renderForQuery(q, allowAutoLaunch = false)
                     }
                 }
-                // Re-render icons in the current variant when the theme toggle flips.
+                // Re-render icons in the current variant when the icon-style mode changes.
                 launch {
-                    viewModel.monochromeIcons.collect { drawerAdapter.notifyDataSetChanged() }
+                    viewModel.iconStyle.collect { drawerAdapter.notifyDataSetChanged() }
                 }
                 // Notification dots (gated by the toggle): re-bind so drawer app + folder
                 // tiles show/hide the dot reactively.

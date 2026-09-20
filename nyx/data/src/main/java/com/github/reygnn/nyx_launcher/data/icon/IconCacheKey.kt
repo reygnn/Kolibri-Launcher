@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.icon
 
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import java.security.MessageDigest
 
 /**
@@ -23,7 +24,7 @@ object IconCacheKey {
         val packId = (ref as? IconRef.Pack)?.packId.orEmpty()
         val content = listOf(
             key.packageName, key.className,
-            sizePx.toString(), variant.name, packId,
+            sizePx.toString(), variant.name, packId, RENDER_VERSION,
         ).joinToString("|")
         return CacheKey("${shortHash(key.packageName)}-${shortHash(content)}")
     }
@@ -38,12 +39,24 @@ object IconCacheKey {
      * (order + which four appear drive the composite) and size. Changing the
      * membership changes the key, so the preview invalidates itself.
      */
-    fun folder(members: List<ComponentKey>, sizePx: Int, monochrome: Boolean): CacheKey {
+    fun folder(members: List<ComponentKey>, sizePx: Int, style: IconStyle): CacheKey {
+        val styleSuffix = when (style) {
+            IconStyle.COLOR -> ""
+            IconStyle.MONOCHROME -> "#mono"
+            IconStyle.GRAYSCALE -> "#grey"
+        }
         val content = members.joinToString("|") {
             "${it.packageName}/${it.className}"
-        } + "@" + sizePx + if (monochrome) "#mono" else ""
+        } + "@" + sizePx + styleSuffix
         return CacheKey("folder-${shortHash(content)}")
     }
+
+    // Salts every app-icon key. Bump when a variant's rendering SEMANTICS change
+    // (not its name), so existing disk-cached bitmaps rotate once on upgrade
+    // instead of serving a stale rendering.
+    // v2: MONOCHROME now falls back to grayscale (was full colour) for apps
+    //     without a monochrome layer — old THEMED disk entries must not be reused.
+    private const val RENDER_VERSION = "2"
 
     private fun shortHash(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))

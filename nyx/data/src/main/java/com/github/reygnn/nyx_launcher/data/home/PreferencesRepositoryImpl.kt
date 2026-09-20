@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -19,11 +21,19 @@ class PreferencesRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : PreferencesRepository {
 
-    override fun monochromeIcons(): Flow<Boolean> =
-        dataStore.readFlowFailOpen("Error reading monochromeIcons") { it[MONOCHROME] ?: false }
+    override fun iconStyle(): Flow<IconStyle> =
+        dataStore.readFlowFailOpen("Error reading iconStyle") { prefs ->
+            // Prefer the tri-state key; migrate legacy boolean (monochrome_icons == true
+            // → MONOCHROME) so existing users keep their setting. Unknown/absent → COLOR.
+            prefs[ICON_STYLE]?.let { runCatching { IconStyle.valueOf(it) }.getOrNull() }
+                ?: if (prefs[MONOCHROME] == true) IconStyle.MONOCHROME else IconStyle.COLOR
+        }
 
-    override suspend fun setMonochromeIcons(enabled: Boolean) {
-        dataStore.edit { it[MONOCHROME] = enabled }
+    override suspend fun setIconStyle(style: IconStyle) {
+        dataStore.edit {
+            it[ICON_STYLE] = style.name
+            it.remove(MONOCHROME) // legacy boolean superseded by ICON_STYLE
+        }
     }
 
     override fun searchAutoLaunch(): Flow<Boolean> =
@@ -62,6 +72,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     }
 
     private companion object {
+        val ICON_STYLE = stringPreferencesKey("icon_style")
+        // Legacy pre-tri-state key; still read for one-way migration into ICON_STYLE.
         val MONOCHROME = booleanPreferencesKey("monochrome_icons")
         val SEARCH_AUTO_LAUNCH = booleanPreferencesKey("search_auto_launch")
         val USAGE_SORT = booleanPreferencesKey("drawer_usage_sort")

@@ -444,7 +444,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         lifecycleScope.launch(coroutineExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
-                launchGuarded { viewModel.monochromeIcons.collect { renderLayout(viewModel.layout.value) } }
+                launchGuarded { viewModel.iconStyle.collect { renderLayout(viewModel.layout.value) } }
                 // Notification dots (gated by the toggle): push the package set into the
                 // grid pages + dock so their icons show/hide the dot reactively.
                 launchGuarded {

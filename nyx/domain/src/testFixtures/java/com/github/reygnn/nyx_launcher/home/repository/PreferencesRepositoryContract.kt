@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
 import app.cash.turbine.test
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -24,33 +25,40 @@ abstract class PreferencesRepositoryContract {
     abstract fun createRepository(): PreferencesRepository
 
     @Test
-    fun monochrome_defaults_to_false() = runTest(mainDispatcherRule.dispatcher) {
+    fun icon_style_defaults_to_color() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        assertThat(repo.monochromeIcons().first()).isFalse()
+        assertThat(repo.iconStyle().first()).isEqualTo(IconStyle.COLOR)
     }
 
     @Test
-    fun setting_monochrome_true_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun setting_icon_style_monochrome_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        repo.setMonochromeIcons(true)
-        assertThat(repo.monochromeIcons().first()).isTrue()
+        repo.setIconStyle(IconStyle.MONOCHROME)
+        assertThat(repo.iconStyle().first()).isEqualTo(IconStyle.MONOCHROME)
     }
 
     @Test
-    fun toggling_monochrome_back_to_false_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun setting_icon_style_grayscale_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        repo.setMonochromeIcons(true)
-        repo.setMonochromeIcons(false)
-        assertThat(repo.monochromeIcons().first()).isFalse()
+        repo.setIconStyle(IconStyle.GRAYSCALE)
+        assertThat(repo.iconStyle().first()).isEqualTo(IconStyle.GRAYSCALE)
     }
 
     @Test
-    fun monochrome_flow_emits_the_new_value_on_change() = runTest(mainDispatcherRule.dispatcher) {
+    fun switching_icon_style_back_to_color_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository()
-        repo.monochromeIcons().test {
-            assertThat(awaitItem()).isFalse() // initial
-            repo.setMonochromeIcons(true)
-            assertThat(awaitItem()).isTrue()
+        repo.setIconStyle(IconStyle.MONOCHROME)
+        repo.setIconStyle(IconStyle.COLOR)
+        assertThat(repo.iconStyle().first()).isEqualTo(IconStyle.COLOR)
+    }
+
+    @Test
+    fun icon_style_flow_emits_the_new_value_on_change() = runTest(mainDispatcherRule.dispatcher) {
+        val repo = createRepository()
+        repo.iconStyle().test {
+            assertThat(awaitItem()).isEqualTo(IconStyle.COLOR) // initial
+            repo.setIconStyle(IconStyle.GRAYSCALE)
+            assertThat(awaitItem()).isEqualTo(IconStyle.GRAYSCALE)
             cancelAndIgnoreRemainingEvents()
         }
     }

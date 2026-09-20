@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
@@ -33,10 +34,10 @@ class IconLoaderImplTest {
 
     private class FakeSource : IconSource {
         var calls = 0
-        var lastMonochrome: Boolean = false
-        override suspend fun load(ref: IconRef, sizePx: Int, monochrome: Boolean): Bitmap {
+        var lastStyle: IconStyle = IconStyle.COLOR
+        override suspend fun load(ref: IconRef, sizePx: Int, style: IconStyle): Bitmap {
             calls++
-            lastMonochrome = monochrome
+            lastStyle = style
             return Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         }
     }
@@ -121,13 +122,30 @@ class IconLoaderImplTest {
                 context,
                 mainDispatcherRule.dispatcher,
                 source,
-                FakePreferencesRepository(monochrome = true),
+                FakePreferencesRepository(iconStyle = IconStyle.MONOCHROME),
             )
-            advanceUntilIdle() // let the monochrome preference flow land before the request
+            advanceUntilIdle() // let the icon-style preference flow land before the request
 
             loader.bitmap(ref("com.mono"), 64)
 
-            assertThat(source.lastMonochrome).isTrue()
+            assertThat(source.lastStyle).isEqualTo(IconStyle.MONOCHROME)
+        }
+
+    @Test
+    fun grayscale_preference_makes_the_source_render_grayscale() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val source = FakeSource()
+            val loader = IconLoaderImpl(
+                context,
+                mainDispatcherRule.dispatcher,
+                source,
+                FakePreferencesRepository(iconStyle = IconStyle.GRAYSCALE),
+            )
+            advanceUntilIdle() // let the icon-style preference flow land before the request
+
+            loader.bitmap(ref("com.grey"), 64)
+
+            assertThat(source.lastStyle).isEqualTo(IconStyle.GRAYSCALE)
         }
 
     private companion object {

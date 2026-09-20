@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Process
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
@@ -22,12 +23,13 @@ class LauncherAppsIconSource @Inject constructor(
     private val launcherApps =
         context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
 
-    override suspend fun load(ref: IconRef, sizePx: Int, monochrome: Boolean): Bitmap {
+    override suspend fun load(ref: IconRef, sizePx: Int, style: IconStyle): Bitmap {
         val drawable = resolveDrawable(ref)
-        return if (monochrome) {
-            rasterizer.rasterizeMonochrome(drawable, sizePx, MONO_BACKGROUND, MONO_FOREGROUND)
-        } else {
-            rasterizer.rasterize(drawable, sizePx)
+        return when (style) {
+            IconStyle.COLOR -> rasterizer.rasterize(drawable, sizePx)
+            IconStyle.GRAYSCALE -> rasterizer.rasterizeGrayscale(drawable, sizePx)
+            IconStyle.MONOCHROME ->
+                rasterizer.rasterizeMonochrome(drawable, sizePx, MONO_BACKGROUND, MONO_FOREGROUND)
         }
     }
 

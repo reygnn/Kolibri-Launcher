@@ -12,6 +12,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
@@ -61,8 +62,11 @@ class NyxBackupManager @Inject constructor(
             try {
                 val layout = homeLayoutRepository.layout().first().toDto()
                 val fab = fabPositionStore.fabPositionFlow.first() // read once (x/y atomic)
+                val iconStyle = preferences.iconStyle().first()
                 val prefs = NyxBackupPrefs(
-                    monochromeIcons = preferences.monochromeIcons().first(),
+                    iconStyle = iconStyle.name,
+                    // Mirror into the legacy flag so an older Nyx can still restore this backup.
+                    monochromeIcons = iconStyle == IconStyle.MONOCHROME,
                     searchAutoLaunch = preferences.searchAutoLaunch().first(),
                     usageSortEnabled = preferences.usageSortEnabled().first(),
                     notificationDots = preferences.notificationDots().first(),
@@ -177,7 +181,10 @@ class NyxBackupManager @Inject constructor(
 
     private suspend fun applyPrefs(prefs: NyxBackupPrefs?) {
         prefs ?: return
-        prefs.monochromeIcons?.let { preferences.setMonochromeIcons(it) }
+        // Prefer the tri-state field; fall back to the legacy boolean for old backups.
+        val importedStyle = prefs.iconStyle?.let { runCatching { IconStyle.valueOf(it) }.getOrNull() }
+            ?: prefs.monochromeIcons?.let { if (it) IconStyle.MONOCHROME else IconStyle.COLOR }
+        importedStyle?.let { preferences.setIconStyle(it) }
         prefs.searchAutoLaunch?.let { preferences.setSearchAutoLaunch(it) }
         prefs.usageSortEnabled?.let { preferences.setUsageSortEnabled(it) }
         prefs.notificationDots?.let { preferences.setNotificationDots(it) }

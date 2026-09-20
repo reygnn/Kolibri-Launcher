@@ -13,6 +13,7 @@ import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
@@ -62,7 +63,7 @@ class NyxBackupManagerTest {
         every { layout() } returns flowOf(this@NyxBackupManagerTest.layout)
     }
     private val preferences = mockk<PreferencesRepository>(relaxed = true) {
-        every { monochromeIcons() } returns flowOf(true)
+        every { iconStyle() } returns flowOf(IconStyle.MONOCHROME)
         every { searchAutoLaunch() } returns flowOf(false)
         every { usageSortEnabled() } returns flowOf(false)
         every { notificationDots() } returns flowOf(true)
@@ -105,7 +106,7 @@ class NyxBackupManagerTest {
         assertThat(result).isInstanceOf(com.github.reygnn.nyx_launcher.home.model.ImportResult.Success::class.java)
         assertThat(savedLayout.captured.grid.columns).isEqualTo(4)
         assertThat(savedLayout.captured.items).hasSize(1)
-        coVerify { preferences.setMonochromeIcons(true) }
+        coVerify { preferences.setIconStyle(IconStyle.MONOCHROME) }
         coVerify { preferences.setSearchAutoLaunch(false) }
         coVerify { preferences.setNotificationDots(true) }
         coVerify { preferences.setShowAlarm(false) }
@@ -193,7 +194,7 @@ class NyxBackupManagerTest {
         )
 
         coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
-        coVerify(exactly = 0) { preferences.setMonochromeIcons(any()) }
+        coVerify(exactly = 0) { preferences.setIconStyle(any()) }
     }
 
     // ---- restoreWallpaper branches (import path; pure JVM — Uri is mocked, not parsed) ----
@@ -296,7 +297,8 @@ class NyxBackupManagerTest {
         val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        coVerify { preferences.setMonochromeIcons(true) } // valid pref still applied
+        // Legacy-only backup (monochromeIcons=true) still maps to the tri-state setter.
+        coVerify { preferences.setIconStyle(IconStyle.MONOCHROME) } // valid pref still applied
         coVerify(exactly = 0) { displaySettings.setWallpaperBackdrop(any()) } // invalid enum skipped
         coVerify(exactly = 0) { displaySettings.setWallpaperSurfaceMode(any()) }
     }
@@ -306,7 +308,7 @@ class NyxBackupManagerTest {
         runTest(mainDispatcherRule.dispatcher) {
             // Settings are applied before the layout write; a mid-import settings failure
             // must not have already replaced the existing home layout (layout is last).
-            coEvery { preferences.setMonochromeIcons(any()) } throws java.io.IOException("disk full")
+            coEvery { preferences.setIconStyle(any()) } throws java.io.IOException("disk full")
             val backup = NyxBackup(layout = layout.toDto(), prefs = NyxBackupPrefs(monochromeIcons = true))
 
             val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())

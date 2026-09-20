@@ -9,6 +9,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
@@ -80,8 +81,8 @@ class HomeViewModel @Inject constructor(
     val layout: StateFlow<HomeLayout?> = observeHomeLayout()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val monochromeIcons: StateFlow<Boolean> = preferences.monochromeIcons()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val iconStyle: StateFlow<IconStyle> = preferences.iconStyle()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle.COLOR)
 
     /**
      * Packages that should show a notification dot RIGHT NOW, gated by the user toggle:
