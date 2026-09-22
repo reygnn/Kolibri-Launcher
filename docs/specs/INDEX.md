@@ -10,6 +10,7 @@ Stand-Übersicht der Zusammenführungs-Specs (Nyx erbt Kolibris battle-tested In
 | `BACKUP_SCHEMA_PORT_SPEC.md` | Geteilte Backup-Engine + pro-App-Schema/Assembler | ENTWURF v1.2 |
 | `WALLPAPER_RESTORE_SPEC.md` | Wallpaper-Persistenz + Blob-Gegenseite des Backups | ENTWURF v1.1 |
 | `HOME_CURATION_SPEC.md` | „Ist auf dem Home" — Lese-Port + Schreib-Callback + Kontextmenü | ENTWURF v1.4 |
+| `SHARED_INSTALLED_APPS_SPEC.md` | In-Memory-App-Store (Loader-`Flow<AppLoad>` + State-Halter) als Klasse A | ENTWURF v1.0 |
 | `NYX_SINGLE_USER_CLEANUP.md` | Einmalige Aufgabe: `userSerial`/Multi-User aus Nyx entfernen | Patch-Liste |
 
 ## Leitprinzip
@@ -34,7 +35,11 @@ battle-tested Infra; die Produkt-Domäne (Grid-Home vs. Favoriten-Home) bleibt p
   mit injizierbarem Tie-Break; Settings-Keys nur im Settings-Backup.
 
 ## Offene Punkte
-Keine mehr — alle Entscheidungen getroffen.
+Bündel-weit keine mehr — außer den drei in `SHARED_INSTALLED_APPS_SPEC §9`
+(Enumeration-API `PackageManager` vs. `LauncherApps`, Empty-Policy,
+CustomName-Overlay-Ort). Dieser Spec hebt zudem den In-Memory-App-Store aus
+Klasse C in die geteilte Klasse-A-Teilmenge — eine vorgeschlagene Erweiterung
+von `MONOREPO_MERGE_SPEC §3.5`, noch nicht im Dach-Spec übernommen.
 
 ## Folge-Arbeit (kein offener Punkt, eigene künftige Specs)
 - `WALLPAPER_SHARE_SPEC` (Rendering/Compositing-Extraktion).
