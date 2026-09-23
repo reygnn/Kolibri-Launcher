@@ -14,6 +14,9 @@ android {
 
     defaultConfig {
         minSdk = 36
+        // Instrumented tests: the on-device installed-apps enumeration parity guard
+        // (InstalledAppsEnumerationParityTest) — plain AndroidJUnit4, no Hilt.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -61,4 +64,12 @@ dependencies {
     // :core testFixtures; the impl-side contract test (InstalledAppsStateRepository-
     // ImplContractTest) and LauncherAppsEnumeratorTest consume them.
     testImplementation(testFixtures(project(":core")))
+
+    // Instrumented (androidTest) — the LauncherApps-vs-PackageManager enumeration
+    // parity guard runs on a real device (the divergence lives in the platform, not
+    // mockable). Plain AndroidJUnit4 + ApplicationProvider; no Hilt.
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core.ktx)
 }
