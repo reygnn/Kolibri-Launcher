@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import javax.inject.Inject
 
 class RefreshAppsUseCase @Inject constructor(

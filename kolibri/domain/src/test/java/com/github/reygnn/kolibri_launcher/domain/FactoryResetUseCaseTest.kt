@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule

@@ -6,7 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository

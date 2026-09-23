@@ -4,7 +4,7 @@ import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot

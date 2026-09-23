@@ -4,16 +4,19 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
+import com.github.reygnn.launcher.core.sortedByDisplayName
+import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RemoveCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetCustomNameUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
-import com.github.reygnn.kolibri_launcher.fakes.ReactiveFakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -22,6 +25,33 @@ import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+
+/**
+ * Local core-typed reactive loader fake (name-reactivity for CustomNamesViewModel).
+ * Mirrors the retired kolibri ReactiveFakeInstalledAppsRepository but implements the
+ * shared [InstalledAppsRepository]; kept local because it needs Kolibri's
+ * [CustomNamesRepository], which :core testFixtures cannot depend on.
+ */
+private class ReactiveFakeInstalledAppsRepository(
+    private val appNamesRepository: CustomNamesRepository,
+) : InstalledAppsRepository {
+    private val delegate = FakeInstalledAppsRepository()
+    private val rawApps = listOf(
+        AppInfo("Clock", "Clock", "com.android.clock", "com.android.clock.Clock"),
+        AppInfo("Camera", "Camera", "com.android.camera", "com.android.camera.Camera"),
+        AppInfo("Calculator", "Calculator", "com.android.calculator", "com.android.calculator.Calculator"),
+    )
+    val appsFlow get() = delegate.appsFlow
+    override fun getInstalledApps(): Flow<AppLoad> = delegate.getInstalledApps()
+    override suspend fun triggerAppsUpdate() {
+        delegate.installedApps = rawApps.map { app ->
+            app.copy(
+                displayName = appNamesRepository.getDisplayNameForPackage(app.packageName, app.originalName),
+            )
+        }.sortedByDisplayName()
+    }
+    override suspend fun purgeRepository() = delegate.purgeRepository()
+}
 
 @ExperimentalCoroutinesApi
 class CustomNamesViewModelTest {

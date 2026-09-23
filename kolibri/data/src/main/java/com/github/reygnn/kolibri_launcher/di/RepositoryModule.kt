@@ -8,8 +8,6 @@ import com.github.reygnn.kolibri_launcher.data.FabPositionRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FavoritesOrderRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.FavoritesRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.HiddenAppsRepositoryImpl
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryImpl
-import com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.ResetRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.DataStoreMaintenanceRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.SettingsRepositoryImpl
@@ -23,16 +21,15 @@ import com.github.reygnn.kolibri_launcher.data.service.PackagePresenceImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 // Shared installed-apps subsystem (SHARED_INSTALLED_APPS_SPEC §3), bound app-side
-// exactly like the Wallpaper/TimeInfo :common-data impls above (no auto-aggregated
-// module). Aliased because the simple names collide with Kolibri's own (still-live)
-// installed-apps types, which stay bound below against their kolibri.domain
-// interfaces — distinct types, no double-bind.
+// exactly like the Wallpaper/TimeInfo :common-data impls (no auto-aggregated
+// module). Since C3 these ARE the installed-apps types Kolibri consumes; the old
+// PackageManager-backed kolibri.data impls + kolibri.domain interfaces are retired.
 import com.github.reygnn.launcher.core.AppEnumerator
-import com.github.reygnn.launcher.core.InstalledAppsRepository as SharedInstalledAppsRepository
-import com.github.reygnn.launcher.core.InstalledAppsStateRepository as SharedInstalledAppsStateRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
-import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl as SharedInstalledAppsRepositoryImpl
-import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsStateRepositoryImpl as SharedInstalledAppsStateRepositoryImpl
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsStateRepositoryImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -41,8 +38,6 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -108,39 +103,28 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
-
-    @Binds
-    @Singleton
     abstract fun bindCustomNamesRepository(impl: CustomNamesRepositoryImpl): CustomNamesRepository
 
     @Binds
     @Singleton
     abstract fun bindDefaultAppsRepository(impl: DefaultAppsRepositoryImpl): DefaultAppsRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindInstalledAppsStateRepository(impl: InstalledAppsStateRepositoryImpl): InstalledAppsStateRepository
-
-    // ── Shared installed-apps subsystem (:core port → :common-data impls) ──
-    // Built + wired here in C2 but NOT yet consumed by Kolibri (consumers still
-    // inject the kolibri.domain interfaces above; the swap is C3). Same "built but
-    // unused" posture the :core interfaces had in C1.
+    // ── Installed-apps subsystem: shared :core port → :common-data impls (C3) ──
+    // Kolibri now consumes the shared LauncherApps-backed motor + holder; the old
+    // PackageManager-backed kolibri.data impls are retired (deleted in C3b).
     @Binds
     @Singleton
     abstract fun bindAppEnumerator(impl: LauncherAppsEnumerator): AppEnumerator
 
     @Binds
     @Singleton
-    abstract fun bindSharedInstalledAppsRepository(
-        impl: SharedInstalledAppsRepositoryImpl,
-    ): SharedInstalledAppsRepository
+    abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
 
     @Binds
     @Singleton
-    abstract fun bindSharedInstalledAppsStateRepository(
-        impl: SharedInstalledAppsStateRepositoryImpl,
-    ): SharedInstalledAppsStateRepository
+    abstract fun bindInstalledAppsStateRepository(
+        impl: InstalledAppsStateRepositoryImpl,
+    ): InstalledAppsStateRepository
 
     @Binds
     @Singleton

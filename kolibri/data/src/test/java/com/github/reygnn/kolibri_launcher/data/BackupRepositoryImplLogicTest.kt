@@ -14,6 +14,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.fakes.*
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first

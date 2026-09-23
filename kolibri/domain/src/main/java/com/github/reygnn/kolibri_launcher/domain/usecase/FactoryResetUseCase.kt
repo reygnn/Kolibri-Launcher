@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import kotlinx.coroutines.CancellationException
 import javax.inject.Inject

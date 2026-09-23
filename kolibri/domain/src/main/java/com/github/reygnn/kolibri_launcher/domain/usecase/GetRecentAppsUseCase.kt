@@ -15,7 +15,7 @@ import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.catch

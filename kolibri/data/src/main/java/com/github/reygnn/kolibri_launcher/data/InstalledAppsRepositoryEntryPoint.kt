@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.launcher.core.AppUpdateSignal
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent

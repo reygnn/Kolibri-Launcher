@@ -5,13 +5,13 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent

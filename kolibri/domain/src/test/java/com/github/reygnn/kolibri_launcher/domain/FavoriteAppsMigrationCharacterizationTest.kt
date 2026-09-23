@@ -7,7 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule

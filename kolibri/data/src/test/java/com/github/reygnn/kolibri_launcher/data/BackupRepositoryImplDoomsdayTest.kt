@@ -18,7 +18,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth

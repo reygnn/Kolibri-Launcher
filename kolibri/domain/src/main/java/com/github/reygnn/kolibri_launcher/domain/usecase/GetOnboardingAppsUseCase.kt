@@ -5,7 +5,7 @@ import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch

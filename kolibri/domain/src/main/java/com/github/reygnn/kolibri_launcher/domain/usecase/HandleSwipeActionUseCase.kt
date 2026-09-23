@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.launcher.core.KolibriLog

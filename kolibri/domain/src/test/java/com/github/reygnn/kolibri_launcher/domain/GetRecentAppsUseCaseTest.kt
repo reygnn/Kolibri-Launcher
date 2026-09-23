@@ -5,7 +5,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsStateRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi

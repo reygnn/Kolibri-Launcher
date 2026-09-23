@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations

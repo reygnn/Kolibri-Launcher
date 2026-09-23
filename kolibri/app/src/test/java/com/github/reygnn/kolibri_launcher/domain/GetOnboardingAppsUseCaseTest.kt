@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetOnboardingAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstalledAppsRepository
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
