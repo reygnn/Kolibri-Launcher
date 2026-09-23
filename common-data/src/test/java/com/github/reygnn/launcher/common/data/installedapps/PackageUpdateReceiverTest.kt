@@ -1,17 +1,18 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.common.data.installedapps
 
 import android.content.Context
 import android.content.Intent
-import com.github.reygnn.launcher.core.PackageEvent
 import android.net.Uri
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.common.data.TimberRule
+import com.github.reygnn.launcher.core.PackageEvent
+import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import io.mockk.spyk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
@@ -19,11 +20,21 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-@ExperimentalCoroutinesApi
+/**
+ * Unit test for the shared [PackageUpdateReceiver] — Intent→[PackageEvent] mapping,
+ * the ACTION filter, the `EXTRA_REPLACING` skip, and fail-safe onFinish. Ported from
+ * Kolibri's retired receiver test when the receiver moved to `:common-data` (C3).
+ *
+ * Single dispatcher via [MainDispatcherRuleBase] (the shared receiver launches its
+ * processing coroutine on `Dispatchers.Main`); MockK for Context/Intent/Uri so no
+ * device or Robolectric is needed.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PackageUpdateReceiverTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
+    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+
     @get:Rule
     val timberRule = TimberRule()
 
@@ -46,13 +57,11 @@ class PackageUpdateReceiverTest {
     @Test
     fun `onReceive - with null context - does not crash and returns early`() {
         receiver.onReceive(null, intent)
-        // Kein Crash = Test bestanden
     }
 
     @Test
     fun `onReceive - with null intent - does not crash and returns early`() {
         receiver.onReceive(context, null)
-        // Kein Crash = Test bestanden
     }
 
     // ========== handleReceive LOGIC TESTS ==========
@@ -144,11 +153,11 @@ class PackageUpdateReceiverTest {
 
         Assert.assertTrue(
             "replace-removal should finish immediately without launching processing",
-            finishCalled
+            finishCalled,
         )
     }
 
-    // ========== Intent -> PackageEvent mapping (L1) ==========
+    // ========== Intent -> PackageEvent mapping ==========
 
     @Test
     fun `mapToPackageEvent - PACKAGE_ADDED maps to Added`() {

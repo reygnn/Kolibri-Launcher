@@ -43,8 +43,8 @@ package com.github.reygnn.kolibri_launcher.data
  *    default-launcher status check, four catch arms (`SecurityException`,
  *    `IllegalStateException`, `IllegalArgumentException`, generic
  *    `Throwable`), and the no-op `purgeRepository` (system data, not user
- *    data — same shape as
- *    [com.github.reygnn.kolibri_launcher.data.InstalledAppsStateRepositoryImpl.purgeRepository]).
+ *    data — same shape as the shared installed-apps holder's no-op
+ *    `purgeRepository`).
  *    This logic is pinned by [ShortcutRepositoryImplTest].
  *
  * WHEN TO REVISIT:
