@@ -1,13 +1,16 @@
 package com.github.reygnn.nyx_launcher
 
 import android.content.Context
-import android.content.pm.LauncherApps
-import android.os.UserHandle
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceiver
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,25 +32,37 @@ import javax.inject.Singleton
  * App-lifecycle glue for package + memory events (the only wiring that turns the
  * pure reconcile + hand-rolled cache into live behaviour):
  *
- * - package removed/changed → [IconLoader.evict] (drop stale icons, ICL-INV-3)
- *   immediately, then a debounced [ReconcileHomeLayoutUseCase] (prune the layout,
- *   fail-closed).
+ * - package added/removed/changed → [IconLoader.evict] (drop stale icons, ICL-INV-3)
+ *   immediately, then force a shared re-enumeration and a debounced
+ *   [ReconcileHomeLayoutUseCase] (prune the layout, fail-closed).
  * - [start] also runs one reconcile for cold-start catch-up (changes that
  *   happened while Nyx wasn't running). The device grid is re-fit separately,
  *   from the real home-grid area, in MainActivity.
  * - [onTrimMemory] forwards to [IconLoader.trim] (ICL-INV-7).
  *
+ * **Freshness source (SHARED_INSTALLED_APPS_SPEC §2, F2 route (a)):** package
+ * events arrive over the SHARED pipeline that both apps now use — the
+ * `:common-data` [PackageUpdateReceiver] maps the broadcast to a [PackageEvent] on
+ * the [AppUpdateSignal] bus; this coordinator collects that bus. This replaces
+ * Nyx's former `LauncherApps.Callback`, which drove the same reconcile + icon
+ * eviction from a Nyx-only mechanism: the bus carries the package name too, so it
+ * fully subsumes the callback (keeping both would double-drive every event). The
+ * bus→trigger step mirrors Kolibri's `AppManagementDelegate` collector, minus
+ * Kolibri's reconcile overlays — Nyx's reconcile is [ReconcileHomeLayoutUseCase].
+ *
+ * The receiver is registered in CODE (Nyx has no manifest `<receiver>`; it
+ * registered the old callback at runtime too), matching Kolibri's
+ * `KolibriLauncherApp.registerPackageUpdateReceiver`.
+ *
  * Reconcile requests are coalesced through a conflated flow debounced by
  * [AppConstants.APP_RELOAD_DEBOUNCE_MS]: a package-event storm (system update,
- * app restore, bulk install) fires many callbacks, and each reconcile is a full
- * [LauncherApps] enumeration plus an atomic DataStore read-modify-write. The
- * debounce collapses the storm to a single reconcile once it settles. The
- * priming `flowOf(Unit)` bypasses the debounce, so the cold-start catch-up runs
- * immediately. Per-package icon eviction stays immediate — it is cheap and must
- * drop a stale icon promptly.
- *
- * Uses [LauncherApps.Callback] — the launcher-idiomatic API — not a manifest
- * broadcast receiver.
+ * app restore, bulk install) fires many events, and each reconcile primes the
+ * shared loader plus an atomic DataStore read-modify-write. The debounce collapses
+ * the storm to a single reconcile once it settles. The priming `flowOf(Unit)`
+ * bypasses the debounce, so the cold-start catch-up runs immediately. Per-package
+ * icon eviction and the re-enumeration trigger stay immediate — eviction is cheap
+ * and must drop a stale icon promptly, and the trigger must kick the shared motor
+ * so the (debounced) reconcile primes a FRESH list, not a stale cached one.
  */
 @Singleton
 class PackageEventCoordinator @Inject constructor(
@@ -55,6 +70,8 @@ class PackageEventCoordinator @Inject constructor(
     private val iconLoader: IconLoader,
     private val folderRenderer: FolderIconRenderer,
     private val reconcile: ReconcileHomeLayoutUseCase,
+    private val appUpdateSignal: AppUpdateSignal,
+    private val refreshApps: RefreshAppsUseCase,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -66,32 +83,14 @@ class PackageEventCoordinator @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    private val launcherApps: LauncherApps
-        get() = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-
-    private val callback = object : LauncherApps.Callback() {
-        override fun onPackageRemoved(packageName: String, user: UserHandle) = onChanged(packageName)
-        override fun onPackageChanged(packageName: String, user: UserHandle) = onChanged(packageName)
-
-        // Adding a package can't invalidate an existing icon or orphan a layout
-        // item; the drawer re-queries on next open. Nothing to do.
-        override fun onPackageAdded(packageName: String, user: UserHandle) = Unit
-
-        override fun onPackagesAvailable(
-            packageNames: Array<out String>,
-            user: UserHandle,
-            replacing: Boolean,
-        ) = Unit
-
-        override fun onPackagesUnavailable(
-            packageNames: Array<out String>,
-            user: UserHandle,
-            replacing: Boolean,
-        ) = Unit
-    }
+    // Registered in start(); no unregister — the coordinator is a process-lifetime
+    // @Singleton, same as the former callback (and Kolibri's receiver).
+    private val packageUpdateReceiver = PackageUpdateReceiver()
 
     @OptIn(FlowPreview::class) // Flow.debounce(Long)
     fun start() {
+        // The debounced reconcile pump: cold-start catch-up (immediate) + coalesced
+        // package-event reconciles.
         scope.launch {
             merge(
                 flowOf(Unit), // cold-start catch-up: immediate, bypasses the debounce
@@ -110,7 +109,29 @@ class PackageEventCoordinator @Inject constructor(
                 }
             }
         }
-        launcherApps.registerCallback(callback)
+
+        // The shared freshness bus (F2 route (a)): broadcast → :common-data
+        // PackageUpdateReceiver → AppUpdateSignal → here. Each PackageEvent carries
+        // the changed package, so this does everything the old LauncherApps.Callback
+        // did — per-package icon eviction — plus forces the shared motor to
+        // re-enumerate (triggerAppsUpdate) so the debounced reconcile primes a fresh
+        // list. Same guard idiom as the reconcile pump.
+        scope.launch {
+            appUpdateSignal.events.collect { event ->
+                try {
+                    iconLoader.evict(event.packageName) // ICL-INV-3, targeted
+                    folderRenderer.clear() // a member's icon may have changed
+                    refreshApps() // force a shared re-enumeration (freshness)
+                    requestReconcile() // debounced layout prune off the fresh list
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    TimberWrapper.silentError(e, "PackageEventCoordinator: package-event handling failed")
+                }
+            }
+        }
+
+        registerReceiver()
     }
 
     fun onTrimMemory(level: Int) {
@@ -118,10 +139,18 @@ class PackageEventCoordinator @Inject constructor(
         folderRenderer.clear()
     }
 
-    private fun onChanged(packageName: String) {
-        iconLoader.evict(packageName)
-        folderRenderer.clear() // a member's icon may have changed
-        requestReconcile()
+    private fun registerReceiver() {
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+            context.registerReceiver(packageUpdateReceiver, filter, Context.RECEIVER_EXPORTED)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "PackageEventCoordinator: could not register PackageUpdateReceiver")
+        }
     }
 
     /** Coalesced, debounced reconcile trigger. Visible for testing the debounce. */

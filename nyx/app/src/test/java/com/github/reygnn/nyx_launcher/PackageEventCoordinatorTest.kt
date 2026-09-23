@@ -3,6 +3,8 @@ package com.github.reygnn.nyx_launcher
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppUpdateSignal
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
@@ -38,6 +40,11 @@ class PackageEventCoordinatorTest {
     private val iconLoader = mockk<IconLoader>(relaxed = true)
     private val folderRenderer = mockk<FolderIconRenderer>(relaxed = true)
     private val reconcile = mockk<ReconcileHomeLayoutUseCase>()
+    // Real (empty) bus + relaxed trigger: these tests drive the debounce via
+    // requestReconcile() directly, so the bus collector stays idle here. The
+    // bus→trigger→reconcile chain is covered by reading (test-tot, like Kolibri's).
+    private val appUpdateSignal = AppUpdateSignal()
+    private val refreshApps = mockk<RefreshAppsUseCase>(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
 
     private val coordinator = PackageEventCoordinator(
@@ -45,6 +52,8 @@ class PackageEventCoordinatorTest {
         iconLoader = iconLoader,
         folderRenderer = folderRenderer,
         reconcile = reconcile,
+        appUpdateSignal = appUpdateSignal,
+        refreshApps = refreshApps,
         dispatcher = dispatcher,
     )
 
