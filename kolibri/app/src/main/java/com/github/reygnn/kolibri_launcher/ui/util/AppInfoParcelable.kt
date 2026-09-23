@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.util
 
 import android.os.Parcel
 import android.os.Parcelable
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 
 /**
  * Parcelable wrapper around the pure-Kotlin domain type [AppInfo], used for

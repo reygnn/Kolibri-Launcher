@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.util
 
 import androidx.recyclerview.widget.DiffUtil
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerAdapter
 
 /**

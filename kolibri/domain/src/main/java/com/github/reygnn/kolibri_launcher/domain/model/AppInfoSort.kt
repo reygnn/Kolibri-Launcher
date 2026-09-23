@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.launcher.core.AppInfo
+
 /**
  * Sorts the receiver alphabetically by display name, case-insensitively.
  *

@@ -4,7 +4,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import io.mockk.mockk
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository

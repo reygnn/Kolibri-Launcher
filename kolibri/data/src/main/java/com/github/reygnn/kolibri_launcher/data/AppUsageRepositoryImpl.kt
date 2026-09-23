@@ -12,7 +12,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.isValidUsageTimestamp
 import com.github.reygnn.launcher.core.timeWeightedUsageScore
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.di.UsageDataStore
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import dagger.hilt.android.qualifiers.ApplicationContext

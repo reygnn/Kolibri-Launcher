@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.launcher.core.AppInfo
 import org.openjdk.jmh.annotations.Benchmark
 import org.openjdk.jmh.annotations.BenchmarkMode
 import org.openjdk.jmh.annotations.Fork

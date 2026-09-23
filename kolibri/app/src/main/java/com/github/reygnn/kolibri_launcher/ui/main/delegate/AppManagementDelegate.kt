@@ -16,7 +16,7 @@ import androidx.lifecycle.asLiveData
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings

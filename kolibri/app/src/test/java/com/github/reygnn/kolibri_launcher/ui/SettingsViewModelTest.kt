@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository

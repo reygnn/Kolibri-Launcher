@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.coerceAtMostSafe
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository

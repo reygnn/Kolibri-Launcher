@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerAdapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

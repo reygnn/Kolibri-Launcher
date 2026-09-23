@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.customnames
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 
 /**
  * Definiert den Zustand der AppNamesActivity-UI.

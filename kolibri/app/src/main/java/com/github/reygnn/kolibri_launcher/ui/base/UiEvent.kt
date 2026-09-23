@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.base
 
 import android.widget.Toast
 import androidx.annotation.StringRes
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 
 /**

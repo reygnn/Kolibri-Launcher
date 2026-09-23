@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.main.AppLaunchAction
 import org.junit.Assert.assertEquals

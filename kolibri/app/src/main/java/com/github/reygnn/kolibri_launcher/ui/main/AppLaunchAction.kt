@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 
 /**
  * Two-way decision for how `MainActivity` should handle a `UiEvent.LaunchApp`:

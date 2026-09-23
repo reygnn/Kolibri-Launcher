@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.repository
 
 import com.github.reygnn.launcher.core.Purgeable
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import kotlinx.coroutines.flow.Flow
 
 /**

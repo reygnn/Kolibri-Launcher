@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.fakes
 
 // 2025-12-04 20:13
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import com.github.reygnn.launcher.core.AppInfo
+import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.launcher.core.Purgeable
 import kotlinx.coroutines.flow.Flow

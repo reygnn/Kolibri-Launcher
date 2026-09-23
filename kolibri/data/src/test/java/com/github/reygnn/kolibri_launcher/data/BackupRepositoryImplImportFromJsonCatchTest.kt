@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository

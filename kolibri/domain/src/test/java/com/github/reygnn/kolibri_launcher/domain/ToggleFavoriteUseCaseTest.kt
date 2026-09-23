@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.launcher.core.Purgeable

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.onboarding
 
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SelectableAppInfo
 
 data class OnboardingUiState(

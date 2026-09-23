@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.launcher.core.AppInfo
+
 /**
  * Filters the receiver to the apps whose name matches [query], case-insensitively.
  *

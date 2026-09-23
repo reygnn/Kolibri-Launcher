@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.domain
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import com.github.reygnn.launcher.core.AppInfo
+import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.InstalledAppsRepository
 import com.github.reygnn.launcher.core.Purgeable

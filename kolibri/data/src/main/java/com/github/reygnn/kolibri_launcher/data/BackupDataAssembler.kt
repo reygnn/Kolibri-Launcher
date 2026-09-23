@@ -21,7 +21,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
-import com.github.reygnn.kolibri_launcher.domain.model.AppLoad
+import com.github.reygnn.launcher.core.AppLoad
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull

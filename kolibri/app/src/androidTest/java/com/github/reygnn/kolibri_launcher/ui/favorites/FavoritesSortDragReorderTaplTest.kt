@@ -11,7 +11,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.tapl.FavoritesSort
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision

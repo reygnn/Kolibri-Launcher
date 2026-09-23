@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
 import android.app.Activity
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
 
 /**

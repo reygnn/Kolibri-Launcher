@@ -1,19 +1,29 @@
-package com.github.reygnn.kolibri_launcher.domain.model
-
-import com.github.reygnn.launcher.core.ComponentKey
+package com.github.reygnn.launcher.core
 
 /**
- * Pure-Kotlin immutable data class for a text-based launcher entry.
+ * Pure-Kotlin immutable data class for a launcher entry — the neutral, shared
+ * app model (MONOREPO_MERGE_SPEC §7, MRG-INV-9 / SIA-INV-3).
  *
  * Holds the minimum information about an installed app and has no Android-framework
- * dependencies — neither Context/Drawable nor Parcelable. The UI layer wraps this
- * type via `AppInfoParcelable` for Bundle/Intent transport.
+ * dependencies — neither Context/Drawable nor Parcelable. It is deliberately
+ * **icon-less** (icons are resolved per app: Nyx `IconRef`/`:data`, Kolibri its
+ * own path — SHARED_INSTALLED_APPS_SPEC §8) and carries **no `isFavorite`**:
+ * favorite / hidden / custom-name / sort are per-app overlays (Klasse B), never
+ * stored in the shared model (SIA-INV-3, MRG-INV-9). Kolibri's former
+ * `AppInfo.isFavorite` field is dropped by the Phase-1 canonicalization that
+ * precedes this migration; favorite membership now lives only in
+ * `GetFavoriteAppsUseCase` / `FavoritesRepository`.
+ *
+ * This is the carry-over of Kolibri's battle-tested precomputed model into the
+ * neutral `com.github.reygnn.launcher.core` namespace (MRG-INV-6). Nyx's former
+ * `LauncherApp` becomes a projection of this type (`label = originalName`,
+ * `customName` applied as an overlay at the consumer).
  */
 data class AppInfo(
     val originalName: String,
     val displayName: String,
     val packageName: String,
-    val className: String
+    val className: String,
 ) {
     /**
      * Precomputed lowercase sort key for [displayName].
@@ -39,44 +49,28 @@ data class AppInfo(
      * system resolves the activity by exact class-name match against the parsed
      * manifest (which stores long-form names), so a relative spelling would fail
      * to resolve. This is the single source of truth for that normalization,
-     * shared by [componentName] (identity) and by the launcher (`AppLauncherImpl`
-     * builds its `ComponentName` from this, not from raw [className]).
+     * shared by [key] (identity) and by each app's launcher.
      *
-     * A body `val` (declared before [componentName], so it is initialized first),
-     * which — like [displayNameLower] and [componentName] — keeps it out of
-     * `equals`/`hashCode`/`copy`/`componentN`.
+     * A body `val` (declared before [key]), which — like [displayNameLower] and
+     * [componentName] — keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
      */
     val normalizedClassName: String =
         if (className.startsWith(".")) "$packageName$className" else className
 
     /**
-     * Ein eindeutiger Bezeichner für einen spezifischen Launcher-Eintrag.
-     * Notwendig, da mehrere Einträge (Activities) im selben Paket existieren können
-     * (z.B. "Google" und "Voice Search").
-     *
-     * Normalisiert automatisch Kurzform (/.Activity) zu Langform (package.Activity)
-     * für konsistenten Vergleich, da Android beide Schreibweisen zulässt.
-     *
-     * z.B. "com.android.chrome/com.google.android.apps.chrome.Main"
-     */
-    /**
      * The canonical structured identity of this entry.
      *
      * Carries the normalized (long-form) class name, so [key] and [componentName]
      * never disagree; [ComponentKey.flat] is the single definition of the
-     * flattened wire format and [componentName] is now merely its projection.
-     *
-     * A body `val` (declared before [componentName], so it is initialized first),
-     * which — like [displayNameLower], [normalizedClassName] and [componentName] —
-     * keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
+     * flattened wire format and [componentName] is merely its projection.
      */
     val key: ComponentKey = ComponentKey(packageName, normalizedClassName)
 
-    // Precomputed once per instance (body val, so it stays out of
-    // equals/hashCode/copy just like displayNameLower) — the former getter
-    // recomputed the concat on every read, and componentName is read on
-    // essentially every AppInfo (hidden-filter, favorites membership, DiffUtil
-    // identity), including twice per AppInfoDiffCallback comparison (AUDIT-14
-    // Nit §212). Projection of [key]: byte-for-byte the historical value.
+    /**
+     * Flattened `"pkg/cls"` projection of [key]. Precomputed body `val` (out of
+     * equals/hashCode/copy like the others) — read on essentially every entry
+     * (hidden-filter, favorites membership, DiffUtil identity). Byte-for-byte the
+     * historical value.
+     */
     val componentName: String = key.flat
 }

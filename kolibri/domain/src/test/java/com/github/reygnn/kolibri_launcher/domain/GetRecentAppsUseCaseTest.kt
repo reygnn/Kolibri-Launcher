@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository

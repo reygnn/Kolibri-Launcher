@@ -6,7 +6,7 @@ import io.mockk.mockk
 
 import android.content.ContentResolver
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions

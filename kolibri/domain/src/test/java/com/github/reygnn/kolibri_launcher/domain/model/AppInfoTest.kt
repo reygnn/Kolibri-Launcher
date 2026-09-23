@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.ComponentKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

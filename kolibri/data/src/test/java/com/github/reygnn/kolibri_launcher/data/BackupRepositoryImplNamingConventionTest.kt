@@ -328,7 +328,7 @@ class BackupRepositoryImplNamingConventionTest {
     // --- Helper ---
 
     private fun createTestAppInfo(packageName: String) =
-        com.github.reygnn.kolibri_launcher.domain.model.AppInfo(
+        com.github.reygnn.launcher.core.AppInfo(
             originalName = "App $packageName",
             displayName = "App $packageName",
             packageName = packageName,

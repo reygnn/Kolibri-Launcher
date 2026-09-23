@@ -11,7 +11,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase

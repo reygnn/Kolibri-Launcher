@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
-import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
+import com.github.reygnn.launcher.core.AppInfo
 
 /**
  * Applies custom names onto an app list as a pure, reactive re-derivation
