@@ -1,9 +1,8 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.installedapps.FakeAppEnumerator
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -16,20 +15,15 @@ import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * FAIL-CLOSED reconcile (RHL-INV-1): only a genuine non-empty [AppLoad.Loaded]
- * reconciles; Failed / empty / prime-timeout all Skip with zero mutation + zero
- * save. Reads the SHARED reactive loader (post-migration) via the prime pattern.
- *
- * The fake is a hot [MutableStateFlow] (never completes), so the empty case
- * exercises the real `withTimeoutOrNull` → LOAD_EMPTY skip instead of a completing
- * flow (which would make the prime's `.first {}` throw).
+ * FAIL-CLOSED reconcile (RHL-INV-1): only a genuine non-empty enumeration reconciles;
+ * a thrown enumeration (LOAD_FAILED) or an empty result (LOAD_EMPTY) Skip with zero
+ * mutation + zero save. Reads the SHARED [com.github.reygnn.launcher.core.AppEnumerator]
+ * directly (F5) — always fresh, no StateFlow replay.
  */
 class ReconcileHomeLayoutUseCaseTest {
 
@@ -41,13 +35,6 @@ class ReconcileHomeLayoutUseCaseTest {
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
     private fun appInfo(p: String) = AppInfo(originalName = p, displayName = p, packageName = p, className = "$p.Main")
 
-    private class FakeSharedLoader(initial: AppLoad) : InstalledAppsRepository {
-        val flow = MutableStateFlow(initial)
-        override fun getInstalledApps(): Flow<AppLoad> = flow
-        override suspend fun triggerAppsUpdate() = Unit
-        override suspend fun purgeRepository() = Unit
-    }
-
     private fun layoutWith(vararg pkgs: String): HomeLayout = HomeLayout(
         grid,
         pages = 1,
@@ -55,15 +42,15 @@ class ReconcileHomeLayoutUseCaseTest {
         dock = emptyList(),
     )
 
-    private fun useCase(layoutRepo: FakeHomeLayoutRepository, apps: InstalledAppsRepository) =
-        ReconcileHomeLayoutUseCase(layoutRepo, apps, ids, mainDispatcherRule.dispatcher)
+    private fun useCase(layoutRepo: FakeHomeLayoutRepository, enumerator: FakeAppEnumerator) =
+        ReconcileHomeLayoutUseCase(layoutRepo, enumerator, ids, mainDispatcherRule.dispatcher)
 
     @Test
     fun failed_load_is_skipped_and_never_saves() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
-        val apps = FakeSharedLoader(AppLoad.Failed(RuntimeException("enumeration boom")))
+        val enumerator = FakeAppEnumerator(throwable = RuntimeException("enumeration boom"))
 
-        val result = useCase(layoutRepo, apps)()
+        val result = useCase(layoutRepo, enumerator)()
 
         assertThat(result).isEqualTo(ReconcileResult.Skipped(SkipReason.LOAD_FAILED))
         assertThat(layoutRepo.saveCount).isEqualTo(0) // FAIL-CLOSED: home untouched
@@ -71,14 +58,13 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     @Test
-    fun empty_load_times_out_and_is_skipped_never_saves() = runTest(mainDispatcherRule.dispatcher) {
-        // The conflated initial Loaded(emptyList()) never satisfies the prime, so the
-        // window elapses → LOAD_EMPTY skip (subsumes the old ENUMERATION_EMPTY). Still
-        // fail-closed: a genuinely-empty / stuck load must never empty the home screen.
+    fun empty_load_is_skipped_and_never_saves() = runTest(mainDispatcherRule.dispatcher) {
+        // An empty/partial enumeration is suspicious (a real device has >= 1 app) →
+        // LOAD_EMPTY skip. Still fail-closed: never empty the home screen.
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
-        val apps = FakeSharedLoader(AppLoad.Loaded(emptyList()))
+        val enumerator = FakeAppEnumerator(result = emptyList())
 
-        val result = useCase(layoutRepo, apps)()
+        val result = useCase(layoutRepo, enumerator)()
 
         assertThat(result).isEqualTo(ReconcileResult.Skipped(SkipReason.LOAD_EMPTY))
         assertThat(layoutRepo.saveCount).isEqualTo(0)
@@ -88,9 +74,9 @@ class ReconcileHomeLayoutUseCaseTest {
     @Test
     fun loaded_with_dead_app_prunes_and_saves_once() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
-        val apps = FakeSharedLoader(AppLoad.Loaded(listOf(appInfo("pa")))) // pb uninstalled
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb uninstalled
 
-        val result = useCase(layoutRepo, apps)()
+        val result = useCase(layoutRepo, enumerator)()
 
         assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
         assertThat(layoutRepo.saveCount).isEqualTo(1)
@@ -100,11 +86,33 @@ class ReconcileHomeLayoutUseCaseTest {
     @Test
     fun loaded_all_installed_is_unchanged_and_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
-        val apps = FakeSharedLoader(AppLoad.Loaded(listOf(appInfo("pa"), appInfo("pb"))))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"), appInfo("pb")))
 
-        val result = useCase(layoutRepo, apps)()
+        val result = useCase(layoutRepo, enumerator)()
 
         assertThat(result).isEqualTo(ReconcileResult.Unchanged)
         assertThat(layoutRepo.saveCount).isEqualTo(0)
+    }
+
+    /**
+     * F5 FRESHNESS PIN. Reconcile must prune against the CURRENT enumeration, not a
+     * stale snapshot. The enumerator starts reporting both apps installed, then pb is
+     * uninstalled (its enumeration result changes) BEFORE reconcile runs; reconcile
+     * must read the fresh (pb-gone) list and prune the pb tile. If reconcile ever
+     * reverts to reading a cached/stale loader value (the F5 regression), pb would
+     * survive and this fails.
+     */
+    @Test
+    fun reconcile_prunes_against_the_fresh_enumeration_not_a_stale_snapshot() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"), appInfo("pb"))) // both present initially
+        // Uninstall lands: the live launchable set no longer contains pb.
+        enumerator.result = listOf(appInfo("pa"))
+
+        val result = useCase(layoutRepo, enumerator)()
+
+        assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
+        assertThat(layoutRepo.saveCount).isEqualTo(1)
+        assertThat(layoutRepo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
     }
 }

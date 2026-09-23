@@ -9,10 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.launcher.core.InstalledAppsRepository
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.github.reygnn.launcher.core.installedapps.FakeAppEnumerator
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
@@ -31,14 +28,6 @@ class ExportImportUseCaseTest {
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
     private fun appInfo(p: String) = AppInfo(originalName = p, displayName = p, packageName = p, className = "$p.Main")
     private fun empty() = HomeLayout(grid, 1, emptyList(), emptyList())
-
-    /** Hot core-loader fake (never completes) emitting a preset [AppLoad]. */
-    private class FakeSharedLoader(initial: AppLoad) : InstalledAppsRepository {
-        val flow = MutableStateFlow(initial)
-        override fun getInstalledApps(): Flow<AppLoad> = flow
-        override suspend fun triggerAppsUpdate() = Unit
-        override suspend fun purgeRepository() = Unit
-    }
     private fun appAt(p: String, x: Int) = PlacedItem(HomeItem.App(ItemId(p), ck(p)), CellPos(0, x, 0))
 
     @Test
@@ -55,7 +44,7 @@ class ExportImportUseCaseTest {
     @Test
     fun import_invalid_data_is_rejected_without_saving() = runTest(mainDispatcherRule.dispatcher) {
         val repo = FakeHomeLayoutRepository(empty())
-        val apps = FakeSharedLoader(AppLoad.Loaded(listOf(appInfo("pa"))))
+        val apps = FakeAppEnumerator(result = listOf(appInfo("pa")))
         val serializer = FakeLayoutSerializer(onDeserialize = { null }) // unparseable
         val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo, apps), mainDispatcherRule.dispatcher)
 
@@ -70,7 +59,7 @@ class ExportImportUseCaseTest {
         // Imported layout references pb, but only pa is installed here → reconcile prunes pb.
         val imported = empty().copy(items = listOf(appAt("pa", 0), appAt("pb", 1)))
         val repo = FakeHomeLayoutRepository(empty())
-        val apps = FakeSharedLoader(AppLoad.Loaded(listOf(appInfo("pa"))))
+        val apps = FakeAppEnumerator(result = listOf(appInfo("pa")))
         val serializer = FakeLayoutSerializer(onDeserialize = { imported })
         val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo, apps), mainDispatcherRule.dispatcher)
 
@@ -81,10 +70,10 @@ class ExportImportUseCaseTest {
         assertThat(repo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
     }
 
-    private fun reconcileWith(repo: FakeHomeLayoutRepository, apps: InstalledAppsRepository) =
+    private fun reconcileWith(repo: FakeHomeLayoutRepository, apps: FakeAppEnumerator) =
         ReconcileHomeLayoutUseCase(
             layoutRepository = repo,
-            appsRepository = apps,
+            enumerator = apps,
             idFactory = ItemIdFactory { ItemId("new") },
             dispatcher = mainDispatcherRule.dispatcher,
         )
