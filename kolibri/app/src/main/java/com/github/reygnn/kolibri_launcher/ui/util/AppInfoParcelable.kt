@@ -15,7 +15,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.AppInfo
  * Hand-rolled `Parcelable` rather than `@Parcelize`: the kotlin-parcelize
  * compiler-plugin's IR pass doesn't attach to AGP 9 built-in Kotlin's
  * `compileKotlin` tasks (TODO §10 mega-bundle post-mortem, 2026-05-15).
- * Five trivial fields — manual write/read is cheaper than the
+ * Four trivial fields — manual write/read is cheaper than the
  * `android.builtInKotlin=false` escape-hatch's deferred AGP-10 bill.
  * `data class` is preserved (`equals`/`hashCode`/`toString`/`copy` are
  * orthogonal to `Parcelable`); only the three interface methods + `CREATOR`
@@ -25,15 +25,13 @@ data class AppInfoParcelable(
     val originalName: String,
     val displayName: String,
     val packageName: String,
-    val className: String,
-    val isFavorite: Boolean
+    val className: String
 ) : Parcelable {
     fun toAppInfo(): AppInfo = AppInfo(
         originalName = originalName,
         displayName = displayName,
         packageName = packageName,
-        className = className,
-        isFavorite = isFavorite
+        className = className
     )
 
     override fun describeContents(): Int = 0
@@ -43,7 +41,6 @@ data class AppInfoParcelable(
         dest.writeString(displayName)
         dest.writeString(packageName)
         dest.writeString(className)
-        dest.writeInt(if (isFavorite) 1 else 0)
     }
 
     companion object CREATOR : Parcelable.Creator<AppInfoParcelable> {
@@ -51,8 +48,7 @@ data class AppInfoParcelable(
             originalName = source.readString()!!,
             displayName = source.readString()!!,
             packageName = source.readString()!!,
-            className = source.readString()!!,
-            isFavorite = source.readInt() != 0
+            className = source.readString()!!
         )
 
         override fun newArray(size: Int): Array<AppInfoParcelable?> = arrayOfNulls(size)
@@ -63,6 +59,5 @@ fun AppInfo.toParcelable(): AppInfoParcelable = AppInfoParcelable(
     originalName = originalName,
     displayName = displayName,
     packageName = packageName,
-    className = className,
-    isFavorite = isFavorite
+    className = className
 )

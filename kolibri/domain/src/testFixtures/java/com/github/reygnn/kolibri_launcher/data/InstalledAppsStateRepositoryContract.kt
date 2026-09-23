@@ -63,7 +63,6 @@ abstract class InstalledAppsStateRepositoryContract {
         displayName = name,
         packageName = pkg,
         className = "$pkg.MainActivity",
-        isFavorite = false
     )
 
     private val appA = appInfo("Alpha", "com.example.a")

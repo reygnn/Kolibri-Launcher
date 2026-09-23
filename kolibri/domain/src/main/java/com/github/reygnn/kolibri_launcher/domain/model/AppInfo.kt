@@ -13,8 +13,7 @@ data class AppInfo(
     val originalName: String,
     val displayName: String,
     val packageName: String,
-    val className: String,
-    val isFavorite: Boolean = false
+    val className: String
 ) {
     /**
      * Precomputed lowercase sort key for [displayName].

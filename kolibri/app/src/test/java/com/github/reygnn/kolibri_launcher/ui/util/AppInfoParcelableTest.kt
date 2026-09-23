@@ -19,48 +19,17 @@ import org.robolectric.RobolectricTestRunner
 class AppInfoParcelableTest {
 
     @Test
-    fun `round-trip preserves all fields when isFavorite is true`() {
+    fun `round-trip preserves all fields`() {
         val original = AppInfoParcelable(
             originalName = "Original Display",
             displayName = "Custom Display",
             packageName = "com.example.app",
-            className = "com.example.app.MainActivity",
-            isFavorite = true
+            className = "com.example.app.MainActivity"
         )
 
         val restored = roundTrip(original)
 
         assertThat(restored).isEqualTo(original)
-    }
-
-    @Test
-    fun `round-trip preserves all fields when isFavorite is false`() {
-        val original = AppInfoParcelable(
-            originalName = "Original",
-            displayName = "Display",
-            packageName = "com.example.app",
-            className = "com.example.app.Main",
-            isFavorite = false
-        )
-
-        val restored = roundTrip(original)
-
-        assertThat(restored).isEqualTo(original)
-    }
-
-    @Test
-    fun `round-trip reads back the isFavorite flag value, not just equality`() {
-        val favorite = AppInfoParcelable(
-            originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isFavorite = true
-        )
-        val nonFavorite = AppInfoParcelable(
-            originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isFavorite = false
-        )
-
-        assertThat(roundTrip(favorite).isFavorite).isTrue()
-        assertThat(roundTrip(nonFavorite).isFavorite).isFalse()
     }
 
     @Test
@@ -69,8 +38,7 @@ class AppInfoParcelableTest {
             originalName = "",
             displayName = "",
             packageName = "",
-            className = "",
-            isFavorite = false
+            className = ""
         )
 
         assertThat(roundTrip(original)).isEqualTo(original)
@@ -80,7 +48,7 @@ class AppInfoParcelableTest {
     fun `describeContents returns 0 (no file descriptors)`() {
         val instance = AppInfoParcelable(
             originalName = "X", displayName = "Y", packageName = "Z",
-            className = "W", isFavorite = false
+            className = "W"
         )
         assertThat(instance.describeContents()).isEqualTo(0)
     }

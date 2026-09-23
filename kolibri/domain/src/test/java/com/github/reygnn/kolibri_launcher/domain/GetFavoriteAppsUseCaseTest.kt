@@ -461,7 +461,6 @@ class GetFavoriteAppsUseCaseTest {
             // componentName round-trips so DiffUtil identity matches the authoritative
             // entry that later replaces this provisional one in place.
             assertEquals(app1.componentName, provisional.data.apps[0].componentName)
-            assertTrue(provisional.data.apps[0].isFavorite)
             expectNoEvents()
         }
     }
@@ -590,7 +589,6 @@ class GetFavoriteAppsUseCaseTest {
                 setOf(app1.componentName, app2.componentName),
                 result.apps.map { it.componentName }.toSet(),
             )
-            assertTrue(result.apps.all { it.isFavorite })
         }
     }
 

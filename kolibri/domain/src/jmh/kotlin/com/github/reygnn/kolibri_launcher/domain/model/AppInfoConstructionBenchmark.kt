@@ -24,18 +24,13 @@ import java.util.concurrent.TimeUnit
  * from rare: each reactive re-derivation of the app list rebuilds every element
  * at least twice, because `copy()` runs through the constructor.
  *
- * The two production `copy` shapes are pinned separately because they differ in
- * how much of the recomputation is actually *useful*:
- * - [copyDisplayName]: the `applyCustomNames` shape — `copy(displayName = …)`.
- *   Both body vals legitimately need to be redone (`displayNameLower` depends on
- *   the changed field; `componentName` does not, and is pure waste here).
- * - [copyIsFavorite]: the `GetFavoriteAppsUseCase.processApps` shape —
- *   `copy(isFavorite = …)`. Neither body val's inputs changed, so the
- *   `lowercase()` **and** the componentName concat re-run for nothing. This is
- *   the shape where the precompute is most clearly working against itself.
+ * The production `copy` shape is pinned via [copyDisplayName]: the
+ * `applyCustomNames` shape — `copy(displayName = …)`. Both body vals legitimately
+ * need to be redone (`displayNameLower` depends on the changed field;
+ * `componentName` does not, and is pure waste here).
  *
  * [construct] is the from-scratch cost (what the enumeration in `:data` pays per
- * app), and [constructBare] is a reference shape carrying the same five fields
+ * app), and [constructBare] is a reference shape carrying the same four fields
  * with **no** body vals — the delta between the two is the per-instance price of
  * the two precomputes. `BareAppInfo` is a shape reference for that one
  * measurement, NOT a copy of production logic, so it carries no drift risk
@@ -117,19 +112,11 @@ open class AppInfoConstructionBenchmark {
     @Benchmark
     fun copyDisplayName(): List<AppInfo> =
         apps.map { it.copy(displayName = it.originalName) }
-
-    /**
-     * `GetFavoriteAppsUseCase.processApps` shape: nothing either body val
-     * depends on has changed, yet both are recomputed.
-     */
-    @Benchmark
-    fun copyIsFavorite(): List<AppInfo> =
-        apps.map { it.copy(isFavorite = true) }
 }
 
 /**
  * Reference shape for [AppInfoConstructionBenchmark.constructBare]: [AppInfo]'s
- * five constructor fields with no precomputed body vals. Exists only to price
+ * four constructor fields with no precomputed body vals. Exists only to price
  * the precomputes — it is not a stand-in for [AppInfo] and has no behaviour to
  * keep in sync.
  */
@@ -138,5 +125,4 @@ data class BareAppInfo(
     val displayName: String,
     val packageName: String,
     val className: String,
-    val isFavorite: Boolean = false,
 )

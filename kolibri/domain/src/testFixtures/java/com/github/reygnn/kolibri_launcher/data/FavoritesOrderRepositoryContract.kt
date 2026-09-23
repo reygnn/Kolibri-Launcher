@@ -76,7 +76,6 @@ abstract class FavoritesOrderRepositoryContract {
         displayName = name,
         packageName = pkg,
         className = klass,
-        isFavorite = true
     )
 
     private val appA = appInfo("Alpha", "com.example.a", ".MainActivity")

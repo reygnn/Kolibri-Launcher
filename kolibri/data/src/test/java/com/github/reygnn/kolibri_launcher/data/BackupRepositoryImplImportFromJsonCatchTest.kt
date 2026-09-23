@@ -97,7 +97,6 @@ class BackupRepositoryImplImportFromJsonCatchTest {
                     displayName = "Example App",
                     packageName = "com.example.app",
                     className = "com.example.app.MainActivity",
-                    isFavorite = false,
                 ),
             )
         }

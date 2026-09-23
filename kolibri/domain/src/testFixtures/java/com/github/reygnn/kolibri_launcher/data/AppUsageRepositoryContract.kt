@@ -73,7 +73,6 @@ abstract class AppUsageRepositoryContract {
         displayName = displayName,
         packageName = packageName,
         className = "$packageName.MainActivity",
-        isFavorite = false
     )
 
     // ---------- Fresh state ----------

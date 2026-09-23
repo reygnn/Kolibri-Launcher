@@ -48,7 +48,7 @@ import javax.inject.Singleton
  * The two code paths in this use case follow from that one rule:
  *
  *   - Favorites path ([processApps] when favorites exist):
- *     filter by `isFavorite` only. Hidden flag does not apply, because
+ *     filter by favorite membership only. Hidden flag does not apply, because
  *     the favorite-status break is in effect.
  *
  *   - Fallback path ([createFallbackApps], used when the
@@ -264,14 +264,13 @@ class GetFavoriteAppsUseCase @Inject constructor(
         hiddenApps: Set<String>,
         savedOrder: List<String>
     ): FavoriteAppsResult {
-        // Filter to favorites FIRST, then copy only the survivors with
-        // isFavorite = true — avoids a full-list AppInfo.copy of every installed
-        // app (each copy recomputes displayNameLower + componentName) just to keep
-        // a handful. Set.contains(String) / filter / map on non-null data classes
-        // cannot throw.
+        // Filter to favorites by componentName membership. Favorite-ness is no
+        // longer stamped onto AppInfo (the isFavorite field was removed — favorite
+        // membership lives in FavoritesRepository), so consumers derive it from the
+        // favorite component set. Set.contains(String) / filter on non-null data
+        // classes cannot throw.
         val favoriteApps = rawApps
             .filter { favorites.contains(it.componentName) }
-            .map { it.copy(isFavorite = true) }
 
         // Einziger Wurfkandidat: sortFavoriteComponents (suspend, Repo-Call).
         val orderedFavorites = try {
@@ -336,7 +335,6 @@ class GetFavoriteAppsUseCase @Inject constructor(
             displayName = label,
             packageName = packageName,
             className = className,
-            isFavorite = true,
         )
     }
 

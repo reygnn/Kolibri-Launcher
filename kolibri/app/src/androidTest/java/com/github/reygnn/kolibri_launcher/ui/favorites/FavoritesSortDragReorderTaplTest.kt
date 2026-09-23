@@ -77,7 +77,6 @@ class FavoritesSortDragReorderTaplTest {
                 displayName = "App$i",
                 packageName = info.packageName,
                 className = info.name,
-                isFavorite = true,
             )
         }
     }
