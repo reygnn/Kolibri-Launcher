@@ -7,7 +7,7 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.launcher.testing.awaitUntil
-import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
+import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -16,7 +16,6 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
-import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import com.github.reygnn.nyx_launcher.tapl.NyxLauncher
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -49,7 +48,7 @@ class DrawerAppToHomeDragTaplTest {
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
 
     @Inject lateinit var homeLayout: HomeLayoutRepository
-    @Inject lateinit var installedApps: InstalledAppsRepository
+    @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
     @Inject @ApplicationContext lateinit var context: Context
 
     private val placeholderKey = ComponentKey("com.example.tapl.absent", "com.example.tapl.absent.Nope")
@@ -61,9 +60,7 @@ class DrawerAppToHomeDragTaplTest {
         InstrumentationRegistry.getInstrumentation().targetContext.packageManager
             .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
 
-        val loaded = runBlocking { installedApps.loadInstalledApps() }
-        assumeTrue("Installed apps didn't load", loaded is AppLoadResult.Loaded)
-        val apps = (loaded as AppLoadResult.Loaded).apps
+        val apps = runBlocking { getDrawerApps() }
         assumeTrue("Need ≥1 installed app for the drawer", apps.isNotEmpty())
         searchQuery = apps.first().displayName.trim().substringBefore(' ')
         assumeTrue("First app displayName is blank", searchQuery.isNotBlank())

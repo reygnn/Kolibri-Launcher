@@ -10,13 +10,12 @@ import com.github.reygnn.launcher.testing.awaitUntil
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
-import com.github.reygnn.nyx_launcher.home.model.AppLoadResult
+import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
-import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import com.github.reygnn.nyx_launcher.tapl.NyxLauncher
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -51,7 +50,7 @@ class DrawerAppToHomeTaplTest {
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
 
     @Inject lateinit var homeLayout: HomeLayoutRepository
-    @Inject lateinit var installedApps: InstalledAppsRepository
+    @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
     @Inject @ApplicationContext lateinit var context: Context
 
     private val placeholderKey = ComponentKey("com.example.tapl.absent", "com.example.tapl.absent.Nope")
@@ -68,9 +67,7 @@ class DrawerAppToHomeTaplTest {
         // loadLabel — so the query is guaranteed to match at least one drawer row
         // (the two label sources can otherwise diverge). First word keeps it clean
         // for token/prefix filters; replaceText in NyxDrawer handles any Unicode.
-        val loaded = runBlocking { installedApps.loadInstalledApps() }
-        assumeTrue("Installed apps didn't load", loaded is AppLoadResult.Loaded)
-        val apps = (loaded as AppLoadResult.Loaded).apps
+        val apps = runBlocking { getDrawerApps() }
         assumeTrue("Need ≥1 installed app for the drawer", apps.isNotEmpty())
         searchQuery = apps.first().displayName.trim().substringBefore(' ')
         assumeTrue("First app displayName is blank", searchQuery.isNotBlank())

@@ -6,16 +6,12 @@ import com.github.reygnn.nyx_launcher.data.home.HiddenAppsRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidDrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
-import com.github.reygnn.nyx_launcher.data.home.InstalledAppsRepositoryImpl
 // Shared installed-apps subsystem (SHARED_INSTALLED_APPS_SPEC §3), bound app-side
 // in Nyx exactly like Kolibri (decision B: no auto-aggregated :common-data module).
-// Aliased because the simple names collide with Nyx's own still-live installed-apps
-// types below, which stay bound against the nyx.home.repository port until the
-// consumer swap (E2) retires them. Distinct types → no double-bind.
 import com.github.reygnn.launcher.core.AppEnumerator
-import com.github.reygnn.launcher.core.InstalledAppsRepository as SharedInstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
-import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl as SharedInstalledAppsRepositoryImpl
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
@@ -30,7 +26,6 @@ import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.home.repository.InstalledAppsRepository
 import com.github.reygnn.launcher.common.data.timeinfo.TimeBasedEventsRepositoryImpl
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
@@ -77,24 +72,18 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
 
+    // ── Shared installed-apps subsystem (:core port → :common-data impls, decision B) ──
+    // The LauncherApps-backed motor (drawer loader + coordinator's RefreshAppsUseCase)
+    // and the enumerator (fail-closed reconcile). LauncherApps + the reload trigger are
+    // provided by Nyx's SystemServiceModule. Nyx's own local InstalledAppsRepositoryImpl
+    // + AppLoadResult port were retired in E3.
     @Binds
     @Singleton
     abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
 
-    // ── Shared installed-apps subsystem (:core port → :common-data impls, decision B) ──
-    // Bound here in E1 for the F2(a) freshness path (RefreshAppsUseCase → the shared
-    // motor). Nyx's own use-cases still inject the nyx port above until E2; the old
-    // port + impl are retired in E3. LauncherApps + the reload trigger are provided by
-    // Nyx's SystemServiceModule.
     @Binds
     @Singleton
     abstract fun bindAppEnumerator(impl: LauncherAppsEnumerator): AppEnumerator
-
-    @Binds
-    @Singleton
-    abstract fun bindSharedInstalledAppsRepository(
-        impl: SharedInstalledAppsRepositoryImpl,
-    ): SharedInstalledAppsRepository
 
     // Home-info subsystem (HIE Phase C): the narrow settings port is Nyx's
     // PreferencesRepository; the calendar/alarm reader is the shared :common-data impl.
