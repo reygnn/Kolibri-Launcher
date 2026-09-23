@@ -22,6 +22,17 @@ import com.github.reygnn.kolibri_launcher.data.service.ComponentLabelResolverImp
 import com.github.reygnn.kolibri_launcher.data.service.PackagePresenceImpl
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
+// Shared installed-apps subsystem (SHARED_INSTALLED_APPS_SPEC §3), bound app-side
+// exactly like the Wallpaper/TimeInfo :common-data impls above (no auto-aggregated
+// module). Aliased because the simple names collide with Kolibri's own (still-live)
+// installed-apps types, which stay bound below against their kolibri.domain
+// interfaces — distinct types, no double-bind.
+import com.github.reygnn.launcher.core.AppEnumerator
+import com.github.reygnn.launcher.core.InstalledAppsRepository as SharedInstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository as SharedInstalledAppsStateRepository
+import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl as SharedInstalledAppsRepositoryImpl
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsStateRepositoryImpl as SharedInstalledAppsStateRepositoryImpl
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -110,6 +121,26 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindInstalledAppsStateRepository(impl: InstalledAppsStateRepositoryImpl): InstalledAppsStateRepository
+
+    // ── Shared installed-apps subsystem (:core port → :common-data impls) ──
+    // Built + wired here in C2 but NOT yet consumed by Kolibri (consumers still
+    // inject the kolibri.domain interfaces above; the swap is C3). Same "built but
+    // unused" posture the :core interfaces had in C1.
+    @Binds
+    @Singleton
+    abstract fun bindAppEnumerator(impl: LauncherAppsEnumerator): AppEnumerator
+
+    @Binds
+    @Singleton
+    abstract fun bindSharedInstalledAppsRepository(
+        impl: SharedInstalledAppsRepositoryImpl,
+    ): SharedInstalledAppsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSharedInstalledAppsStateRepository(
+        impl: SharedInstalledAppsStateRepositoryImpl,
+    ): SharedInstalledAppsStateRepository
 
     @Binds
     @Singleton

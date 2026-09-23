@@ -57,4 +57,8 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
+    // Shared installed-apps state-holder contract + MainDispatcherRuleBase live in
+    // :core testFixtures; the impl-side contract test (InstalledAppsStateRepository-
+    // ImplContractTest) and LauncherAppsEnumeratorTest consume them.
+    testImplementation(testFixtures(project(":core")))
 }
