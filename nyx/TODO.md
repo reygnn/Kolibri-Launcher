@@ -159,28 +159,12 @@ beide fail-safe Richtung „behalten". Umgesetzte Schichten:
   als Defense-in-Depth für seinen langlebigen Collector.
 - **fix 5 — fail-safe-Logging via `reportToAcra` statt `silentError` (Medium-Review-Follow-up,
   2026-09-24):** die drei fail-safe-to-keep-Catches der geteilten Seams
-  (`PackageManagerPresence.isComponentPresent`/`isPackagePresent` → `true`,
-  `PackageManagerInstallSessions.activeSessionPackages` → `null`) nutzten `TimberWrapper.silentError`,
-  das in DEBUG-Builds wirft (`crashInDebug`). Damit gab ein transienter PackageManager-/
-  PackageInstaller-Fehler in einem DEBUG-On-Device-Build **nicht** den fail-safe-Default zurück,
-  sondern warf — der Throw entkam der Methode (upstream gefangen: nyx als `STORE_FAILED`
-  fehletikettiert, kolibri bricht den Store via `runCleanup` ab). Fail-safe in der Richtung (kein
-  Datenverlust, ein übersprungener/abgebrochener Pass statt eines zusätzlichen Prunes), aber es
-  machte den dokumentierten Vertrag (»resolves to present/null« der Seams, und die Reconcile-KDoc
-  »the gate arms … swallow their own platform errors, rethrowing only cancellation«) in DEBUG
-  falsch. Fix: alle drei auf `reportToAcra` (meldet in RELEASE, **kein** DEBUG-Throw) — der Vertrag
-  hält jetzt in JEDEM Build, RELEASE behält das ACRA-Signal. Betrifft beide Launcher (geteiltes
-  Impl in `:common-data`).
-
-**Merke (Rule-9-Nuance, `silentError` vs. `reportToAcra`):** `silentError` **wirft in DEBUG** —
-es ist der Kanal für *gefangene Programmierfehler*, die im Dev-Build laut auffallen sollen. Für
-eine **fail-safe-to-keep-Grenze**, deren Vertrag »gib in JEDEM Build den sicheren Default zurück«
-lautet (System-API-Boundary, environmental, self-healing), ist es das falsche Werkzeug: der
-DEBUG-Throw bricht genau diesen Vertrag (und wird oben nur mislabeled/abgebrochen weitergereicht).
-Dort gehört `reportToAcra` hin (RELEASE-Signal ohne DEBUG-Throw) — dieselbe Wahl wie in
-`ReconcileHomeLayoutUseCase`s `STORE_FAILED`-Catch (fix 4). Kurz: **erwarteter,
-environmental-transienter, upstream-behandelter Fehler → `reportToAcra`; echter Programmierfehler,
-der laut werden soll → `silentError`.**
+  (`PackageManagerPresence` ×2 → `true`, `PackageManagerInstallSessions` → `null`) nutzten
+  `silentError`, das in DEBUG wirft und so den fail-safe-Vertrag in DEBUG-Builds brach; auf
+  `reportToAcra` umgestellt. **Betrifft beide Launcher gleich** (geteiltes `:common-data`-Impl) —
+  die Konvention dahinter (`silentError` ↔ `reportToAcra` an fail-safe-Grenzen) steht daher im
+  **root `TODO.md`**, nicht hier. Passt zu fix 4 (der nyx-eigene `STORE_FAILED`-Catch traf
+  dieselbe Wahl).
 
 Ein Rest-Fall bleibt bewusst offen (Restore ohne auffindbare Session) — dokumentiert in
 `ACCEPTED_LIMITATIONS.md` („… pruned during a restore that exposes no install session").
