@@ -18,7 +18,6 @@ import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
-import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -182,16 +181,25 @@ class ReconcileHomeLayoutUseCaseTest {
      * does not degrade to an empty layout and prune. Contrast with the fail-OPEN [layout]
      * flow, under which the same error would yield an empty layout → no candidates →
      * `pb` pruned against the partial snapshot. That regression is exactly what this pins.
+     *
+     * The abort is a value-honest [SkipReason.STORE_FAILED] skip, NOT a thrown exception:
+     * `invoke()` is total (only cancellation escapes), so a store fault is reported the same
+     * way as an enumeration fault ([LOAD_FAILED]) and every caller is correct without its own
+     * guard. The load-bearing assertion is still "zero mutation on a bad read".
      */
     @Test
-    fun snapshot_read_failure_aborts_reconcile_without_pruning() = runTest(mainDispatcherRule.dispatcher) {
+    fun snapshot_read_failure_skips_reconcile_without_pruning() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb")).apply {
             failSnapshotWith = IOException("transient store read")
         }
         val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
 
-        assertFailsWith<IOException> { useCase(layoutRepo, enumerator)() }
+        val result = useCase(layoutRepo, enumerator)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Skipped(SkipReason.STORE_FAILED))
         assertThat(layoutRepo.saveCount).isEqualTo(0) // nothing pruned on a bad read
+        assertThat(layoutRepo.current.items.map { it.item.id })
+            .containsExactly(ItemId("pa"), ItemId("pb")) // home untouched
     }
 
     /**

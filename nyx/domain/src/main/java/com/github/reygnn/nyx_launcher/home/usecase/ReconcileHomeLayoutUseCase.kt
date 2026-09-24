@@ -5,6 +5,7 @@ import com.github.reygnn.launcher.core.AppPresence
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.launcher.core.InstallSessionInspector
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
@@ -87,38 +88,55 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
         // each against an independent presence check (fail-safe → present) and fold the
         // still-installed ones back into `installed`, so the pure reconciler never prunes a
         // merely-transiently-absent app. The candidate read is fail-CLOSED ([snapshot], not
-        // the fail-open [layout] flow): a transient read error must abort this pass, not
-        // degrade to an empty layout that drops every protection. It runs outside the atomic
+        // the fail-open [layout] flow): a transient read error aborts this pass as a
+        // value-honest [SkipReason.STORE_FAILED] skip (see the catch below) — never a throw and
+        // never a degrade to an empty layout that drops every protection. It runs outside the atomic
         // RMW below, which is safe because it only ever ADDS protection (it can reduce
         // pruning, never cause a bad write) and the reconcile still runs against the fresh
         // `current` inside the lock (A1-03 preserved). A complete snapshot → no candidates
         // → no gate IPC (neither arm consulted).
-        val candidates = layoutRepository.snapshot()
-            .referencedKeys()
-            .filterTo(HashSet()) { it !in installed }
-        for (key in candidates) {
-            // Keep the key if EITHER it still resolves independently (cross-surface
-            // PackageManager presence — a LauncherApps enumeration transient can't poison it)
-            // OR its package has an install/restore session in flight (Launcher3-style promise:
-            // an app on its way back during restore is legitimately absent right now but must
-            // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
-            // Short-circuit: presence first (one cheap package query), session only if absent.
-            if (appPresence.isComponentPresent(key) || installSessions.hasActiveSession(key.packageName)) {
-                installed.add(key)
-            }
-        }
-
-        var result: ReconcileResult = ReconcileResult.Unchanged
-        layoutRepository.update { current -> // atomic RMW (A1-03)
-            when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
-                ReconcileOutcome.Unchanged -> null
-                is ReconcileOutcome.Changed -> {
-                    result = ReconcileResult.Reconciled(outcome.report)
-                    outcome.layout
+        try {
+            val candidates = layoutRepository.snapshot()
+                .referencedKeys()
+                .filterTo(HashSet()) { it !in installed }
+            for (key in candidates) {
+                // Keep the key if EITHER it still resolves independently (cross-surface
+                // PackageManager presence — a LauncherApps enumeration transient can't poison it)
+                // OR its package has an install/restore session in flight (Launcher3-style promise:
+                // an app on its way back during restore is legitimately absent right now but must
+                // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
+                // Short-circuit: presence first (one cheap package query), session only if absent.
+                if (appPresence.isComponentPresent(key) || installSessions.hasActiveSession(key.packageName)) {
+                    installed.add(key)
                 }
             }
+
+            var result: ReconcileResult = ReconcileResult.Unchanged
+            layoutRepository.update { current -> // atomic RMW (A1-03)
+                when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
+                    ReconcileOutcome.Unchanged -> null
+                    is ReconcileOutcome.Changed -> {
+                        result = ReconcileResult.Reconciled(outcome.report)
+                        outcome.layout
+                    }
+                }
+            }
+            result
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Fail-closed store I/O (RHL-INV-1), reported the SAME way as an enumeration
+            // failure: a value, not a throw. Both the fail-closed candidate read ([snapshot])
+            // and the atomic RMW ([update]) read the raw DataStore and propagate an IOException
+            // on a transient error; either one skips the pass with zero mutation rather than
+            // degrading to an empty layout and pruning. Keeping this on the value channel makes
+            // invoke() total (only CancellationException escapes), so every caller —
+            // PackageEventCoordinator and ImportLayoutUseCase — is correct without its own guard.
+            // (The gate arms themselves never land here: AppPresence / InstallSessionInspector are
+            // fail-safe-to-keep and swallow their own platform errors, rethrowing only cancellation.)
+            TimberWrapper.silentError(e, "Reconcile store read/write failed; skipping pass without pruning")
+            ReconcileResult.Skipped(SkipReason.STORE_FAILED)
         }
-        result
     }
 }
 

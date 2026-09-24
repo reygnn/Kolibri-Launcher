@@ -24,6 +24,11 @@ class ImportLayoutUseCase @Inject constructor(
     suspend operator fun invoke(raw: String): ImportResult = withContext(dispatcher) {
         val layout = serializer.deserialize(raw) ?: return@withContext ImportResult.InvalidData
         repository.save(layout)
+        // reconcile() is total (fail-closed to a ReconcileResult.Skipped value, only
+        // CancellationException escapes), so no guard is needed here: a transient store/
+        // enumeration fault leaves the just-saved layout in place and de-dup/prune simply
+        // defers to the next reconcile (cold start / package event). The saved import is the
+        // success; the cleanup pass is best-effort.
         reconcile()
         ImportResult.Success
     }

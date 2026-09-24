@@ -46,6 +46,18 @@ enum class SkipReason {
      * anything that is not a genuine non-empty load — holds regardless (RHL-INV-1).
      */
     LOAD_EMPTY,
+
+    /**
+     * The layout STORE could not be read or written during the pass: the fail-closed
+     * candidate read (`HomeLayoutRepository.snapshot()`) or the atomic read-modify-write
+     * (`update`) threw a non-cancellation `Throwable` (a transient DataStore IOException).
+     * `ReconcileHomeLayoutUseCase` catches it and skips with zero mutation — the same
+     * value-honest fail-closed posture as [LOAD_FAILED], just for the store side rather
+     * than the enumeration side (RHL-INV-1). Kept distinct from [LOAD_FAILED] for
+     * observability: a store fault and an enumeration fault have different root causes.
+     * Observability-only, like the others (no consumer branches on it).
+     */
+    STORE_FAILED,
 }
 
 /** Use-case output, including the fail-closed [Skipped] case (RHL-INV-1). */
