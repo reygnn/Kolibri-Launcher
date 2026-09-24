@@ -67,7 +67,10 @@ class PackageManagerInstallSessions @Inject constructor(
             // Fail-safe: sessions could not be read → null ("undetermined"), so the caller keeps
             // every candidate. A lingering dead placement self-heals on the next reconcile once
             // the query works; a wrongly-pruned restore is unrecoverable.
-            TimberWrapper.silentError(e, "Install-session read failed; failing safe to keep (undetermined)")
+            // reportToAcra, NOT silentError: the "resolves to null" fail-safe must hold in EVERY
+            // build — a silentError DEBUG throw would escape instead of returning null (and land
+            // mislabeled in the reconcile's STORE_FAILED catch). The RELEASE signal is kept via ACRA.
+            TimberWrapper.reportToAcra(e, "Install-session read failed; failing safe to keep (undetermined)")
             null
         }
     }

@@ -70,8 +70,11 @@ class PackageManagerPresence @Inject constructor(
             throw e
         } catch (e: Throwable) {
             // Fail-safe: presence could not be determined → treat as present so the
-            // reconcile never prunes on a transient system-API error.
-            TimberWrapper.silentError(e, "AppPresence check failed for ${key.flat}; failing safe to present")
+            // reconcile never prunes on a transient system-API error. reportToAcra, NOT
+            // silentError: the "resolves to present" fail-safe must hold in DEBUG too — a
+            // silentError DEBUG throw would escape instead of returning true. RELEASE keeps the
+            // ACRA signal.
+            TimberWrapper.reportToAcra(e, "AppPresence check failed for ${key.flat}; failing safe to present")
             true
         }
     }
@@ -85,7 +88,8 @@ class PackageManagerPresence @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "AppPresence package check failed for $packageName; failing safe to present")
+            // reportToAcra (not silentError): fail-safe-to-present must hold in DEBUG too.
+            TimberWrapper.reportToAcra(e, "AppPresence package check failed for $packageName; failing safe to present")
             true
         }
     }
