@@ -188,3 +188,59 @@ Linse, durch die die nächste Entscheidung laufen sollte: **bevor ein neuer auto
 dazukommt**, erst fragen „muss der überhaupt auto-prunen, oder reicht Slot + lazy?". Reframed auch den
 count-floor (ACCEPTED_LIMITATIONS-Re-Eval): ein Sanity-Floor ist ein *Pflaster auf dem Auto-Prune* —
 die tiefere Frage ist, ob der Auto-Prune am jeweiligen Store überhaupt gerechtfertigt ist.
+
+### OPTION (nicht beschlossen): Auto-Prune ganz raus → lazy, user-bestätigtes Entfernen
+
+Die radikale Konsequenz der Reflexion oben, hier als **abwägbare Option** festgehalten, nicht als
+Richtungsentscheidung. Idee: die kuratierten Stores (**home-layout/nyx, favorites/kolibri, custom
+names, hidden apps**) werden **nie automatisch geprunt**. Eine Referenz auf eine verschwundene App
+bleibt stehen; sichtbare Stores markieren sie als „missing" und bieten „App nicht gefunden.
+Entfernen?" an (Windows-Verknüpfung-Modell), unsichtbare lassen sie einfach liegen. Der Membership-
+Check ist ein In-Memory `key in currentApps` — **kein IPC, kein Gate**, weil eine nicht-destruktive
+/ user-bestätigte Aktion kein Fail-safe braucht.
+
+**Was dadurch WEGFÄLLT** (~1.300–1.700 LOC prod+test, praktisch die gesamte F7-Arbeit + der Alt-
+Reconcile-Prune):
+
+- `core/DeletionGatePass` (+Test), `core/AppPresence`, `core/InstallSessionInspector` — danach
+  konsumentenlos, komplett tot.
+- `common-data/PackageManagerPresence` (+Test), `common-data/PackageManagerInstallSessions` (+Test).
+- nyx: die Gate-Logik in `ReconcileHomeLayoutUseCase`, der `snapshot()`-fail-closed-Read, `STORE_FAILED`,
+  der Prune-Pass in `HomeLayoutReconciler` (Struktur-Pässe dedup/regrid/folder-dissolve bleiben).
+- kolibri: die vier `reconcile*Components`-Methoden, der Reconcile-Block in `ObserveInstalledAppsUseCase`,
+  `snapshotFailClosed`.
+- Die Cross-Launcher-Parity-Arbeit (a/b) + DI-Bindings + die ACCEPTED_LIMITATIONS-Restore-Einträge +
+  die count-floor-Idee — alles moot.
+
+**Was NEU dazukommt — asymmetrisch pro Store:**
+
+- **Sichtbar (home/nyx, favorites/kolibri):** ein „missing"-UI-Zustand (Tile/Row vergraut + Badge) +
+  „Entfernen?"-Affordance an der toten Referenz. Remove-Pfad existiert schon
+  (`removeFavoriteComponent` etc.). Aufwand liegt in der **View-Schicht beider Launcher** (dünne
+  Logik, aber UI-Arbeit — schlechter JVM-testbar als die heutige Domain-Logik: der Aufwand
+  verschiebt sich von „viel getestete Domain" zu „wenig getestete UI").
+- **Unsichtbar (custom names, hidden):** **gar nichts** — ein Custom-Name / Hidden-Eintrag für eine
+  fehlende App tut nichts. Nur die Reconcile-Methode löschen. Bei **Hidden ist no-prune strikt
+  besser** (Verstecken überlebt Uninstall→Reinstall). Optional später ein „Aufräumen"-Screen.
+
+**Load-bearing Mechanik gegen die Restore-Flut:** nur im UI **markieren**, und erst bei
+**User-Interaktion** mit dem toten Item fragen — **nie** proaktiv scannen+prompten. Damit gibt es
+keinen Reconcile-Pass mehr, der während Restore/Settling danebengreifen kann → die gesamte Timing-/
+Restore-Verlust-Klasse verschwindet *by design*, nicht per Fail-safe.
+
+**Was BLEIBT:** der Drawer hat keinen persistierten State (zeigt Live-Enumeration ∖ hidden) → nichts
+zu verlieren; der triviale `isEmpty()`-Guard + last-good im `InstalledAppsStateRepository` gegen
+transienten Anzeige-Flicker bleibt.
+
+**Vorgeschlagene Reihenfolge (falls je umgesetzt):**
+1. Billige Wins zuerst: `reconcileCustomNames` + `reconcileHiddenComponents` **löschen** (reine
+   Entfernung, für hidden strikt besser). Gate bleibt grün (die zugehörigen Tests mit weg).
+2. Sichtbare Stores: „missing"-State + „Entfernen?" in nyx-Home und kolibri-Favorites bauen, dann
+   `reconcileFavoriteComponents` + den Home-Layout-Prune-Pass entfernen.
+3. Zuletzt die nun tote Infra löschen: `DeletionGatePass`/`AppPresence`/`InstallSessionInspector` +
+   die beiden `PackageManager*`-Impls + DI + Doku-Einträge.
+
+**Offene Abwägung (der eigentliche Call):** lohnt „zero-touch-Sauberkeit" (heute: nie Karteileichen,
+self-healing) den Preis von ~1.500 Zeilen Korrektheits-Maschinerie + einem unbewiesenen Verlust-Vektor?
+Für kleine, user-kuratierte Mengen (8 Home-Slots, paar Favoriten) spricht viel für die Option; dagegen
+spricht die UI-Arbeit und der Verlust der guten Domain-Testbarkeit. **Bewusst offen gelassen.**
