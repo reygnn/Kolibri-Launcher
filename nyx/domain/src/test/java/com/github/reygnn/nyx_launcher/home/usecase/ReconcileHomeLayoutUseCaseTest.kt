@@ -13,6 +13,7 @@ import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
+import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -24,6 +25,11 @@ import org.junit.Test
  * a thrown enumeration (LOAD_FAILED) or an empty result (LOAD_EMPTY) Skip with zero
  * mutation + zero save. Reads the SHARED [com.github.reygnn.launcher.core.AppEnumerator]
  * directly (F5) — always fresh, no StateFlow replay.
+ *
+ * PARTIAL-SNAPSHOT GATE (RHL-INV-6, AUDIT-1 F7): a non-empty-but-INCOMPLETE enumeration
+ * must NOT prune apps that are still installed. A key the layout references but the
+ * snapshot missed is re-confirmed through [AppPresence]; a still-present one is protected,
+ * a genuinely-absent one is pruned. A complete snapshot consults presence zero times.
  */
 class ReconcileHomeLayoutUseCaseTest {
 
@@ -35,6 +41,20 @@ class ReconcileHomeLayoutUseCaseTest {
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
     private fun appInfo(p: String) = AppInfo(originalName = p, displayName = p, packageName = p, className = "$p.Main")
 
+    /**
+     * Presence fake. [present] is the set of keys the platform would still resolve; any key
+     * not in it is confirmed-absent. Default empty → a candidate is treated as uninstalled,
+     * so the pre-F7 prune tests keep their old outcome unchanged. [checked] records every
+     * lookup so a test can assert the complete-snapshot path does zero presence IPC.
+     */
+    private class FakeAppPresence(var present: Set<ComponentKey> = emptySet()) : AppPresence {
+        val checked = mutableListOf<ComponentKey>()
+        override suspend fun isPresent(key: ComponentKey): Boolean {
+            checked += key
+            return key in present
+        }
+    }
+
     private fun layoutWith(vararg pkgs: String): HomeLayout = HomeLayout(
         grid,
         pages = 1,
@@ -42,8 +62,21 @@ class ReconcileHomeLayoutUseCaseTest {
         dock = emptyList(),
     )
 
-    private fun useCase(layoutRepo: FakeHomeLayoutRepository, enumerator: FakeAppEnumerator) =
-        ReconcileHomeLayoutUseCase(layoutRepo, enumerator, ids, mainDispatcherRule.dispatcher)
+    /** A single grid folder whose members are [pkgs] (folders need >= 2 members). */
+    private fun layoutWithFolder(vararg pkgs: String): HomeLayout = HomeLayout(
+        grid,
+        pages = 1,
+        items = listOf(
+            PlacedItem(HomeItem.Folder(ItemId("folder"), title = "", members = pkgs.map { ck(it) }), CellPos(0, 0, 0)),
+        ),
+        dock = emptyList(),
+    )
+
+    private fun useCase(
+        layoutRepo: FakeHomeLayoutRepository,
+        enumerator: FakeAppEnumerator,
+        appPresence: AppPresence = FakeAppPresence(),
+    ) = ReconcileHomeLayoutUseCase(layoutRepo, enumerator, appPresence, ids, mainDispatcherRule.dispatcher)
 
     @Test
     fun failed_load_is_skipped_and_never_saves() = runTest(mainDispatcherRule.dispatcher) {
@@ -59,8 +92,10 @@ class ReconcileHomeLayoutUseCaseTest {
 
     @Test
     fun empty_load_is_skipped_and_never_saves() = runTest(mainDispatcherRule.dispatcher) {
-        // An empty/partial enumeration is suspicious (a real device has >= 1 app) →
-        // LOAD_EMPTY skip. Still fail-closed: never empty the home screen.
+        // A fully-EMPTY enumeration is suspicious (a real device has >= 1 app) →
+        // LOAD_EMPTY skip. (A non-empty PARTIAL load is handled by the presence gate,
+        // not here — see the partial_snapshot_* tests.) Still fail-closed: never empty
+        // the home screen.
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
         val enumerator = FakeAppEnumerator(result = emptyList())
 
@@ -114,5 +149,83 @@ class ReconcileHomeLayoutUseCaseTest {
         assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
         assertThat(layoutRepo.saveCount).isEqualTo(1)
         assertThat(layoutRepo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
+    }
+
+    // ---- PARTIAL-SNAPSHOT GATE (RHL-INV-6, AUDIT-1 F7) ----
+
+    /**
+     * THE F7 FIX. A non-empty but PARTIAL snapshot (pb missing) must not prune pb while
+     * pb is in fact still installed — the presence gate re-confirms pb and protects it.
+     * Mutation check: delete the gate (prune straight against `installed`) and pb is
+     * pruned → Reconciled + saveCount 1, so this test goes red. That is its whole point.
+     */
+    @Test
+    fun partial_snapshot_does_not_prune_a_still_present_app() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing THIS pass
+        val presence = FakeAppPresence(present = setOf(ck("pb"))) // …but pb is really still there
+
+        val result = useCase(layoutRepo, enumerator, presence)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(layoutRepo.saveCount).isEqualTo(0) // pb protected: home untouched
+        assertThat(layoutRepo.current.items.map { it.item.id })
+            .containsExactly(ItemId("pa"), ItemId("pb"))
+        assertThat(presence.checked).containsExactly(ck("pb")) // only the missing key is gated
+    }
+
+    /**
+     * The gate must not over-protect: a candidate the presence check confirms GONE is
+     * still pruned. Distinguishes "transiently absent" (keep) from "actually uninstalled
+     * during a partial pass" (prune).
+     */
+    @Test
+    fun partial_snapshot_still_prunes_a_genuinely_absent_app() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa")))
+        val presence = FakeAppPresence(present = emptySet()) // pb confirmed gone
+
+        val result = useCase(layoutRepo, enumerator, presence)()
+
+        assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
+        assertThat(layoutRepo.saveCount).isEqualTo(1)
+        assertThat(layoutRepo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
+    }
+
+    /**
+     * COMMON-PATH COST PIN. A complete snapshot (every layout key present) yields zero
+     * prune candidates, so the presence gate is never consulted — no per-reconcile IPC is
+     * added to the healthy path.
+     */
+    @Test
+    fun complete_snapshot_consults_presence_zero_times() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"), appInfo("pb")))
+        val presence = FakeAppPresence()
+
+        val result = useCase(layoutRepo, enumerator, presence)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(presence.checked).isEmpty()
+    }
+
+    /**
+     * The gate covers FOLDER MEMBERS too (referencedKeys spans both prune scopes,
+     * RHL-INV-4): a folder member missing from a partial snapshot but still installed is
+     * protected, so the folder keeps both members and does not dissolve.
+     */
+    @Test
+    fun partial_snapshot_protects_a_still_present_folder_member() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWithFolder("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+        val presence = FakeAppPresence(present = setOf(ck("pb"))) // pb still installed
+
+        val result = useCase(layoutRepo, enumerator, presence)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(layoutRepo.saveCount).isEqualTo(0)
+        val folder = layoutRepo.current.items.single().item as HomeItem.Folder
+        assertThat(folder.members).containsExactly(ck("pa"), ck("pb"))
+        assertThat(presence.checked).containsExactly(ck("pb"))
     }
 }

@@ -129,6 +129,34 @@ gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-L
 Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
 Aufwand wert.
 
+### Presence-Naht teilen (F7-Gate → `:core` / `:common-data`, Option B — offener Refactor-Kandidat, 2026-09-24)
+
+Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (Option A, nyx-lokal):
+`ReconcileHomeLayoutUseCase` prunt nicht mehr blind gegen den Enumerations-Snapshot,
+sondern re-bestätigt jeden fehlenden Layout-Key über ein Deletion-Gate, das fail-safe
+auf „present" auflöst (RHL-INV-6, das nyx-Analog zu Kolibris R-INV-2). Beteiligt:
+Port `home/service/AppPresence` (nyx/domain), Impl `data/installedapps/LauncherAppsPresence`
+(nyx/data, über die geteilte `LauncherApps`-Naht) und die Gate-Logik im Use-Case.
+
+**Offen (Option B):** die *Naht* teilen. Der `AppEnumerator` liegt bereits geteilt
+(Port in `:core`, Impl `LauncherAppsEnumerator` in `:common-data`, app-seitig via
+`@Binds` gebunden, `LauncherApps` app-seitig provided). Ein Presence-Check auf derselben
+Naht ist sein natürliches Geschwister, liegt aktuell aber nyx-lokal — eine Asymmetrie.
+Umzug: `AppPresence` → `:core` (neben `AppEnumerator`), `LauncherAppsPresence` →
+`:common-data` (neben `LauncherAppsEnumerator`), gebunden in *beiden* App-`RepositoryModule`s.
+Das **Use-Case-Gate bleibt in nyx** — es hängt am `HomeLayout` (Folder, Positionen) und
+ist nicht teilbar. Geringes Risiko, keine Verhaltensänderung — reiner Modul-/Namespace-
+Umzug plus zweite Bindung; Kolibri hat `LauncherApps` bereits app-seitig (`AppModule`),
+der Enumerator beweist das Binde-Muster über beide Apps.
+
+**Größerer Folgeschritt (Option C, separate Spec):** Kolibris bestehendes
+`PackagePresence` (PackageManager-Naht, zusätzlich Package-Level-Variante für
+Custom-Names) auf die geteilte Naht migrieren, damit es *eine* Presence-Abstraktion
+für alles gibt. Berührt Kolibris Favorites/Hidden/Swipe/CustomNames und hat eine
+semantische Lücke (Component- vs. Package-Level) — bewusst nicht Teil des F7-Fixes.
+Kein Blocker, nur (noch) nicht den Aufwand wert. Empfehlung: B als nächster Schritt,
+C nur wenn Kolibri die LauncherApps-Variante ohnehin braucht.
+
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 
 Frei umbenennbare App-Namen sind ein Feature für **textbasierte** Launcher

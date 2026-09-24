@@ -13,6 +13,7 @@ import com.github.reygnn.launcher.core.installedapps.FakeAppEnumerator
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
+import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -70,10 +71,17 @@ class ExportImportUseCaseTest {
         assertThat(repo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
     }
 
+    // Import reconcile prunes apps that are genuinely not installed here, so the gate
+    // must confirm ABSENCE for the missing keys (RHL-INV-6): presence resolves to false.
+    private val absentPresence = object : AppPresence {
+        override suspend fun isPresent(key: ComponentKey) = false
+    }
+
     private fun reconcileWith(repo: FakeHomeLayoutRepository, apps: FakeAppEnumerator) =
         ReconcileHomeLayoutUseCase(
             layoutRepository = repo,
             enumerator = apps,
+            appPresence = absentPresence,
             idFactory = ItemIdFactory { ItemId("new") },
             dispatcher = mainDispatcherRule.dispatcher,
         )

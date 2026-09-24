@@ -12,6 +12,8 @@ import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
+import com.github.reygnn.nyx_launcher.data.installedapps.LauncherAppsPresence
+import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
@@ -84,6 +86,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAppEnumerator(impl: LauncherAppsEnumerator): AppEnumerator
+
+    // Per-target deletion gate for the fail-closed reconcile (AUDIT-1 F7, RHL-INV-6):
+    // the Nyx analog of Kolibri's PackagePresence, over the same shared LauncherApps seam.
+    @Binds
+    @Singleton
+    abstract fun bindAppPresence(impl: LauncherAppsPresence): AppPresence
 
     // Home-info subsystem (HIE Phase C): the narrow settings port is Nyx's
     // PreferencesRepository; the calendar/alarm reader is the shared :common-data impl.
