@@ -148,6 +148,15 @@ beide fail-safe Richtung „behalten". Umgesetzte Schichten:
   `PackageManagerInstallSessions` (`PackageInstaller.getAllSessions()`). Launcher3-Muster:
   einen Key, dessen Paket eine aktive Install/Restore-Session hat, nie prunen (Promise).
   Schließt den Mid-Restore-Vektor, den keine Presence-Prüfung schließen kann.
+- **fix 4 — einheitlicher Skip-Kanal (Follow-up-Review):** der store-seitige fail-closed
+  Read ist jetzt value-honest wie die Enumerations-Seite. Wirft `snapshot()` oder der
+  atomare `update()`-RMW eine transiente `IOException`, fängt der Use-Case sie ab und gibt
+  `ReconcileResult.Skipped(STORE_FAILED)` zurück, statt zu werfen (neuer `SkipReason`,
+  observability-only wie `LOAD_FAILED`). Damit ist `invoke()` total (nur
+  `CancellationException` entkommt), und beide Aufrufer (`PackageEventCoordinator`,
+  `ImportLayoutUseCase`) sind ohne eigenen Guard korrekt — vorher hing der Import-Pfad am
+  weit entfernten `runCatching` im `SettingsFragment`. Der `try/catch` im Coordinator bleibt
+  als Defense-in-Depth für seinen langlebigen Collector.
 
 Ein Rest-Fall bleibt bewusst offen (Restore ohne auffindbare Session) — dokumentiert in
 `ACCEPTED_LIMITATIONS.md` („… pruned during a restore that exposes no install session").

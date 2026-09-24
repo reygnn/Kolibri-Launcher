@@ -26,6 +26,17 @@ import javax.inject.Inject
  * returns [ReconcileResult.Skipped] with zero mutation and zero save, so a transient
  * enumeration failure never empties the home screen.
  *
+ * STORE-SIDE FAIL-CLOSED (RHL-INV-1, symmetric to the enumeration side): the layout store
+ * is also read fail-closed — the candidate read ([HomeLayoutRepository.snapshot]) and the
+ * atomic RMW ([HomeLayoutRepository.update]) both propagate a transient DataStore IOException
+ * rather than degrading to an empty layout. [invoke] catches it and returns
+ * [ReconcileResult.Skipped] ([SkipReason.STORE_FAILED]) with zero mutation, exactly like an
+ * enumeration failure. So [invoke] is TOTAL: every transient fault (enumeration OR store)
+ * surfaces as a Skipped value and only [CancellationException] escapes — callers
+ * (PackageEventCoordinator, [ImportLayoutUseCase]) need no fault handling of their own; the
+ * coordinator's `try/catch` is then defense-in-depth for its long-lived collector, not a
+ * functional requirement of the reconcile.
+ *
  * FRESHNESS (F5): a one-shot reconcile reads the SHARED [AppEnumerator] directly, NOT
  * the cached loader `Flow<AppLoad>`. The loader is a `WhileSubscribed` `StateFlow`
  * that replays a possibly-stale cached list within its sharing window, so priming it
