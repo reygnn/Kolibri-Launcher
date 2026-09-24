@@ -149,3 +149,42 @@ Helfer war schon `DeletionGatePassTest`; (b) fügte die Wiring-Parität über be
 hinzu). Beide auf Branch `refactor/shared-deletion-gate`, Gate grün. Der Haupt-Drift-Vektor
 (dupliziertes Delete-Gate) ist damit strukturell geschlossen **und** durch einen Cross-Launcher-Test
 abgesichert.
+
+---
+
+## Design-Frage (Reflexion, offen): Auto-Prune vs. feste Slots + lazy-Validierung
+
+**Ausgangsbeobachtung.** Der gesamte F7-/Delete-Gate-/Drift-Prävention-Apparat existiert nur, *weil*
+beide Launcher gespeicherte User-Zuweisungen (favorites / hidden / swipe / custom names / home-layout)
+**automatisch prunen** — per Snapshot-Diff gegen die frische Enumeration. Genau dieser Auto-Prune
+erzeugt die stille-Datenverlust-Klasse, gegen die das Gate dann fail-safe verteidigen muss. Anders
+gesagt: das Problem ist zu einem guten Teil **selbst induziert** durch die Entscheidung, eine
+*offene* Referenzmenge automatisch zu bereinigen.
+
+**Die Alternative.** Für manche Stores ginge auch das Gegenmodell: **feste / user-kuratierte Referenz +
+lazy Validierung am Verwendungspunkt, aber nie stilles Auto-Löschen.** Eine Referenz auf eine
+verschwundene App bleibt dann sichtbar stehen und wird erst beim *Benutzen* behandelt (z. B. Toast
+„nicht mehr installiert" statt Absturz), aufgeräumt nur durch User-Aktion oder Reinstall. Damit
+verschwindet die Prune-Verlust-Klasse **komplett** — es gibt nichts still zu verlieren, also braucht
+es dort auch kein Gate.
+
+**Der Trade-off (ehrlich, kein Freibier).**
+
+- *Auto-Prune* (heute): keine Karteileichen, self-healing beim nächsten Load — **aber** braucht das
+  Fail-safe-Gate + fail-closed Reads + count-floor-Erwägung, sonst Datenverlust.
+- *Feste Slots + lazy*: keine Gate-Komplexität, immun gegen die Verlust-Klasse — **aber** tote
+  Einträge sammeln sich an (veraltetes Label, Toast beim Tippen), heilen nur manuell.
+
+Es ist **pro Store** abzuwägen, nicht pauschal:
+
+- **Slot-artige Stores** (Swipe-Left/-Right sind schon einzelne Slots) sind die natürlichen
+  Kandidaten fürs lazy-Modell: ein toter Swipe-Slot könnte beim Auslösen validiert werden statt per
+  Reconcile geprunt — das spräche das Gate an dieser Stelle komplett frei.
+- **Offene Mengen** (home-layout, favorites, hidden, custom names) profitieren stärker vom
+  Auto-Cleanup (sonst wächst der Müll unbegrenzt), also lohnt dort das Gate eher.
+
+**Warum das hier steht (kein Task).** Nichts davon ist ein Bug oder eine ToDo-Umsetzung — es ist die
+Linse, durch die die nächste Entscheidung laufen sollte: **bevor ein neuer auto-geprunter Store
+dazukommt**, erst fragen „muss der überhaupt auto-prunen, oder reicht Slot + lazy?". Reframed auch den
+count-floor (ACCEPTED_LIMITATIONS-Re-Eval): ein Sanity-Floor ist ein *Pflaster auf dem Auto-Prune* —
+die tiefere Frage ist, ob der Auto-Prune am jeweiligen Store überhaupt gerechtfertigt ist.
