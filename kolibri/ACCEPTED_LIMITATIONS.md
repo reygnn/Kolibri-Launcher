@@ -663,3 +663,60 @@ Reopen this entry if any of the following changes:
 - Real reports show an alarm label off by an hour around a DST change (distinct from
   the alarm actually *firing* at the wrong time, which is an OS/alarm-subsystem
   concern, not this formatter).
+
+---
+
+## 11. A component-bound assignment can be pruned during a restore that exposes no install session
+
+- **Status:** 🟡 Accepted residual (AUDIT-1 F7, RECONCILE_FIX_SPEC R-INV-2); the
+  common restore case is covered by the install-session arm added in the F7
+  Patch-12 alignment
+- **Frequency:** Only the narrow conjunction below; steady state prunes nothing a
+  presence/session check keeps
+- **Affected:** Favorites, swipe actions, hidden components and custom names — the
+  four component-/package-bound stores reconciled by `ObserveInstalledAppsUseCase`
+
+**What:** After the fail-closed store reconcile (AUDIT-1 F7), a stored assignment
+(a favorite, a swipe target, a hidden entry, a custom name) is pruned only when its
+component/package is BOTH absent from a fresh app load AND fails two independent
+keep-checks: cross-surface presence (`PackageManagerPresence`) and an
+active-install/restore-session probe (`PackageManagerInstallSessions`, consulted
+once per pass via `PassSessionGate`). In the normal restore flow the session probe
+keeps a not-yet-reinstalled app as a "promise" until its install session completes.
+The residual gap: if a package is genuinely not installed yet AND no discoverable
+`PackageInstaller` session represents its pending restore, both keep-checks say
+"gone" and the assignment is pruned — it is not recovered when the app later
+appears (the app returns to the drawer, but its favorite/hidden/swipe/custom-name
+assignment is gone).
+
+**Why:** The reconcile candidate finder is the fresh app load, which can be partial
+mid-restore. Presence (which fixes the shared-transient failure mode) cannot help
+here because the app really is absent at that instant. The session probe (the
+Launcher3 mechanism) closes the common case but depends on a session being visible
+to Kolibri: `getAllSessions()` requires Kolibri to be the active default launcher
+for foreign sessions to carry a package name, and some restore agents may not
+surface a per-package session at all. When no session is visible, there is no signal
+left that distinguishes "being restored" from "uninstalled", and the gate's
+fail-safe covers only query *errors* (`activeSessionPackages() == null`), not a
+legitimate empty result.
+
+**Not blocking:** Requires the conjunction of an active restore, a package not yet
+reinstalled at the moment a reconcile runs, and no discoverable session for it — and
+even then only affects the stored assignment, never app access (the app relaunches
+from the drawer once restored). This is the exact counterpart of Nyx's home-layout
+residual (see `nyx/ACCEPTED_LIMITATIONS.md`, "A home item can be pruned during a
+restore that exposes no install session"); with the F7 Patch-12 alignment both
+launchers now share the identical two-arm gate and therefore the identical residual.
+Neither launcher adds a sanity-floor.
+
+### Trigger for re-evaluation
+
+Reopen this entry if any of the following changes:
+
+- Field reports show lost favorites / hidden / swipe / custom-name assignments after
+  a device transfer or app restore.
+- Nyx moves off the accepted residual (e.g. honours `ACTION_SESSION_COMMITTED` / a
+  restore-aware defer window, or a keep-last-good count floor that skips the
+  reconcile when the load count drops implausibly, not only at zero) — the two
+  launchers are deliberately kept in lock-step here, so Kolibri should follow the
+  same fix. Do NOT relax the presence fail-safe.

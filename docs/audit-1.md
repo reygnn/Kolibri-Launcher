@@ -269,6 +269,24 @@ implausibly (not only when it hits zero). At minimum, correct the misleading
 comment at lines 52-55. Documenting the limitation (per nyx `ACCEPTED_LIMITATIONS.md`)
 is a defensible interim choice.
 
+**Status — RESOLVED (F7 Patches 01–12, branch `fix/f7-partial-enumeration-guard`).**
+Nyx's `ReconcileHomeLayoutUseCase` now runs the recommended per-candidate gate: a
+key absent from the fresh enumeration is only a *candidate*, kept if EITHER
+cross-surface `AppPresence` (`PackageManagerPresence`) OR an active install/restore
+session (`InstallSessionInspector` / `PackageManagerInstallSessions`) says so, with
+the store read fail-closed (`snapshot()` → `STORE_FAILED`) and the snapshot→RMW
+window closed. The misleading `LOAD_EMPTY` comment was corrected in the same pass.
+Kolibri's four component-bound store reconciles were already presence-gated; Patch 12
+added the **same** install/restore-session arm (`PassSessionGate`), so both launchers
+now share one two-arm gate. One residual is accepted on **both** sides — a restore
+that exposes no discoverable install session (launcher not the active default) still
+prunes — documented symmetrically in `nyx/ACCEPTED_LIMITATIONS.md` (§"A home item can
+be pruned during a restore that exposes no install session") and, since this fix,
+`kolibri/ACCEPTED_LIMITATIONS.md` §11. (Supersedes the interim F7-review claim that
+"Kolibri accepts the same residual": that parity was only *incidentally* true before
+Patch 12 — pre-12 Kolibri had **no** session arm, a broader and undocumented gap; it
+is now a designed, documented equivalence.)
+
 ### F8 — `GetInstalledAppsUseCase` KDoc claims a sort that no longer happens · PARTIALLY_CONFIRMED (low)
 
 **File:** `kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetInstalledAppsUseCase.kt:33-35`
