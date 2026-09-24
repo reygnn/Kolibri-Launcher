@@ -18,6 +18,7 @@ import com.github.reygnn.kolibri_launcher.data.UsageExportRepositoryImpl
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.service.ComponentLabelResolverImpl
 import com.github.reygnn.launcher.common.data.installedapps.PackageManagerPresence
+import com.github.reygnn.launcher.common.data.installedapps.PackageManagerInstallSessions
 import com.github.reygnn.kolibri_launcher.data.service.ShortcutLauncherServiceImpl
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 // Shared installed-apps subsystem (SHARED_INSTALLED_APPS_SPEC §3), bound app-side
@@ -52,6 +53,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.launcher.core.AppPresence
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
 import dagger.Binds
 import dagger.Module
@@ -157,6 +159,13 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAppPresence(impl: PackageManagerPresence): AppPresence
+
+    // Second arm of the store-reconcile deletion gate (AUDIT-1 F7 review point 5; aligns Kolibri
+    // with Nyx): an app mid-install/restore is kept even though it is absent right now. Shares the
+    // PackageManager + IoDispatcher providers already used by PackageManagerPresence.
+    @Binds
+    @Singleton
+    abstract fun bindInstallSessionInspector(impl: PackageManagerInstallSessions): InstallSessionInspector
 
     @Binds
     @Singleton

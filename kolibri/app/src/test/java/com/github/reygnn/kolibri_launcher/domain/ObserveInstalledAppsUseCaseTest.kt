@@ -16,6 +16,7 @@ import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.kolibri_launcher.fakes.FakeAppPresence
+import com.github.reygnn.kolibri_launcher.fakes.FakeInstallSessionInspector
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
@@ -43,6 +44,7 @@ class ObserveInstalledAppsUseCaseTest {
     private lateinit var hiddenAppsRepository: FakeHiddenAppsRepository
     private lateinit var customNamesRepository: FakeCustomNamesRepository
     private lateinit var appPresence: FakeAppPresence
+    private lateinit var installSessions: FakeInstallSessionInspector
     private lateinit var useCase: ObserveInstalledAppsUseCase
 
     private val testApps = listOf(
@@ -60,6 +62,7 @@ class ObserveInstalledAppsUseCaseTest {
         hiddenAppsRepository = FakeHiddenAppsRepository()
         customNamesRepository = FakeCustomNamesRepository()
         appPresence = FakeAppPresence()
+        installSessions = FakeInstallSessionInspector()
         useCase = ObserveInstalledAppsUseCase(
             installedAppsRepository,
             installedAppsStateRepository,
@@ -67,7 +70,8 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            appPresence
+            appPresence,
+            installSessions,
         )
     }
 
@@ -235,6 +239,55 @@ class ObserveInstalledAppsUseCaseTest {
     }
 
     @Test
+    fun `session arm keeps a mid-restore assignment across all stores and reads once`() = runTest {
+        // AUDIT-1 F7 review point 5 (Kolibri session-arm, aligning with Nyx). com.app2 is dropped
+        // from the load AND reported absent by presence (not reinstalled yet), but an install/
+        // restore session targets it — so every store must KEEP it (Launcher3-style promise), across
+        // both grains: component-keyed (favorites/swipe/hidden) and package-keyed (custom names).
+        // com.gone has no session and is absent → still pruned everywhere. The session set is read
+        // exactly ONCE for the whole pass (batched + shared across all four stores), never per key.
+        //
+        // Mutation checks: (a) drop the `|| sessions.isRestoring(...)` arm and com.app2 is pruned →
+        // red; (b) build a fresh PassSessionGate per store instead of one per pass and `reads` != 1.
+        val restoring = testApps[1].componentName    // com.app2/com.app2.Main
+        val restoringPkg = testApps[1].packageName   // com.app2
+        val orphanComponent = "com.gone/com.gone.Main"
+        val orphanPkg = "com.gone"
+
+        favoritesRepository.saveFavoriteComponents(listOf(restoring, orphanComponent))
+        hiddenAppsRepository.hiddenApps = setOf(restoring, orphanComponent)
+        swipeActionsRepository.swipeLeftApp = restoring
+        swipeActionsRepository.swipeRightApp = orphanComponent
+        customNamesRepository.setCustomNameForPackage(restoringPkg, "Keep")
+        customNamesRepository.setCustomNameForPackage(orphanPkg, "Drop")
+
+        // Presence reports BOTH absent (nothing set present); the session arm is the only thing
+        // that can rescue com.app2.
+        installSessions.active = setOf(restoringPkg)
+
+        // Partial load: testApps minus com.app2, so com.app2 is a prune candidate.
+        installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
+
+        useCase().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Kept by the session arm (absent from presence, but restoring)...
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(restoring)
+        assertThat(hiddenAppsRepository.hiddenApps).contains(restoring)
+        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(restoring)
+        assertThat(customNamesRepository.getAllCustomNames()).containsKey(restoringPkg)
+        // ...while the session-less orphan is still pruned everywhere.
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(orphanComponent)
+        assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(orphanComponent)
+        assertThat(swipeActionsRepository.swipeRightApp).isNull()
+        assertThat(customNamesRepository.getAllCustomNames()).doesNotContainKey(orphanPkg)
+        // Batched: one PackageInstaller read for the whole pass, shared across all four stores.
+        assertThat(installSessions.reads).isEqualTo(1)
+    }
+
+    @Test
     fun `invoke isolates a failing cleanup - other stores still reconcile and state still updates`() = runTest {
         // The four cleanups share a try-block with updateApps + emit(Success). If
         // a store's cleanup weren't guarded independently (runCleanup), its throw
@@ -309,7 +362,8 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            appPresence
+            appPresence,
+            installSessions,
         )
 
         // Act & Assert
@@ -344,7 +398,8 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            appPresence
+            appPresence,
+            installSessions,
         )
 
         useCaseWithSequence().test {
@@ -375,7 +430,8 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            appPresence
+            appPresence,
+            installSessions,
         )
 
         // Act & Assert

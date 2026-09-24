@@ -11,6 +11,7 @@ import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.AppPresence
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -24,7 +25,8 @@ class ObserveInstalledAppsUseCase @Inject constructor(
     private val swipeActionsRepository: SwipeActionsRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val customNamesRepository: CustomNamesRepository,
-    private val appPresence: AppPresence
+    private val appPresence: AppPresence,
+    private val installSessions: InstallSessionInspector,
 ) {
 
     /**
@@ -111,29 +113,36 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                                 // per-store failure so one bad store can't skip the others.
                                 val validComponents = realApps.map { it.componentName }
                                 val validPackages = realApps.map { it.packageName }
-                                // The three component-keyed stores bridge their flattened
-                                // "pkg/class" string to the shared component-grain gate via
-                                // [AppPresence.isFlatComponentPresent] (parse + gate, malformed
-                                // → absent; see its KDoc). Custom names are package-keyed and
-                                // use the package-grain gate directly.
+                                // Each store's deletion gate keeps a candidate if EITHER it still
+                                // resolves (presence) OR its package has an install/restore session
+                                // in flight (Launcher3-style promise). The session set is read at
+                                // most ONCE per pass and lazily — only when a presence-absent
+                                // candidate actually needs it — and shared across all four stores,
+                                // so a complete/all-present load performs zero session IPC (AUDIT-1
+                                // F7 review point 5; aligns Kolibri's store reconcile with Nyx's
+                                // home reconcile). Component-keyed stores (favorites/swipe/hidden)
+                                // bridge their flattened "pkg/class" key via
+                                // [isFlatComponentPresentOrRestoring] (parse + gate, malformed →
+                                // absent); custom names are package-keyed.
+                                val sessionGate = PassSessionGate(installSessions)
                                 runCleanup("favorites") {
                                     favoritesRepository.reconcileFavoriteComponents(validComponents) {
-                                        appPresence.isFlatComponentPresent(it)
+                                        appPresence.isFlatComponentPresentOrRestoring(it, sessionGate)
                                     }
                                 }
                                 runCleanup("swipe actions") {
                                     swipeActionsRepository.reconcileSwipeActions(validComponents) {
-                                        appPresence.isFlatComponentPresent(it)
+                                        appPresence.isFlatComponentPresentOrRestoring(it, sessionGate)
                                     }
                                 }
                                 runCleanup("hidden components") {
                                     hiddenAppsRepository.reconcileHiddenComponents(validComponents) {
-                                        appPresence.isFlatComponentPresent(it)
+                                        appPresence.isFlatComponentPresentOrRestoring(it, sessionGate)
                                     }
                                 }
                                 runCleanup("custom names") {
                                     customNamesRepository.reconcileCustomNames(validPackages) {
-                                        appPresence.isPackagePresent(it)
+                                        appPresence.isPackagePresentOrRestoring(it, sessionGate)
                                     }
                                 }
 
@@ -175,16 +184,51 @@ class ObserveInstalledAppsUseCase @Inject constructor(
 }
 
 /**
- * Bridge a component-keyed store's flattened `"pkg/class"` string to the shared component-grain
- * gate [AppPresence.isComponentPresent]: parse to a [ComponentKey], then query presence.
- *
- * A malformed stored key (`ComponentKey.parse == null` — e.g. a slash-less bare package) is not
- * a real component, so it resolves to absent (`false`). That matches the pre-migration string
- * check exactly, which reconstructed `"pkg/class"` from the resolved activity and compared it to
- * the stored value — a comparison a slash-less key could never satisfy — so such garbage was
- * pruned then and is pruned now. Extracted from the three identical favorites/swipe/hidden call
- * sites (AUDIT-1 F7 review, point 2: DRY); the fail-safe-to-present contract still lives entirely
- * in [AppPresence] itself, so a transient platform error can never become a prune.
+ * The install/restore-session set for one reconcile pass: read at most ONCE, lazily, and only
+ * when a presence-absent candidate needs it, then membership-tested per key. Shared across all
+ * four store reconciles so a pass performs at most a SINGLE PackageInstaller enumeration no matter
+ * how many keys it gates — and a complete/all-present load performs zero (AUDIT-1 F7 review point 5;
+ * Kolibri analog of Nyx's ReconcileHomeLayoutUseCase session arm). A `null` from
+ * [InstallSessionInspector.activeSessionPackages] means "undetermined" (the query failed) → keep
+ * every candidate, mirroring that interface's fail-safe contract.
  */
-private suspend fun AppPresence.isFlatComponentPresent(flat: String): Boolean =
-    ComponentKey.parse(flat)?.let { isComponentPresent(it) } ?: false
+private class PassSessionGate(private val inspector: InstallSessionInspector) {
+    private var packages: Set<String>? = null
+    private var read = false
+
+    /** True if [packageName] has an active install/restore session, OR if that is undetermined. */
+    suspend fun isRestoring(packageName: String): Boolean {
+        if (!read) {
+            packages = inspector.activeSessionPackages()
+            read = true
+        }
+        // null (undetermined) → fail-safe keep; otherwise keep iff a session targets the package.
+        return packages?.contains(packageName) ?: true
+    }
+}
+
+/**
+ * Component-grain deletion gate for a flattened `"pkg/class"` store key (favorites/swipe/hidden):
+ * keep it if the component still resolves ([AppPresence.isComponentPresent]) OR its package has an
+ * install/restore session in flight ([PassSessionGate] — the Launcher3-style promise arm, aligned
+ * with Nyx's home reconcile). Presence is checked first; the session set is consulted only when
+ * presence is absent (`||` short-circuit), so the common path stays at zero session IPC.
+ *
+ * A malformed stored key (`ComponentKey.parse == null` — e.g. a slash-less bare package) is not a
+ * real component → absent, and its (non-existent) package is not consulted for a session either, so
+ * the garbage is pruned exactly as before (matches the pre-migration string check). The
+ * fail-safe-to-present contract lives in [AppPresence]; the session fail-safe in [PassSessionGate].
+ * Extracted once (AUDIT-1 F7 review, point 2: DRY) from the three component-keyed call sites.
+ */
+private suspend fun AppPresence.isFlatComponentPresentOrRestoring(flat: String, sessions: PassSessionGate): Boolean {
+    val key = ComponentKey.parse(flat) ?: return false
+    return isComponentPresent(key) || sessions.isRestoring(key.packageName)
+}
+
+/**
+ * Package-grain deletion gate for a package-keyed store (custom names): keep it if the package
+ * still exposes a launcher entry ([AppPresence.isPackagePresent]) OR it has an install/restore
+ * session in flight. Presence first; the session set is consulted only when presence is absent.
+ */
+private suspend fun AppPresence.isPackagePresentOrRestoring(pkg: String, sessions: PassSessionGate): Boolean =
+    isPackagePresent(pkg) || sessions.isRestoring(pkg)
