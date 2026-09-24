@@ -51,3 +51,67 @@ sind gleich betroffen (ein geteiltes Impl).
 - Enforcement: der Intent-Gate-Linter (`kolibri/tools/check-intent-gate.awk`) fängt **bare**
   `Timber.e(`, aber **nicht** ein falsch gewähltes `silentError` an einer fail-safe-Grenze — das
   bleibt eine Review-/Konventions-Frage, daher dieser Eintrag.
+
+---
+
+## Drift-Prävention App-Verwaltung: geteilter Gate-Helfer + Cross-Launcher-Parity-Test (offen, 2026-09-24)
+
+**Ausgangslage (gemessen 2026-09-24, LOC ohne Tests).** Die App-Verwaltung (Enumeration → Laden
+→ In-RAM-State → Delete-Gate → Reconcile der User-Zuweisungen) ist zu **~50 %** geteilt: die
+**Engine** (`:core`-Ports/Modelle + `:common-data/installedapps`, ~1150 LOC) läuft in beiden
+Launchern als *ein* Impl (100 % geteilt), die **Policy-Schicht** (~1400 LOC) ist zu 0 % geteilt.
+Letzteres ist fundamental — nyx verwaltet ein räumliches `HomeLayout` (Positionen/Folder/Dock),
+kolibri vier flache Key-Sets (favorites/hidden/swipe/customnames) —, aber es bedeutet, dass das
+Delete-Gate **zweimal orchestriert** ist (`nyx ReconcileHomeLayoutUseCase` inline vs. kolibri
+`ObserveInstalledAppsUseCase` + `PassSessionGate` über vier Store-Reconciles). Diese Duplikation
+ist der Haupt-Drift-Vektor: Session-Arm, `null→keep`-Fail-safe, malformed-key-Kurzschluss und
+Presence-vor-Session-Reihenfolge stehen doppelt, und **nichts erzwingt Gleichheit** — Patch 12
+(Session-Arm nach kolibri nachziehen) und die schiefe Test-Parität waren genau das. Der
+wahrscheinlichste nächste Auslöser ist der in beiden `ACCEPTED_LIMITATIONS.md` genannte
+keep-last-good-**count-floor**: landet er nur in einem Launcher, öffnet sich das akzeptierte
+Restore-Restrisiko wieder einseitig.
+
+Zwei Hebel dagegen (a reduziert die Duplikation, b macht Rest-Drift laut):
+
+### a) Kandidaten-Finder + Gate-Anwendung als geteilten Helfer nach `:core` extrahieren
+
+Heute steckt „fehlender Key → nur Kandidat → keep, wenn Presence **oder** Session anschlägt (beide
+fail-safe), sonst prune" in beiden Policies als eigener Code. Ziel: die **reine, Android-freie**
+Gate-Logik einmal in `:core` (neben `AppPresence`/`InstallSessionInspector`), sodass die
+Policy-Schicht nur noch zwei launcher-eigene Enden liefert:
+
+- **Input:** die Menge der vom Store referenzierten Keys (nyx: `HomeLayout.referencedKeys()`;
+  kolibri: die vier Store-Key-Sets) + die frische Enumeration.
+- **Shared:** Kandidaten = referenziert ∧ nicht enumeriert; pro Kandidat `AppPresence` (grain-korrekt)
+  ODER die **einmal pro Pass** gelesene `InstallSessionInspector`-Menge; `null→keep`; malformed →
+  absent. Rückgabe: „diese Keys prunen".
+- **Output:** jeder Launcher wendet das Prune-Set auf sein eigenes Modell an (nyx im atomaren
+  `update{}`, kolibri per subtract-only `edit{}` je Store).
+
+Damit lebt der Fail-safe-Kern (inkl. eines künftigen count-floors) an **einer** Stelle; die
+Policy-Schicht schrumpft auf „liefere Keys / wende Ergebnis an". `PassSessionGate` und die inline
+`sessionsRead`-Mechanik in nyx werden durch den Helfer ersetzt. Akzeptanzkriterium: nach der
+Extraktion referenzieren **beide** Reconcile-Eingänge denselben Helfer; kein zweites `null→keep`
+oder `session-read-once` mehr im Repo-/UseCase-Code.
+
+### b) Cross-Launcher-Parity-Test für das Delete-Gate
+
+Heute testen nyx und kolibri ihr Gate **unabhängig** — eine einseitige Semantik-Änderung wird nicht
+rot. Ziel: **eine** Tabelle von Gate-Szenarien (present / absent+session / absent+no-session /
+undetermined / malformed / partial-load / store-read-fail), die gegen **beide** Reconcile-Eingänge
+läuft und identisches keep/prune-Verhalten (plus `reads==1`/`reads==0`) assertet. Zwei Formen
+möglich:
+
+- **Nach (a):** ein JVM-Contract-Test direkt gegen den geteilten Helfer (deckt den Kern ab) +
+  je ein dünner Adapter-Test pro Launcher (liefert-Keys / wendet-an).
+- **Ohne (a):** ein parametrisierter Test, der dieselbe Szenario-Liste einmal durch
+  `ReconcileHomeLayoutUseCase` und einmal durch `ObserveInstalledAppsUseCase` schickt und die
+  Ergebnisse vergleicht.
+
+Akzeptanzkriterium: eine bewusst eingebaute Divergenz (z. B. `null→keep` in nur einem Launcher auf
+`null→prune` kippen) macht den Parity-Test rot. Ergänzt die bestehenden per-Launcher-Suites, ersetzt
+sie nicht.
+
+**Reihenfolge:** (a) zuerst macht (b) fast trivial (ein Contract gegen den Helfer). (b) allein geht
+auch und ist billiger, fängt aber nur Divergenz ab, statt sie strukturell zu verhindern. Beides ist
+echter Aufwand und braucht einen eigenen Branch — kein Drive-by.
