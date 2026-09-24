@@ -22,9 +22,17 @@ package com.github.reygnn.launcher.core
 interface InstallSessionInspector {
 
     /**
-     * True if [packageName] has an active install/restore session in progress, OR if that
-     * could not be determined (fail-safe → keep). Suspends: the impl hops to IO for the
-     * platform query.
+     * The set of package names that currently have an active install/restore session, or `null`
+     * if that could NOT be determined (fail-safe → the caller keeps every candidate).
+     *
+     * Batch by design (AUDIT-1 F7 review, point 5): a reconcile reads this ONCE per pass and
+     * membership-tests each prune candidate against the returned set, so a pass performs at most
+     * a SINGLE `PackageInstaller` enumeration no matter how many keys it must gate — instead of
+     * one full enumeration per candidate. The three-way outcome is deliberate: a package in the
+     * set is being restored (keep); a package absent from a non-null set is genuinely session-less
+     * (prunable if also absent from presence); a `null` result means the query failed and the
+     * caller must keep every candidate (the per-package fail-safe-to-keep contract, now expressed
+     * once for the whole set). Suspends: the impl hops to IO for the platform query.
      */
-    suspend fun hasActiveSession(packageName: String): Boolean
+    suspend fun activeSessionPackages(): Set<String>?
 }

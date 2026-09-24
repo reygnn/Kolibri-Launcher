@@ -80,8 +80,9 @@ class ExportImportUseCaseTest {
     }
 
     // …and no restore is in flight, so the session arm doesn't rescue the missing keys.
+    // emptySet (NOT null): determined "nothing active", so genuinely-absent import keys still prune.
     private val noSessions = object : InstallSessionInspector {
-        override suspend fun hasActiveSession(packageName: String) = false
+        override suspend fun activeSessionPackages(): Set<String> = emptySet()
     }
 
     private fun reconcileWith(repo: FakeHomeLayoutRepository, apps: FakeAppEnumerator) =

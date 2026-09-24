@@ -61,16 +61,23 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     /**
-     * Session fake. [active] is the set of package names with an install/restore session in
-     * flight. Default empty → no package is being restored, so the pre-fix-3 prune tests keep
-     * their outcome. [checked] records lookups so a test can assert the presence short-circuit
-     * (a present key must not reach the session probe).
+     * Session fake (batch API, point 5). [active] is the set of package names with an install/
+     * restore session in flight; default empty → no package is being restored, so the prune tests
+     * keep their outcome. [undetermined] returns `null` (query failed → fail-safe keep). [reads]
+     * counts how often the session set was fetched: a test asserts it is 0 on the present/complete
+     * paths (short-circuit + zero common-path IPC) and 1 when a candidate is absent (read once per
+     * pass, never per candidate).
      */
-    private class FakeInstallSessions(var active: Set<String> = emptySet()) : InstallSessionInspector {
-        val checked = mutableListOf<String>()
-        override suspend fun hasActiveSession(packageName: String): Boolean {
-            checked += packageName
-            return packageName in active
+    private class FakeInstallSessions(
+        var active: Set<String> = emptySet(),
+        var undetermined: Boolean = false,
+    ) : InstallSessionInspector {
+        var reads = 0
+            private set
+
+        override suspend fun activeSessionPackages(): Set<String>? {
+            reads++
+            return if (undetermined) null else active
         }
     }
 
@@ -241,7 +248,7 @@ class ReconcileHomeLayoutUseCaseTest {
         assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
         assertThat(layoutRepo.saveCount).isEqualTo(1)
         assertThat(layoutRepo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
-        assertThat(sessions.checked).containsExactly("pb") // absent → session arm consulted
+        assertThat(sessions.reads).isEqualTo(1) // absent → session set read once (per pass, not per key)
     }
 
     /**
@@ -279,7 +286,7 @@ class ReconcileHomeLayoutUseCaseTest {
         val result = useCase(layoutRepo, enumerator, presence, sessions)()
 
         assertThat(result).isEqualTo(ReconcileResult.Unchanged)
-        assertThat(sessions.checked).isEmpty() // never reached the second arm
+        assertThat(sessions.reads).isEqualTo(0) // present via presence → session set never read
     }
 
     /**
@@ -298,7 +305,7 @@ class ReconcileHomeLayoutUseCaseTest {
 
         assertThat(result).isEqualTo(ReconcileResult.Unchanged)
         assertThat(presence.checked).isEmpty()
-        assertThat(sessions.checked).isEmpty()
+        assertThat(sessions.reads).isEqualTo(0)
     }
 
     /**

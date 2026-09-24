@@ -63,7 +63,11 @@ import javax.inject.Inject
  * folded back into the installed set so the pure reconciler never drops it. Nyx analog of
  * Kolibri's per-target deletion gate (RECONCILE_FIX_SPEC R-INV-2): bulk snapshot proposes,
  * single-target checks dispose. A COMPLETE snapshot yields zero candidates and performs
- * zero gate IPC — the common path is unchanged in cost and behavior. One residual case is
+ * zero gate IPC — the common path is unchanged in cost and behavior. The session arm is read
+ * once per pass and lazily (only if some candidate is absent from presence), then membership-
+ * tested per key — never one enumeration per candidate (point 5). The snapshot→RMW window is
+ * closed: a key that the in-lock `current` references but the (out-of-lock) snapshot did not was
+ * never gated, so it is fail-safe kept rather than pruned (point 3). One residual case is
  * accepted (a restore with no discoverable session); see nyx ACCEPTED_LIMITATIONS.md.
  */
 class ReconcileHomeLayoutUseCase @Inject constructor(
@@ -110,14 +114,31 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
             val candidates = layoutRepository.snapshot()
                 .referencedKeys()
                 .filterTo(HashSet()) { it !in installed }
+            // The install/restore-session set is read at most ONCE per pass and lazily — only if
+            // some candidate is absent from presence (AUDIT-1 F7 review, point 5). A complete
+            // snapshot (no candidates) or an all-present candidate set never touches it, so the
+            // common path stays at zero session IPC; the abnormal path pays a single
+            // PackageInstaller enumeration, not one per candidate. `null` = undetermined → keep.
+            var sessionPackages: Set<String>? = null
+            var sessionsRead = false
             for (key in candidates) {
                 // Keep the key if EITHER it still resolves independently (cross-surface
                 // PackageManager presence — a LauncherApps enumeration transient can't poison it)
                 // OR its package has an install/restore session in flight (Launcher3-style promise:
                 // an app on its way back during restore is legitimately absent right now but must
                 // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
-                // Short-circuit: presence first (one cheap package query), session only if absent.
-                if (appPresence.isComponentPresent(key) || installSessions.hasActiveSession(key.packageName)) {
+                // Short-circuit: presence first (one cheap package query), session set only if absent.
+                if (appPresence.isComponentPresent(key)) {
+                    installed.add(key)
+                    continue
+                }
+                if (!sessionsRead) {
+                    sessionPackages = installSessions.activeSessionPackages()
+                    sessionsRead = true
+                }
+                // null (undetermined) → fail-safe keep; otherwise keep iff a session targets it.
+                val sessions = sessionPackages
+                if (sessions == null || key.packageName in sessions) {
                     installed.add(key)
                 }
             }

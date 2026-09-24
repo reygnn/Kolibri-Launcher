@@ -27,7 +27,8 @@ import javax.inject.Singleton
  * reconcile once the query works, whereas a wrongly-pruned placement during restore is
  * unrecoverable. The broad `Throwable` catch is the sanctioned system-API-boundary form;
  * `CancellationException` still propagates. Runs on [dispatcher] (the query is blocking);
- * consulted only for a candidate the presence check already reported absent.
+ * consulted at most ONCE per reconcile pass (only when some candidate is absent from presence),
+ * then membership-tested per candidate in the use-case — never re-enumerated per key.
  */
 @Singleton
 class PackageManagerInstallSessions @Inject constructor(
@@ -35,18 +36,24 @@ class PackageManagerInstallSessions @Inject constructor(
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) : InstallSessionInspector {
 
-    override suspend fun hasActiveSession(packageName: String): Boolean = withContext(dispatcher) {
+    override suspend fun activeSessionPackages(): Set<String>? = withContext(dispatcher) {
         try {
-            packageManager.packageInstaller.allSessions.any { session ->
-                session.isActive && session.appPackageName == packageName
-            }
+            // ONE enumeration per reconcile pass (point 5): map every active session to its
+            // target package. A session with no readable appPackageName (foreign session with
+            // no name granted, e.g. nyx not the current launcher) contributes nothing.
+            packageManager.packageInstaller.allSessions
+                .asSequence()
+                .filter { it.isActive }
+                .mapNotNull { it.appPackageName }
+                .toHashSet()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // Fail-safe: sessions could not be read → keep, so a restore-in-progress is
-            // never pruned on a transient query failure.
-            TimberWrapper.silentError(e, "Install-session check failed for $packageName; failing safe to keep")
-            true
+            // Fail-safe: sessions could not be read → null ("undetermined"), so the caller keeps
+            // every candidate. A lingering dead placement self-heals on the next reconcile once
+            // the query works; a wrongly-pruned restore is unrecoverable.
+            TimberWrapper.silentError(e, "Install-session read failed; failing safe to keep (undetermined)")
+            null
         }
     }
 }
