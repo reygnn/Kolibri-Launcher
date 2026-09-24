@@ -30,10 +30,12 @@ import javax.inject.Inject
  * **The flow is UNSORTED (RAL-4 map-only): [applyCustomNames] no longer imposes a
  * display order.** The name says so — every collector sorts for itself (CustomNames
  * via `buildCustomNamesViews`, Hidden / Swipe via `sortedByDisplayName()`) or is
- * order-agnostic (Settings). Underneath, the enumeration still emits a deterministic
- * order (`InstalledAppsRepositoryImpl` sorts by original name), so this flow's own
- * `distinctUntilChanged` behaves identically — but collectors must NOT rely on that
- * for what they DISPLAY.
+ * order-agnostic (Settings). Underneath, the shared enumerator returns the RAW,
+ * unsorted `getActivityList` order (SIA-INV-3: the holder holds raw; no sort in the
+ * loader), so collectors must NOT rely on any upstream order for what they DISPLAY.
+ * The `distinctUntilChanged` below collapses redundant re-derivations by VALUE
+ * equality of the applied list (e.g. a `customNamesFlow` tick that leaves the list
+ * unchanged), NOT by assuming a stable upstream ordering.
  */
 class GetInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,

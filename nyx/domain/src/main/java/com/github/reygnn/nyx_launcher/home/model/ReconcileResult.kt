@@ -25,25 +25,25 @@ sealed interface ReconcileOutcome {
  */
 enum class SkipReason {
     /**
-     * An explicit `AppLoad.Failed` was observed within the prime window: the
-     * shared loader caught a load error. Crisp — mapped 1:1 from the envelope.
+     * `enumerator.enumerate()` threw (a non-cancellation `Throwable`): the shared
+     * enumeration failed. `ReconcileHomeLayoutUseCase` maps that throw 1:1 to this
+     * reason and skips with zero mutation (fail-closed, RHL-INV-1).
      */
     LOAD_FAILED,
 
     /**
-     * The prime window elapsed without ever observing a non-empty `Loaded` and
-     * without an explicit `Failed` — no usable app list materialised (a
-     * genuinely-empty device, or a load that stayed empty/stuck).
+     * `enumerator.enumerate()` returned an empty list — no usable app list (a
+     * genuinely-empty device, or a transient empty enumeration). Skipped with zero
+     * mutation as suspicious (fail-closed, RHL-INV-1).
      *
-     * NOTE — semantic shift from the deleted `AppLoadResult.Reason`: Nyx's old
-     * one-shot repository could return a crisp terminal `Loaded(empty)`. The
-     * shared contract is a hot `StateFlow<AppLoad>` whose *initial* value is
-     * itself `Loaded(emptyList())`, so a one-shot reconcile call cannot separate
-     * "settled empty" from "initial/priming empty". This reason therefore means
-     * "no non-empty list within the window", which subsumes the historical
-     * `ENUMERATION_EMPTY`. Both reasons are observability-only (no consumer
+     * `ReconcileHomeLayoutUseCase` reads the shared `AppEnumerator` DIRECTLY — a
+     * one-shot suspend read of the CURRENT launchable set, NOT the cached
+     * `StateFlow<AppLoad>` loader — so an empty result here is a *settled* empty:
+     * there is no prime window and no `Loaded(emptyList())` initial value to
+     * confuse it with (this replaces the historical `ENUMERATION_EMPTY` and the
+     * old prime-window reasoning). Both reasons are observability-only (no consumer
      * branches on them); the invariant that matters — skip with zero mutation on
-     * anything that is not a genuine non-empty load — holds either way (RHL-INV-1).
+     * anything that is not a genuine non-empty load — holds regardless (RHL-INV-1).
      */
     LOAD_EMPTY,
 }
