@@ -22,8 +22,10 @@ import javax.inject.Singleton
  * active default home app; when nyx is not the current launcher this may return nothing, in
  * which case the presence check and its fail-safe still govern.
  *
- * **Fail-safe:** any failure resolves to `true` (keep). If sessions cannot be read, the
- * conservative choice is to not prune — a lingering dead placement self-heals on the next
+ * **Fail-safe:** any failure resolves to `null` ("undetermined"), which the caller treats as
+ * keep-every-candidate — the per-package keep contract expressed once for the whole set
+ * (AUDIT-1 F7 review point 5; was `true` before the batch migration). If sessions cannot be
+ * read, the conservative choice is to not prune — a lingering dead placement self-heals on the next
  * reconcile once the query works, whereas a wrongly-pruned placement during restore is
  * unrecoverable. The broad `Throwable` catch is the sanctioned system-API-boundary form;
  * `CancellationException` still propagates. Runs on [dispatcher] (the query is blocking);

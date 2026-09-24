@@ -354,4 +354,34 @@ class ReconcileHomeLayoutUseCaseTest {
             .containsExactly(ItemId("pa"), ItemId("pb"))
         assertThat(presence.checked).isEmpty() // pb was not a snapshot candidate → not probed
     }
+
+    /**
+     * SESSION READ UNDETERMINED (RHL-INV-6, AUDIT-1 F7 review point 5 fail-safe). When the
+     * session query itself fails, [InstallSessionInspector.activeSessionPackages] returns `null`
+     * ("undetermined"), and the use-case must fall back to KEEPING every presence-absent
+     * candidate — the per-package fail-safe-to-keep contract, now expressed once for the whole
+     * set. Here pb is absent from the enumeration AND confirmed absent by presence, so the session
+     * arm is consulted; it returns null, so pb is kept rather than pruned. The set is still read
+     * exactly once ([reads] == 1), not per candidate.
+     *
+     * This pins the WIRING (`null` from the impl → keep in the use-case), which the impl-level
+     * `PackageManagerInstallSessionsTest` ("null (undetermined) when reading sessions throws")
+     * does not cover. Mutation check: change the keep guard from `sessions == null || key... in
+     * sessions` to `sessions != null && key... in sessions` and pb is pruned → red.
+     */
+    @Test
+    fun undetermined_session_read_keeps_a_presence_absent_candidate() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+        val presence = FakeAppPresence(present = emptySet()) // pb confirmed absent → session arm consulted
+        val sessions = FakeInstallSessions(undetermined = true) // …but the session query fails → null
+
+        val result = useCase(layoutRepo, enumerator, presence, sessions)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(layoutRepo.saveCount).isEqualTo(0) // pb kept: undetermined → fail-safe keep
+        assertThat(layoutRepo.current.items.map { it.item.id })
+            .containsExactly(ItemId("pa"), ItemId("pb"))
+        assertThat(sessions.reads).isEqualTo(1) // read once (per pass), null → keep-all
+    }
 }
