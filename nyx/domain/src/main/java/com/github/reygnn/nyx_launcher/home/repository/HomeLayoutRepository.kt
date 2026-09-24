@@ -23,6 +23,19 @@ import kotlinx.coroutines.flow.Flow
 interface HomeLayoutRepository {
     fun layout(): Flow<HomeLayout>
 
+    /**
+     * Fail-CLOSED point read of the current layout: reads the store once and lets an
+     * IOException propagate rather than recovering to the empty [HomeLayout] default.
+     *
+     * Use this — never the fail-open [layout] flow — whenever a read feeds a DESTRUCTIVE
+     * decision, e.g. computing which keys a reconcile may prune. Through [layout] a
+     * transient read error would surface as an empty layout, which reads as "nothing to
+     * protect" and silently drops every prune-protection; [snapshot] instead aborts the
+     * pass (skip, retry next event). Same posture and same underlying read [update] uses
+     * internally (DSR snapshotFailClosed).
+     */
+    suspend fun snapshot(): HomeLayout
+
     /** Full replace, serialized against [update] and other [save] calls. */
     suspend fun save(layout: HomeLayout)
 

@@ -33,9 +33,15 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
     var saveCount = 0
         private set
 
+    // When set, [snapshot] throws it — lets a test drive the fail-CLOSED read path
+    // (a transient DataStore error) without a real store. [layout] stays fail-open.
+    var failSnapshotWith: Throwable? = null
+
     val current: HomeLayout get() = state.value
 
     override fun layout(): Flow<HomeLayout> = state
+
+    override suspend fun snapshot(): HomeLayout = failSnapshotWith?.let { throw it } ?: state.value
 
     override suspend fun save(layout: HomeLayout) = writeMutex.withLock {
         saveCount++

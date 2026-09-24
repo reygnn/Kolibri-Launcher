@@ -14,7 +14,6 @@ import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutReconciler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -80,14 +79,16 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
 
         // PARTIAL-SNAPSHOT GATE (RHL-INV-6, Nyx analog of R-INV-2). Every key the layout
         // references but this snapshot missed is only a *candidate* for pruning; confirm
-        // each against the live LauncherApps seam (fail-safe → present) and fold the
+        // each against an independent presence check (fail-safe → present) and fold the
         // still-installed ones back into `installed`, so the pure reconciler never prunes a
-        // merely-transiently-absent app. Reading the layout once here is outside the atomic
-        // RMW below; that is safe because this only ever ADDS protection (it can reduce
-        // pruning, never cause a bad write), and the reconcile still runs against the fresh
+        // merely-transiently-absent app. The candidate read is fail-CLOSED ([snapshot], not
+        // the fail-open [layout] flow): a transient read error must abort this pass, not
+        // degrade to an empty layout that drops every protection. It runs outside the atomic
+        // RMW below, which is safe because it only ever ADDS protection (it can reduce
+        // pruning, never cause a bad write) and the reconcile still runs against the fresh
         // `current` inside the lock (A1-03 preserved). A complete snapshot → no candidates
         // → no presence IPC.
-        val candidates = layoutRepository.layout().first()
+        val candidates = layoutRepository.snapshot()
             .referencedKeys()
             .filterTo(HashSet()) { it !in installed }
         for (key in candidates) {

@@ -16,6 +16,8 @@ import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import java.io.IOException
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -152,6 +154,24 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     // ---- PARTIAL-SNAPSHOT GATE (RHL-INV-6, AUDIT-1 F7) ----
+
+    /**
+     * FAIL-CLOSED candidate read. If the layout store read for candidate computation
+     * throws (transient DataStore error), the reconcile aborts and writes NOTHING — it
+     * does not degrade to an empty layout and prune. Contrast with the fail-OPEN [layout]
+     * flow, under which the same error would yield an empty layout → no candidates →
+     * `pb` pruned against the partial snapshot. That regression is exactly what this pins.
+     */
+    @Test
+    fun snapshot_read_failure_aborts_reconcile_without_pruning() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb")).apply {
+            failSnapshotWith = IOException("transient store read")
+        }
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+
+        assertFailsWith<IOException> { useCase(layoutRepo, enumerator)() }
+        assertThat(layoutRepo.saveCount).isEqualTo(0) // nothing pruned on a bad read
+    }
 
     /**
      * THE F7 FIX. A non-empty but PARTIAL snapshot (pb missing) must not prune pb while
