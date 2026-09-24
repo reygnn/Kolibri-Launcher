@@ -51,11 +51,17 @@ class PackageManagerInstallSessionsTest {
         }
 
     @Test
-    fun `inactive sessions are excluded`() =
+    fun `committed or queued (inactive) restore sessions are still kept`() =
         runTest(mainDispatcherRule.testDispatcher) {
+            // AUDIT-1 F7 branch review: SessionInfo.isActive reflects only momentary forward
+            // progress, so a committed-but-installing / queued restore session reports
+            // isActive=false yet still represents a pending restore whose package presence cannot
+            // rescue. It MUST be kept — filtering it out would re-open the F7 prune. So an inactive
+            // session with a readable package name is kept exactly like an active one.
+            // Mutation guard: re-add `.filter { it.isActive }` to the impl and this goes red.
             onSessions(session("com.example.a", active = true), session("com.example.b", active = false))
 
-            assertThat(sessions.activeSessionPackages()).containsExactly("com.example.a")
+            assertThat(sessions.activeSessionPackages()).containsExactly("com.example.a", "com.example.b")
         }
 
     @Test

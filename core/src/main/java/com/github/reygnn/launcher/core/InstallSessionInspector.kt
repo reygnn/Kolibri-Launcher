@@ -16,8 +16,8 @@ package com.github.reygnn.launcher.core
  * AND session-less.
  *
  * The default implementation (`PackageManagerInstallSessions`, in `:common-data`) reads
- * `PackageInstaller` sessions. Bound app-side; currently consumed only by Nyx's home
- * reconcile, available to any app that needs the same gate.
+ * `PackageInstaller` sessions. Bound app-side; consumed by Nyx's home reconcile AND Kolibri's
+ * store reconcile — either launcher ORs this signal with [AppPresence].
  */
 interface InstallSessionInspector {
 

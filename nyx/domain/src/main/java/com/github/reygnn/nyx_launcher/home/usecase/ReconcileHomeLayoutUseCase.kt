@@ -63,7 +63,8 @@ import javax.inject.Inject
  * folded back into the installed set so the pure reconciler never drops it. Nyx analog of
  * Kolibri's per-target deletion gate (RECONCILE_FIX_SPEC R-INV-2): bulk snapshot proposes,
  * single-target checks dispose. A COMPLETE snapshot yields zero candidates and performs
- * zero gate IPC — the common path is unchanged in cost and behavior. The session arm is read
+ * zero GATE IPC — behavior on the common path is unchanged; its only added cost is the single
+ * fail-closed [snapshot] read per pass (the gate arms themselves stay untouched). The session arm is read
  * once per pass and lazily (only if some candidate is absent from presence), then membership-
  * tested per key — never one enumeration per candidate (point 5). The snapshot→RMW window is
  * closed: a key that the in-lock `current` references but the (out-of-lock) snapshot did not was
@@ -175,7 +176,14 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
             // PackageEventCoordinator and ImportLayoutUseCase — is correct without its own guard.
             // (The gate arms themselves never land here: AppPresence / InstallSessionInspector are
             // fail-safe-to-keep and swallow their own platform errors, rethrowing only cancellation.)
-            TimberWrapper.silentError(e, "Reconcile store read/write failed; skipping pass without pruning")
+            // reportToAcra, NOT silentError: a transient DataStore I/O error is environmental (it
+            // self-heals on the next pass), not a programmer error — silentError's DEBUG throw would
+            // re-throw out of invoke() in a DEBUG on-device build and break the "only
+            // CancellationException escapes" totality this arm documents. reportToAcra reports in
+            // RELEASE without throwing, so invoke() stays total in EVERY build (DSR-INV-3: an I/O
+            // fault must not throw in DEBUG). The LOAD_FAILED arm stays silent because an
+            // enumeration blip is far more common and benign than a persistent store read failure.
+            TimberWrapper.reportToAcra(e, "Reconcile store read/write failed; skipping pass without pruning")
             ReconcileResult.Skipped(SkipReason.STORE_FAILED)
         }
     }

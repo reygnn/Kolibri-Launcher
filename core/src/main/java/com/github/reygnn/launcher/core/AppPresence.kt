@@ -35,7 +35,7 @@ package com.github.reygnn.launcher.core
  *
  * This gate answers "installed now?". A target legitimately absent because it is
  * mid-restore is kept by the separate [InstallSessionInspector] arm, which a caller may OR
- * with this one (Nyx does).
+ * with this one (Nyx's home reconcile and Kolibri's store reconcile both do).
  */
 interface AppPresence {
 

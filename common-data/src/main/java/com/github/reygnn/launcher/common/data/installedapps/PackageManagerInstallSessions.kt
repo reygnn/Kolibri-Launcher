@@ -12,15 +12,27 @@ import javax.inject.Singleton
 
 /**
  * [InstallSessionInspector] over `PackageManager.getPackageInstaller()` (AUDIT-1 F7 review,
- * fix 3). A package counts as mid-install/restore iff there is an active session whose
- * target package matches — the same source AOSP Launcher3 consults before it keeps a
- * placement as a promise icon.
+ * fix 3). A package counts as mid-install/restore iff a live install/restore session targets
+ * it — the same signal AOSP Launcher3 consults before it keeps a placement as a promise icon.
+ *
+ * **Deliberately NOT filtered by `SessionInfo.isActive`** (AUDIT-1 F7 branch review): `isActive`
+ * reflects only momentary forward progress (a stream in flight / a commit running), so a
+ * committed-but-installing or queued restore session reports `isActive == false` for most of its
+ * life. During a multi-app device restore that is the majority of sessions at any instant.
+ * Filtering on it would omit exactly those pending-restore packages from the returned set — and
+ * because a mid-restore app is genuinely not installed yet, the [AppPresence] arm cannot rescue it
+ * either (its KDoc says so), so the candidate would be BOTH absent AND (apparently) session-less
+ * and get pruned permanently: the exact F7 loss this gate exists to prevent. Launcher3's
+ * `PackageInstallerCompat` keys sessions on a non-null `appPackageName` and does NOT filter on
+ * `isActive`; this impl matches that (keep-biased), so every session with a readable target
+ * package counts.
  *
  * Uses `getAllSessions()` (not `getMySessions()`): a restore/install session is created by
  * the installer or the restore agent, not by this launcher, so we must see sessions we do
  * not own. Foreign-session visibility (and a non-null `appPackageName`) is granted to the
- * active default home app; when nyx is not the current launcher this may return nothing, in
- * which case the presence check and its fail-safe still govern.
+ * active default home app; when the consuming launcher (nyx or kolibri) is not the current
+ * default this may return nothing, in which case the presence check and its fail-safe still
+ * govern.
  *
  * **Fail-safe:** any failure resolves to `null` ("undetermined"), which the caller treats as
  * keep-every-candidate — the per-package keep contract expressed once for the whole set
@@ -40,12 +52,13 @@ class PackageManagerInstallSessions @Inject constructor(
 
     override suspend fun activeSessionPackages(): Set<String>? = withContext(dispatcher) {
         try {
-            // ONE enumeration per reconcile pass (point 5): map every active session to its
-            // target package. A session with no readable appPackageName (foreign session with
-            // no name granted, e.g. nyx not the current launcher) contributes nothing.
+            // ONE enumeration per reconcile pass (point 5): map every live session to its
+            // target package — deliberately NOT filtered by isActive (see the KDoc: that would
+            // drop pending/committed restore sessions and re-open F7). A session with no readable
+            // appPackageName (foreign session with no name granted, e.g. the consuming launcher is
+            // not the current default) contributes nothing.
             packageManager.packageInstaller.allSessions
                 .asSequence()
-                .filter { it.isActive }
                 .mapNotNull { it.appPackageName }
                 .toHashSet()
         } catch (e: CancellationException) {

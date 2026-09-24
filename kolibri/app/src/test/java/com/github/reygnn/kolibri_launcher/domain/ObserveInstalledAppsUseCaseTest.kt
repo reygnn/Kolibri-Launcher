@@ -288,6 +288,99 @@ class ObserveInstalledAppsUseCaseTest {
     }
 
     @Test
+    fun `undetermined session read keeps a presence-absent candidate across all stores and reads once`() = runTest {
+        // Nyx analog: undetermined_session_read_keeps_a_presence_absent_candidate. When the
+        // PackageInstaller query fails, activeSessionPackages() returns null; PassSessionGate.isRestoring
+        // fail-safe KEEPS every presence-absent candidate (`packages?.contains(pkg) ?: true`) rather
+        // than pruning it. com.app2 is dropped from the load AND absent from presence; with the session
+        // read undetermined it must survive across all four stores, and the set is read exactly ONCE.
+        // Mutation guard: flip the elvis in PassSessionGate to `?: false` and com.app2 is pruned -> red.
+        val candidate = testApps[1].componentName    // com.app2/com.app2.Main
+        val candidatePkg = testApps[1].packageName   // com.app2
+
+        favoritesRepository.saveFavoriteComponents(listOf(candidate))
+        hiddenAppsRepository.hiddenApps = setOf(candidate)
+        swipeActionsRepository.swipeLeftApp = candidate
+        customNamesRepository.setCustomNameForPackage(candidatePkg, "Keep")
+
+        // Nothing present; the session query is undetermined (fail-safe keep).
+        installSessions.undetermined = true
+
+        // Partial load: testApps minus com.app2, so com.app2 is a prune candidate.
+        installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
+
+        useCase().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Kept everywhere by the fail-safe (undetermined -> keep)...
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(candidate)
+        assertThat(hiddenAppsRepository.hiddenApps).contains(candidate)
+        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(candidate)
+        assertThat(customNamesRepository.getAllCustomNames()).containsKey(candidatePkg)
+        // ...and still batched: one read for the whole pass, shared across all four stores.
+        assertThat(installSessions.reads).isEqualTo(1)
+    }
+
+    @Test
+    fun `a malformed component key is pruned without ever consulting the session arm`() = runTest {
+        // isFlatComponentPresentOrRestoring does `ComponentKey.parse(flat) ?: return false` — a
+        // slash-less/garbage key is not a real component, so it is pruned WITHOUT touching the session
+        // set (the parse-null short-circuits before the `|| sessions.isRestoring` arm). With the
+        // malformed key the only orphan, the session set is never read (reads == 0).
+        // Mutation guards: change `?: return false` to `?: return true` and the garbage survives -> red;
+        // route the malformed key through the session arm and reads != 0.
+        val malformed = "com.malformed.no.slash"   // ComponentKey.parse(...) == null
+
+        hiddenAppsRepository.hiddenApps = setOf(malformed)
+        favoritesRepository.saveFavoriteComponents(listOf(malformed))
+
+        // Everything genuinely installed is present; the malformed key is the only orphan.
+        installedAppsRepository.installedApps = testApps
+
+        useCase().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // The garbage is pruned from both component-keyed stores...
+        assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(malformed)
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(malformed)
+        // ...and the session arm was never consulted (parse-null short-circuits before it).
+        assertThat(installSessions.reads).isEqualTo(0)
+    }
+
+    @Test
+    fun `an all-present load performs zero session IPC`() = runTest {
+        // Nyx analog: complete_snapshot_consults_neither_gate (reads == 0). When every stored
+        // assignment resolves against the load there is no prune candidate, so neither the presence
+        // gate nor the session set is touched — a healthy reconcile costs zero PackageInstaller IPC.
+        // Mutation guard: read the session set eagerly (once per pass or per store) and reads != 0.
+        val a = testApps[0].componentName
+        val b = testApps[1].componentName
+        favoritesRepository.saveFavoriteComponents(listOf(a, b))
+        hiddenAppsRepository.hiddenApps = setOf(a)
+        swipeActionsRepository.swipeRightApp = b
+        customNamesRepository.setCustomNameForPackage(testApps[0].packageName, "Keep")
+
+        installedAppsRepository.installedApps = testApps
+
+        useCase().test {
+            awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // All assignments valid -> no candidates -> session set never read.
+        assertThat(installSessions.reads).isEqualTo(0)
+        // ...and nothing was pruned.
+        assertThat(favoritesRepository.favoriteComponentsFlow.first()).containsExactly(a, b)
+        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(a)
+        assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(b)
+        assertThat(customNamesRepository.getAllCustomNames()).containsKey(testApps[0].packageName)
+    }
+
+    @Test
     fun `invoke isolates a failing cleanup - other stores still reconcile and state still updates`() = runTest {
         // The four cleanups share a try-block with updateApps + emit(Success). If
         // a store's cleanup weren't guarded independently (runCleanup), its throw
