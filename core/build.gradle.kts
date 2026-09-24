@@ -41,5 +41,6 @@ dependencies {
     // Dispatchers.Main for a TestDispatcher). Each module's tiny MainDispatcherRule
     // subclass consumes it via `testFixtures(project(":core"))`.
     testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.kotlin.test.junit) // DeletionGateParityContract assertions
     testFixturesImplementation(libs.kotlinx.coroutines.test)
 }

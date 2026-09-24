@@ -111,7 +111,20 @@ oder `session-read-once` mehr im Repo-/UseCase-Code.
 
 </details>
 
-### b) Cross-Launcher-Parity-Test für das Delete-Gate (jetzt billig — nach a)
+### b) ✅ Erledigt (2026-09-24, Branch `refactor/shared-deletion-gate`)
+
+Umgesetzt als abstrakter `core/testFixtures/DeletionGateParityContract` (vier Component-Grain-Szenarien:
+present→keep, absent+session→keep, absent+session-less→**prune**, undetermined→keep), implementiert
+von **beiden** Launchern: `NyxDeletionGateParityTest` (Kandidat als Home-Tile → `ReconcileHomeLayoutUseCase`
+→ überlebt im Layout?) und `KolibriDeletionGateParityTest` (Kandidat im Hidden-Store →
+`ObserveInstalledAppsUseCase` → überlebt im Store?). Eine Szenario-Tabelle, zwei Adapter, gegen die
+**echten** Use-Cases. Nicht-vacuous, weil beide Richtungen assertet werden (der prune-Fall ist
+`assertFalse`). Ergänzt die per-Launcher-Suites (`DeletionGatePassTest` pinnt den Kern, dies pinnt die
+Wiring-Parität). Ein Launcher, der einen Store nicht mehr durchs Gate routet oder die Fail-safe-Richtung
+kippt, macht seine Adapter-Seite rot. Nur Component-Grain (kolibris Package-Grain für custom names hat
+kein nyx-Analog → von `DeletionGatePassTest` + kolibri-Suite abgedeckt). Gate grün.
+
+<details><summary>Ursprünglicher Plan (Referenz)</summary>
 
 Heute testen nyx und kolibri ihr Gate **unabhängig** — eine einseitige Semantik-Änderung wird nicht
 rot. Ziel: **eine** Tabelle von Gate-Szenarien (present / absent+session / absent+no-session /
@@ -129,6 +142,10 @@ Akzeptanzkriterium: eine bewusst eingebaute Divergenz (z. B. `null→keep` in nu
 `null→prune` kippen) macht den Parity-Test rot. Ergänzt die bestehenden per-Launcher-Suites, ersetzt
 sie nicht.
 
-**Reihenfolge:** (a) zuerst macht (b) fast trivial (ein Contract gegen den Helfer). (b) allein geht
-auch und ist billiger, fängt aber nur Divergenz ab, statt sie strukturell zu verhindern. Beides ist
-echter Aufwand und braucht einen eigenen Branch — kein Drive-by.
+</details>
+
+**Reihenfolge (erledigt):** (a) zuerst gemacht → (b) war dann fast trivial (der Contract gegen den
+Helfer war schon `DeletionGatePassTest`; (b) fügte die Wiring-Parität über beide echten Use-Cases
+hinzu). Beide auf Branch `refactor/shared-deletion-gate`, Gate grün. Der Haupt-Drift-Vektor
+(dupliziertes Delete-Gate) ist damit strukturell geschlossen **und** durch einen Cross-Launcher-Test
+abgesichert.
