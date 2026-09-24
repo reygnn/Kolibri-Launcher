@@ -22,7 +22,7 @@ import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent

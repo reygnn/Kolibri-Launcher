@@ -46,7 +46,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUse
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetContentTopMarginUseCase
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification

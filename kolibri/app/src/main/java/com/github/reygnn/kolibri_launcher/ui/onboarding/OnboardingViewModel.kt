@@ -14,7 +14,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.sortedByDisplayName
+import com.github.reygnn.launcher.core.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult

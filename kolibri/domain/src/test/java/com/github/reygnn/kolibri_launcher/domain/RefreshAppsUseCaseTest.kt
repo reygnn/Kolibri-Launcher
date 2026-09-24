@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import io.mockk.MockKAnnotations
 import io.mockk.coVerify

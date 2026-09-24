@@ -10,7 +10,6 @@ import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceive
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,8 +32,8 @@ import javax.inject.Singleton
  * pure reconcile + hand-rolled cache into live behaviour):
  *
  * - package added/removed/changed → [IconLoader.evict] (drop stale icons, ICL-INV-3)
- *   immediately, then force a shared re-enumeration and a debounced
- *   [ReconcileHomeLayoutUseCase] (prune the layout, fail-closed).
+ *   immediately, then a debounced [ReconcileHomeLayoutUseCase] (prune the layout,
+ *   fail-closed).
  * - [start] also runs one reconcile for cold-start catch-up (changes that
  *   happened while Nyx wasn't running). The device grid is re-fit separately,
  *   from the real home-grid area, in MainActivity.
@@ -56,13 +55,14 @@ import javax.inject.Singleton
  *
  * Reconcile requests are coalesced through a conflated flow debounced by
  * [AppConstants.APP_RELOAD_DEBOUNCE_MS]: a package-event storm (system update,
- * app restore, bulk install) fires many events, and each reconcile primes the
- * shared loader plus an atomic DataStore read-modify-write. The debounce collapses
- * the storm to a single reconcile once it settles. The priming `flowOf(Unit)`
- * bypasses the debounce, so the cold-start catch-up runs immediately. Per-package
- * icon eviction and the re-enumeration trigger stay immediate — eviction is cheap
- * and must drop a stale icon promptly, and the trigger must kick the shared motor
- * so the (debounced) reconcile primes a FRESH list, not a stale cached one.
+ * app restore, bulk install) fires many events, and each reconcile reads the
+ * shared enumerator plus an atomic DataStore read-modify-write. The debounce
+ * collapses the storm to a single reconcile once it settles. The priming
+ * `flowOf(Unit)` bypasses the debounce, so the cold-start catch-up runs
+ * immediately. Per-package icon eviction stays immediate — it is cheap and must
+ * drop a stale icon promptly. The reconcile reads the shared enumerator directly
+ * (a one-shot read in [ReconcileHomeLayoutUseCase]), so it always sees a fresh
+ * list without this coordinator having to prime the shared loader.
  */
 @Singleton
 class PackageEventCoordinator @Inject constructor(
@@ -71,7 +71,6 @@ class PackageEventCoordinator @Inject constructor(
     private val folderRenderer: FolderIconRenderer,
     private val reconcile: ReconcileHomeLayoutUseCase,
     private val appUpdateSignal: AppUpdateSignal,
-    private val refreshApps: RefreshAppsUseCase,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -113,16 +112,16 @@ class PackageEventCoordinator @Inject constructor(
         // The shared freshness bus (F2 route (a)): broadcast → :common-data
         // PackageUpdateReceiver → AppUpdateSignal → here. Each PackageEvent carries
         // the changed package, so this does everything the old LauncherApps.Callback
-        // did — per-package icon eviction — plus forces the shared motor to
-        // re-enumerate (triggerAppsUpdate) so the debounced reconcile primes a fresh
-        // list. Same guard idiom as the reconcile pump.
+        // did — per-package icon eviction — and then requests a debounced reconcile.
+        // The reconcile reads the shared enumerator directly (a one-shot enumerate()),
+        // so no explicit re-enumeration trigger is needed here. Same guard idiom as
+        // the reconcile pump.
         scope.launch {
             appUpdateSignal.events.collect { event ->
                 try {
                     iconLoader.evict(event.packageName) // ICL-INV-3, targeted
                     folderRenderer.clear() // a member's icon may have changed
-                    refreshApps() // force a shared re-enumeration (freshness)
-                    requestReconcile() // debounced layout prune off the fresh list
+                    requestReconcile() // debounced layout prune (reconcile reads the enumerator directly)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

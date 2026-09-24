@@ -73,10 +73,10 @@ abstract class RepositoryModule {
     abstract fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
 
     // ── Shared installed-apps subsystem (:core port → :common-data impls, decision B) ──
-    // The LauncherApps-backed motor (drawer loader + coordinator's RefreshAppsUseCase)
-    // and the enumerator (fail-closed reconcile). LauncherApps + the reload trigger are
-    // provided by Nyx's SystemServiceModule. Nyx's own local InstalledAppsRepositoryImpl
-    // + AppLoadResult port were retired in E3.
+    // The LauncherApps-backed motor (drawer loader) and the enumerator (read directly
+    // by the fail-closed reconcile). LauncherApps + the reload trigger are provided by
+    // Nyx's SystemServiceModule. Nyx's own local InstalledAppsRepositoryImpl +
+    // AppLoadResult port were retired in E3.
     @Binds
     @Singleton
     abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository

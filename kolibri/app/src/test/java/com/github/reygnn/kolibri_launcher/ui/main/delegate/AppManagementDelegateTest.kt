@@ -16,7 +16,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.HideAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveHomeSettingsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.RefreshAppsUseCase
+import com.github.reygnn.launcher.core.RefreshAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
