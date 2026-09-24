@@ -320,4 +320,31 @@ class ReconcileHomeLayoutUseCaseTest {
         assertThat(folder.members).containsExactly(ck("pa"), ck("pb"))
         assertThat(presence.checked).containsExactly(ck("pb"))
     }
+
+    /**
+     * SNAPSHOT→RMW WINDOW (RHL-INV-6, AUDIT-1 F7 review point 3). Candidates are computed from
+     * [FakeHomeLayoutRepository.snapshot] OUTSIDE the atomic RMW; a key that the fresh in-lock
+     * `current` references but the snapshot did NOT (a concurrent save/import landed pb between
+     * the two reads) was never gate-checked. It must be kept, not pruned — otherwise F7 reopens
+     * on that one key. Here the snapshot sees only pa, `current` has pa+pb, pb is absent from the
+     * enumeration AND the presence gate reports it absent — yet pb survives because it is a NEW
+     * referenced key (not among the snapshot-derived candidates), so it is fail-safe kept.
+     * Mutation check: drop the in-lock `filterTo(installed)` line and pb is pruned → red.
+     */
+    @Test
+    fun key_added_between_snapshot_and_rmw_is_not_pruned() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb")).apply {
+            snapshotOverride = layoutWith("pa") // snapshot predates pb's placement
+        }
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+        val presence = FakeAppPresence(present = emptySet()) // pb would be confirmed absent IF checked
+
+        val result = useCase(layoutRepo, enumerator, presence)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(layoutRepo.saveCount).isEqualTo(0) // pb kept: never gate-checked, so fail-safe
+        assertThat(layoutRepo.current.items.map { it.item.id })
+            .containsExactly(ItemId("pa"), ItemId("pb"))
+        assertThat(presence.checked).isEmpty() // pb was not a snapshot candidate → not probed
+    }
 }

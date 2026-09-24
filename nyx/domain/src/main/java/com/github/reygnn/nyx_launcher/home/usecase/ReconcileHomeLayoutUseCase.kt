@@ -124,6 +124,15 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
 
             var result: ReconcileResult = ReconcileResult.Unchanged
             layoutRepository.update { current -> // atomic RMW (A1-03)
+                // Close the snapshot()→RMW window (RHL-INV-6, AUDIT-1 F7 review point 3): the
+                // candidate set was derived from [snapshot] OUTSIDE this lock, so a key that
+                // `current` references but the snapshot did not (a placement added by a
+                // concurrent save/import in the meantime) was never gate-checked. Pruning it
+                // would reintroduce the F7 failure class on that one key. Fail-safe: fold every
+                // such NEW referenced key back into `installed` so it is kept. Deliberately-pruned
+                // keys (in `candidates`, both gate arms negative) stay excluded and still prune.
+                // Pure set work on the in-lock `current` — no IPC held under the store lock.
+                current.referencedKeys().filterTo(installed) { it !in installed && it !in candidates }
                 when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
                     ReconcileOutcome.Unchanged -> null
                     is ReconcileOutcome.Changed -> {
