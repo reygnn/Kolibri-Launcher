@@ -55,6 +55,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.truth)
     testImplementation(libs.robolectric)

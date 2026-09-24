@@ -87,7 +87,7 @@ class PackageUpdateReceiverTest {
     }
 
     @Test
-    fun `handleReceive - with relevant action - launches coroutine and eventually finishes`() = runTest {
+    fun `handleReceive - with relevant action - launches coroutine and eventually finishes`() = runTest(mainDispatcherRule.testDispatcher) {
         every { intent.action } returns Intent.ACTION_PACKAGE_ADDED
 
         val mockUri = mockk<Uri>()
@@ -114,7 +114,7 @@ class PackageUpdateReceiverTest {
     }
 
     @Test
-    fun `handleReceive - with package removed action - processes correctly`() = runTest {
+    fun `handleReceive - with package removed action - processes correctly`() = runTest(mainDispatcherRule.testDispatcher) {
         every { intent.action } returns Intent.ACTION_PACKAGE_REMOVED
         // A genuine uninstall, not a replace — so it takes the processing path.
         every { intent.getBooleanExtra(Intent.EXTRA_REPLACING, false) } returns false
@@ -185,7 +185,7 @@ class PackageUpdateReceiverTest {
     }
 
     @Test
-    fun `handleReceive - with package changed action - processes correctly`() = runTest {
+    fun `handleReceive - with package changed action - processes correctly`() = runTest(mainDispatcherRule.testDispatcher) {
         every { intent.action } returns Intent.ACTION_PACKAGE_CHANGED
 
         val mockUri = mockk<Uri>()

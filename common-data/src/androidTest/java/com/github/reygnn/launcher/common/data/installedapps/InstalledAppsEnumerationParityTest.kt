@@ -36,6 +36,13 @@ import org.junit.runner.RunWith
  * activities. On a device where the test app is NOT the default launcher this
  * still returns the primary user's launchable set; if an image restricts it,
  * document that here rather than deleting the assertion.
+ *
+ * VISIBILITY: the androidTest manifest (`src/androidTest/AndroidManifest.xml`)
+ * grants `QUERY_ALL_PACKAGES`. Without it the PackageManager side would be
+ * package-visibility filtered (Android 11+) while `getActivityList` is not, so
+ * the two APIs would enumerate different universes and the diff below would be a
+ * visibility artefact rather than a real behaviour change. With the grant, both
+ * sides see the same launchable set, so a non-empty diff is a genuine divergence.
  */
 @RunWith(AndroidJUnit4::class)
 class InstalledAppsEnumerationParityTest {

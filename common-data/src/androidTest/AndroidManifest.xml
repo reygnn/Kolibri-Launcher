@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        InstalledAppsEnumerationParityTest compares
+        PackageManager.queryIntentActivities(MAIN + LAUNCHER) against
+        LauncherApps.getActivityList. On Android 11+ the PackageManager query is
+        package-visibility filtered while getActivityList is not, so WITHOUT this
+        permission the two APIs enumerate different universes (the instrumentation
+        APK would see only its own launchable activities via queryIntentActivities
+        but every launchable app via getActivityList) and the parity assertion
+        could never hold — a visibility artefact, not a real divergence.
+
+        QUERY_ALL_PACKAGES gives the instrumentation APK the same visibility
+        getActivityList already has, so the test measures a genuine enumeration-set
+        divergence between the retired PM path and the surviving LauncherApps path.
+        androidTest-only; it is not merged into any shipped app manifest.
+    -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+</manifest>
