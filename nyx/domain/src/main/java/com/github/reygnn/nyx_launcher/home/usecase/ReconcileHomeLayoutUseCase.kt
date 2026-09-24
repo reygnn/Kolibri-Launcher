@@ -1,8 +1,10 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.AppEnumerator
+import com.github.reygnn.launcher.core.AppPresence
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
@@ -10,8 +12,6 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileOutcome
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
-import com.github.reygnn.nyx_launcher.home.service.AppPresence
-import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutReconciler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher

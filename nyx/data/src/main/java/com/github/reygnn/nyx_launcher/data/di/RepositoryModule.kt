@@ -12,10 +12,10 @@ import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
-import com.github.reygnn.nyx_launcher.data.installedapps.PackageManagerInstallSessions
-import com.github.reygnn.nyx_launcher.data.installedapps.PackageManagerPresence
-import com.github.reygnn.nyx_launcher.home.service.AppPresence
-import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
+import com.github.reygnn.launcher.common.data.installedapps.PackageManagerInstallSessions
+import com.github.reygnn.launcher.common.data.installedapps.PackageManagerPresence
+import com.github.reygnn.launcher.core.AppPresence
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory

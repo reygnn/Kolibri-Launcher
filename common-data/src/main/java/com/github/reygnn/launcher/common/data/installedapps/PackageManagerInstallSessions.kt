@@ -1,9 +1,9 @@
-package com.github.reygnn.nyx_launcher.data.installedapps
+package com.github.reygnn.launcher.common.data.installedapps
 
 import android.content.pm.PackageManager
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext

@@ -1,4 +1,4 @@
-package com.github.reygnn.nyx_launcher.data.installedapps
+package com.github.reygnn.launcher.common.data.installedapps
 
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager

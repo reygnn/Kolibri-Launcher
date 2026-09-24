@@ -129,7 +129,7 @@ gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-L
 Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
 Aufwand wert.
 
-### Presence-Naht teilen (F7-Gate → `:core` / `:common-data`, Option B/C — offener Refactor-Kandidat, 2026-09-24)
+### Presence-Naht teilen (F7-Gate) — Option B erledigt, Option C offen (2026-09-24)
 
 Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (RHL-INV-6, das nyx-Analog
 zu Kolibris R-INV-2). `ReconcileHomeLayoutUseCase` prunt einen fehlenden Layout-Key nicht
@@ -140,31 +140,32 @@ beide fail-safe Richtung „behalten". Umgesetzte Schichten:
   (fail-CLOSED, wie der interne `update`-Read) statt über den fail-open `layout()`-Flow
   berechnet; ein transienter Read-Fehler bricht den Pass ab, statt zu einem leeren Layout
   ohne Schutz zu degradieren.
-- **fix 2 — Cross-Surface-Presence:** `AppPresence`-Impl ist jetzt `PackageManagerPresence`
+- **fix 2 — Cross-Surface-Presence:** `AppPresence`-Impl ist `PackageManagerPresence`
   (PackageManager, `ACTION_MAIN`/`CATEGORY_LAUNCHER`, komponentengenau) — ein *anderes*
   Subsystem als die LauncherApps-Enumeration, sodass ein LauncherApps-Transient den Check
   nicht mitvergiftet. Technik von Kolibris `PackagePresenceImpl` übernommen.
-- **fix 3 — Session-Gate:** neuer Port `home/service/InstallSessionInspector` + Impl
-  `data/installedapps/PackageManagerInstallSessions` (`PackageInstaller.getAllSessions()`).
-  Launcher3-Muster: einen Key, dessen Paket eine aktive Install/Restore-Session hat, nie
-  prunen (Promise). Schließt den Mid-Restore-Vektor, den keine Presence-Prüfung schließen kann.
+- **fix 3 — Session-Gate:** Port `InstallSessionInspector` + Impl
+  `PackageManagerInstallSessions` (`PackageInstaller.getAllSessions()`). Launcher3-Muster:
+  einen Key, dessen Paket eine aktive Install/Restore-Session hat, nie prunen (Promise).
+  Schließt den Mid-Restore-Vektor, den keine Presence-Prüfung schließen kann.
 
 Ein Rest-Fall bleibt bewusst offen (Restore ohne auffindbare Session) — dokumentiert in
-`ACCEPTED_LIMITATIONS.md` („Reconcile während Restore …").
+`ACCEPTED_LIMITATIONS.md` („… pruned during a restore that exposes no install session").
 
-**Offen (Option B):** die Presence-*Naht* teilen. `AppEnumerator` liegt bereits geteilt
-(Port in `:core`, Impl `LauncherAppsEnumerator` in `:common-data`, app-seitig gebunden).
-`AppPresence` + `InstallSessionInspector` sind nyx-lokal — eine Asymmetrie. Umzug der Ports
-nach `:core` und der PackageManager-Impls nach `:common-data`, gebunden in *beiden*
-App-`RepositoryModule`s. Das **Use-Case-Gate bleibt in nyx** (hängt am `HomeLayout`). Geringes
-Risiko, keine Verhaltensänderung.
+**Erledigt (Option B):** die Presence-*Naht* ist geteilt, symmetrisch zum `AppEnumerator`.
+Ports `AppPresence` + `InstallSessionInspector` → `:core` (neben `AppEnumerator`), Impls
+`PackageManagerPresence` + `PackageManagerInstallSessions` → `:common-data` (neben
+`LauncherAppsEnumerator`), app-seitig via `@Binds` in nyx' `RepositoryModule` gebunden
+(`PackageManager` app-seitig provided). Das Use-Case-Gate blieb in nyx (hängt am
+`HomeLayout`). Reiner Modul-/Namespace-Umzug, keine Verhaltensänderung. Kolibri bindet
+die geteilten Ports (noch) nicht — die Klassen liegen bereit, werden dort aber nicht
+konsumiert, also keine toten Bindings.
 
-**Größerer Folgeschritt (Option C, separate Spec):** Jetzt, da nyx' Presence ebenfalls auf
-PackageManager sitzt, ist die semantische Lücke zu Kolibris `PackagePresence` klein
-(String- vs. `ComponentKey`-Keying, 2 vs. 1 Methode). Beide auf *eine* geteilte
-Presence-Abstraktion zusammenführen ist damit realistischer geworden — berührt aber Kolibris
-Favorites/Hidden/Swipe/CustomNames. Empfehlung: B als nächster Schritt, C nur wenn der
-Konsolidierungsdruck steigt.
+**Offen (Option C, separate Spec):** Kolibris bestehendes `PackagePresence` (String-Keying,
+2 Methoden inkl. Package-Level für Custom-Names) auf die jetzt geteilte
+`AppPresence`-Abstraktion (`ComponentKey`, 1 Methode) migrieren, damit es *eine* Presence
+für beide Apps gibt. Berührt Kolibris Favorites/Hidden/Swipe/CustomNames + hat die
+Component-vs-Package-Lücke — nur angehen, wenn der Konsolidierungsdruck steigt.
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 

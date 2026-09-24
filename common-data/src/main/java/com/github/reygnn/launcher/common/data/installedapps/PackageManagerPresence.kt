@@ -1,11 +1,11 @@
-package com.github.reygnn.nyx_launcher.data.installedapps
+package com.github.reygnn.launcher.common.data.installedapps
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import com.github.reygnn.launcher.core.AppPresence
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.nyx_launcher.home.service.AppPresence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -36,9 +36,10 @@ import javax.inject.Singleton
  * **Does NOT close the genuine mid-restore vector.** If a package is genuinely not yet
  * reinstalled during a restore, PackageManager also reports it absent — correctly, it IS
  * absent right now — and the key would still be pruned. That timing case is handled by the
- * install-session gate ([com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector]),
+ * install-session gate ([com.github.reygnn.launcher.core.InstallSessionInspector]),
  * not here; this check only removes the shared-transient failure mode (see nyx
- * ACCEPTED_LIMITATIONS.md, "reconcile during restore").
+ * ACCEPTED_LIMITATIONS.md, "reconcile during restore"). The session arm is
+ * [com.github.reygnn.launcher.core.InstallSessionInspector].
  *
  * **Fail-safe:** any platform failure resolves to `true` (present) so a transient
  * system-API error can never become a prune. The broad `Throwable` catch is the

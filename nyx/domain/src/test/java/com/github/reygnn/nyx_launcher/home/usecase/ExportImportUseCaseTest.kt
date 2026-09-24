@@ -13,8 +13,8 @@ import com.github.reygnn.launcher.core.installedapps.FakeAppEnumerator
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
-import com.github.reygnn.nyx_launcher.home.service.AppPresence
-import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
+import com.github.reygnn.launcher.core.AppPresence
+import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
