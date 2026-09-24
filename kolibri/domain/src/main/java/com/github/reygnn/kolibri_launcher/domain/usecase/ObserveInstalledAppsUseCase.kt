@@ -111,26 +111,24 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                                 // per-store failure so one bad store can't skip the others.
                                 val validComponents = realApps.map { it.componentName }
                                 val validPackages = realApps.map { it.packageName }
-                                // The component-keyed stores pass a flattened "pkg/class"
-                                // string; bridge it to the shared component-grain gate via
-                                // ComponentKey.parse. A malformed stored key (parse == null)
-                                // is not a real component → treat as absent so the garbage
-                                // is cleaned (matches the pre-migration string check, which
-                                // also never matched a slash-less key). Custom names are
-                                // package-keyed and use the package-grain gate directly.
+                                // The three component-keyed stores bridge their flattened
+                                // "pkg/class" string to the shared component-grain gate via
+                                // [AppPresence.isFlatComponentPresent] (parse + gate, malformed
+                                // → absent; see its KDoc). Custom names are package-keyed and
+                                // use the package-grain gate directly.
                                 runCleanup("favorites") {
                                     favoritesRepository.reconcileFavoriteComponents(validComponents) {
-                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
+                                        appPresence.isFlatComponentPresent(it)
                                     }
                                 }
                                 runCleanup("swipe actions") {
                                     swipeActionsRepository.reconcileSwipeActions(validComponents) {
-                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
+                                        appPresence.isFlatComponentPresent(it)
                                     }
                                 }
                                 runCleanup("hidden components") {
                                     hiddenAppsRepository.reconcileHiddenComponents(validComponents) {
-                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
+                                        appPresence.isFlatComponentPresent(it)
                                     }
                                 }
                                 runCleanup("custom names") {
@@ -175,3 +173,18 @@ class ObserveInstalledAppsUseCase @Inject constructor(
         }
     }
 }
+
+/**
+ * Bridge a component-keyed store's flattened `"pkg/class"` string to the shared component-grain
+ * gate [AppPresence.isComponentPresent]: parse to a [ComponentKey], then query presence.
+ *
+ * A malformed stored key (`ComponentKey.parse == null` — e.g. a slash-less bare package) is not
+ * a real component, so it resolves to absent (`false`). That matches the pre-migration string
+ * check exactly, which reconstructed `"pkg/class"` from the resolved activity and compared it to
+ * the stored value — a comparison a slash-less key could never satisfy — so such garbage was
+ * pruned then and is pruned now. Extracted from the three identical favorites/swipe/hidden call
+ * sites (AUDIT-1 F7 review, point 2: DRY); the fail-safe-to-present contract still lives entirely
+ * in [AppPresence] itself, so a transient platform error can never become a prune.
+ */
+private suspend fun AppPresence.isFlatComponentPresent(flat: String): Boolean =
+    ComponentKey.parse(flat)?.let { isComponentPresent(it) } ?: false
