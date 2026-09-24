@@ -247,8 +247,9 @@ class ObserveInstalledAppsUseCaseTest {
         // com.gone has no session and is absent → still pruned everywhere. The session set is read
         // exactly ONCE for the whole pass (batched + shared across all four stores), never per key.
         //
-        // Mutation checks: (a) drop the `|| sessions.isRestoring(...)` arm and com.app2 is pruned →
-        // red; (b) build a fresh PassSessionGate per store instead of one per pass and `reads` != 1.
+        // Mutation checks: (a) drop the session arm in core DeletionGatePass.keepComponent/keepPackage
+        // (make it presence-only) and com.app2 is pruned → red; (b) build a fresh DeletionGatePass per
+        // store instead of one per pass and `reads` != 1.
         val restoring = testApps[1].componentName    // com.app2/com.app2.Main
         val restoringPkg = testApps[1].packageName   // com.app2
         val orphanComponent = "com.gone/com.gone.Main"
@@ -290,11 +291,11 @@ class ObserveInstalledAppsUseCaseTest {
     @Test
     fun `undetermined session read keeps a presence-absent candidate across all stores and reads once`() = runTest {
         // Nyx analog: undetermined_session_read_keeps_a_presence_absent_candidate. When the
-        // PackageInstaller query fails, activeSessionPackages() returns null; PassSessionGate.isRestoring
-        // fail-safe KEEPS every presence-absent candidate (`packages?.contains(pkg) ?: true`) rather
+        // PackageInstaller query fails, activeSessionPackages() returns null; the shared core
+        // DeletionGatePass fail-safe KEEPS every presence-absent candidate (null → keep) rather
         // than pruning it. com.app2 is dropped from the load AND absent from presence; with the session
         // read undetermined it must survive across all four stores, and the set is read exactly ONCE.
-        // Mutation guard: flip the elvis in PassSessionGate to `?: false` and com.app2 is pruned -> red.
+        // Mutation guard: flip the null→keep in core DeletionGatePass to prune-on-null → com.app2 pruned, red.
         val candidate = testApps[1].componentName    // com.app2/com.app2.Main
         val candidatePkg = testApps[1].packageName   // com.app2
 
@@ -325,12 +326,12 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `a malformed component key is pruned without ever consulting the session arm`() = runTest {
-        // isFlatComponentPresentOrRestoring does `ComponentKey.parse(flat) ?: return false` — a
-        // slash-less/garbage key is not a real component, so it is pruned WITHOUT touching the session
-        // set (the parse-null short-circuits before the `|| sessions.isRestoring` arm). With the
-        // malformed key the only orphan, the session set is never read (reads == 0).
+        // keepFlatComponent does `ComponentKey.parse(flat) ?: return false` — a slash-less/garbage key
+        // is not a real component, so it is pruned WITHOUT touching the session set (the parse-null
+        // short-circuits before the shared gate's session arm). With the malformed key the only orphan,
+        // the session set is never read (reads == 0).
         // Mutation guards: change `?: return false` to `?: return true` and the garbage survives -> red;
-        // route the malformed key through the session arm and reads != 0.
+        // route the malformed key through the gate (keepComponent) anyway and reads != 0.
         val malformed = "com.malformed.no.slash"   // ComponentKey.parse(...) == null
 
         hiddenAppsRepository.hiddenApps = setOf(malformed)

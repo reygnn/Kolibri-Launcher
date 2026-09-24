@@ -4,6 +4,7 @@ import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.AppPresence
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.DeletionGatePass
 import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
@@ -115,31 +116,19 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
             val candidates = layoutRepository.snapshot()
                 .referencedKeys()
                 .filterTo(HashSet()) { it !in installed }
-            // The install/restore-session set is read at most ONCE per pass and lazily — only if
-            // some candidate is absent from presence (AUDIT-1 F7 review, point 5). A complete
-            // snapshot (no candidates) or an all-present candidate set never touches it, so the
-            // common path stays at zero session IPC; the abnormal path pays a single
-            // PackageInstaller enumeration, not one per candidate. `null` = undetermined → keep.
-            var sessionPackages: Set<String>? = null
-            var sessionsRead = false
+            // Apply the shared per-pass deletion gate (core [DeletionGatePass]): a candidate is
+            // kept if it still resolves independently (cross-surface PackageManager presence — a
+            // LauncherApps enumeration transient can't poison it) OR its package has an install/
+            // restore session in flight (Launcher3-style promise). The gate reads the session set at
+            // most ONCE per pass and lazily — only when a candidate is absent from presence — so a
+            // complete snapshot (no candidates) or an all-present candidate set performs zero
+            // session IPC; the abnormal path pays a single PackageInstaller enumeration, not one per
+            // candidate; `null`/undetermined → fail-safe keep. Only a key BOTH absent AND
+            // session-less is pruned. This is the SAME gate kolibri's store reconciles apply, so the
+            // two launchers can't drift on the fail-safe policy (root TODO.md "Drift-Prävention" a).
+            val gate = DeletionGatePass(appPresence, installSessions)
             for (key in candidates) {
-                // Keep the key if EITHER it still resolves independently (cross-surface
-                // PackageManager presence — a LauncherApps enumeration transient can't poison it)
-                // OR its package has an install/restore session in flight (Launcher3-style promise:
-                // an app on its way back during restore is legitimately absent right now but must
-                // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
-                // Short-circuit: presence first (one cheap package query), session set only if absent.
-                if (appPresence.isComponentPresent(key)) {
-                    installed.add(key)
-                    continue
-                }
-                if (!sessionsRead) {
-                    sessionPackages = installSessions.activeSessionPackages()
-                    sessionsRead = true
-                }
-                // null (undetermined) → fail-safe keep; otherwise keep iff a session targets it.
-                val sessions = sessionPackages
-                if (sessions == null || key.packageName in sessions) {
+                if (gate.keepComponent(key)) {
                     installed.add(key)
                 }
             }

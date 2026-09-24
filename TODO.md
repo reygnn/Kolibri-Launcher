@@ -73,7 +73,22 @@ Restore-Restrisiko wieder einseitig.
 
 Zwei Hebel dagegen (a reduziert die Duplikation, b macht Rest-Drift laut):
 
-### a) Kandidaten-Finder + Gate-Anwendung als geteilten Helfer nach `:core` extrahieren
+### a) ✅ Erledigt (2026-09-24, Branch `refactor/shared-deletion-gate`)
+
+Umgesetzt als `core/DeletionGatePass` — eine per-Pass-Instanz, die `AppPresence` + `InstallSessionInspector`
+kapselt und `keepComponent(ComponentKey)` / `keepPackage(String)` anbietet (Presence zuerst,
+Session-Set **einmal** pro Pass lazy gelesen, `null→keep`). nyx' inline `sessionsRead`-Schleife und
+kolibris `PassSessionGate` + beide Bridges (`isFlatComponentPresentOrRestoring` /
+`isPackagePresentOrRestoring`) sind entfernt; beide Reconciles rufen jetzt denselben Helfer. Kolibri
+behält nur einen 3-Zeilen-Bridge `DeletionGatePass.keepFlatComponent` (flat-String → parse →
+`keepComponent`, malformed → prune), weil seine Store-Keys flache Strings sind. Getrennt bleiben
+(fundamental): Kandidaten-Finden (`referencedKeys` vs Store-Orphans), Modell-Anwendung (atomares
+`update{}` vs subtract-`edit{}`), das snapshot→RMW-Fenster. Direkt gepinnt durch
+`core/DeletionGatePassTest` (8 Fälle: present→reads==0, absent+session→keep, absent+session-less→prune,
+undetermined→keep, beide Grains, batching reads==1). Der Fail-safe-Kern (inkl. eines künftigen
+count-floors) lebt jetzt an **einer** Stelle. Gate grün.
+
+<details><summary>Ursprünglicher Plan (Referenz)</summary>
 
 Heute steckt „fehlender Key → nur Kandidat → keep, wenn Presence **oder** Session anschlägt (beide
 fail-safe), sonst prune" in beiden Policies als eigener Code. Ziel: die **reine, Android-freie**
@@ -94,7 +109,9 @@ Policy-Schicht schrumpft auf „liefere Keys / wende Ergebnis an". `PassSessionG
 Extraktion referenzieren **beide** Reconcile-Eingänge denselben Helfer; kein zweites `null→keep`
 oder `session-read-once` mehr im Repo-/UseCase-Code.
 
-### b) Cross-Launcher-Parity-Test für das Delete-Gate
+</details>
+
+### b) Cross-Launcher-Parity-Test für das Delete-Gate (jetzt billig — nach a)
 
 Heute testen nyx und kolibri ihr Gate **unabhängig** — eine einseitige Semantik-Änderung wird nicht
 rot. Ziel: **eine** Tabelle von Gate-Szenarien (present / absent+session / absent+no-session /
