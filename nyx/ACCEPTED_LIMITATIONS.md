@@ -35,3 +35,42 @@ app of the same name.
 add non-drag alternatives — context-menu entries ("Add to folder…" / "Remove from
 folder") or custom `AccessibilityAction`s on the tiles — NOT to move off the
 custom drag engine.
+
+---
+
+## A home item can be pruned during a restore that exposes no install session
+
+**What:** After the fail-closed reconcile (AUDIT-1 F7, RHL-INV-6), a home/dock
+placement is pruned only when its package is BOTH absent from a fresh app
+enumeration AND fails two independent keep-checks: cross-surface presence
+(`PackageManagerPresence`) and an active-install/restore-session probe
+(`PackageManagerInstallSessions`). In the normal restore flow the session probe
+keeps a not-yet-reinstalled app as a "promise" until its install session
+completes. The residual gap: if a package is genuinely not installed yet AND no
+discoverable `PackageInstaller` session represents its pending restore, both
+keep-checks say "gone" and the placement is pruned — its position/folder
+membership is not recovered when the app later appears (it returns to the drawer,
+not to its old spot).
+
+**Why:** The reconcile candidate finder is the fresh enumeration, which can be
+partial mid-restore. Presence (fixes the shared-transient failure mode) cannot
+help here because the app really is absent at that instant. The session probe
+(the Launcher3 mechanism) closes the common case but depends on a session being
+visible to nyx: `getAllSessions()` requires nyx to be the active default launcher
+for foreign sessions to carry a package name, and some restore agents may not
+surface a per-package session at all. When no session is visible, there is no
+signal left that distinguishes "being restored" from "uninstalled", and the
+gate's fail-safe covers only query *errors*, not a legitimate empty result.
+
+**Not blocking:** Requires the conjunction of an active restore, a package not yet
+reinstalled at the moment a reconcile runs, and no discoverable session for it —
+and even then only affects placement, never app access (the app relaunches from
+the drawer once restored). Kolibri accepts the same residual for its component-
+bound stores; neither launcher adds a sanity-floor.
+
+**Re-evaluate when:** field reports show lost home placements after a device
+transfer. The sanctioned next steps are, in order: (1) also honor the
+`ACTION_SESSION_COMMITTED` broadcast / a longer restore-aware defer window so a
+reconcile does not run while a restore is in progress; (2) a keep-last-good count
+floor (skip the reconcile when the enumeration count drops implausibly, not only
+at zero). Do NOT relax the presence fail-safe.

@@ -14,6 +14,7 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.service.AppPresence
+import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
@@ -57,6 +58,20 @@ class ReconcileHomeLayoutUseCaseTest {
         }
     }
 
+    /**
+     * Session fake. [active] is the set of package names with an install/restore session in
+     * flight. Default empty → no package is being restored, so the pre-fix-3 prune tests keep
+     * their outcome. [checked] records lookups so a test can assert the presence short-circuit
+     * (a present key must not reach the session probe).
+     */
+    private class FakeInstallSessions(var active: Set<String> = emptySet()) : InstallSessionInspector {
+        val checked = mutableListOf<String>()
+        override suspend fun hasActiveSession(packageName: String): Boolean {
+            checked += packageName
+            return packageName in active
+        }
+    }
+
     private fun layoutWith(vararg pkgs: String): HomeLayout = HomeLayout(
         grid,
         pages = 1,
@@ -78,7 +93,10 @@ class ReconcileHomeLayoutUseCaseTest {
         layoutRepo: FakeHomeLayoutRepository,
         enumerator: FakeAppEnumerator,
         appPresence: AppPresence = FakeAppPresence(),
-    ) = ReconcileHomeLayoutUseCase(layoutRepo, enumerator, appPresence, ids, mainDispatcherRule.dispatcher)
+        installSessions: InstallSessionInspector = FakeInstallSessions(),
+    ) = ReconcileHomeLayoutUseCase(
+        layoutRepo, enumerator, appPresence, installSessions, ids, mainDispatcherRule.dispatcher,
+    )
 
     @Test
     fun failed_load_is_skipped_and_never_saves() = runTest(mainDispatcherRule.dispatcher) {
@@ -195,38 +213,81 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     /**
-     * The gate must not over-protect: a candidate the presence check confirms GONE is
-     * still pruned. Distinguishes "transiently absent" (keep) from "actually uninstalled
-     * during a partial pass" (prune).
+     * The gate must not over-protect: a candidate that is absent AND has no install session
+     * is still pruned. Distinguishes "transiently absent / being restored" (keep) from
+     * "actually uninstalled" (prune), and pins that the session probe IS consulted once
+     * presence reports absent (the OR reaches its second arm).
      */
     @Test
     fun partial_snapshot_still_prunes_a_genuinely_absent_app() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
         val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa")))
         val presence = FakeAppPresence(present = emptySet()) // pb confirmed gone
+        val sessions = FakeInstallSessions(active = emptySet()) // …and not being restored
 
-        val result = useCase(layoutRepo, enumerator, presence)()
+        val result = useCase(layoutRepo, enumerator, presence, sessions)()
 
         assertThat(result).isInstanceOf(ReconcileResult.Reconciled::class.java)
         assertThat(layoutRepo.saveCount).isEqualTo(1)
         assertThat(layoutRepo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
+        assertThat(sessions.checked).containsExactly("pb") // absent → session arm consulted
+    }
+
+    /**
+     * SESSION GATE (fix 3, Launcher3-style promise). A candidate the presence check reports
+     * ABSENT is still kept when its package has an install/restore session in flight — the
+     * mid-restore vector no presence check can close. Mutation check: drop the `|| session`
+     * arm and pb is pruned → red.
+     */
+    @Test
+    fun partial_snapshot_protects_an_app_with_an_active_install_session() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+        val presence = FakeAppPresence(present = emptySet()) // pb not installed *yet*
+        val sessions = FakeInstallSessions(active = setOf("pb")) // …but a restore is in flight
+
+        val result = useCase(layoutRepo, enumerator, presence, sessions)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(layoutRepo.saveCount).isEqualTo(0) // pb kept as a "promise"
+        assertThat(layoutRepo.current.items.map { it.item.id })
+            .containsExactly(ItemId("pa"), ItemId("pb"))
+    }
+
+    /**
+     * SHORT-CIRCUIT. A present candidate is kept by the first arm alone; the session probe
+     * must not be consulted (presence is the cheaper, primary signal).
+     */
+    @Test
+    fun present_candidate_short_circuits_the_session_probe() = runTest(mainDispatcherRule.dispatcher) {
+        val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
+        val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"))) // pb missing this pass
+        val presence = FakeAppPresence(present = setOf(ck("pb"))) // pb present via presence
+        val sessions = FakeInstallSessions()
+
+        val result = useCase(layoutRepo, enumerator, presence, sessions)()
+
+        assertThat(result).isEqualTo(ReconcileResult.Unchanged)
+        assertThat(sessions.checked).isEmpty() // never reached the second arm
     }
 
     /**
      * COMMON-PATH COST PIN. A complete snapshot (every layout key present) yields zero
-     * prune candidates, so the presence gate is never consulted — no per-reconcile IPC is
-     * added to the healthy path.
+     * prune candidates, so neither gate is consulted — no per-reconcile IPC is added to
+     * the healthy path.
      */
     @Test
-    fun complete_snapshot_consults_presence_zero_times() = runTest(mainDispatcherRule.dispatcher) {
+    fun complete_snapshot_consults_neither_gate() = runTest(mainDispatcherRule.dispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
         val enumerator = FakeAppEnumerator(result = listOf(appInfo("pa"), appInfo("pb")))
         val presence = FakeAppPresence()
+        val sessions = FakeInstallSessions()
 
-        val result = useCase(layoutRepo, enumerator, presence)()
+        val result = useCase(layoutRepo, enumerator, presence, sessions)()
 
         assertThat(result).isEqualTo(ReconcileResult.Unchanged)
         assertThat(presence.checked).isEmpty()
+        assertThat(sessions.checked).isEmpty()
     }
 
     /**

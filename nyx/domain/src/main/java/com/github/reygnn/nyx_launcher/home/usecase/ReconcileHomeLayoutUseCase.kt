@@ -11,6 +11,7 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.service.AppPresence
+import com.github.reygnn.nyx_launcher.home.service.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.home.transition.HomeLayoutReconciler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -43,17 +44,21 @@ import javax.inject.Inject
  * `getActivityList` mid-restore / early post-unlock, or a per-item drop in the
  * enumerator) passes both and would let the reconciler prune every app missing from
  * the partial set, permanently. So a layout key absent from the snapshot is only a
- * *candidate* for pruning: each candidate is re-confirmed through [AppPresence]
- * (which fail-safes to "present") and, if still installed, folded back into the
- * installed set so the pure reconciler never drops it. This is the Nyx analog of
- * Kolibri's per-target deletion gate (RECONCILE_FIX_SPEC R-INV-2): bulk snapshot
- * proposes, single-target check disposes. A COMPLETE snapshot yields zero candidates
- * and performs zero presence IPC — the common path is unchanged in cost and behavior.
+ * *candidate* for pruning, kept if EITHER of two independent signals says so:
+ * [AppPresence] (cross-surface PackageManager, so a LauncherApps transient can't poison
+ * it) OR [InstallSessionInspector] (a package mid-install/restore — Launcher3-style
+ * promise). Both fail-safe toward keeping; a confirmed-present or being-restored key is
+ * folded back into the installed set so the pure reconciler never drops it. Nyx analog of
+ * Kolibri's per-target deletion gate (RECONCILE_FIX_SPEC R-INV-2): bulk snapshot proposes,
+ * single-target checks dispose. A COMPLETE snapshot yields zero candidates and performs
+ * zero gate IPC — the common path is unchanged in cost and behavior. One residual case is
+ * accepted (a restore with no discoverable session); see nyx ACCEPTED_LIMITATIONS.md.
  */
 class ReconcileHomeLayoutUseCase @Inject constructor(
     private val layoutRepository: HomeLayoutRepository,
     private val enumerator: AppEnumerator,
     private val appPresence: AppPresence,
+    private val installSessions: InstallSessionInspector,
     private val idFactory: ItemIdFactory,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
@@ -87,12 +92,20 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
         // RMW below, which is safe because it only ever ADDS protection (it can reduce
         // pruning, never cause a bad write) and the reconcile still runs against the fresh
         // `current` inside the lock (A1-03 preserved). A complete snapshot → no candidates
-        // → no presence IPC.
+        // → no gate IPC (neither arm consulted).
         val candidates = layoutRepository.snapshot()
             .referencedKeys()
             .filterTo(HashSet()) { it !in installed }
         for (key in candidates) {
-            if (appPresence.isPresent(key)) installed.add(key)
+            // Keep the key if EITHER it still resolves independently (cross-surface
+            // PackageManager presence — a LauncherApps enumeration transient can't poison it)
+            // OR its package has an install/restore session in flight (Launcher3-style promise:
+            // an app on its way back during restore is legitimately absent right now but must
+            // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
+            // Short-circuit: presence first (one cheap package query), session only if absent.
+            if (appPresence.isPresent(key) || installSessions.hasActiveSession(key.packageName)) {
+                installed.add(key)
+            }
         }
 
         var result: ReconcileResult = ReconcileResult.Unchanged

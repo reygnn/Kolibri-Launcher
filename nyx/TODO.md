@@ -129,33 +129,42 @@ gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-L
 Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
 Aufwand wert.
 
-### Presence-Naht teilen (F7-Gate → `:core` / `:common-data`, Option B — offener Refactor-Kandidat, 2026-09-24)
+### Presence-Naht teilen (F7-Gate → `:core` / `:common-data`, Option B/C — offener Refactor-Kandidat, 2026-09-24)
 
-Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (Option A, nyx-lokal):
-`ReconcileHomeLayoutUseCase` prunt nicht mehr blind gegen den Enumerations-Snapshot,
-sondern re-bestätigt jeden fehlenden Layout-Key über ein Deletion-Gate, das fail-safe
-auf „present" auflöst (RHL-INV-6, das nyx-Analog zu Kolibris R-INV-2). Beteiligt:
-Port `home/service/AppPresence` (nyx/domain), Impl `data/installedapps/LauncherAppsPresence`
-(nyx/data, über die geteilte `LauncherApps`-Naht) und die Gate-Logik im Use-Case.
+Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (RHL-INV-6, das nyx-Analog
+zu Kolibris R-INV-2). `ReconcileHomeLayoutUseCase` prunt einen fehlenden Layout-Key nicht
+mehr blind, sondern behält ihn, wenn *eine* von zwei unabhängigen Prüfungen anschlägt —
+beide fail-safe Richtung „behalten". Umgesetzte Schichten:
 
-**Offen (Option B):** die *Naht* teilen. Der `AppEnumerator` liegt bereits geteilt
-(Port in `:core`, Impl `LauncherAppsEnumerator` in `:common-data`, app-seitig via
-`@Binds` gebunden, `LauncherApps` app-seitig provided). Ein Presence-Check auf derselben
-Naht ist sein natürliches Geschwister, liegt aktuell aber nyx-lokal — eine Asymmetrie.
-Umzug: `AppPresence` → `:core` (neben `AppEnumerator`), `LauncherAppsPresence` →
-`:common-data` (neben `LauncherAppsEnumerator`), gebunden in *beiden* App-`RepositoryModule`s.
-Das **Use-Case-Gate bleibt in nyx** — es hängt am `HomeLayout` (Folder, Positionen) und
-ist nicht teilbar. Geringes Risiko, keine Verhaltensänderung — reiner Modul-/Namespace-
-Umzug plus zweite Bindung; Kolibri hat `LauncherApps` bereits app-seitig (`AppModule`),
-der Enumerator beweist das Binde-Muster über beide Apps.
+- **fix 1 — fail-closed Read:** Kandidaten werden über `HomeLayoutRepository.snapshot()`
+  (fail-CLOSED, wie der interne `update`-Read) statt über den fail-open `layout()`-Flow
+  berechnet; ein transienter Read-Fehler bricht den Pass ab, statt zu einem leeren Layout
+  ohne Schutz zu degradieren.
+- **fix 2 — Cross-Surface-Presence:** `AppPresence`-Impl ist jetzt `PackageManagerPresence`
+  (PackageManager, `ACTION_MAIN`/`CATEGORY_LAUNCHER`, komponentengenau) — ein *anderes*
+  Subsystem als die LauncherApps-Enumeration, sodass ein LauncherApps-Transient den Check
+  nicht mitvergiftet. Technik von Kolibris `PackagePresenceImpl` übernommen.
+- **fix 3 — Session-Gate:** neuer Port `home/service/InstallSessionInspector` + Impl
+  `data/installedapps/PackageManagerInstallSessions` (`PackageInstaller.getAllSessions()`).
+  Launcher3-Muster: einen Key, dessen Paket eine aktive Install/Restore-Session hat, nie
+  prunen (Promise). Schließt den Mid-Restore-Vektor, den keine Presence-Prüfung schließen kann.
 
-**Größerer Folgeschritt (Option C, separate Spec):** Kolibris bestehendes
-`PackagePresence` (PackageManager-Naht, zusätzlich Package-Level-Variante für
-Custom-Names) auf die geteilte Naht migrieren, damit es *eine* Presence-Abstraktion
-für alles gibt. Berührt Kolibris Favorites/Hidden/Swipe/CustomNames und hat eine
-semantische Lücke (Component- vs. Package-Level) — bewusst nicht Teil des F7-Fixes.
-Kein Blocker, nur (noch) nicht den Aufwand wert. Empfehlung: B als nächster Schritt,
-C nur wenn Kolibri die LauncherApps-Variante ohnehin braucht.
+Ein Rest-Fall bleibt bewusst offen (Restore ohne auffindbare Session) — dokumentiert in
+`ACCEPTED_LIMITATIONS.md` („Reconcile während Restore …").
+
+**Offen (Option B):** die Presence-*Naht* teilen. `AppEnumerator` liegt bereits geteilt
+(Port in `:core`, Impl `LauncherAppsEnumerator` in `:common-data`, app-seitig gebunden).
+`AppPresence` + `InstallSessionInspector` sind nyx-lokal — eine Asymmetrie. Umzug der Ports
+nach `:core` und der PackageManager-Impls nach `:common-data`, gebunden in *beiden*
+App-`RepositoryModule`s. Das **Use-Case-Gate bleibt in nyx** (hängt am `HomeLayout`). Geringes
+Risiko, keine Verhaltensänderung.
+
+**Größerer Folgeschritt (Option C, separate Spec):** Jetzt, da nyx' Presence ebenfalls auf
+PackageManager sitzt, ist die semantische Lücke zu Kolibris `PackagePresence` klein
+(String- vs. `ComponentKey`-Keying, 2 vs. 1 Methode). Beide auf *eine* geteilte
+Presence-Abstraktion zusammenführen ist damit realistischer geworden — berührt aber Kolibris
+Favorites/Hidden/Swipe/CustomNames. Empfehlung: B als nächster Schritt, C nur wenn der
+Konsolidierungsdruck steigt.
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 

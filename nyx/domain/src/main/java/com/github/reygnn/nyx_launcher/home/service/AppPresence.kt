@@ -19,8 +19,10 @@ import com.github.reygnn.launcher.core.ComponentKey
  *
  * So a key missing from the snapshot is only a *candidate* for pruning; the use-case
  * re-confirms each candidate here before the reconciler is allowed to drop it. That
- * decoupling — bulk snapshot proposes, single-target check disposes — is what makes a
- * partial or transient list read unable to cause data loss (RHL-INV-6).
+ * decoupling — bulk snapshot proposes, single-target check disposes — is what stops a
+ * partial or transient list read from pruning a still-installed app (RHL-INV-6). The
+ * mid-restore case (absent now, on its way back) is the other arm's job — see the port
+ * note below and [InstallSessionInspector].
  *
  * **Component-exact.** Presence is checked at the `package/class` grain (not just the
  * package), so an app that disables ONE launcher alias (an icon-hide toggle) while
@@ -33,11 +35,18 @@ import com.github.reygnn.launcher.core.ComponentKey
  * next reconcile fixes it. The gate therefore errs toward keeping.
  *
  * Pure-Kotlin port: `nyx/domain` is plain-JVM, so the implementation
- * ([com.github.reygnn.nyx_launcher.data.installedapps.LauncherAppsPresence]) lives in
- * `:data` over the same shared `LauncherApps` seam the enumerator uses (SIA-INV-4).
- * Nyx-local by design: the sole consumer is Nyx's reconcile, and Kolibri already owns
- * an equivalent gate for its own stores. Promote to `:common-data` only if Kolibri
- * ever needs the LauncherApps-based variant too.
+ * ([com.github.reygnn.nyx_launcher.data.installedapps.PackageManagerPresence]) lives in
+ * `:data`. It queries [android.content.pm.PackageManager] — deliberately a DIFFERENT
+ * subsystem from the [android.content.pm.LauncherApps]-based enumeration the reconcile
+ * diffs against, so a LauncherApps transient can't poison the re-confirmation (AUDIT-1 F7
+ * review, fix 2). Nyx-local by design: the sole consumer is Nyx's reconcile, and Kolibri
+ * already owns an equivalent gate (`PackagePresence`, same PackageManager technique) for
+ * its own stores. Promote both to shared modules only if the consolidation is taken up
+ * (see nyx TODO, Option B/C).
+ *
+ * This is only ONE arm of the gate: it answers "installed now?". A package legitimately
+ * absent because it is mid-restore is kept by the separate [InstallSessionInspector] arm,
+ * which the use-case ORs with this one.
  */
 interface AppPresence {
 
