@@ -17,8 +17,8 @@ import javax.inject.Singleton
  * from the [android.content.pm.LauncherApps]-based enumeration the reconcile diffs
  * against.
  *
- * That cross-surface split is the point (AUDIT-1 F7 review, fix 2, borrowed from Kolibri's
- * `PackagePresenceImpl`). The deletion gate only helps if it can disagree with the
+ * That cross-surface split is the point (AUDIT-1 F7 review, fix 2, borrowed from
+ * Kolibri's former presence impl). The deletion gate only helps if it can disagree with the
  * enumeration: a check on the *same* `LauncherApps.getActivityList` surface shares that
  * surface's transient failure modes, so a systemic LauncherApps hiccup mid-restore /
  * early-post-unlock would report a still-installed app as absent on BOTH paths and prune
@@ -53,7 +53,7 @@ class PackageManagerPresence @Inject constructor(
     @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) : AppPresence {
 
-    override suspend fun isPresent(key: ComponentKey): Boolean = withContext(dispatcher) {
+    override suspend fun isComponentPresent(key: ComponentKey): Boolean = withContext(dispatcher) {
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
@@ -72,6 +72,20 @@ class PackageManagerPresence @Inject constructor(
             // Fail-safe: presence could not be determined → treat as present so the
             // reconcile never prunes on a transient system-API error.
             TimberWrapper.silentError(e, "AppPresence check failed for ${key.flat}; failing safe to present")
+            true
+        }
+    }
+
+    override suspend fun isPackagePresent(packageName: String): Boolean = withContext(dispatcher) {
+        try {
+            // Package-level: does the package expose ANY launcher entry? (getLaunchIntent
+            // resolves the primary CATEGORY_LAUNCHER activity.) Coarser than the
+            // component-exact check above — for stores keyed on package (custom names).
+            packageManager.getLaunchIntentForPackage(packageName) != null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "AppPresence package check failed for $packageName; failing safe to present")
             true
         }
     }

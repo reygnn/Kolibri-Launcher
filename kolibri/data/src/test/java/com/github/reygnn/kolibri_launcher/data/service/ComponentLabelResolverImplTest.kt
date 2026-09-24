@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
  * `PackageManager` is mocked so each resolution outcome is controlled; labels are set
  * via `nonLocalizedLabel` so `loadLabel` returns them without a resource lookup.
  *
- * The load-bearing assertion is the inverse of PackagePresence's fail-safe: a
+ * The load-bearing assertion is the inverse of AppPresence's fail-safe: a
  * PackageManager failure (or an unresolvable component) resolves to `null` — the
  * favorite is OMITTED from the provisional paint — so a transient error or a
  * disappeared app can never paint a ghost favorite.

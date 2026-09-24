@@ -103,7 +103,7 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
             // an app on its way back during restore is legitimately absent right now but must
             // not be pruned). Only a key that is BOTH absent AND session-less is pruned.
             // Short-circuit: presence first (one cheap package query), session only if absent.
-            if (appPresence.isPresent(key) || installSessions.hasActiveSession(key.packageName)) {
+            if (appPresence.isComponentPresent(key) || installSessions.hasActiveSession(key.packageName)) {
                 installed.add(key)
             }
         }

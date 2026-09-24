@@ -22,7 +22,7 @@ import javax.inject.Inject
  *
  * Each query runs on [ioDispatcher] (the PackageManager call is blocking). The broad
  * `Throwable` catch is the sanctioned System-API-boundary form; unlike
- * `PackagePresenceImpl` it resolves failure to `null` (omit), not to a safe default —
+ * `PackageManagerPresence` it resolves failure to `null` (omit), not to a safe default —
  * see the fail-closed rationale in the [ComponentLabelResolver] KDoc.
  * `CancellationException` still propagates.
  */

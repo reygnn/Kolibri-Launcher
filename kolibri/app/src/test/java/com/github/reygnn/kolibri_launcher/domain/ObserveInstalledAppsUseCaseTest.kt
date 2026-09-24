@@ -14,7 +14,8 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakePackagePresence
+import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.kolibri_launcher.fakes.FakeAppPresence
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
@@ -41,7 +42,7 @@ class ObserveInstalledAppsUseCaseTest {
     private lateinit var swipeActionsRepository: FakeSwipeActionsRepository
     private lateinit var hiddenAppsRepository: FakeHiddenAppsRepository
     private lateinit var customNamesRepository: FakeCustomNamesRepository
-    private lateinit var packagePresence: FakePackagePresence
+    private lateinit var appPresence: FakeAppPresence
     private lateinit var useCase: ObserveInstalledAppsUseCase
 
     private val testApps = listOf(
@@ -58,7 +59,7 @@ class ObserveInstalledAppsUseCaseTest {
         swipeActionsRepository = FakeSwipeActionsRepository()
         hiddenAppsRepository = FakeHiddenAppsRepository()
         customNamesRepository = FakeCustomNamesRepository()
-        packagePresence = FakePackagePresence()
+        appPresence = FakeAppPresence()
         useCase = ObserveInstalledAppsUseCase(
             installedAppsRepository,
             installedAppsStateRepository,
@@ -66,7 +67,7 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            packagePresence
+            appPresence
         )
     }
 
@@ -196,7 +197,7 @@ class ObserveInstalledAppsUseCaseTest {
         // The core R-INV guarantee (RECONCILE_SPEC §3): the loaded list is only a
         // candidate finder, not ground truth. com.app2 is dropped from the load
         // but is actually still installed; com.gone is a genuine orphan. Both are
-        // assigned across the stores. PackagePresence is the deletion gate.
+        // assigned across the stores. AppPresence is the deletion gate.
         val stillInstalled = testApps[1].componentName   // com.app2/com.app2.Main
         val stillInstalledPkg = testApps[1].packageName  // com.app2
         val orphanComponent = "com.gone/com.gone.Main"
@@ -210,8 +211,8 @@ class ObserveInstalledAppsUseCaseTest {
         customNamesRepository.setCustomNameForPackage(orphanPkg, "Drop")
 
         // Deletion gate: the dropped-but-installed app is present, the orphan is gone.
-        packagePresence.presentComponents = setOf(stillInstalled)
-        packagePresence.presentPackages = setOf(stillInstalledPkg)
+        appPresence.presentComponents = setOf(ComponentKey.parse(stillInstalled)!!)
+        appPresence.presentPackages = setOf(stillInstalledPkg)
 
         // Partial load: testApps minus com.app2, so stillInstalled is a candidate.
         installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
@@ -308,7 +309,7 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            packagePresence
+            appPresence
         )
 
         // Act & Assert
@@ -343,7 +344,7 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            packagePresence
+            appPresence
         )
 
         useCaseWithSequence().test {
@@ -374,7 +375,7 @@ class ObserveInstalledAppsUseCaseTest {
             swipeActionsRepository,
             hiddenAppsRepository,
             customNamesRepository,
-            packagePresence
+            appPresence
         )
 
         // Act & Assert

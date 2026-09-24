@@ -129,7 +129,7 @@ gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-L
 Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
 Aufwand wert.
 
-### Presence-Naht teilen (F7-Gate) — Option B erledigt, Option C offen (2026-09-24)
+### Presence-Naht teilen (F7-Gate) — Option B + C erledigt (2026-09-24)
 
 Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (RHL-INV-6, das nyx-Analog
 zu Kolibris R-INV-2). `ReconcileHomeLayoutUseCase` prunt einen fehlenden Layout-Key nicht
@@ -157,15 +157,18 @@ Ports `AppPresence` + `InstallSessionInspector` → `:core` (neben `AppEnumerato
 `PackageManagerPresence` + `PackageManagerInstallSessions` → `:common-data` (neben
 `LauncherAppsEnumerator`), app-seitig via `@Binds` in nyx' `RepositoryModule` gebunden
 (`PackageManager` app-seitig provided). Das Use-Case-Gate blieb in nyx (hängt am
-`HomeLayout`). Reiner Modul-/Namespace-Umzug, keine Verhaltensänderung. Kolibri bindet
-die geteilten Ports (noch) nicht — die Klassen liegen bereit, werden dort aber nicht
-konsumiert, also keine toten Bindings.
+`HomeLayout`). Reiner Modul-/Namespace-Umzug, keine Verhaltensänderung. (Kolibri bindet die
+geteilten Ports seit Option C ebenfalls — siehe unten.)
 
-**Offen (Option C, separate Spec):** Kolibris bestehendes `PackagePresence` (String-Keying,
-2 Methoden inkl. Package-Level für Custom-Names) auf die jetzt geteilte
-`AppPresence`-Abstraktion (`ComponentKey`, 1 Methode) migrieren, damit es *eine* Presence
-für beide Apps gibt. Berührt Kolibris Favorites/Hidden/Swipe/CustomNames + hat die
-Component-vs-Package-Lücke — nur angehen, wenn der Konsolidierungsdruck steigt.
+**Erledigt (Option C):** Kolibris eigenes `PackagePresence` (Interface, `PackagePresenceImpl`,
+`FakePackagePresence`, dessen Robolectric-Test) ist entfernt; beide Apps nutzen jetzt die
+*eine* geteilte `AppPresence` aus `:core`. Die Naht trägt jetzt beide Grains:
+`isComponentPresent(ComponentKey)` + `isPackagePresent(String)`, implementiert vom geteilten
+`PackageManagerPresence`. Kolibris `ObserveInstalledAppsUseCase` überbrückt seine flachen
+`"pkg/class"`-Strings via `ComponentKey.parse` auf die Component-Grain-Methode (malformed →
+absent, wie zuvor); Custom-Names nutzen die Package-Grain-Methode direkt. Damit gibt es genau
+eine Presence-Abstraktion und eine Impl für nyx **und** kolibri — die F7-Konsolidierung ist
+abgeschlossen.
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 

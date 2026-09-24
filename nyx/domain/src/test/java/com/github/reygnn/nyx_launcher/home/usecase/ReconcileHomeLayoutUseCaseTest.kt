@@ -52,10 +52,13 @@ class ReconcileHomeLayoutUseCaseTest {
      */
     private class FakeAppPresence(var present: Set<ComponentKey> = emptySet()) : AppPresence {
         val checked = mutableListOf<ComponentKey>()
-        override suspend fun isPresent(key: ComponentKey): Boolean {
+        override suspend fun isComponentPresent(key: ComponentKey): Boolean {
             checked += key
             return key in present
         }
+
+        // Package grain is unused by the home reconcile (component-keyed layout).
+        override suspend fun isPackagePresent(packageName: String): Boolean = false
     }
 
     /**

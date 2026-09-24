@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.common.data.installedapps
 
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -49,7 +50,7 @@ class PackageManagerPresenceTest {
         runTest(mainDispatcherRule.testDispatcher) {
             onQuery(resolve("com.example.a", "com.example.a.Main"))
 
-            assertThat(presence.isPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isTrue()
+            assertThat(presence.isComponentPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isTrue()
         }
 
     @Test
@@ -57,7 +58,7 @@ class PackageManagerPresenceTest {
         runTest(mainDispatcherRule.testDispatcher) {
             onQuery(resolve("com.example.a", "com.example.a.OtherAlias"))
 
-            assertThat(presence.isPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isFalse()
+            assertThat(presence.isComponentPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isFalse()
         }
 
     @Test
@@ -65,7 +66,7 @@ class PackageManagerPresenceTest {
         runTest(mainDispatcherRule.testDispatcher) {
             onQuery()
 
-            assertThat(presence.isPresent(ComponentKey("com.example.gone", "com.example.gone.Main"))).isFalse()
+            assertThat(presence.isComponentPresent(ComponentKey("com.example.gone", "com.example.gone.Main"))).isFalse()
         }
 
     @Test
@@ -76,7 +77,7 @@ class PackageManagerPresenceTest {
                 packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
             } throws RuntimeException("system boom")
 
-            assertThat(presence.isPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isTrue()
+            assertThat(presence.isComponentPresent(ComponentKey("com.example.a", "com.example.a.Main"))).isTrue()
         }
 
     @Test
@@ -87,7 +88,33 @@ class PackageManagerPresenceTest {
             } throws CancellationException("cancelled")
 
             assertFailsWith<CancellationException> {
-                presence.isPresent(ComponentKey("com.example.a", "com.example.a.Main"))
+                presence.isComponentPresent(ComponentKey("com.example.a", "com.example.a.Main"))
             }
+        }
+
+    // ---- package grain (isPackagePresent) ----
+
+    @Test
+    fun `package present when it has a launch intent`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { packageManager.getLaunchIntentForPackage("com.example.a") } returns Intent()
+
+            assertThat(presence.isPackagePresent("com.example.a")).isTrue()
+        }
+
+    @Test
+    fun `package absent when it has no launch intent`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { packageManager.getLaunchIntentForPackage("com.example.gone") } returns null
+
+            assertThat(presence.isPackagePresent("com.example.gone")).isFalse()
+        }
+
+    @Test
+    fun `package check fail-safe to present when it throws`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            every { packageManager.getLaunchIntentForPackage(any()) } throws RuntimeException("system boom")
+
+            assertThat(presence.isPackagePresent("com.example.a")).isTrue()
         }
 }

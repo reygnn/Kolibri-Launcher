@@ -248,7 +248,7 @@ class FavoritesRepositoryImpl @Inject constructor(
         val orphans = current - installedComponentNames.toSet()
         if (orphans.isEmpty()) return
 
-        // Gate every candidate through PackagePresence; a present one is vetoed.
+        // Gate every candidate through the presence callback (AppPresence); a present one is vetoed.
         val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
         if (verifiedAbsent.isEmpty()) return
 

@@ -75,7 +75,8 @@ class ExportImportUseCaseTest {
     // Import reconcile prunes apps that are genuinely not installed here, so the gate
     // must confirm ABSENCE for the missing keys (RHL-INV-6): presence resolves to false.
     private val absentPresence = object : AppPresence {
-        override suspend fun isPresent(key: ComponentKey) = false
+        override suspend fun isComponentPresent(key: ComponentKey) = false
+        override suspend fun isPackagePresent(packageName: String) = false
     }
 
     // …and no restore is in flight, so the session arm doesn't rescue the missing keys.

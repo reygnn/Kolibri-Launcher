@@ -9,7 +9,8 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.domain.service.PackagePresence
+import com.github.reygnn.launcher.core.AppPresence
+import com.github.reygnn.launcher.core.ComponentKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -23,7 +24,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
     private val swipeActionsRepository: SwipeActionsRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val customNamesRepository: CustomNamesRepository,
-    private val packagePresence: PackagePresence
+    private val appPresence: AppPresence
 ) {
 
     /**
@@ -98,7 +99,7 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                                 // The loaded list is only a removal-CANDIDATE finder, not
                                 // ground truth (RECONCILE_FIX_SPEC R-INV-2): each store
                                 // reconciles its own assignments against the list and gates
-                                // every deletion through PackagePresence — a candidate the
+                                // every deletion through AppPresence — a candidate the
                                 // check reports present is kept. Candidate-read and delete
                                 // are the SAME fail-closed store read inside the repo, so a
                                 // partial or transient load cannot prune a still-installed
@@ -110,24 +111,31 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                                 // per-store failure so one bad store can't skip the others.
                                 val validComponents = realApps.map { it.componentName }
                                 val validPackages = realApps.map { it.packageName }
+                                // The component-keyed stores pass a flattened "pkg/class"
+                                // string; bridge it to the shared component-grain gate via
+                                // ComponentKey.parse. A malformed stored key (parse == null)
+                                // is not a real component → treat as absent so the garbage
+                                // is cleaned (matches the pre-migration string check, which
+                                // also never matched a slash-less key). Custom names are
+                                // package-keyed and use the package-grain gate directly.
                                 runCleanup("favorites") {
                                     favoritesRepository.reconcileFavoriteComponents(validComponents) {
-                                        packagePresence.isComponentPresent(it)
+                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
                                     }
                                 }
                                 runCleanup("swipe actions") {
                                     swipeActionsRepository.reconcileSwipeActions(validComponents) {
-                                        packagePresence.isComponentPresent(it)
+                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
                                     }
                                 }
                                 runCleanup("hidden components") {
                                     hiddenAppsRepository.reconcileHiddenComponents(validComponents) {
-                                        packagePresence.isComponentPresent(it)
+                                        ComponentKey.parse(it)?.let { key -> appPresence.isComponentPresent(key) } ?: false
                                     }
                                 }
                                 runCleanup("custom names") {
                                     customNamesRepository.reconcileCustomNames(validPackages) {
-                                        packagePresence.isPackagePresent(it)
+                                        appPresence.isPackagePresent(it)
                                     }
                                 }
 
