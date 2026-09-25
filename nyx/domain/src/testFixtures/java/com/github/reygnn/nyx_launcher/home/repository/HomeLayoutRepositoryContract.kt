@@ -52,14 +52,6 @@ abstract class HomeLayoutRepositoryContract {
     }
 
     @Test
-    fun snapshot_returns_the_current_persisted_layout() = runTest(mainDispatcherRule.dispatcher) {
-        val repo = createRepository(EMPTY)
-        assertThat(repo.snapshot()).isEqualTo(EMPTY)
-        repo.save(WITH_APP)
-        assertThat(repo.snapshot()).isEqualTo(WITH_APP)
-    }
-
-    @Test
     fun update_persists_the_transformed_layout() = runTest(mainDispatcherRule.dispatcher) {
         val repo = createRepository(EMPTY)
         repo.layout().test {

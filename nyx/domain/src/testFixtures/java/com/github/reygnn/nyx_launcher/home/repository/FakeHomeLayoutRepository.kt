@@ -33,15 +33,6 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
     var saveCount = 0
         private set
 
-    // When set, [snapshot] throws it — lets a test drive the fail-CLOSED read path
-    // (a transient DataStore error) without a real store. [layout] stays fail-open.
-    var failSnapshotWith: Throwable? = null
-
-    // When set, [snapshot] returns THIS instead of the live [current] — lets a test simulate a
-    // snapshot taken before a concurrent write, so [update]'s fresh `current` references a key the
-    // snapshot did not (the snapshot→RMW window, RHL-INV-6 point 3). [failSnapshotWith] wins.
-    var snapshotOverride: HomeLayout? = null
-
     // When set, [update] throws it — lets a test drive the fail-CLOSED store-write path (a
     // transient DataStore error inside the atomic RMW) without a real store. Mirrors the impl,
     // whose DataStore read/write inside update() propagates an IOException.
@@ -50,9 +41,6 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
     val current: HomeLayout get() = state.value
 
     override fun layout(): Flow<HomeLayout> = state
-
-    override suspend fun snapshot(): HomeLayout =
-        failSnapshotWith?.let { throw it } ?: snapshotOverride ?: state.value
 
     override suspend fun save(layout: HomeLayout) = writeMutex.withLock {
         saveCount++

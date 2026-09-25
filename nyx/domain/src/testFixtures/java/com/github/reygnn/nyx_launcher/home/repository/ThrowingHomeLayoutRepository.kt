@@ -22,10 +22,6 @@ class ThrowingHomeLayoutRepository(
 
     override fun layout(): Flow<HomeLayout> = flowOf(current)
 
-    // Reads succeed (only writes fail here): a use-case must be able to read the
-    // current layout and still have its failing WRITE propagate.
-    override suspend fun snapshot(): HomeLayout = current
-
     override suspend fun save(layout: HomeLayout): Unit = throw error()
 
     override suspend fun update(transform: suspend (HomeLayout) -> HomeLayout?) {

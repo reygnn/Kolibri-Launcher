@@ -20,9 +20,11 @@ import timber.log.Timber
  * [AppUpdateSignal] bus (SHARED_INSTALLED_APPS_SPEC §2 "Freshness"; lifted from
  * Kolibri, which won over Nyx's `LauncherApps.Callback`-only refresh). The bus and
  * its consumers stay Android-free; the Intent→event mapping happens here at the
- * `:common-data` edge. Both apps register this one receiver in their manifest
- * (each app's `applicationId` scopes the receiver, so there is still one receiver
- * *per app process*, but one shared *class*, SIA-INV-1 / MRG-INV-1).
+ * `:common-data` edge. Both apps register this one receiver at RUNTIME (Kolibri via
+ * `KolibriLauncherApp.registerPackageUpdateReceiver`, Nyx via
+ * `PackageEventCoordinator.registerReceiver`) — there is deliberately no manifest
+ * `<receiver>` entry in either app. Each app process registers its own instance, but
+ * they share one *class* (SIA-INV-1 / MRG-INV-1).
  *
  * [PackageEvent.Removed] is only emitted for a genuine uninstall: the replace half
  * of an in-place update (`EXTRA_REPLACING`) is filtered; the paired

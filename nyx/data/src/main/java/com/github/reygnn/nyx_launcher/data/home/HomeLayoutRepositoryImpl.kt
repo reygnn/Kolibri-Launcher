@@ -44,12 +44,6 @@ class HomeLayoutRepositoryImpl @Inject constructor(
     override fun layout(): Flow<HomeLayout> =
         dataStore.readFlowFailOpen("Error reading home layout") { parseLayout(it) }
 
-    // Fail-CLOSED point read: the SAME read [update] does inside the lock (an IOException
-    // propagates and aborts the caller) rather than the fail-open [layout] flow. For
-    // reconcile's prune-candidate computation, a transient read error must skip the pass,
-    // not degrade to an empty layout that drops every protection (DSR snapshotFailClosed).
-    override suspend fun snapshot(): HomeLayout = parseLayout(dataStore.data.first())
-
     private fun parseLayout(prefs: Preferences): HomeLayout {
         val raw = prefs[KEY] ?: return DEFAULT
         return serializer.deserialize(raw) ?: DEFAULT

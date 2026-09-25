@@ -444,7 +444,15 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         lifecycleScope.launch(coroutineExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
-                launchGuarded { viewModel.iconStyle.collect { renderLayout(viewModel.layout.value) } }
+                launchGuarded {
+                    viewModel.iconStyle.collect {
+                        // renderLayout refreshes the dock (DockAdapter full rebind) and keeps
+                        // the layout consistent, but the grid's positional DiffUtil sees no cell
+                        // change on a style switch — so force the pages to re-decode their icons.
+                        renderLayout(viewModel.layout.value)
+                        pagerAdapter?.refreshIcons()
+                    }
+                }
                 // Re-render when the installed-apps set changes so a freshly uninstalled
                 // app's tile greys out (missing state) and a reinstall un-greys it.
                 launchGuarded { viewModel.installedKeys.collect { renderLayout(viewModel.layout.value) } }

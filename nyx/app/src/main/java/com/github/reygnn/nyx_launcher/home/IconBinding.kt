@@ -52,6 +52,18 @@ val NOTIFICATION_DOT_PAYLOAD = Any()
 fun List<Any>.isDotOnlyPayload(): Boolean = isNotEmpty() && all { it === NOTIFICATION_DOT_PAYLOAD }
 
 /**
+ * Payload marking an icon-style change: the cell DATA is unchanged (so the grid's
+ * positional DiffUtil would rebind nothing), but every icon must re-decode under the
+ * new [com.github.reygnn.launcher.core.IconStyle]. Carried per-page by the pager so a
+ * style switch repaints the grid — the dock ([DockAdapter]) and drawer already repaint
+ * via their own full rebind.
+ */
+val ICON_STYLE_PAYLOAD = Any()
+
+/** True if a payload list is exactly an icon-style-only refresh. */
+fun List<Any>.isIconStylePayload(): Boolean = isNotEmpty() && all { it === ICON_STYLE_PAYLOAD }
+
+/**
  * Whether [this] cell should show a notification dot given [dotPackages] (the set of
  * packages with a dot-worthy notification): an app matches its own package, a folder
  * matches if any member does. Pure — unit-tested (see HomeCellDotTest).

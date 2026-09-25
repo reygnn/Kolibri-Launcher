@@ -47,9 +47,21 @@ class HomePagerAdapter(
         notifyItemRangeChanged(0, pages.size, NOTIFICATION_DOT_PAYLOAD)
     }
 
+    /**
+     * Icon-style change: re-decode every live page's icons. The cell data is unchanged, so
+     * this rides an icon-style payload straight to each page's [HomeGridAdapter.refreshIcons]
+     * (offscreen pages re-decode naturally when next bound). Called from MainActivity's
+     * iconStyle collector — without it the grid keeps the old-style bitmaps.
+     */
+    fun refreshIcons() = notifyItemRangeChanged(0, pages.size, ICON_STYLE_PAYLOAD)
+
     override fun onBindViewHolder(holder: PageHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isDotOnlyPayload()) {
             holder.gridAdapter.refreshDots()
+            return
+        }
+        if (payloads.isIconStylePayload()) {
+            holder.gridAdapter.refreshIcons()
             return
         }
         super.onBindViewHolder(holder, position, payloads)

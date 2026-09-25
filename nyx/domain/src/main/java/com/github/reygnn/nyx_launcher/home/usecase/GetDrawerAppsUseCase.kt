@@ -39,12 +39,19 @@ class GetDrawerAppsUseCase @Inject constructor(
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): List<LauncherApp> = withContext(dispatcher) {
-        // Normally the holder is already warm (InstalledAppsHolderPump); the wait only
-        // bites on a fast cold open before the first enumeration lands. On timeout we
-        // still return getCurrentApps() — the last-good snapshot (SIA-INV-5), empty only
-        // on a genuinely-empty device.
-        withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-            stateRepository.rawAppsFlow.first { it.isNotEmpty() }
+        // Fast path: the holder already has a snapshot (warm pump, or a last-good from a
+        // prior load). Return it immediately — never pay the prime wait when there is
+        // already something to show. This is the common case and also covers a transient
+        // empty/failed reload (rawAppsFlow momentarily empty while getCurrentApps() still
+        // carries last-good, SIA-INV-5), which the unconditional wait would have stalled
+        // on for the full prime timeout.
+        if (stateRepository.getCurrentApps().isEmpty()) {
+            // Genuine cold start (holder never fed yet): wait for the first NON-EMPTY load,
+            // bounded by the prime timeout, then fall through to getCurrentApps() (still
+            // empty only on a genuinely-empty device — a latency edge, not a hang).
+            withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+                stateRepository.rawAppsFlow.first { it.isNotEmpty() }
+            }
         }
         stateRepository.getCurrentApps()
             .map { it.toLauncherApp() }

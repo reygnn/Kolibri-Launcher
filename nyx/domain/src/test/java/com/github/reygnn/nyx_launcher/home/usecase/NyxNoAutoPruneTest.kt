@@ -10,6 +10,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
+import kotlinx.coroutines.flow.first
 
 /**
  * nyx side of [NoAutoPruneContract]. The candidate is a home tile alongside one
@@ -46,6 +47,6 @@ class NyxNoAutoPruneTest : NoAutoPruneContract() {
             mainDispatcherRule.testDispatcher,
         )()
 
-        return layoutRepo.snapshot().items.any { (it.item as? HomeItem.App)?.key == candidate }
+        return layoutRepo.layout().first().items.any { (it.item as? HomeItem.App)?.key == candidate }
     }
 }

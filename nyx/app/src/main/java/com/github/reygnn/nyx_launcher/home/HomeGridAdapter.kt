@@ -84,6 +84,14 @@ class HomeGridAdapter(
     /** Refresh only the dots (payload bind) — no icon reload. Driven by the pager. */
     fun refreshDots() = notifyItemRangeChanged(0, cells.size, NOTIFICATION_DOT_PAYLOAD)
 
+    /**
+     * Re-decode every icon on this page (full rebind, no payload). Driven by the pager on
+     * an icon-style change: the cell DATA is unchanged so [submit]'s DiffUtil would rebind
+     * nothing, yet each icon must re-decode under the new style (IconLoader / FolderIconRenderer
+     * key their caches by style). Mirrors the dock's and drawer's full-rebind-on-style.
+     */
+    fun refreshIcons() = notifyItemRangeChanged(0, cells.size)
+
     override fun onBindViewHolder(holder: CellHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isDotOnlyPayload()) {
             holder.dot.visibility =

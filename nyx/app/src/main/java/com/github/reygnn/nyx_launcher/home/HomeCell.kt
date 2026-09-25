@@ -12,13 +12,22 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
  *
  * [App.missing] marks a tile whose app is no longer installed (Windows-shortcut
  * model, root TODO.md): the reference is KEPT, rendered greyed, and interacting with
- * it offers to remove it. Folder members are not individually flagged (a missing
- * member is reached through its folder), so [Folder] carries no missing state.
+ * it offers to remove it. Folder members are not individually flagged as missing at
+ * the tile level (a missing member is reached through its folder) — but the folder's
+ * 2×2 composite only draws its INSTALLED members, so [Folder.presentMembers] carries
+ * which members are currently installed. It is part of the cell's value identity so the
+ * grid DiffUtil rebinds (and the composite re-renders) when a member is un/reinstalled;
+ * without it a member uninstall would leave a stale composite (the [members] list is
+ * unchanged, so DiffUtil would skip the folder tile).
  */
 sealed interface HomeCell {
     data object Empty : HomeCell
     data class App(val id: ItemId, val key: ComponentKey, val missing: Boolean = false) : HomeCell
-    data class Folder(val id: ItemId, val members: List<ComponentKey>) : HomeCell
+    data class Folder(
+        val id: ItemId,
+        val members: List<ComponentKey>,
+        val presentMembers: List<ComponentKey> = members,
+    ) : HomeCell
 }
 
 /**
@@ -29,7 +38,14 @@ sealed interface HomeCell {
  */
 private fun HomeItem.toCell(installed: Set<ComponentKey>): HomeCell = when (this) {
     is HomeItem.App -> HomeCell.App(id, key, missing = LazySlotMembership.isMissing(key, installed))
-    is HomeItem.Folder -> HomeCell.Folder(id, members)
+    // presentMembers drives the composite re-render on member un/reinstall (see [HomeCell]).
+    // An EMPTY installed set means "not loaded yet" (same guard as App.missing above), so
+    // treat all members as present rather than blanking every folder during cold start.
+    is HomeItem.Folder -> HomeCell.Folder(
+        id,
+        members,
+        presentMembers = if (installed.isEmpty()) members else members.filter { it in installed },
+    )
 }
 
 /**
