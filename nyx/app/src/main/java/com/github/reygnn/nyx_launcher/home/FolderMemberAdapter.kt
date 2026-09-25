@@ -8,17 +8,27 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import kotlinx.coroutines.CoroutineScope
 
 /** Icons of a folder's members. Tap launches; long-press starts a home drag to
- *  extract the member (finger-drag, placed where the user drops it). */
+ *  extract the member (finger-drag, placed where the user drops it).
+ *
+ *  A member whose app is no longer installed ([installed] is the current installed-key
+ *  set; empty means "not loaded" → flag nothing, per [LazySlotMembership]) renders greyed
+ *  with a placeholder and, on tap, calls [onMissingApp] to offer removal from the folder —
+ *  the folder-internal analog of a greyed top-level tile. Drawer folders leave [installed]
+ *  empty (their members are already reconciled against the live app set), so nothing greys
+ *  there. */
 class FolderMemberAdapter(
     private val iconLoader: IconLoader,
     private val scope: CoroutineScope,
     private val iconSizePx: Int,
     private val onLaunch: (ComponentKey) -> Unit,
     private val onStartDrag: (view: View, key: ComponentKey) -> Unit,
+    private val installed: Set<ComponentKey> = emptySet(),
+    private val onMissingApp: (ComponentKey) -> Unit = {},
 ) : RecyclerView.Adapter<FolderMemberAdapter.MemberHolder>() {
 
     private var members: List<ComponentKey> = emptyList()
@@ -57,10 +67,20 @@ class FolderMemberAdapter(
         val token = ++holder.bindToken
         holder.icon.setImageDrawable(null)
         holder.dot.visibility = if (key.packageName in dotPackages) View.VISIBLE else View.GONE
-        holder.itemView.setOnClickListener { onLaunch(key) }
         holder.itemView.setOnLongClickListener { onStartDrag(holder.itemView, key); true }
-        holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
-            iconLoader.bitmap(IconRef.System(key), iconSizePx)
+        if (LazySlotMembership.isMissing(key, installed)) {
+            // Dead reference (Windows-shortcut model): a launch is impossible, so a tap offers
+            // to remove it from the folder; long-press still extracts (it becomes a greyed
+            // top-level tile, removable there too). Greyed placeholder instead of the icon.
+            holder.icon.alpha = MISSING_MEMBER_ALPHA
+            holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
+            holder.itemView.setOnClickListener { onMissingApp(key) }
+        } else {
+            holder.icon.alpha = 1f
+            holder.itemView.setOnClickListener { onLaunch(key) }
+            holder.icon.loadIconGated(scope, token, { holder.bindToken }) {
+                iconLoader.bitmap(IconRef.System(key), iconSizePx)
+            }
         }
     }
 
@@ -73,5 +93,10 @@ class FolderMemberAdapter(
         val icon: ImageView = view.findViewById(R.id.member_icon)
         val dot: View = view.findViewById(R.id.member_dot)
         var bindToken: Int = 0
+    }
+
+    private companion object {
+        /** Alpha for a "missing" member (app no longer installed) — matches the grid/dock tiles. */
+        const val MISSING_MEMBER_ALPHA = 0.35f
     }
 }

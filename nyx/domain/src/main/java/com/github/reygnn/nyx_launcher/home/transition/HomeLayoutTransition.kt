@@ -382,6 +382,37 @@ object HomeLayoutTransition {
         }
     }
 
+    /**
+     * Delete a DEAD member (its app uninstalled) from a folder — the folder-internal analog
+     * of [remove] for a top-level tile. Unlike [removeFromFolder], there is NO placement: the
+     * reference is discarded (the user confirmed removal via the "App not found" prompt in the
+     * folder overlay), not relocated to a drop target. Membership policy (shrink vs. dissolve)
+     * is the shared [FolderMembership.remove]; a not-a-member / duplicated key is a NoOp. On
+     * dissolve the sole survivor is promoted to the folder's old cell (RFF-INV-1/-2), reusing
+     * an existing top-level tile if the survivor already is one (scoped IHM-INV-7).
+     */
+    fun deleteFromFolder(
+        layout: HomeLayout,
+        folder: ItemId,
+        member: ComponentKey,
+        newId: () -> ItemId,
+    ): LayoutEdit {
+        val folderItem = layout.itemById(folder) as? HomeItem.Folder ?: return LayoutEdit.NoOp
+        return when (val membership = FolderMembership.remove(folderItem.members, member)) {
+            FolderMembership.RemoveResult.NotAMember -> LayoutEdit.NoOp
+            is FolderMembership.RemoveResult.Removed ->
+                LayoutEdit.Changed(
+                    layout.replacingItem(folder, folderItem.copy(members = membership.members)),
+                )
+            is FolderMembership.RemoveResult.Dissolved -> {
+                val placement = layout.placementOf(folder) ?: return LayoutEdit.NoOp
+                val (dissolved, _) =
+                    promoteSurvivor(layout.removing(folder), membership.survivor, placement, newId)
+                LayoutEdit.Changed(dissolved)
+            }
+        }
+    }
+
     // ===================== place / remove / rename (HOME_EDIT) ===============
 
     fun place(

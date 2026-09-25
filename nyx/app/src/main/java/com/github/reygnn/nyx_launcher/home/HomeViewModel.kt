@@ -24,6 +24,7 @@ import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.home.transition.DrawerFoldersTransition
 import com.github.reygnn.nyx_launcher.home.usecase.FitHomeGridUseCase
+import com.github.reygnn.nyx_launcher.home.usecase.DeleteFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
@@ -68,6 +69,7 @@ class HomeViewModel @Inject constructor(
     private val moveItem: MoveItemUseCase,
     private val placeItem: PlaceItemUseCase,
     private val removeFromFolder: RemoveFromFolderUseCase,
+    private val deleteFromFolder: DeleteFromFolderUseCase,
     private val removeItem: RemoveItemUseCase,
     private val renameFolderUseCase: RenameFolderUseCase,
     private val fitHomeGrid: FitHomeGridUseCase,
@@ -238,6 +240,16 @@ class HomeViewModel @Inject constructor(
 
     fun extractFromFolder(folder: ItemId, member: ComponentKey, target: DropTarget) {
         launchSafe { removeFromFolder(folder, member, target) }
+    }
+
+    /**
+     * Remove a MISSING (uninstalled) member from a folder — the folder-internal analog of
+     * [remove] for a dead top-level tile (Windows-shortcut model). No placement: the dead
+     * reference is discarded (the user confirmed via the "App not found" prompt in the
+     * folder overlay). The folder auto-dissolves below two members.
+     */
+    fun removeMissingFolderMember(folder: ItemId, member: ComponentKey) {
+        launchSafe { deleteFromFolder(folder, member) }
     }
 
     /**

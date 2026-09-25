@@ -9,6 +9,7 @@ import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceiver
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppUpdateSignal
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
@@ -32,11 +33,15 @@ import javax.inject.Singleton
  * pure reconcile + hand-rolled cache into live behaviour):
  *
  * - package added/removed/changed → [IconLoader.evict] (drop stale icons, ICL-INV-3)
- *   immediately, then a debounced [ReconcileHomeLayoutUseCase] (prune the layout,
- *   fail-closed).
- * - [start] also runs one reconcile for cold-start catch-up (changes that
- *   happened while Nyx wasn't running). The device grid is re-fit separately,
- *   from the real home-grid area, in MainActivity.
+ *   immediately, then [InstalledAppsRepository.triggerAppsUpdate] so the shared
+ *   installed-apps loader re-enumerates (keeps the no-prune "missing" tile state and
+ *   the drawer live — see the collector below), then a debounced
+ *   [ReconcileHomeLayoutUseCase]. Since the no-prune rebuild that reconcile is
+ *   STRUCTURAL-ONLY and idempotent (no enumerate, no prune): on a package event it
+ *   is a harmless no-op unless a prior import/edit left a structural inconsistency.
+ * - [start] also runs one reconcile for cold-start catch-up (a structural cleanup of
+ *   the stored layout). The device grid is re-fit separately, from the real
+ *   home-grid area, in MainActivity.
  * - [onTrimMemory] forwards to [IconLoader.trim] (ICL-INV-7).
  *
  * **Freshness source (SHARED_INSTALLED_APPS_SPEC §2, F2 route (a)):** package
@@ -55,14 +60,13 @@ import javax.inject.Singleton
  *
  * Reconcile requests are coalesced through a conflated flow debounced by
  * [AppConstants.APP_RELOAD_DEBOUNCE_MS]: a package-event storm (system update,
- * app restore, bulk install) fires many events, and each reconcile reads the
- * shared enumerator plus an atomic DataStore read-modify-write. The debounce
- * collapses the storm to a single reconcile once it settles. The priming
- * `flowOf(Unit)` bypasses the debounce, so the cold-start catch-up runs
- * immediately. Per-package icon eviction stays immediate — it is cheap and must
- * drop a stale icon promptly. The reconcile reads the shared enumerator directly
- * (a one-shot read in [ReconcileHomeLayoutUseCase]), so it always sees a fresh
- * list without this coordinator having to prime the shared loader.
+ * app restore, bulk install) fires many events, and each structural reconcile does
+ * an atomic DataStore read-modify-write. The debounce collapses the storm to a
+ * single reconcile once it settles. The priming `flowOf(Unit)` bypasses the
+ * debounce, so the cold-start catch-up runs immediately. Per-package icon eviction
+ * and the [InstalledAppsRepository.triggerAppsUpdate] refresh stay immediate — the
+ * refresh is what re-enumerates the shared loader on a package event (the reconcile
+ * no longer enumerates anything).
  */
 @Singleton
 class PackageEventCoordinator @Inject constructor(
@@ -71,6 +75,7 @@ class PackageEventCoordinator @Inject constructor(
     private val folderRenderer: FolderIconRenderer,
     private val reconcile: ReconcileHomeLayoutUseCase,
     private val appUpdateSignal: AppUpdateSignal,
+    private val installedAppsRepository: InstalledAppsRepository,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -121,7 +126,17 @@ class PackageEventCoordinator @Inject constructor(
                 try {
                     iconLoader.evict(event.packageName) // ICL-INV-3, targeted
                     folderRenderer.clear() // a member's icon may have changed
-                    requestReconcile() // debounced layout prune (reconcile reads the enumerator directly)
+                    // Refresh the SHARED installed-apps loader (the documented
+                    // PackageUpdateReceiver → AppUpdateSignal → triggerAppsUpdate funnel,
+                    // InstalledAppsRepository KDoc). This is what makes the no-prune model
+                    // live: HomeViewModel.installedKeys re-emits the fresh set, so a tile
+                    // greys the moment its app is uninstalled and un-greys on reinstall,
+                    // and the drawer's pull-on-open stays fresh even while installedKeys
+                    // holds the shared StateFlow warm. Without this the loader only
+                    // re-enumerates on a cold (re-)subscription — the reactive layer would
+                    // never react to a package event while home stays foreground.
+                    installedAppsRepository.triggerAppsUpdate()
+                    requestReconcile() // debounced STRUCTURAL reconcile (idempotent; only fixes import/edit drift)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

@@ -620,6 +620,26 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         showTrackedDialog(dialog)
     }
 
+    /**
+     * Confirmation for removing a "missing" MEMBER from the open folder — a member whose app
+     * is no longer installed (Windows-shortcut model). Reuses the top-level missing dialog
+     * strings; removal goes through the folder-delete path (auto-dissolves below two members)
+     * and closes the overlay, since its snapshot member list may have shrunk or dissolved.
+     */
+    private fun confirmRemoveMissingFolderMember(folder: ItemId, key: ComponentKey) {
+        if (isFinishing || isDestroyed) return
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.home_missing_dialog_title)
+            .setMessage(getString(R.string.home_missing_dialog_message, key.packageName))
+            .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ ->
+                viewModel.removeMissingFolderMember(folder, key)
+                folderOverlayController.close()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        showTrackedDialog(dialog)
+    }
+
     /** All upcoming events, grouped today/tomorrow via the shared formatter. */
     private fun showEventsDialog() {
         if (isFinishing || isDestroyed) return
@@ -1296,6 +1316,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             iconSizePx = gridIconPx,
             onLaunch = { key -> launchApp(key); folderOverlayController.close() },
             onStartDrag = { view, key -> startFolderMemberDrag(view, key) },
+            installed = viewModel.installedKeys.value,
+            onMissingApp = { key -> confirmRemoveMissingFolderMember(folderId, key) },
         ).also { it.submit(folder.members); it.submitNotificationDots(viewModel.notificationDots.value) }
         folderOverlayController.open(
             initialTitle = folder.title,

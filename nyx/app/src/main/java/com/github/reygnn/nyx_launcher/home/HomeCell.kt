@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
@@ -27,7 +28,7 @@ sealed interface HomeCell {
  * during the cold-start enumeration window.
  */
 private fun HomeItem.toCell(installed: Set<ComponentKey>): HomeCell = when (this) {
-    is HomeItem.App -> HomeCell.App(id, key, missing = installed.isNotEmpty() && key !in installed)
+    is HomeItem.App -> HomeCell.App(id, key, missing = LazySlotMembership.isMissing(key, installed))
     is HomeItem.Folder -> HomeCell.Folder(id, members)
 }
 

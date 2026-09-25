@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import kotlinx.coroutines.CancellationException
@@ -83,9 +84,9 @@ import javax.inject.Singleton
  * different order (the provisional sorts a `Set`, the authoritative sorts the
  * enumeration list, and `sortedByDisplayName` is stable), so their positions
  * can swap on replacement. Only their icons differ, the text is identical.
- * A favorite whose component no longer resolves returns `null` and is simply
- * omitted (no ghost), unlike a persisted cache which would paint it until
- * reconciliation.
+ * A favorite whose component no longer resolves is KEPT as a greyed "missing" entry
+ * (best-effort label), the same as the authoritative pass produces — so the provisional
+ * first paint is a faithful preview and the missing tile does not pop in later.
  */
 class GetFavoriteAppsUseCase @Inject constructor(
     private val installedAppsStateRepository: InstalledAppsStateRepository,
@@ -191,8 +192,10 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
     /**
      * Builds the provisional favorites list from LIVE per-component label lookups
-     * (no persistence). A favorite whose component no longer resolves returns `null`
-     * and is omitted (ghost-free). Empty favorites, or none resolvable, → [UiState.Loading].
+     * (no persistence). A favorite whose component no longer resolves is KEPT as a
+     * greyed "missing" entry (best-effort label), matching the authoritative pass;
+     * only a malformed favorite key (not a real component) is omitted. Empty favorites,
+     * or none resolvable to a real component, → [UiState.Loading].
      *
      * Reuses [applyCustomNames] and [FavoritesOrderRepository.sortFavoriteComponents]
      * so the provisional output matches the authoritative [processApps] result in
@@ -217,20 +220,47 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // awaitAll are index-ordered), so the provisional list is identical to the
         // sequential one before sortFavoriteComponents reorders it — the byte-
         // identical-label tie in the class KDoc is unchanged.
-        val resolved = coroutineScope {
+        //
+        // A favorite whose app is GONE (resolveLabel == null) is NO LONGER dropped: it
+        // is kept as a synthesized "missing" entry (best-effort label via
+        // toMissingAppInfo — custom name, else package), exactly as the authoritative
+        // processApps does. So the first paint is a faithful preview of the final
+        // result — a missing favorite renders greyed immediately instead of popping in
+        // ~150 ms later (parity with nyx tiles). The former "ghost-free" omission is
+        // gone with the auto-prune it guarded against (root TODO.md): nothing prunes a
+        // favorite any more, so there is no flash-then-vanish to avoid. Trade-off: an
+        // INSTALLED favorite whose scoped resolveLabel transiently returns null in the
+        // pre-enumeration window paints greyed for that window, then the authoritative
+        // pass flips it to present — in practice rare, since the scoped query resolves
+        // an installed component even before the bulk enumeration. A malformed favorite
+        // key yields null from resolveLabel AND from toMissingAppInfo, so it is still
+        // omitted (not a real component).
+        val entries = coroutineScope {
             step.favorites
                 .map { component ->
                     async {
-                        componentLabelResolver.resolveLabel(component)
-                            ?.let { label -> component.toProvisionalAppInfo(label) }
+                        val label = componentLabelResolver.resolveLabel(component)
+                        if (label != null) {
+                            ProvisionalEntry(component.toProvisionalAppInfo(label), missing = false)
+                        } else {
+                            component.toMissingAppInfo(step.customNames)
+                                ?.let { ProvisionalEntry(it, missing = true) }
+                        }
                     }
                 }
                 .awaitAll()
                 .filterNotNull()
         }
-        if (resolved.isEmpty()) return UiState.Loading
+        // Empty only if EVERY favorite was a malformed key (no real component to paint) —
+        // otherwise present + missing entries make this non-empty.
+        if (entries.isEmpty()) return UiState.Loading
 
-        val named = applyCustomNames(resolved, step.customNames)
+        val provisionalApps = entries.map { it.app }
+        val missingComponentsAll = entries
+            .filter { it.missing }
+            .mapTo(HashSet()) { it.app.componentName }
+
+        val named = applyCustomNames(provisionalApps, step.customNames)
 
         // Same order source as the authoritative path (only throw candidate:
         // sortFavoriteComponents, a suspend repo call).
@@ -243,10 +273,15 @@ class GetFavoriteAppsUseCase @Inject constructor(
             named.sortedByDisplayName()
         }
 
+        val limited = ordered.take(AppConstants.MAX_FAVORITES_ON_HOME)
         return UiState.Success(
             FavoriteAppsResult(
-                apps = ordered.take(AppConstants.MAX_FAVORITES_ON_HOME),
+                apps = limited,
                 isFallback = false,
+                // Only those actually in the emitted (limited) list — mirrors processApps.
+                missingComponents = limited
+                    .filter { it.componentName in missingComponentsAll }
+                    .mapTo(HashSet()) { it.componentName },
             ),
         )
     }
@@ -271,15 +306,21 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // derive it from the favorite component set. Set.contains(String) / filter
         // on non-null data classes cannot throw.
         val presentFavorites = rawApps.filter { favorites.contains(it.componentName) }
-        val presentComponents = presentFavorites.mapTo(HashSet()) { it.componentName }
 
         // Missing favorites (Windows-shortcut model, root TODO.md): a favorite whose
         // component is NOT in the loaded list is no longer silently dropped — it is
         // KEPT as a synthesized "missing" entry (greyed on home, removable on tap).
+        // The missing decision goes through the SHARED [LazySlotMembership.isMissing]
+        // rule (same one nyx tiles + the swipe slot use), against the full loaded-app
+        // component set: an empty set would flag nothing, but processApps only runs on a
+        // non-empty load (the empty case is the provisional/Loading path upstream), so
+        // the guard here is belt-and-braces. For a favorite, "not in the loaded set" is
+        // exactly the former inner-join drop condition.
         // A malformed key (no "/", or a trailing "/") is not a real component and is
-        // omitted, exactly as the previous inner-join filter dropped it.
+        // omitted by toMissingAppInfo, exactly as the previous inner-join filter dropped it.
+        val installedComponents = rawApps.mapTo(HashSet()) { it.componentName }
         val missingFavorites = favorites
-            .filter { it !in presentComponents }
+            .filter { LazySlotMembership.isMissing(it, installedComponents) }
             .mapNotNull { it.toMissingAppInfo(customNames) }
         val missingComponents = missingFavorites.mapTo(HashSet()) { it.componentName }
 
@@ -394,4 +435,12 @@ class GetFavoriteAppsUseCase @Inject constructor(
 
         data class Resolved(val result: FavoriteAppsResult) : RawStep
     }
+
+    /**
+     * One resolved favorite in the provisional first paint: its display-only [app] plus
+     * whether it is [missing] (its app is no longer installed, painted greyed). Lets
+     * [buildProvisional] carry the present/missing split out of the concurrent resolution
+     * without a shared-mutable-set race across the `async` children.
+     */
+    private data class ProvisionalEntry(val app: AppInfo, val missing: Boolean)
 }

@@ -81,10 +81,12 @@ class GetFavoriteAppsUseCaseTest {
         every { hiddenAppsRepository.hiddenAppsFlow } returns hiddenAppsFlow
         every { favoritesOrderRepository.favoriteComponentsOrderFlow } returns orderFlow
         every { customNamesRepository.customNamesFlow } returns customNamesFlow
-        // Live first-paint resolver: default returns null (component not resolvable),
-        // so every EXISTING test keeps its `Loading` first emission (no favorite
-        // resolves → no provisional). The provisional-specific tests below stub real
-        // labels per component.
+        // Live first-paint resolver: default returns null (component not resolvable).
+        // Since the ghost-free rule was dropped, an unresolvable favorite is now painted
+        // as a "missing" provisional entry (not omitted). Result-focused tests below
+        // therefore arrange a NON-EMPTY raw list BEFORE collecting, so the first emission
+        // is the authoritative result directly (no Loading/provisional step to sequence
+        // around). Provisional-specific tests stub real labels per component.
         coEvery { componentLabelResolver.resolveLabel(any()) } returns null
 
         useCase = GetFavoriteAppsUseCase(
@@ -105,16 +107,11 @@ class GetFavoriteAppsUseCaseTest {
         val customSortedFavorites = listOf(app2, app1)
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns customSortedFavorites
 
+        // Arrange fully before collecting → first emission is the authoritative result.
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            // No second Loading here any more: the favorites-set re-emission over
-            // the still-empty raw list is identical to the first Loading and is
-            // now collapsed by distinctUntilChanged (AUDIT-14 F1).
-
-            rawAppsFlow.value = allApps
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -130,12 +127,11 @@ class GetFavoriteAppsUseCaseTest {
     fun `favoriteApps returns default fallback apps when no favorites are set`() = runTest {
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
+        // No favorites + non-empty raw arranged up front → first emission is the fallback.
+        favoritesFlow.value = emptySet()
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = emptySet()
-            rawAppsFlow.value = allApps
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -166,13 +162,10 @@ class GetFavoriteAppsUseCaseTest {
             throw RuntimeException("Sorting failed")
         }
 
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            rawAppsFlow.value = allApps
-            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -189,13 +182,10 @@ class GetFavoriteAppsUseCaseTest {
             throw IOException("Cannot read order")
         }
 
+        favoritesFlow.value = setOf(app3.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app3.componentName)
-            rawAppsFlow.value = allApps
-            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -222,11 +212,9 @@ class GetFavoriteAppsUseCaseTest {
             dispatcher = mainDispatcherRule.testDispatcher
         )
 
+        rawAppsFlow.value = allApps
+
         crashingUseCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            rawAppsFlow.value = allApps
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -255,13 +243,10 @@ class GetFavoriteAppsUseCaseTest {
             dispatcher = mainDispatcherRule.testDispatcher
         )
 
+        favoritesFlow.value = setOf(app1.componentName)
+        rawAppsFlow.value = allApps
+
         crashingUseCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName)
-            rawAppsFlow.value = allApps
-            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -275,20 +260,13 @@ class GetFavoriteAppsUseCaseTest {
     fun `favoriteApps - with all favorites hidden - returns fallback`() = runTest {
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
+        // All favorites are ALSO hidden; with the sort mocked to empty the result is the
+        // fallback (top-N of the non-hidden apps). Arranged up front → first emission.
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            rawAppsFlow.value = allApps
-            val firstEmission = awaitItem()
-            assertTrue(firstEmission is UiState.Success)
-
-            // Marking these two favorites produces the SAME fallback output as
-            // before (sortFavoriteComponents is mocked to empty → still fallback,
-            // hidden set unchanged), so distinctUntilChanged emits nothing here
-            // (AUDIT-14 F1). The observable change comes from the hide below.
-            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-
-            hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -305,13 +283,12 @@ class GetFavoriteAppsUseCaseTest {
             firstArg<List<AppInfo>>()
         }
 
+        // Malformed keys ("" / "invalid") are not real components: they resolve to neither
+        // a present nor a missing entry, so they are dropped. Arranged up front.
+        favoritesFlow.value = setOf(app1.componentName, "", "invalid", app2.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName, "", "invalid", app2.componentName)
-            rawAppsFlow.value = allApps
-            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -330,13 +307,10 @@ class GetFavoriteAppsUseCaseTest {
 
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns largeFavoritesList
 
+        favoritesFlow.value = largeFavoritesList.map { it.componentName }.toSet()
+        rawAppsFlow.value = largeFavoritesList
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = largeFavoritesList.map { it.componentName }.toSet()
-            rawAppsFlow.value = largeFavoritesList
-            // distinctUntilChanged collapses the redundant Loading re-emission (AUDIT-14 F1)
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
 
@@ -405,13 +379,19 @@ class GetFavoriteAppsUseCaseTest {
     }
 
     @Test
-    fun `favoriteApps - with empty raw apps but favorites set - emits loading`() = runTest {
-        useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+    fun `favoriteApps - with empty raw apps but favorites set - paints provisional missing entries`() = runTest {
+        // Cold-start window: raw list empty, one favorite set, its live label unresolvable
+        // (default resolver → null). Since the ghost-free rule was dropped it is painted
+        // immediately as a greyed "missing" entry instead of collapsing to Loading.
+        favoritesFlow.value = setOf(app1.componentName)
 
-            favoritesFlow.value = setOf(app1.componentName)
-            // Raw list still empty → the re-emission is another identical Loading,
-            // now collapsed by distinctUntilChanged, so nothing new arrives.
+        useCase.favoriteApps.test {
+            val provisional = awaitItem()
+            assertTrue(provisional is UiState.Success)
+            val result = provisional.data
+            assertFalse(result.isFallback)
+            assertTrue(result.apps.any { it.componentName == app1.componentName })
+            assertEquals(setOf(app1.componentName), result.missingComponents)
             expectNoEvents()
         }
     }
@@ -502,10 +482,10 @@ class GetFavoriteAppsUseCaseTest {
     }
 
     @Test
-    fun `favoriteApps omits a favorite whose component no longer resolves - no ghost`() = runTest {
-        // A favorite uninstalled while the launcher was dead: its live lookup returns
-        // null, so it is simply omitted from the provisional paint (no ghost), unlike
-        // a persisted cache which would show it until reconciliation.
+    fun `favoriteApps keeps a favorite whose component no longer resolves as a provisional missing entry`() = runTest {
+        // A favorite uninstalled while the launcher was dead: its live lookup returns null.
+        // Since the ghost-free rule was dropped it is KEPT as a greyed "missing" provisional
+        // entry (best-effort label = package), matching the authoritative pass — no pop-in.
         favoritesFlow.value = setOf(app1.componentName, "com.dead/Gone")
         coEvery { componentLabelResolver.resolveLabel(app1.componentName) } returns "App A"
         coEvery { componentLabelResolver.resolveLabel("com.dead/Gone") } returns null
@@ -516,8 +496,17 @@ class GetFavoriteAppsUseCaseTest {
         useCase.favoriteApps.test {
             val provisional = awaitItem()
             assertTrue(provisional is UiState.Success)
-            assertEquals(listOf("App A"), provisional.data.apps.map { it.displayName })
-            assertFalse(provisional.data.isFallback)
+            val result = provisional.data
+            assertFalse(result.isFallback)
+            // Both are in the paint: the resolvable one AND the missing one (kept, not dropped).
+            assertEquals(
+                setOf(app1.componentName, "com.dead/Gone"),
+                result.apps.map { it.componentName }.toSet(),
+            )
+            // Only the unresolvable one is flagged missing; its best-effort label is the package.
+            assertEquals(setOf("com.dead/Gone"), result.missingComponents)
+            val missingEntry = result.apps.first { it.componentName == "com.dead/Gone" }
+            assertEquals("com.dead", missingEntry.displayName)
             expectNoEvents()
         }
     }
@@ -581,14 +570,12 @@ class GetFavoriteAppsUseCaseTest {
             firstArg<List<AppInfo>>()
         }
 
+        // Both favorites are ALSO hidden — they must still appear. Arranged up front.
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            // Both favorites are ALSO hidden — they must still appear.
-            hiddenAppsFlow.value = setOf(app1.componentName, app2.componentName)
-            rawAppsFlow.value = allApps
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
             val result = successState.data
@@ -608,14 +595,12 @@ class GetFavoriteAppsUseCaseTest {
             firstArg<List<AppInfo>>()
         }
 
+        // Only app1 is hidden; app2 is visible. Neither may be dropped. Arranged up front.
+        favoritesFlow.value = setOf(app1.componentName, app2.componentName)
+        hiddenAppsFlow.value = setOf(app1.componentName)
+        rawAppsFlow.value = allApps
+
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
-
-            favoritesFlow.value = setOf(app1.componentName, app2.componentName)
-            // Only app1 is hidden; app2 is visible. Neither may be dropped.
-            hiddenAppsFlow.value = setOf(app1.componentName)
-            rawAppsFlow.value = allApps
-
             val successState = awaitItem()
             assertTrue(successState is UiState.Success)
             val result = successState.data

@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.core.view.updateLayoutParams
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
@@ -46,8 +47,31 @@ class HomeGridAdapter(
     }
 
     fun submit(newCells: List<HomeCell>) {
+        val old = cells
         cells = newCells
-        notifyDataSetChanged()
+        // The grid is a DENSE, FIXED-SIZE list (index = y*columns + x); its length is
+        // constant for the life of an adapter instance (a grid-dimension change rebuilds
+        // the whole pager adapter in MainActivity). A length change therefore only happens
+        // on the first submit (from the empty initial list), where a full rebind is right.
+        if (old.size != newCells.size) {
+            notifyDataSetChanged()
+            return
+        }
+        // Positional identity: a slot IS its position, so DiffUtil computes NO moves (which
+        // would fight the drag-view bridge in MainActivity.renderLayout) — only the cells
+        // whose HomeCell value actually changed are rebound. This is the win for the
+        // no-prune "missing" model: an uninstall flips one App(missing=…) and only that one
+        // tile re-decodes/greys, instead of notifyDataSetChanged re-decoding the whole page.
+        // The dot-only update path (submitNotificationDots) is separate and untouched.
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = old.size
+            override fun getNewListSize(): Int = newCells.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                oldItemPosition == newItemPosition
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                old[oldItemPosition] == newCells[newItemPosition]
+        })
+        diff.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CellHolder {

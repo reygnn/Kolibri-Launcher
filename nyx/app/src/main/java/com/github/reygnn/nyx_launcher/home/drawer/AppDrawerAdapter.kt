@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
@@ -40,8 +41,13 @@ class AppDrawerAdapter(
     private var dotPackages: Set<String> = emptySet()
 
     fun submit(newEntries: List<DrawerEntry>) {
+        val old = entries
         entries = newEntries
-        notifyDataSetChanged()
+        // Content identity (DrawerEntryDiff): a search keystroke moves/keeps unchanged
+        // rows and only binds the ones that actually appeared or changed, instead of a
+        // notifyDataSetChanged full rebind that re-decodes every visible icon. The
+        // dot-only update path (submitNotificationDots) stays separate and untouched.
+        DiffUtil.calculateDiff(DrawerEntryDiff.callback(old, newEntries)).dispatchUpdatesTo(this)
     }
 
     fun submitNotificationDots(newDots: Set<String>) {

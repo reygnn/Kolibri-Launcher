@@ -21,10 +21,9 @@ import javax.inject.Inject
  * its authoritative replacement carry an identical label (no reshuffle on swap).
  *
  * Each query runs on [ioDispatcher] (the PackageManager call is blocking). The broad
- * `Throwable` catch is the sanctioned System-API-boundary form; unlike
- * `PackageManagerPresence` it resolves failure to `null` (omit), not to a safe default —
- * see the fail-closed rationale in the [ComponentLabelResolver] KDoc.
- * `CancellationException` still propagates.
+ * `Throwable` catch is the sanctioned System-API-boundary form; it resolves failure to
+ * `null` (omit the entry), not to a safe default — see the fail-closed rationale in the
+ * [ComponentLabelResolver] KDoc. `CancellationException` still propagates.
  */
 class ComponentLabelResolverImpl @Inject constructor(
     private val packageManager: PackageManager,

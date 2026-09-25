@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.launcher.core.KolibriLog
@@ -49,6 +50,11 @@ class HandleSwipeActionUseCase @Inject constructor(
         val appToLaunch = currentApps.find {
             it.componentName == componentName
         }
+        // The installed view as a component-key set, for the SHARED lazy-slot rule
+        // ([LazySlotMembership.isMissing]) — the same rule nyx tiles + kolibri favorites
+        // use, so the "empty view = not loaded, don't treat absent as missing" guard has
+        // one home and can't drift between the surfaces.
+        val installed = currentApps.mapTo(HashSet()) { it.componentName }
 
         return when {
             appToLaunch != null -> {
@@ -59,24 +65,24 @@ class HandleSwipeActionUseCase @Inject constructor(
                 Result.LaunchApp(appToLaunch)
             }
 
-            currentApps.isEmpty() -> {
-                // Empty list = cold-start window before the first load (or a
-                // transient failure). "Absent" is an unreliable uninstall signal
-                // here — the app may well be installed — so stay SILENT (no toast),
-                // exactly as before. This is the branch that closed the AUDIT-5
-                // cold-start data-loss; it must never mutate persisted state.
-                KolibriLog.d("Swipe $slot: app list not loaded yet, treating as no-op ($componentName)")
-                Result.NoAction
+            LazySlotMembership.isMissing(componentName, installed) -> {
+                // The list IS loaded (non-empty) and the assigned component is genuinely
+                // absent → lazily validate (Windows-shortcut model). The caller surfaces a
+                // "no longer installed" toast; the assignment is NEVER auto-cleared here
+                // (there is no load-path reconcile any more), the user reassigns/clears the
+                // slot in Settings.
+                KolibriLog.w("App for swipe $slot not in current list: $componentName. Lazy-validated (no auto-clear).")
+                Result.AppNotInstalled(slot, componentName)
             }
 
             else -> {
-                // The list IS loaded (non-empty) and the assigned component is
-                // genuinely absent → lazily validate (Windows-shortcut model). The
-                // caller surfaces a "no longer installed" toast; the assignment is
-                // NEVER auto-cleared here (there is no load-path reconcile any more),
-                // the user reassigns/clears the slot in Settings.
-                KolibriLog.w("App for swipe $slot not in current list: $componentName. Lazy-validated (no auto-clear).")
-                Result.AppNotInstalled(slot, componentName)
+                // Empty list = cold-start window before the first load (or a transient
+                // failure). "Absent" is an unreliable uninstall signal here — the app may
+                // well be installed — so stay SILENT (no toast). This is the branch that
+                // closed the AUDIT-5 cold-start data-loss; it must never mutate persisted
+                // state.
+                KolibriLog.d("Swipe $slot: app list not loaded yet, treating as no-op ($componentName)")
+                Result.NoAction
             }
         }
     }
