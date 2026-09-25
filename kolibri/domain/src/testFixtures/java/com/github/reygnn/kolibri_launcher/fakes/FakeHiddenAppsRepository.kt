@@ -41,15 +41,6 @@ class FakeHiddenAppsRepository : HiddenAppsRepository {
         hiddenApps = (hiddenApps + componentsToHide) - componentsToShow
     }
 
-    override suspend fun reconcileHiddenComponents(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        val orphans = hiddenApps - installedComponentNames.toSet()
-        val verifiedAbsent = orphans.filterTo(HashSet()) { !isStillPresent(it) }
-        hiddenApps = hiddenApps - verifiedAbsent
-    }
-
     override suspend fun purgeRepository() {
         hiddenApps = emptySet()
     }

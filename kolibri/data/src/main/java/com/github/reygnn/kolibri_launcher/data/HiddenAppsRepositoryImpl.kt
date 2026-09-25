@@ -209,30 +209,6 @@ class HiddenAppsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun reconcileHiddenComponents(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        // FAIL-CLOSED read (propagates; NOT the fail-open shared flow). No
-        // try/catch — errors propagate to the caller's runCleanup (R-INV-2).
-        val current = dataStore.data.first()[PreferencesKeys.HIDDEN_COMPONENTS] ?: emptySet()
-        val orphans = current - installedComponentNames.toSet()
-        if (orphans.isEmpty()) return
-
-        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
-        if (verifiedAbsent.isEmpty()) return
-
-        dataStore.edit { preferences ->
-            // Value-scoped: re-read inside the edit, subtract verified-absent.
-            val now = preferences[PreferencesKeys.HIDDEN_COMPONENTS] ?: return@edit
-            val cleaned = now - verifiedAbsent
-            if (cleaned.size < now.size) {
-                Timber.w("Removed ${now.size - cleaned.size} orphaned hidden components")
-                preferences[PreferencesKeys.HIDDEN_COMPONENTS] = cleaned
-            }
-        }
-    }
-
     override suspend fun purgeRepository() {
         dataStore.safePurge("HiddenAppsRepositoryImpl") { preferences ->
             preferences[PreferencesKeys.HIDDEN_COMPONENTS] = emptySet()

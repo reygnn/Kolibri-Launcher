@@ -212,61 +212,6 @@ abstract class SwipeActionsRepositoryContract {
         assertNull(repo.right())
     }
 
-    // ---------- reconcileSwipeActions ----------
-
-    @Test
-    fun `reconcileSwipeActions clears a slot whose app is not installed`() = runTest {
-        val repo = createRepository()
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
-
-        repo.reconcileSwipeActions(listOf(appB)) { false } // appA uninstalled
-
-        assertNull(repo.left())
-        assertEquals(appB, repo.right())
-    }
-
-    @Test
-    fun `reconcileSwipeActions keeps both slots when both installed`() = runTest {
-        val repo = createRepository()
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
-
-        repo.reconcileSwipeActions(listOf(appA, appB)) { false }
-
-        assertEquals(appA, repo.left())
-        assertEquals(appB, repo.right())
-    }
-
-    @Test
-    fun `reconcileSwipeActions with empty installed list clears both slots`() = runTest {
-        val repo = createRepository()
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
-
-        repo.reconcileSwipeActions(emptyList()) { false }
-
-        assertNull(repo.left())
-        assertNull(repo.right())
-    }
-
-    @Test
-    fun `reconcileSwipeActions keeps a slot the presence check reports present`() = runTest {
-        val repo = createRepository()
-        repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        // appA absent from the load but the presence predicate vetoes clearing it.
-        repo.reconcileSwipeActions(emptyList()) { it == appA }
-        assertEquals(appA, repo.left())
-    }
-
-    @Test
-    fun `reconcileSwipeActions on fresh repository is a no-op`() = runTest {
-        val repo = createRepository()
-        repo.reconcileSwipeActions(listOf(appA)) { false }
-        assertNull(repo.left())
-        assertNull(repo.right())
-    }
-
     // ---------- getSwipeActionComponent (authoritative read for the launch path) ----------
 
     @Test

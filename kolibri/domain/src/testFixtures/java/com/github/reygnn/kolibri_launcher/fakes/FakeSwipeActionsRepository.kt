@@ -24,15 +24,6 @@ class FakeSwipeActionsRepository : SwipeActionsRepository {
             SwipeSlot.NONE -> null
         }
 
-    override suspend fun reconcileSwipeActions(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        val installedSet = installedComponentNames.toSet()
-        swipeLeftApp?.let { if (it !in installedSet && !isStillPresent(it)) swipeLeftApp = null }
-        swipeRightApp?.let { if (it !in installedSet && !isStillPresent(it)) swipeRightApp = null }
-    }
-
     override suspend fun purgeRepository() {
         swipeLeftApp = null
         swipeRightApp = null

@@ -87,21 +87,6 @@ class FakeCustomNamesRepository : CustomNamesRepository {
         return true
     }
 
-    override suspend fun reconcileCustomNames(
-        installedPackageNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        // Custom names are keyed by package; a name whose package is absent from
-        // the load is a candidate, removed only if isStillPresent says gone.
-        // No trigger — mirrors the impl's load-time no-trigger path.
-        val installedSet = installedPackageNames.toSet()
-        val verifiedAbsent = customNames.keys
-            .filter { it !in installedSet }
-            .filterTo(HashSet()) { !isStillPresent(it) }
-        customNames.keys.removeAll(verifiedAbsent)
-        syncFlow()
-    }
-
     override suspend fun purgeRepository() {
         customNames.clear()
         syncFlow()

@@ -104,39 +104,6 @@ class SwipeActionsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun reconcileSwipeActions(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        // FAIL-CLOSED read (propagates). No try/catch — errors propagate to the
-        // caller's runCleanup (R-INV-2).
-        val current = dataStore.data.first()
-        val installedSet = installedComponentNames.toSet()
-        val orphans = listOfNotNull(
-            current[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT],
-            current[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT],
-        ).filterTo(HashSet()) { it !in installedSet }
-        if (orphans.isEmpty()) return
-
-        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
-        if (verifiedAbsent.isEmpty()) return
-
-        dataStore.edit { preferences ->
-            // VALUE-GUARD (RECONCILE_FIX_SPEC §2/§5): a slot is keyed, not the
-            // target, so re-read the slot value INSIDE the edit and clear it only
-            // if it STILL holds a verified-absent component — never a blind
-            // remove(slot), which would clobber a concurrent reassignment.
-            if (preferences[PreferencesKeys.SWIPE_LEFT_APP_COMPONENT] in verifiedAbsent) {
-                preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)
-                Timber.w("Removed orphaned LEFT swipe action")
-            }
-            if (preferences[PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT] in verifiedAbsent) {
-                preferences.remove(PreferencesKeys.SWIPE_RIGHT_APP_COMPONENT)
-                Timber.w("Removed orphaned RIGHT swipe action")
-            }
-        }
-    }
-
     override suspend fun purgeRepository() {
         dataStore.safePurge("SwipeActionsRepositoryImpl") { preferences ->
             preferences.remove(PreferencesKeys.SWIPE_LEFT_APP_COMPONENT)

@@ -277,59 +277,6 @@ abstract class HiddenAppsRepositoryContract {
         assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
     }
 
-    // ---------- reconcileHiddenComponents ----------
-
-    @Test
-    fun `reconcileHiddenComponents keeps only components in installed list`() = runTest {
-        val repo = createRepository()
-        repo.hideComponent(compA)
-        repo.hideComponent(compB)
-        repo.hideComponent(compC)
-
-        repo.reconcileHiddenComponents(listOf(compA, compC)) { false }
-
-        assertEquals(setOf(compA, compC), repo.hiddenAppsFlow.first())
-    }
-
-    @Test
-    fun `reconcileHiddenComponents with all installed changes nothing`() = runTest {
-        val repo = createRepository()
-        repo.hideComponent(compA)
-        repo.hideComponent(compB)
-
-        repo.reconcileHiddenComponents(listOf(compA, compB, compC)) { false }
-
-        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
-    }
-
-    @Test
-    fun `reconcileHiddenComponents with empty installed list clears hidden set`() = runTest {
-        val repo = createRepository()
-        repo.hideComponent(compA)
-        repo.hideComponent(compB)
-
-        repo.reconcileHiddenComponents(emptyList()) { false }
-
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
-    }
-
-    @Test
-    fun `reconcileHiddenComponents on empty repository stays empty`() = runTest {
-        val repo = createRepository()
-        repo.reconcileHiddenComponents(listOf(compA, compB)) { false }
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
-    }
-
-    @Test
-    fun `reconcileHiddenComponents keeps an orphan the presence check reports present`() = runTest {
-        val repo = createRepository()
-        repo.hideComponent(compA)
-        repo.hideComponent(compB)
-        // compB absent from the load but the presence predicate vetoes its removal.
-        repo.reconcileHiddenComponents(listOf(compA)) { it == compB }
-        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
-    }
-
     // ---------- purgeRepository ----------
 
     @Test

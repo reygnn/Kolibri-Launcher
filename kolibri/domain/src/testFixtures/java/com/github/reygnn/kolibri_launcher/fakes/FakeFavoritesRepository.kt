@@ -46,15 +46,6 @@ class FakeFavoritesRepository : FavoritesRepository {
         }
     }
 
-    override suspend fun reconcileFavoriteComponents(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        val orphans = favorites - installedComponentNames.toSet()
-        val verifiedAbsent = orphans.filterTo(HashSet()) { !isStillPresent(it) }
-        favorites = favorites - verifiedAbsent
-    }
-
     override suspend fun saveFavoriteComponents(componentNames: List<String>) {
         // Blank-Einträge filtern — konsistent mit addFavoriteComponent und
         // isFavoriteComponent, die beide Blanks ablehnen. Muss mit

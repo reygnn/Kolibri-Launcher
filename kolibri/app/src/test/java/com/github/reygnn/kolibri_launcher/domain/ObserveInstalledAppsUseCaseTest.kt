@@ -1,36 +1,34 @@
 package com.github.reygnn.kolibri_launcher.domain
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
-import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
-import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
-import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.kolibri_launcher.fakes.FakeAppPresence
-import com.github.reygnn.kolibri_launcher.fakes.FakeInstallSessionInspector
-import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.IOException
 
+/**
+ * The use case no longer reconciles (auto-prunes) any store: stored user
+ * assignments are kept and validated lazily at the point of use (the
+ * Windows-shortcut model, root TODO.md). Its remaining job is purely to load,
+ * keep-last-good on failure, update the central state, and emit an
+ * [AppLoadResult]. The no-prune guarantee is now STRUCTURAL — the use case has
+ * no store dependencies at all — so there is nothing store-related to assert
+ * here; the lazy "missing" handling is pinned at the UI / GetFavoriteAppsUseCase
+ * level instead.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ObserveInstalledAppsUseCaseTest {
 
@@ -39,12 +37,6 @@ class ObserveInstalledAppsUseCaseTest {
 
     private lateinit var installedAppsRepository: FakeInstalledAppsRepository
     private lateinit var installedAppsStateRepository: FakeInstalledAppsStateRepository
-    private lateinit var favoritesRepository: TestFakeFavoritesRepository
-    private lateinit var swipeActionsRepository: FakeSwipeActionsRepository
-    private lateinit var hiddenAppsRepository: FakeHiddenAppsRepository
-    private lateinit var customNamesRepository: FakeCustomNamesRepository
-    private lateinit var appPresence: FakeAppPresence
-    private lateinit var installSessions: FakeInstallSessionInspector
     private lateinit var useCase: ObserveInstalledAppsUseCase
 
     private val testApps = listOf(
@@ -57,21 +49,9 @@ class ObserveInstalledAppsUseCaseTest {
     fun setup() {
         installedAppsRepository = FakeInstalledAppsRepository()
         installedAppsStateRepository = FakeInstalledAppsStateRepository()
-        favoritesRepository = TestFakeFavoritesRepository()
-        swipeActionsRepository = FakeSwipeActionsRepository()
-        hiddenAppsRepository = FakeHiddenAppsRepository()
-        customNamesRepository = FakeCustomNamesRepository()
-        appPresence = FakeAppPresence()
-        installSessions = FakeInstallSessionInspector()
         useCase = ObserveInstalledAppsUseCase(
             installedAppsRepository,
             installedAppsStateRepository,
-            favoritesRepository,
-            swipeActionsRepository,
-            hiddenAppsRepository,
-            customNamesRepository,
-            appPresence,
-            installSessions,
         )
     }
 
@@ -81,10 +61,8 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `invoke emits Success when apps are loaded`() = runTest {
-        // Arrange
         installedAppsRepository.installedApps = testApps
 
-        // Act & Assert
         useCase().test {
             val result = awaitItem()
             assertThat(result).isEqualTo(AppLoadResult.Success)
@@ -94,16 +72,13 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `invoke updates state repository with loaded apps`() = runTest {
-        // Arrange
         installedAppsRepository.installedApps = testApps
 
-        // Act
         useCase().test {
             awaitItem()
             cancelAndIgnoreRemainingEvents()
         }
 
-        // Assert
         assertThat(installedAppsStateRepository.rawAppsFlow.value).isEqualTo(testApps)
     }
 
@@ -113,327 +88,15 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `invoke with empty list updates state to empty without error`() = runTest {
-        // Arrange
         installedAppsRepository.installedApps = emptyList()
 
-        // Act
         useCase().test {
             // Kein Error-Event erwartet, Flow sollte einfach enden
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
         }
 
-        // Assert
         assertThat(installedAppsStateRepository.rawAppsFlow.value).isEmpty()
-    }
-
-    // =========================================================================
-    // Favoriten-Cleanup
-    // =========================================================================
-
-    @Test
-    fun `invoke calls reconcileFavoriteComponents with correct componentNames`() = runTest {
-        // Arrange
-        installedAppsRepository.installedApps = testApps
-
-        // Act
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Assert
-        val expectedComponentNames = testApps.map { it.componentName }
-        assertThat(favoritesRepository.lastCleanupComponentNames)
-            .containsExactlyElementsIn(expectedComponentNames)
-    }
-
-    @Test
-    fun `invoke does not call cleanup when app list is empty`() = runTest {
-        // Arrange
-        installedAppsRepository.installedApps = emptyList()
-
-        // Act
-        useCase().test {
-            expectNoEvents()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Assert
-        assertThat(favoritesRepository.cleanupCallCount).isEqualTo(0)
-    }
-
-    // =========================================================================
-    // Load-time reconciliation of swipe / hidden / custom names (TODO §24)
-    // =========================================================================
-
-    @Test
-    fun `invoke reconciles swipe hidden and custom names against loaded apps`() = runTest {
-        // Arrange: one valid assignment (present in testApps) + one orphan each.
-        val validComponent = testApps[0].componentName // com.app1/com.app1.Main
-        val orphanComponent = "com.gone/com.gone.Main"
-        val validPackage = testApps[0].packageName      // com.app1
-        val orphanPackage = "com.gone"
-
-        swipeActionsRepository.swipeLeftApp = orphanComponent
-        swipeActionsRepository.swipeRightApp = validComponent
-        hiddenAppsRepository.hiddenApps = setOf(validComponent, orphanComponent)
-        customNamesRepository.setCustomNameForPackage(validPackage, "Keep")
-        customNamesRepository.setCustomNameForPackage(orphanPackage, "Drop")
-
-        installedAppsRepository.installedApps = testApps
-
-        // Act
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Assert: orphans gone, valid entries kept.
-        assertThat(swipeActionsRepository.swipeLeftApp).isNull()
-        assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(validComponent)
-        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(validComponent)
-        assertThat(customNamesRepository.getAllCustomNames().keys).containsExactly(validPackage)
-    }
-
-    @Test
-    fun `partial load vetoes a still-present app but still removes a genuine orphan`() = runTest {
-        // The core R-INV guarantee (RECONCILE_SPEC §3): the loaded list is only a
-        // candidate finder, not ground truth. com.app2 is dropped from the load
-        // but is actually still installed; com.gone is a genuine orphan. Both are
-        // assigned across the stores. AppPresence is the deletion gate.
-        val stillInstalled = testApps[1].componentName   // com.app2/com.app2.Main
-        val stillInstalledPkg = testApps[1].packageName  // com.app2
-        val orphanComponent = "com.gone/com.gone.Main"
-        val orphanPkg = "com.gone"
-
-        favoritesRepository.saveFavoriteComponents(listOf(stillInstalled, orphanComponent))
-        hiddenAppsRepository.hiddenApps = setOf(stillInstalled, orphanComponent)
-        swipeActionsRepository.swipeLeftApp = stillInstalled
-        swipeActionsRepository.swipeRightApp = orphanComponent
-        customNamesRepository.setCustomNameForPackage(stillInstalledPkg, "Keep")
-        customNamesRepository.setCustomNameForPackage(orphanPkg, "Drop")
-
-        // Deletion gate: the dropped-but-installed app is present, the orphan is gone.
-        appPresence.presentComponents = setOf(ComponentKey.parse(stillInstalled)!!)
-        appPresence.presentPackages = setOf(stillInstalledPkg)
-
-        // Partial load: testApps minus com.app2, so stillInstalled is a candidate.
-        installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
-
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Vetoed (verified-present) assignments survive the partial load...
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(stillInstalled)
-        assertThat(hiddenAppsRepository.hiddenApps).contains(stillInstalled)
-        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(stillInstalled)
-        assertThat(customNamesRepository.getAllCustomNames()).containsKey(stillInstalledPkg)
-        // ...while the genuine orphan is still removed (M3 covers favorites too).
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(orphanComponent)
-        assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(orphanComponent)
-        assertThat(swipeActionsRepository.swipeRightApp).isNull()
-        assertThat(customNamesRepository.getAllCustomNames()).doesNotContainKey(orphanPkg)
-    }
-
-    @Test
-    fun `session arm keeps a mid-restore assignment across all stores and reads once`() = runTest {
-        // AUDIT-1 F7 review point 5 (Kolibri session-arm, aligning with Nyx). com.app2 is dropped
-        // from the load AND reported absent by presence (not reinstalled yet), but an install/
-        // restore session targets it — so every store must KEEP it (Launcher3-style promise), across
-        // both grains: component-keyed (favorites/swipe/hidden) and package-keyed (custom names).
-        // com.gone has no session and is absent → still pruned everywhere. The session set is read
-        // exactly ONCE for the whole pass (batched + shared across all four stores), never per key.
-        //
-        // Mutation checks: (a) drop the session arm in core DeletionGatePass.keepComponent/keepPackage
-        // (make it presence-only) and com.app2 is pruned → red; (b) build a fresh DeletionGatePass per
-        // store instead of one per pass and `reads` != 1.
-        val restoring = testApps[1].componentName    // com.app2/com.app2.Main
-        val restoringPkg = testApps[1].packageName   // com.app2
-        val orphanComponent = "com.gone/com.gone.Main"
-        val orphanPkg = "com.gone"
-
-        favoritesRepository.saveFavoriteComponents(listOf(restoring, orphanComponent))
-        hiddenAppsRepository.hiddenApps = setOf(restoring, orphanComponent)
-        swipeActionsRepository.swipeLeftApp = restoring
-        swipeActionsRepository.swipeRightApp = orphanComponent
-        customNamesRepository.setCustomNameForPackage(restoringPkg, "Keep")
-        customNamesRepository.setCustomNameForPackage(orphanPkg, "Drop")
-
-        // Presence reports BOTH absent (nothing set present); the session arm is the only thing
-        // that can rescue com.app2.
-        installSessions.active = setOf(restoringPkg)
-
-        // Partial load: testApps minus com.app2, so com.app2 is a prune candidate.
-        installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
-
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Kept by the session arm (absent from presence, but restoring)...
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(restoring)
-        assertThat(hiddenAppsRepository.hiddenApps).contains(restoring)
-        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(restoring)
-        assertThat(customNamesRepository.getAllCustomNames()).containsKey(restoringPkg)
-        // ...while the session-less orphan is still pruned everywhere.
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(orphanComponent)
-        assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(orphanComponent)
-        assertThat(swipeActionsRepository.swipeRightApp).isNull()
-        assertThat(customNamesRepository.getAllCustomNames()).doesNotContainKey(orphanPkg)
-        // Batched: one PackageInstaller read for the whole pass, shared across all four stores.
-        assertThat(installSessions.reads).isEqualTo(1)
-    }
-
-    @Test
-    fun `undetermined session read keeps a presence-absent candidate across all stores and reads once`() = runTest {
-        // Nyx analog: undetermined_session_read_keeps_a_presence_absent_candidate. When the
-        // PackageInstaller query fails, activeSessionPackages() returns null; the shared core
-        // DeletionGatePass fail-safe KEEPS every presence-absent candidate (null → keep) rather
-        // than pruning it. com.app2 is dropped from the load AND absent from presence; with the session
-        // read undetermined it must survive across all four stores, and the set is read exactly ONCE.
-        // Mutation guard: flip the null→keep in core DeletionGatePass to prune-on-null → com.app2 pruned, red.
-        val candidate = testApps[1].componentName    // com.app2/com.app2.Main
-        val candidatePkg = testApps[1].packageName   // com.app2
-
-        favoritesRepository.saveFavoriteComponents(listOf(candidate))
-        hiddenAppsRepository.hiddenApps = setOf(candidate)
-        swipeActionsRepository.swipeLeftApp = candidate
-        customNamesRepository.setCustomNameForPackage(candidatePkg, "Keep")
-
-        // Nothing present; the session query is undetermined (fail-safe keep).
-        installSessions.undetermined = true
-
-        // Partial load: testApps minus com.app2, so com.app2 is a prune candidate.
-        installedAppsRepository.installedApps = listOf(testApps[0], testApps[2])
-
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Kept everywhere by the fail-safe (undetermined -> keep)...
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).contains(candidate)
-        assertThat(hiddenAppsRepository.hiddenApps).contains(candidate)
-        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo(candidate)
-        assertThat(customNamesRepository.getAllCustomNames()).containsKey(candidatePkg)
-        // ...and still batched: one read for the whole pass, shared across all four stores.
-        assertThat(installSessions.reads).isEqualTo(1)
-    }
-
-    @Test
-    fun `a malformed component key is pruned without ever consulting the session arm`() = runTest {
-        // keepFlatComponent does `ComponentKey.parse(flat) ?: return false` — a slash-less/garbage key
-        // is not a real component, so it is pruned WITHOUT touching the session set (the parse-null
-        // short-circuits before the shared gate's session arm). With the malformed key the only orphan,
-        // the session set is never read (reads == 0).
-        // Mutation guards: change `?: return false` to `?: return true` and the garbage survives -> red;
-        // route the malformed key through the gate (keepComponent) anyway and reads != 0.
-        val malformed = "com.malformed.no.slash"   // ComponentKey.parse(...) == null
-
-        hiddenAppsRepository.hiddenApps = setOf(malformed)
-        favoritesRepository.saveFavoriteComponents(listOf(malformed))
-
-        // Everything genuinely installed is present; the malformed key is the only orphan.
-        installedAppsRepository.installedApps = testApps
-
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // The garbage is pruned from both component-keyed stores...
-        assertThat(hiddenAppsRepository.hiddenApps).doesNotContain(malformed)
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).doesNotContain(malformed)
-        // ...and the session arm was never consulted (parse-null short-circuits before it).
-        assertThat(installSessions.reads).isEqualTo(0)
-    }
-
-    @Test
-    fun `an all-present load performs zero session IPC`() = runTest {
-        // Nyx analog: complete_snapshot_consults_neither_gate (reads == 0). When every stored
-        // assignment resolves against the load there is no prune candidate, so neither the presence
-        // gate nor the session set is touched — a healthy reconcile costs zero PackageInstaller IPC.
-        // Mutation guard: read the session set eagerly (once per pass or per store) and reads != 0.
-        val a = testApps[0].componentName
-        val b = testApps[1].componentName
-        favoritesRepository.saveFavoriteComponents(listOf(a, b))
-        hiddenAppsRepository.hiddenApps = setOf(a)
-        swipeActionsRepository.swipeRightApp = b
-        customNamesRepository.setCustomNameForPackage(testApps[0].packageName, "Keep")
-
-        installedAppsRepository.installedApps = testApps
-
-        useCase().test {
-            awaitItem()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // All assignments valid -> no candidates -> session set never read.
-        assertThat(installSessions.reads).isEqualTo(0)
-        // ...and nothing was pruned.
-        assertThat(favoritesRepository.favoriteComponentsFlow.first()).containsExactly(a, b)
-        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(a)
-        assertThat(swipeActionsRepository.swipeRightApp).isEqualTo(b)
-        assertThat(customNamesRepository.getAllCustomNames()).containsKey(testApps[0].packageName)
-    }
-
-    @Test
-    fun `invoke isolates a failing cleanup - other stores still reconcile and state still updates`() = runTest {
-        // The four cleanups share a try-block with updateApps + emit(Success). If
-        // a store's cleanup weren't guarded independently (runCleanup), its throw
-        // would land in the outer catch and SKIP updateApps + Success — so a
-        // freshly installed/uninstalled app would never reach the drawer/home
-        // over a transient DataStore hiccup. Pin that a failing favorites cleanup
-        // is isolated: the other stores still reconcile, the state still updates,
-        // and the load still reports Success.
-        favoritesRepository.throwOnCleanup = RuntimeException("DataStore write failed")
-
-        val validComponent = testApps[0].componentName // com.app1/com.app1.Main
-        val orphanComponent = "com.gone/com.gone.Main"
-        swipeActionsRepository.swipeLeftApp = orphanComponent
-        hiddenAppsRepository.hiddenApps = setOf(validComponent, orphanComponent)
-        customNamesRepository.setCustomNameForPackage("com.gone", "Drop")
-
-        installedAppsRepository.installedApps = testApps
-
-        useCase().test {
-            // The failing favorites cleanup must NOT abort the load.
-            assertThat(awaitItem()).isEqualTo(AppLoadResult.Success)
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Favorites cleanup was attempted (and threw)...
-        assertThat(favoritesRepository.cleanupCallCount).isEqualTo(1)
-        // ...the other three stores still reconciled despite it...
-        assertThat(swipeActionsRepository.swipeLeftApp).isNull()
-        assertThat(hiddenAppsRepository.hiddenApps).containsExactly(validComponent)
-        assertThat(customNamesRepository.getAllCustomNames()).isEmpty()
-        // ...and the freshly loaded list still reached the central state.
-        assertThat(installedAppsStateRepository.getCurrentApps()).isEqualTo(testApps)
-    }
-
-    @Test
-    fun `invoke does not reconcile swipe hidden custom names when app list is empty`() = runTest {
-        // Cold-start guard: an empty load must NOT wipe assignments.
-        swipeActionsRepository.swipeLeftApp = "com.gone/com.gone.Main"
-        hiddenAppsRepository.hiddenApps = setOf("com.gone/com.gone.Main")
-        customNamesRepository.setCustomNameForPackage("com.gone", "Drop")
-
-        installedAppsRepository.installedApps = emptyList()
-
-        useCase().test {
-            expectNoEvents()
-            cancelAndIgnoreRemainingEvents()
-        }
-
-        // Untouched — the empty-list guard skips all cleanup.
-        assertThat(swipeActionsRepository.swipeLeftApp).isEqualTo("com.gone/com.gone.Main")
-        assertThat(hiddenAppsRepository.hiddenApps).containsExactly("com.gone/com.gone.Main")
-        assertThat(customNamesRepository.getAllCustomNames().keys).containsExactly("com.gone")
     }
 
     // =========================================================================
@@ -442,30 +105,22 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `invoke uses cached apps on error when cache exists`() = runTest {
-        // Arrange: Cache vorhanden
+        // Cache vorhanden
         installedAppsStateRepository.updateApps(testApps)
 
-        // Repository wirft Fehler
         val errorRepository = FailingInstalledAppsRepository(
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
             errorRepository,
             installedAppsStateRepository,
-            favoritesRepository,
-            swipeActionsRepository,
-            hiddenAppsRepository,
-            customNamesRepository,
-            appPresence,
-            installSessions,
         )
 
-        // Act & Assert
         useCaseWithError().test {
             awaitComplete()  // Flow endet OHNE Error-Event
         }
 
-        // Assert: State bleibt auf Cache
+        // State bleibt auf Cache
         assertThat(installedAppsStateRepository.rawAppsFlow.value).isEqualTo(testApps)
     }
 
@@ -488,12 +143,6 @@ class ObserveInstalledAppsUseCaseTest {
         val useCaseWithSequence = ObserveInstalledAppsUseCase(
             sequencedRepository,
             installedAppsStateRepository,
-            favoritesRepository,
-            swipeActionsRepository,
-            hiddenAppsRepository,
-            customNamesRepository,
-            appPresence,
-            installSessions,
         )
 
         useCaseWithSequence().test {
@@ -513,22 +162,15 @@ class ObserveInstalledAppsUseCaseTest {
 
     @Test
     fun `invoke emits Error when no cache exists on failure`() = runTest {
-        // Arrange: Kein Cache
+        // Kein Cache
         val errorRepository = FailingInstalledAppsRepository(
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
             errorRepository,
             installedAppsStateRepository,
-            favoritesRepository,
-            swipeActionsRepository,
-            hiddenAppsRepository,
-            customNamesRepository,
-            appPresence,
-            installSessions,
         )
 
-        // Act & Assert
         useCaseWithError().test {
             val result = awaitItem()
             assertThat(result).isEqualTo(AppLoadResult.Error(AppLoadResult.Failure.NotLoaded))
@@ -536,65 +178,9 @@ class ObserveInstalledAppsUseCaseTest {
         }
     }
 
-    // Retry across invocations: removed. The old .retry(IOException) was dead in
-    // production (a stateIn StateFlow never propagates an upstream exception) and
-    // the motivating PackageManager failures are not IOException; the retry was
-    // dropped in INSTALLED_APPS_LOAD_SPEC Commit 1, so there is nothing to pin.
-
     // =========================================================================
-// Test-Hilfsklassen
-// =========================================================================
-
-    /**
-     * Eigenständiges Fake das Cleanup-Aufrufe trackt.
-     * (FakeFavoritesRepository ist final, daher eigene Implementierung)
-     */
-    private class TestFakeFavoritesRepository : FavoritesRepository, Purgeable {
-        private val flow = MutableStateFlow(setOf<String>())
-
-        var lastCleanupComponentNames: List<String>? = null
-        var cleanupCallCount = 0
-
-        /** When set, cleanup records the call and then throws it (I/O-failure sim). */
-        var throwOnCleanup: Throwable? = null
-
-        override val favoriteComponentsFlow = flow
-
-        override suspend fun isFavoriteComponent(componentName: String?) =
-            componentName in flow.value
-
-        override suspend fun reconcileFavoriteComponents(
-            installedComponentNames: List<String>,
-            isStillPresent: suspend (String) -> Boolean,
-        ) {
-            cleanupCallCount++
-            lastCleanupComponentNames = installedComponentNames
-            throwOnCleanup?.let { throw it }
-            // Real predicate-gated removal (RECONCILE_FIX_SPEC M3) so the favorites
-            // veto branch is exercisable, not just call-tracked.
-            val orphans = flow.value - installedComponentNames.toSet()
-            val verifiedAbsent = orphans.filterTo(HashSet()) { !isStillPresent(it) }
-            flow.value = flow.value - verifiedAbsent
-        }
-
-        override suspend fun toggleFavoriteComponent(componentName: String) = true
-        override suspend fun addFavoriteComponent(componentName: String) = true
-        override suspend fun removeFavoriteComponent(componentName: String) = true
-        override suspend fun saveFavoriteComponents(componentNames: List<String>) {
-            flow.value = componentNames.toSet()
-        }
-
-        override suspend fun getFavoriteComponentsSnapshot(): Set<String> = flow.value
-
-        override suspend fun readFavoritesForEdit(): FavoritesEditRead =
-            FavoritesEditRead.Loaded(flow.value)
-
-        override suspend fun purgeRepository() {
-            flow.value = emptySet()
-            lastCleanupComponentNames = null
-            cleanupCallCount = 0
-        }
-    }
+    // Test-Hilfsklassen
+    // =========================================================================
 
     /**
      * Repository that EMITS a load failure as [AppLoad.Failed] — it does NOT throw.

@@ -210,37 +210,6 @@ class CustomNamesRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun reconcileCustomNames(
-        installedPackageNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        // FAIL-CLOSED read (propagates; NOT the swallow-to-empty getAllCustomNames).
-        // Candidate read and delete are the same authority; no try/catch — errors
-        // propagate to the caller's runCleanup (RECONCILE_FIX_SPEC R-INV-2).
-        val current = dataStore.data.first()
-        val assignedPackages = current.customNameKeys().mapTo(HashSet()) { it.customNamePackage() }
-        val orphans = assignedPackages - installedPackageNames.toSet()
-        if (orphans.isEmpty()) return
-
-        // isStillPresent receives a PACKAGE name (custom names are package-based).
-        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
-        if (verifiedAbsent.isEmpty()) return
-
-        dataStore.edit { preferences ->
-            // Value-scoped: key == package identity, so remove(key) can only touch
-            // the verified-absent package. Re-snapshot inside the edit.
-            val toRemove = preferences.customNameKeys()
-                .filter { it.customNamePackage() in verifiedAbsent }
-            if (toRemove.isNotEmpty()) {
-                // Log only the count, never package names (PII).
-                Timber.w("Removed ${toRemove.size} orphaned custom names")
-                toRemove.forEach { preferences.remove(it) }
-            }
-        }
-        // Runs inside the app-load pipeline; the DataStore edit alone re-emits
-        // customNamesFlow, which is the only reactive channel now.
-    }
-
     override suspend fun purgeRepository() {
         try {
             dataStore.edit { preferences ->

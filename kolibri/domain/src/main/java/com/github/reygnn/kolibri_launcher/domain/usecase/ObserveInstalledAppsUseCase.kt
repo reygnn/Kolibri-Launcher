@@ -3,16 +3,8 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
-import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.launcher.core.AppPresence
-import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.launcher.core.DeletionGatePass
-import com.github.reygnn.launcher.core.InstallSessionInspector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -22,28 +14,27 @@ import javax.inject.Inject
 class ObserveInstalledAppsUseCase @Inject constructor(
     private val installedAppsRepository: InstalledAppsRepository,
     private val installedAppsStateRepository: InstalledAppsStateRepository,
-    private val favoritesRepository: FavoritesRepository,
-    private val swipeActionsRepository: SwipeActionsRepository,
-    private val hiddenAppsRepository: HiddenAppsRepository,
-    private val customNamesRepository: CustomNamesRepository,
-    private val appPresence: AppPresence,
-    private val installSessions: InstallSessionInspector,
 ) {
 
     /**
-     * Activates the flow that loads the installed apps, reconciles the
-     * component-bound stores, updates the central state, and emits an
-     * [AppLoadResult] telling the ViewModel whether a user-visible error occurred.
+     * Activates the flow that loads the installed apps, updates the central state,
+     * and emits an [AppLoadResult] telling the ViewModel whether a user-visible
+     * error occurred.
      *
-     * The loader now yields a typed [AppLoad] (INSTALLED_APPS_LOAD_SPEC Belang A):
+     * Stored user assignments (favorites / swipe / hidden / custom names) are NOT
+     * reconciled here: nothing is auto-pruned against the load. A reference to a
+     * no-longer-installed app is kept and handled lazily at the point of use
+     * (the Windows-shortcut model, root TODO.md).
+     *
+     * The loader yields a typed [AppLoad] (INSTALLED_APPS_LOAD_SPEC Belang A):
      * a load failure arrives as [AppLoad.Failed], not as a collapsed empty list.
      * This makes the keep-last-good / error recovery LIVE (it used to sit behind a
      * `.catch`/`.retry` on a `stateIn` StateFlow that never delivers upstream
      * exceptions, so it was dead code). The old `.retry(IOException)` is gone: it
      * never fired in production, and the motivating PackageManager failures are not
-     * `IOException` anyway. The `isEmpty()` guard STAYS (IAL-INV-3): reconcile runs
-     * only on a non-empty [AppLoad.Loaded], never on a genuinely empty load or the
-     * `stateIn` cold-start init.
+     * `IOException` anyway. The `isEmpty()` guard STAYS (IAL-INV-3): a genuinely
+     * empty load records the empty snapshot without emitting Success, and never
+     * runs on the `stateIn` cold-start init.
      */
     operator fun invoke(): Flow<AppLoadResult> = flow {
         try {
@@ -86,68 +77,22 @@ class ObserveInstalledAppsUseCase @Inject constructor(
                             is AppLoad.Loaded -> {
                                 val realApps = load.apps
                                 if (realApps.isEmpty()) {
-                                    KolibriLog.w("Loaded an empty app list. Skipping cleanup to prevent data loss.")
+                                    KolibriLog.w("Loaded an empty app list; recording the empty snapshot without emitting Success.")
                                     installedAppsStateRepository.updateApps(emptyList())
                                     return@collect
                                 }
 
-                                // Reconcile the component-bound stores against the
-                                // freshly loaded list. This also covers apps uninstalled
-                                // while the process was dead (whose PACKAGE_REMOVED
-                                // broadcast the receiver missed) — the sweep runs on the
-                                // next load. Each store is guarded independently
-                                // (runCleanup) so one failure can't skip the others. The
-                                // empty-input guard lives above (realApps.isEmpty()).
+                                // No store reconcile: stored user assignments
+                                // (favorites / swipe / hidden / custom names) are NEVER
+                                // auto-pruned against the load. A reference to an app that
+                                // is no longer installed stays put and is handled lazily at
+                                // the point of use (a "missing" home favorite, a swipe toast)
+                                // — the Windows-shortcut model (root TODO.md, the
+                                // no-auto-prune / lazy-user-confirmed-removal option). The
+                                // whole deletion-gate apparatus (app-presence / install-session
+                                // inspector / deletion-gate) is therefore gone: there is nothing
+                                // to silently lose, so nothing to fail-safe against.
                                 //
-                                // The loaded list is only a removal-CANDIDATE finder, not
-                                // ground truth (RECONCILE_FIX_SPEC R-INV-2): each store
-                                // reconciles its own assignments against the list and gates
-                                // every deletion through AppPresence — a candidate the
-                                // check reports present is kept. Candidate-read and delete
-                                // are the SAME fail-closed store read inside the repo, so a
-                                // partial or transient load cannot prune a still-installed
-                                // assignment. Verification runs only on candidates (usually
-                                // none), so the steady state costs nothing extra.
-                                //
-                                // Four separate reconcile calls by design, one per
-                                // repository (each owns its keys); runCleanup isolates a
-                                // per-store failure so one bad store can't skip the others.
-                                val validComponents = realApps.map { it.componentName }
-                                val validPackages = realApps.map { it.packageName }
-                                // Each store's deletion gate keeps a candidate if EITHER it still
-                                // resolves (presence) OR its package has an install/restore session
-                                // in flight (Launcher3-style promise). The shared per-pass
-                                // [DeletionGatePass] (core) reads the session set at most ONCE, lazily
-                                // — only when a presence-absent candidate needs it — and is shared
-                                // across all four stores, so a complete/all-present load performs zero
-                                // session IPC (AUDIT-1 F7 review point 5). It is the SAME gate nyx's
-                                // home reconcile applies, so the two launchers can't drift on the
-                                // fail-safe policy (root TODO.md "Drift-Prävention" a). Component-keyed
-                                // stores (favorites/swipe/hidden) bridge their flattened "pkg/class"
-                                // key via [keepFlatComponent] (parse + gate, malformed → absent);
-                                // custom names are package-keyed.
-                                val gate = DeletionGatePass(appPresence, installSessions)
-                                runCleanup("favorites") {
-                                    favoritesRepository.reconcileFavoriteComponents(validComponents) {
-                                        gate.keepFlatComponent(it)
-                                    }
-                                }
-                                runCleanup("swipe actions") {
-                                    swipeActionsRepository.reconcileSwipeActions(validComponents) {
-                                        gate.keepFlatComponent(it)
-                                    }
-                                }
-                                runCleanup("hidden components") {
-                                    hiddenAppsRepository.reconcileHiddenComponents(validComponents) {
-                                        gate.keepFlatComponent(it)
-                                    }
-                                }
-                                runCleanup("custom names") {
-                                    customNamesRepository.reconcileCustomNames(validPackages) {
-                                        gate.keepPackage(it)
-                                    }
-                                }
-
                                 // Update the central state holder.
                                 installedAppsStateRepository.updateApps(realApps)
 
@@ -168,34 +113,4 @@ class ObserveInstalledAppsUseCase @Inject constructor(
         }
     }
 
-    /**
-     * Runs one post-load store reconciliation, isolating its failure so the
-     * other stores still run. CancellationException is rethrown (never
-     * swallowed) so a cancelled load propagates promptly instead of falling
-     * through to the state update and Success emit.
-     */
-    private suspend fun runCleanup(label: String, cleanup: suspend () -> Unit) {
-        try {
-            cleanup()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error cleaning up $label")
-        }
-    }
-}
-
-/**
- * Component-grain bridge for a flattened `"pkg/class"` store key (favorites/swipe/hidden): parse it
- * to the structured key and gate at component grain via the shared [DeletionGatePass]. A malformed
- * stored key (`ComponentKey.parse == null` — e.g. a slash-less bare package) is not a real component
- * → absent, so it is pruned exactly as before (matches the pre-migration string check) and is never
- * routed through the gate (no session probe for it either). Package-keyed stores (custom names) call
- * [DeletionGatePass.keepPackage] directly. Extracted once (AUDIT-1 F7 review point 2: DRY) from the
- * three component-keyed call sites; the session-read-once / null→keep / presence-first policy now
- * lives in the shared gate, not here (root TODO.md "Drift-Prävention" step a).
- */
-private suspend fun DeletionGatePass.keepFlatComponent(flat: String): Boolean {
-    val key = ComponentKey.parse(flat) ?: return false
-    return keepComponent(key)
 }

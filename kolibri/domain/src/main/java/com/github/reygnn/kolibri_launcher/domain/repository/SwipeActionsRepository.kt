@@ -20,23 +20,6 @@ interface SwipeActionsRepository : Purgeable {
     suspend fun setSwipeAction(slot: SwipeSlot, componentName: String?)
 
     /**
-     * Reconciles the swipe slots against the loaded app list, gating each
-     * removal through [isStillPresent] — analogous to
-     * [FavoritesRepository.reconcileFavoriteComponents] (RECONCILE_FIX_SPEC
-     * R-INV-2). A slot whose component is absent from [installedComponentNames]
-     * is only a candidate; it is cleared only if [isStillPresent] returns false.
-     *
-     * Slot-keyed store: the delete re-reads each slot INSIDE `edit{}` and clears
-     * it only if it STILL holds a verified-absent component (value-guard, §2/§5)
-     * — never a blind `remove(slot)`, which would clobber a concurrent
-     * reassignment. Fail-closed read; empty-installed guard lives at the caller.
-     */
-    suspend fun reconcileSwipeActions(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    )
-
-    /**
      * Reads the CURRENT component assigned to [slot] straight from the store.
      * The launch path needs the authoritative value: a slot changed in the
      * Settings activity must take effect on the very next swipe, so the read

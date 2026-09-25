@@ -95,23 +95,6 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
-    fun `reconcileFavoriteComponents removes orphaned favorites`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        val currentFavorites = setOf("com.installed.app/ComponentH", "com.orphaned.app/ComponentI")
-        val installedComponents =
-            listOf("com.installed.app/ComponentH", "com.another.installed.app/ComponentJ")
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to currentFavorites))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
-
-        favoritesRepositoryImpl.reconcileFavoriteComponents(installedComponents) { false }
-
-        val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertTrue(savedFavorites?.contains("com.installed.app/ComponentH") == true)
-        Assert.assertFalse(savedFavorites?.contains("com.orphaned.app/ComponentI") == true)
-        Assert.assertEquals(1, savedFavorites?.size)
-    }
-
-    @Test
     fun `addFavoriteComponent when limit reached allows adding component from existing favorite package`() =
         runTest {
             val fakeDataStore = FakeDataStore()
@@ -278,73 +261,6 @@ class FavoritesRepositoryImplTest {
 
         // Verify it attempted but failed
         Assert.assertNotNull(favoritesRepositoryImpl)
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents - with empty installed list - removes all favorites`() =
-        runTest {
-            val fakeDataStore = FakeDataStore()
-            fakeDataStore.setInitialData(
-                preferencesOf(
-                    favoritesKey to setOf(
-                        "com.app1/Component",
-                        "com.app2/Component"
-                    )
-                )
-            )
-            val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
-
-            favoritesRepositoryImpl.reconcileFavoriteComponents(emptyList()) { false }
-
-            val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-            Assert.assertTrue(savedFavorites.isNullOrEmpty())
-        }
-
-    @Test
-    fun `reconcileFavoriteComponents - when DataStore edit fails - propagates (fail-closed)`() = runTest {
-        val fakeDataStore = FakeDataStore()
-        val initialFavorites = setOf("com.app1/Component")
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to initialFavorites))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
-
-        // Wait for initialization
-        favoritesRepositoryImpl.favoriteComponentsFlow.first()
-
-        // Make edit fail
-        fakeDataStore.makeEditFail()
-
-        // Fail-closed: the edit failure PROPAGATES (no swallow). The "skip this
-        // store, delete nothing" outcome is enforced one level up by the caller's
-        // runCleanup (RECONCILE_FIX_SPEC §4). com.app1 is an orphan (installed is
-        // com.other) and the predicate reports it absent, so the edit is attempted.
-        var thrown: Throwable? = null
-        try {
-            favoritesRepositoryImpl.reconcileFavoriteComponents(listOf("com.other/Component")) { false }
-        } catch (e: Throwable) {
-            thrown = e
-        }
-        Assert.assertTrue("edit failure must propagate, not be swallowed", thrown is IOException)
-
-        // And nothing was deleted (the edit never committed).
-        val favorites = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertTrue(favorites?.contains("com.app1/Component") == true)
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents - when the candidate read fails - propagates (fail-closed)`() = runTest {
-        // The candidate read is fail-CLOSED (dataStore.data.first(), not the
-        // fail-open shared flow): a read error propagates so the caller's
-        // runCleanup skips the store and deletes nothing. A fail-open read would
-        // yield empty -> no candidate -> "nothing deleted" too, so only asserting
-        // the throw distinguishes fail-closed from the M1 regression (§6.1).
-        val fakeDataStore = FakeDataStore()
-        fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.app1/Component")))
-        val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
-        fakeDataStore.makeReadFail()
-
-        assertFailsWith<IOException> {
-            favoritesRepositoryImpl.reconcileFavoriteComponents(listOf("com.other/Component")) { false }
-        }
     }
 
     @Test

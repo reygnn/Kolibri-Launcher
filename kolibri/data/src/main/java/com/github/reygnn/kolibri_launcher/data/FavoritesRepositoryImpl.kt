@@ -1,5 +1,4 @@
 package com.github.reygnn.kolibri_launcher.data
-import com.github.reygnn.launcher.common.data.snapshotFailClosed
 import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.snapshotFailOpen
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
@@ -36,16 +35,15 @@ import javax.inject.Singleton
  * go stale — the AUDIT-13 hazard is gone by construction. The constructor takes
  * just the [DataStore]; no `externalScope` / `sharingStrategy` / test factory.
  *
- * **Three read policies, all via named envelopes (DSR-INV-3):**
+ * **Read/write policies (DSR-INV-3):**
  * - continuous / point-read for DISPLAY → fail-open ([favoriteComponentsFlow],
  *   [getFavoriteComponentsSnapshot], [isFavoriteComponent]): an I/O error yields
  *   the empty default, never throws.
- * - the reconcile candidate read → fail-CLOSED ([snapshotFailClosed]): an I/O
- *   error propagates so a transient failure deletes nothing (RECONCILE_FIX_SPEC
- *   R-INV-2).
- * - every WRITE (add/remove/save/reconcile-delete) is a read-modify-write INSIDE
- *   `edit{}`, so a concurrent change can't be clobbered by a stale outside
- *   snapshot.
+ * - the edit-favorites pre-selection read → fail-CLOSED ([readFavoritesForEdit]):
+ *   an I/O error is surfaced as [FavoritesEditRead.Unavailable] so the editor
+ *   never persists an empty set over the real favorites (DSR-INV-4).
+ * - every WRITE (add/remove/save) is a read-modify-write INSIDE `edit{}`, so a
+ *   concurrent change can't be clobbered by a stale outside snapshot.
  *
  * **Package-based limit.** `MAX_FAVORITES_ON_HOME` caps distinct PACKAGES, not
  * components, so multiple activities of one app (Gmail + Gmail Compose) are
@@ -234,35 +232,6 @@ class FavoritesRepositoryImpl @Inject constructor(
             Timber.w(e, "Error reading favorites for edit; reporting Unavailable")
             FavoritesEditRead.Unavailable(e)
         }
-
-    override suspend fun reconcileFavoriteComponents(
-        installedComponentNames: List<String>,
-        isStillPresent: suspend (String) -> Boolean,
-    ) {
-        // FAIL-CLOSED read via snapshotFailClosed (propagates IOException;
-        // deliberately NOT the fail-open cold flow / snapshotFailOpen): the
-        // candidate read and the delete are the same authority
-        // (RECONCILE_FIX_SPEC R-INV-2). No try/catch here — errors propagate to
-        // the caller's runCleanup, which skips this store.
-        val current = dataStore.snapshotFailClosed { it[PreferencesKeys.FAVORITES] ?: emptySet() }
-        val orphans = current - installedComponentNames.toSet()
-        if (orphans.isEmpty()) return
-
-        // Gate every candidate through the presence callback (AppPresence); a present one is vetoed.
-        val verifiedAbsent = orphans.filterNotTo(HashSet()) { isStillPresent(it) }
-        if (verifiedAbsent.isEmpty()) return
-
-        dataStore.edit { preferences ->
-            // Value-scoped: re-read inside the edit and subtract the verified-absent
-            // set, so a concurrently-added favorite survives.
-            val now = preferences[PreferencesKeys.FAVORITES] ?: return@edit
-            val cleaned = now - verifiedAbsent
-            if (cleaned.size < now.size) {
-                Timber.w("Removed ${now.size - cleaned.size} orphaned favorites")
-                preferences[PreferencesKeys.FAVORITES] = cleaned
-            }
-        }
-    }
 
     override suspend fun purgeRepository() {
         dataStore.safePurge("FavoritesRepositoryImpl") { preferences ->

@@ -341,48 +341,6 @@ abstract class FavoritesRepositoryContract {
         assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
     }
 
-    // ---------- reconcileFavoriteComponents ----------
-
-    @Test
-    fun `reconcileFavoriteComponents keeps only components in installed list`() = runTest {
-        val repo = createRepository()
-        repo.saveFavoriteComponents(listOf(compA, compB, compC))
-        repo.reconcileFavoriteComponents(listOf(compA, compC)) { false }
-        assertEquals(setOf(compA, compC), repo.favoriteComponentsFlow.first())
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents with all favorites installed changes nothing`() = runTest {
-        val repo = createRepository()
-        repo.saveFavoriteComponents(listOf(compA, compB))
-        repo.reconcileFavoriteComponents(listOf(compA, compB, compC)) { false }
-        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents with empty installed list clears favorites`() = runTest {
-        val repo = createRepository()
-        repo.saveFavoriteComponents(listOf(compA, compB))
-        repo.reconcileFavoriteComponents(emptyList()) { false }
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents on empty repository stays empty`() = runTest {
-        val repo = createRepository()
-        repo.reconcileFavoriteComponents(listOf(compA, compB)) { false }
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
-    }
-
-    @Test
-    fun `reconcileFavoriteComponents keeps an orphan the presence check reports present`() = runTest {
-        val repo = createRepository()
-        repo.saveFavoriteComponents(listOf(compA, compB))
-        // compB is absent from the load but the presence predicate vetoes its removal.
-        repo.reconcileFavoriteComponents(listOf(compA)) { it == compB }
-        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
-    }
-
     // ---------- purgeRepository ----------
 
     @Test

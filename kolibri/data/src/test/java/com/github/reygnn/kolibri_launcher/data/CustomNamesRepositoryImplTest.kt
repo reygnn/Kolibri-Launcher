@@ -43,34 +43,6 @@ class CustomNamesRepositoryImplTest {
         customNamesManager = CustomNamesRepositoryImpl(fakeDataStore)
     }
 
-    @Test
-    fun `reconcileCustomNames - when DataStore edit fails - propagates (fail-closed)`() = runTest {
-        val key = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
-        fakeDataStore.setInitialData(preferencesOf(key to "Drop"))
-        fakeDataStore.makeEditFail()
-        // Orphan com.gone, predicate reports it absent -> edit attempted -> throws
-        // (no swallow; the skip is enforced upstream by runCleanup, §6.6).
-        assertFailsWith<IOException> {
-            customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
-        }
-    }
-
-    @Test
-    fun `reconcileCustomNames - when the candidate read fails - propagates (fail-closed)`() = runTest {
-        // The candidate read is fail-CLOSED (dataStore.data.first(), NOT the
-        // swallow-to-empty getAllCustomNames the spec forbids): a read error
-        // propagates so the caller's runCleanup skips the store and deletes
-        // nothing. A fail-open read would yield empty -> no candidate ->
-        // "nothing deleted" too, so only asserting the throw distinguishes
-        // fail-closed from the M1 regression (§6.1).
-        val key = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
-        fakeDataStore.setInitialData(preferencesOf(key to "Drop"))
-        fakeDataStore.makeReadFail()
-        assertFailsWith<IOException> {
-            customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
-        }
-    }
-
     // ========== EXISTING TESTS ==========
 
     @Test
@@ -248,18 +220,6 @@ class CustomNamesRepositoryImplTest {
 
         Assert.assertTrue(result)
         Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
-    }
-
-    @Test
-    fun `reconcileCustomNames - removes orphans`() = runTest {
-        val validKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.installed")
-        val orphanKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + "com.gone")
-        fakeDataStore.setInitialData(preferencesOf(validKey to "Keep", orphanKey to "Drop"))
-
-        customNamesManager.reconcileCustomNames(listOf("com.installed")) { false }
-
-        // Orphan gone, valid kept.
-        Assert.assertEquals(mapOf("com.installed" to "Keep"), customNamesManager.getAllCustomNames())
     }
 
     @Test
