@@ -14,19 +14,19 @@ package com.github.reygnn.kolibri_launcher.domain.service
  * the bulk enumeration, so the favorites can paint almost immediately and the
  * authoritative pass then replaces them in place.
  *
- * **Fail-closed contract (opposite of [com.github.reygnn.launcher.core.AppPresence]):** a component that no
- * longer resolves as a launcher activity — or any PackageManager failure — returns
- * `null`, i.e. that favorite is simply OMITTED from the provisional paint (it fills
- * in when the authoritative enumeration completes). This is the inverse of
- * [com.github.reygnn.launcher.core.AppPresence]'s fail-to-`true`, because the consequences are inverted: there a
- * false-negative would DELETE a stored assignment, so it must fail safe toward
- * "present"; here a false-positive would paint a GHOST favorite for an app that is
- * gone, so it must fail toward "omit". Under-showing for one frame is always safe;
- * showing a ghost or a wrong label is not.
+ * **Fail-closed contract:** a component that no longer resolves as a launcher
+ * activity — or any PackageManager failure — returns `null`, i.e. that favorite is
+ * simply OMITTED from the provisional paint (it fills in when the authoritative
+ * enumeration completes). A false-positive here would paint a GHOST favorite for an
+ * app that is gone, so it must fail toward "omit". Under-showing for one frame is
+ * always safe; showing a ghost or a wrong label is not. (This is the inverse of a
+ * store-reconcile presence check, which had to fail toward "present" so a transient
+ * error could never delete a stored assignment — that whole deletion-gate apparatus
+ * has since been removed with the no-prune rebuild, root TODO.md.)
  *
  * NO CONTRACT TEST (ADR): wraps the Android `PackageManager`, so it is not honestly
  * JVM-instantiable. Covered by `ComponentLabelResolverImplTest` (Robolectric). Same
- * rationale as [com.github.reygnn.launcher.core.AppPresence] and the system-API repositories.
+ * rationale as the system-API repositories.
  */
 interface ComponentLabelResolver {
 
