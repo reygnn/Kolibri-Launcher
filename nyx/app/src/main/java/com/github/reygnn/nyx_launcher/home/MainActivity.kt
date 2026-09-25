@@ -445,6 +445,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
                 launchGuarded { viewModel.iconStyle.collect { renderLayout(viewModel.layout.value) } }
+                // Re-render when the installed-apps set changes so a freshly uninstalled
+                // app's tile greys out (missing state) and a reinstall un-greys it.
+                launchGuarded { viewModel.installedKeys.collect { renderLayout(viewModel.layout.value) } }
                 // Notification dots (gated by the toggle): push the package set into the
                 // grid pages + dock so their icons show/hide the dot reactively.
                 launchGuarded {
@@ -600,6 +603,23 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         dialog.show()
     }
 
+    /**
+     * Confirmation for removing a "missing" home tile — a placement whose app is no
+     * longer installed (Windows-shortcut model, root TODO.md). The tile is never
+     * auto-pruned; the user removes it here via the existing remove path. Only the
+     * package name is available for a gone app, so the message uses it.
+     */
+    private fun confirmRemoveMissingApp(id: ItemId, key: ComponentKey) {
+        if (isFinishing || isDestroyed) return
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.home_missing_dialog_title)
+            .setMessage(getString(R.string.home_missing_dialog_message, key.packageName))
+            .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ -> viewModel.remove(id) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        showTrackedDialog(dialog)
+    }
+
     /** All upcoming events, grouped today/tomorrow via the shared formatter. */
     private fun showEventsDialog() {
         if (isFinishing || isDestroyed) return
@@ -685,9 +705,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // ---- setup ----
 
     private fun setupDock() {
-        dockAdapter = DockAdapter(iconLoader, folderRenderer, lifecycleScope, gridIconPx, ::launchApp, ::openFolder) { v, id ->
-            homeRoot.armDrag(DragPayload.Existing(id), v)
-        }
+        dockAdapter = DockAdapter(
+            iconLoader, folderRenderer, lifecycleScope, gridIconPx, ::launchApp, ::openFolder,
+            onIconLongPress = { v, id -> homeRoot.armDrag(DragPayload.Existing(id), v) },
+            onMissingApp = ::confirmRemoveMissingApp,
+        )
         dock.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         dock.adapter = dockAdapter
         // Re-center the dock whenever its item set changes. Tied to the adapter's
@@ -942,6 +964,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 onLaunch = ::launchApp,
                 onOpenFolder = ::openFolder,
                 onStartDrag = { v, id -> homeRoot.armDrag(DragPayload.Existing(id), v) },
+                onMissingApp = ::confirmRemoveMissingApp,
             ).also { pager.adapter = it }
             // Seed the fresh adapter with the current dots: notificationDots is a
             // StateFlow that won't re-emit its unchanged value for a new adapter, so
@@ -951,11 +974,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         }
         val currentPage = pager.currentItem
         // Render the occupied pages plus one empty landing page (see renderedPageCount).
+        // The installed-keys set flags "missing" tiles (apps no longer installed) so they
+        // render greyed; an empty set (pre-enumeration) flags nothing (see HomeCell.toCell).
+        val installed = viewModel.installedKeys.value
         val renderedPages = layout.renderedPageCount()
-        pagerAdapter?.submit((0 until renderedPages).map(layout::pageCells))
+        pagerAdapter?.submit((0 until renderedPages).map { layout.pageCells(it, installed) })
         if (currentPage < renderedPages) pager.setCurrentItem(currentPage, false)
         updatePageIndicator(layout)
-        dockAdapter.submit(layout.dockCells())
+        dockAdapter.submit(layout.dockCells(installed))
         // A drop leaves its drag view in place to bridge the async commit; the
         // commit's re-render arrives here, so clear it now (idempotent otherwise).
         // Skip while an actual drag is in flight (an unrelated re-render mid-drag

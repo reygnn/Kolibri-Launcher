@@ -21,6 +21,7 @@ class DockAdapter(
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onIconLongPress: (view: View, id: ItemId) -> Unit,
+    private val onMissingApp: (id: ItemId, key: ComponentKey) -> Unit,
 ) : RecyclerView.Adapter<DockAdapter.DockHolder>() {
 
     private var items: List<HomeCell> = emptyList()
@@ -66,7 +67,7 @@ class DockAdapter(
         // Dock has no empties; App/Folder wiring is shared with the grid (A1-06).
         bindLaunchableCell(
             holder.itemView, holder.icon, holder.dot, cell, dotPackages, scope, token, { holder.bindToken },
-            iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress,
+            iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress, onMissingApp,
         )
     }
 

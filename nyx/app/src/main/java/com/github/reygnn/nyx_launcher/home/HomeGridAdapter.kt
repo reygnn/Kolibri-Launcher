@@ -29,6 +29,7 @@ class HomeGridAdapter(
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onIconLongPress: (view: View, id: ItemId) -> Unit,
+    private val onMissingApp: (id: ItemId, key: ComponentKey) -> Unit,
 ) : RecyclerView.Adapter<HomeGridAdapter.CellHolder>() {
 
     private var cells: List<HomeCell> = emptyList()
@@ -103,7 +104,7 @@ class HomeGridAdapter(
         } else {
             bindLaunchableCell(
                 holder.itemView, holder.icon, holder.dot, cell, dotPackages(), scope, token, { holder.bindToken },
-                iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress,
+                iconLoader, folderRenderer, iconSizePx, onLaunch, onOpenFolder, onIconLongPress, onMissingApp,
             )
         }
     }

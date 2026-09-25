@@ -3,7 +3,9 @@ package com.github.reygnn.nyx_launcher.home
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
@@ -39,6 +41,7 @@ import com.github.reygnn.nyx_launcher.home.notifications.NotificationPresenceSto
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -61,6 +64,7 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     observeHomeLayout: ObserveHomeLayoutUseCase,
     private val getDrawerApps: GetDrawerAppsUseCase,
+    installedAppsRepository: InstalledAppsRepository,
     private val moveItem: MoveItemUseCase,
     private val placeItem: PlaceItemUseCase,
     private val removeFromFolder: RemoveFromFolderUseCase,
@@ -80,6 +84,19 @@ class HomeViewModel @Inject constructor(
 
     val layout: StateFlow<HomeLayout?> = observeHomeLayout()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * The set of currently-installed component keys, for flagging "missing" home tiles
+     * (Windows-shortcut model, root TODO.md — the layout is never auto-pruned, so a tile
+     * whose app is gone is greyed and offered for removal instead). Derived from the shared
+     * reactive installed-apps loader; a load failure or the pre-enumeration seed yields the
+     * EMPTY set, which the cell mapping treats as "not loaded → flag nothing" so no tile is
+     * greyed during the cold-start window. WhileSubscribed so the enumeration stays warm only
+     * while home is visible.
+     */
+    val installedKeys: StateFlow<Set<ComponentKey>> = installedAppsRepository.getInstalledApps()
+        .map { load -> if (load is AppLoad.Loaded) load.apps.mapTo(HashSet()) { it.key } else emptySet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     val iconStyle: StateFlow<IconStyle> = preferences.iconStyle()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle.COLOR)

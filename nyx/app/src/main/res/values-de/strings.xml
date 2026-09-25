@@ -108,4 +108,9 @@
     <string name="wallpaper_memory_total">Gesamt: %1$s</string>
     <string name="wallpaper_memory_empty">Kein Wallpaper geladen</string>
     <string name="wallpaper_layer_indicator">Ebene %1$d/%2$d</string>
+
+    <!-- Missing home tile (app no longer installed) -->
+    <string name="home_missing_dialog_title">App nicht gefunden</string>
+    <string name="home_missing_dialog_message">\"%1$s\" ist nicht mehr installiert. Vom Startbildschirm entfernen?</string>
+    <string name="home_missing_dialog_remove">Entfernen</string>
 </resources>

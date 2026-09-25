@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.home
 
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.notifications.NotificationPresenceStore
 import com.github.reygnn.nyx_launcher.home.model.CellPos
@@ -86,6 +87,7 @@ class HomeViewModelTest {
     private val drawerFolders = FakeDrawerFoldersRepository()
     private val hiddenApps = FakeHiddenAppsRepository()
     private val appUsage = FakeAppUsageRepository()
+    private val installedAppsRepository = FakeInstalledAppsRepository()
     private val getDrawerContent = GetDrawerContentUseCase(drawerFolders, hiddenApps, appUsage)
     private val drawerFolderIdFactory = DrawerFolderIdFactory { DrawerFolderId("new-folder") }
 
@@ -95,6 +97,7 @@ class HomeViewModelTest {
         return HomeViewModel(
             observeHomeLayout,
             getDrawerApps,
+            installedAppsRepository,
             moveItem,
             placeItem,
             removeFromFolder,

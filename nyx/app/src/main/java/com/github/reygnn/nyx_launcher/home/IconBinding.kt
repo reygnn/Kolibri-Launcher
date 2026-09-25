@@ -62,6 +62,9 @@ fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this)
     is HomeCell.Folder -> members.any { it.packageName in dotPackages }
 }
 
+/** Alpha for a "missing" tile (app no longer installed) — a greyed broken-shortcut look. */
+private const val MISSING_ICON_ALPHA = 0.35f
+
 fun bindLaunchableCell(
     itemView: View,
     icon: ImageView,
@@ -77,13 +80,23 @@ fun bindLaunchableCell(
     onLaunch: (ComponentKey) -> Unit,
     onOpenFolder: (id: ItemId) -> Unit,
     onIconLongPress: (view: View, id: ItemId) -> Unit,
+    onMissingApp: (id: ItemId, key: ComponentKey) -> Unit = { _, _ -> },
 ) {
     dot.visibility = if (cell.hasNotificationDot(dotPackages)) View.VISIBLE else View.GONE
     when (cell) {
         HomeCell.Empty -> Unit
-        is HomeCell.App -> {
+        is HomeCell.App -> if (cell.missing) {
+            // Dead reference (Windows-shortcut model): a launch is impossible, so a tap
+            // offers to remove it; long-press still arms the drag/context menu (reposition
+            // or remove). Greyed placeholder icon instead of the (unavailable) app icon.
+            itemView.setOnClickListener { onMissingApp(cell.id, cell.key) }
+            itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
+            icon.alpha = MISSING_ICON_ALPHA
+            icon.setImageResource(android.R.drawable.sym_def_app_icon)
+        } else {
             itemView.setOnClickListener { onLaunch(cell.key) }
             itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
+            icon.alpha = 1f
             icon.loadIconGated(scope, tokenAtBind, currentToken) {
                 iconLoader.bitmap(IconRef.System(cell.key), iconSizePx)
             }
@@ -91,6 +104,8 @@ fun bindLaunchableCell(
         is HomeCell.Folder -> {
             itemView.setOnClickListener { onOpenFolder(cell.id) }
             itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
+            // Reset alpha in case this holder was recycled from a greyed missing tile.
+            icon.alpha = 1f
             icon.loadIconGated(scope, tokenAtBind, currentToken) {
                 folderRenderer.render(cell.members, iconSizePx)
             }

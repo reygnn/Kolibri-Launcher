@@ -125,4 +125,27 @@ class HomeCellTest {
         val cells = layout(items = listOf(placed(a, 0, 0), placed(b, 0, 0))).pageCells(0) // both li0
         assertThat(cells[0]).isEqualTo(HomeCell.App(b.id, ck("pb"))) // last in list wins
     }
+
+    // ---- missing-app flagging (Windows-shortcut model, no auto-prune) ----
+
+    @Test fun a_tile_absent_from_a_nonempty_installed_set_is_flagged_missing() {
+        val present = app("a", "pa")
+        val gone = app("b", "pb")
+        val cells = layout(items = listOf(placed(present, 0, 0), placed(gone, 1, 0)))
+            .pageCells(0, installed = setOf(ck("pa")))
+        assertThat(cells[0]).isEqualTo(HomeCell.App(present.id, ck("pa"), missing = false))
+        assertThat(cells[1]).isEqualTo(HomeCell.App(gone.id, ck("pb"), missing = true))
+    }
+
+    @Test fun an_empty_installed_set_flags_nothing_missing() {
+        // Cold-start / not-loaded: an empty installed set must NOT grey every tile.
+        val gone = app("b", "pb")
+        val cells = layout(items = listOf(placed(gone, 0, 0))).pageCells(0, installed = emptySet())
+        assertThat(cells[0]).isEqualTo(HomeCell.App(gone.id, ck("pb"), missing = false))
+    }
+
+    @Test fun dock_tiles_are_flagged_missing_too() {
+        val cells = layout(dock = listOf(app("d", "pd"))).dockCells(installed = setOf(ck("px")))
+        assertThat(cells.single()).isEqualTo(HomeCell.App(ItemId("d"), ck("pd"), missing = true))
+    }
 }

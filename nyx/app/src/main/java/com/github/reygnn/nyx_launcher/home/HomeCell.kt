@@ -8,20 +8,35 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 /**
  * One rendering slot: empty, an app (launchable), or a folder (opens a sheet; its
  * icon is the derived 2×2 composite of [Folder.members]).
+ *
+ * [App.missing] marks a tile whose app is no longer installed (Windows-shortcut
+ * model, root TODO.md): the reference is KEPT, rendered greyed, and interacting with
+ * it offers to remove it. Folder members are not individually flagged (a missing
+ * member is reached through its folder), so [Folder] carries no missing state.
  */
 sealed interface HomeCell {
     data object Empty : HomeCell
-    data class App(val id: ItemId, val key: ComponentKey) : HomeCell
+    data class App(val id: ItemId, val key: ComponentKey, val missing: Boolean = false) : HomeCell
     data class Folder(val id: ItemId, val members: List<ComponentKey>) : HomeCell
 }
 
-private fun HomeItem.toCell(): HomeCell = when (this) {
-    is HomeItem.App -> HomeCell.App(id, key)
+/**
+ * [installed] is the set of currently-installed component keys. A key absent from a
+ * NON-EMPTY [installed] set is "missing"; an EMPTY set means "not loaded yet" (a real
+ * device always has apps), so nothing is flagged — this avoids greying every tile
+ * during the cold-start enumeration window.
+ */
+private fun HomeItem.toCell(installed: Set<ComponentKey>): HomeCell = when (this) {
+    is HomeItem.App -> HomeCell.App(id, key, missing = installed.isNotEmpty() && key !in installed)
     is HomeItem.Folder -> HomeCell.Folder(id, members)
 }
 
-/** Dense row-major cells for one page (empties for gaps); index = y*columns + x. */
-fun HomeLayout.pageCells(page: Int): List<HomeCell> {
+/**
+ * Dense row-major cells for one page (empties for gaps); index = y*columns + x.
+ * [installed] flags missing app tiles (see [HomeCell.App.missing] / [toCell]); the
+ * default empty set flags nothing (used by pure tests that don't exercise missing).
+ */
+fun HomeLayout.pageCells(page: Int, installed: Set<ComponentKey> = emptySet()): List<HomeCell> {
     val cols = grid.columns
     val rows = grid.rows
     // Filter to in-bounds cells BEFORE indexing: on-grid is a transition + regridder
@@ -32,11 +47,11 @@ fun HomeLayout.pageCells(page: Int): List<HomeCell> {
     val byIndex = items
         .filter { it.pos.page == page && it.pos.x in 0 until cols && it.pos.y in 0 until rows }
         .associateBy { it.pos.y * cols + it.pos.x }
-    return (0 until cols * rows).map { index -> byIndex[index]?.item?.toCell() ?: HomeCell.Empty }
+    return (0 until cols * rows).map { index -> byIndex[index]?.item?.toCell(installed) ?: HomeCell.Empty }
 }
 
-/** Flat cell list for the dock (no empties). */
-fun HomeLayout.dockCells(): List<HomeCell> = dock.map { it.toCell() }
+/** Flat cell list for the dock (no empties). [installed] flags missing tiles (see [pageCells]). */
+fun HomeLayout.dockCells(installed: Set<ComponentKey> = emptySet()): List<HomeCell> = dock.map { it.toCell(installed) }
 
 /**
  * How many pages the pager renders: the occupied pages plus exactly one empty

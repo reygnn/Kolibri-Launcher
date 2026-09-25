@@ -26,6 +26,7 @@ class HomePagerAdapter(
     private val onLaunch: (ComponentKey) -> Unit,
     private val onOpenFolder: (id: ItemId) -> Unit,
     private val onStartDrag: (View, ItemId) -> Unit,
+    private val onMissingApp: (id: ItemId, key: ComponentKey) -> Unit,
 ) : RecyclerView.Adapter<HomePagerAdapter.PageHolder>() {
 
     private var pages: List<List<HomeCell>> = emptyList()
@@ -67,7 +68,7 @@ class HomePagerAdapter(
             }
             clipToPadding = false
         }
-        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, { currentDots }, onLaunch, onOpenFolder, onStartDrag)
+        val gridAdapter = HomeGridAdapter(iconLoader, folderRenderer, scope, iconSizePx, rows, { currentDots }, onLaunch, onOpenFolder, onStartDrag, onMissingApp)
         recycler.adapter = gridAdapter
         return PageHolder(recycler, gridAdapter)
     }
