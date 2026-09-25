@@ -236,6 +236,17 @@ Option (kein stiller Verlust dafür manuelle Bereinigung). Missing-Folder-*Membe
 (noch) keine eigene missing-Markierung — sie sind über ihren Folder erreichbar; nur top-level Tiles +
 Dock werden ausgegraut.
 
+**Offener Review-Punkt (nyx, Perf-Haltung):** Die missing-Erkennung in nyx abonniert den reaktiven
+Installed-Apps-Loader `WhileSubscribed`, solange Home sichtbar ist (`HomeViewModel.installedKeys`) —
+ein bewusster Bruch mit nyx' bisheriger *pull-on-open*-Enumerations-Haltung (Enumeration nur beim
+Drawer-Öffnen, nicht dauerhaft warm). Das Feature verlangt kontinuierliches Wissen über den
+Installations-Status (damit ein Tile beim Uninstall live ausgraut), daher die stehende Subscription
+während Home sichtbar ist. **Abwägung:** live-Ausgrauen vs. immer-warme Enumeration. Falls die
+Perf-Haltung höher gewichtet wird, ist die Alternative „installed-Set nur auf Paket-Events (via
+`PackageEventCoordinator`/`AppUpdateSignal`) + beim ersten Home-Show refreshen" statt der
+kontinuierlichen `WhileSubscribed`-Subscription — dann graut ein Tile erst beim nächsten Paket-Event
+aus statt sofort. **Noch nicht entschieden.**
+
 <details><summary>Ursprüngliche Option-Notiz (Referenz)</summary>
 
 **Was dadurch WEGFÄLLT** (~1.300–1.700 LOC prod+test, praktisch die gesamte F7-Arbeit + der Alt-
