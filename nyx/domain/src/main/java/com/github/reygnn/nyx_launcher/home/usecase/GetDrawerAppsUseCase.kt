@@ -2,63 +2,53 @@ package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.launcher.core.DefaultDispatcher
-import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.model.displayName
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
- * The drawer's app list: prime the shared loader, project to [LauncherApp], then
- * sort by display name (case-insensitive). On any non-usable load the drawer
- * shows empty (the reconcile path is where a load error actually matters).
- * Sorting is the consumer's job, not the repository's (APPLIST_SORT_SPLIT posture).
+ * The drawer's app list: read the shared in-RAM HOLDER, project to [LauncherApp], then
+ * sort by display name (case-insensitive). Sorting is the consumer's job, not the
+ * repository's (APPLIST_SORT_SPLIT posture).
  *
- * MIGRATION (SHARED_INSTALLED_APPS_SPEC §2 "Ladevertrag"): Nyx's former one-shot
- * `InstalledAppsRepository.loadInstalledApps(): AppLoadResult` is replaced by the
- * shared reactive `Flow<AppLoad>` that won over Nyx's pull-on-open shape. Because
- * that flow is a `WhileSubscribed` `StateFlow` seeded with `Loaded(emptyList())`,
- * a cold reader must wait for the first *non-empty* `Loaded` rather than take the
- * conflated initial value — the canonical prime pattern
- * ([AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS]). A persistent failure surfaces
- * as `AppLoad.Failed`, which never satisfies the predicate, so the timeout bounds
- * that case too; either way the drawer falls back to empty.
+ * OPTION A (SIA-INV-5, now cross-launcher): nyx reads the central
+ * [InstalledAppsStateRepository] like kolibri, instead of priming the loader directly.
+ * [InstalledAppsHolderPump] keeps the holder fed, so this is normally an instant
+ * point-read via [InstalledAppsStateRepository.getCurrentApps] — which carries the
+ * keep-last-good fallback, so a transient empty/failed reload never blanks the drawer
+ * (the gap the old pull-on-open path had). To preserve the historical "first open waits
+ * for the first real load" behaviour on a cold start (holder not fed yet), we wait for
+ * the first NON-EMPTY [InstalledAppsStateRepository.rawAppsFlow] value up to the prime
+ * timeout, then fall back to [InstalledAppsStateRepository.getCurrentApps] (last-good,
+ * possibly empty on a genuinely-empty device — a latency edge, not a hang).
  *
- * OVERLAY GAP (consumer TODO): the shared [AppInfo] carries no `customName` — it
- * is a per-app overlay (SIA-INV-3). This projection sets `customName = null`, so
- * the custom-name feature is NOT wired here yet. When Nyx lifts its custom-names
- * store to a Klasse-B overlay, apply it over this projection (join by
- * [AppInfo.key]) before the sort; the sort already keys on
- * [LauncherApp.displayName] (`customName ?: label`), so it needs no change then.
+ * OVERLAY GAP (consumer TODO, unchanged by Option A): the shared [AppInfo] carries no
+ * `customName` — it is a per-app overlay (SIA-INV-3). This projection sets
+ * `customName = null`, so the custom-name feature is NOT wired here yet. When nyx lifts
+ * a custom-names store, apply it over this projection (join by [AppInfo.key]) before the
+ * sort; the sort already keys on [LauncherApp.displayName] (`customName ?: label`).
  */
 class GetDrawerAppsUseCase @Inject constructor(
-    private val repository: InstalledAppsRepository,
+    private val stateRepository: InstalledAppsStateRepository,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): List<LauncherApp> = withContext(dispatcher) {
-        // [F3] We read the shared LOADER directly, not the shared holder
-        // (InstalledAppsStateRepository). Nyx's pull-on-open pattern needs no
-        // holder, so there is intentionally NO keep-last-good here (SIA-INV-5 does
-        // not cover Nyx); the drawer just re-primes on each open.
-        // [F4] The prime waits for the first NON-EMPTY Loaded. On a real device
-        // (always >= 1 launchable app) this returns fast; a genuinely-empty device
-        // never satisfies the predicate and falls through the 10 s timeout to an
-        // empty drawer — a latency edge, not a hang.
-        val loaded: AppLoad.Loaded? = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
-            repository.getInstalledApps()
-                .filterIsInstance<AppLoad.Loaded>()
-                .first { it.apps.isNotEmpty() }
+        // Normally the holder is already warm (InstalledAppsHolderPump); the wait only
+        // bites on a fast cold open before the first enumeration lands. On timeout we
+        // still return getCurrentApps() — the last-good snapshot (SIA-INV-5), empty only
+        // on a genuinely-empty device.
+        withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+            stateRepository.rawAppsFlow.first { it.isNotEmpty() }
         }
-        loaded?.apps
-            ?.map { it.toLauncherApp() }
-            ?.sortedBy { it.displayName.lowercase() }
-            ?: emptyList()
+        stateRepository.getCurrentApps()
+            .map { it.toLauncherApp() }
+            .sortedBy { it.displayName.lowercase() }
     }
 }
 

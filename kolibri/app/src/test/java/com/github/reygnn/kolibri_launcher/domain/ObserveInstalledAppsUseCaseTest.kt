@@ -7,6 +7,7 @@ import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.kolibri_launcher.domain.model.AppLoadResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveInstalledAppsUseCase
+import com.github.reygnn.launcher.core.SyncInstalledAppsToHolder
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -50,8 +51,7 @@ class ObserveInstalledAppsUseCaseTest {
         installedAppsRepository = FakeInstalledAppsRepository()
         installedAppsStateRepository = FakeInstalledAppsStateRepository()
         useCase = ObserveInstalledAppsUseCase(
-            installedAppsRepository,
-            installedAppsStateRepository,
+            SyncInstalledAppsToHolder(installedAppsRepository, installedAppsStateRepository),
         )
     }
 
@@ -112,8 +112,7 @@ class ObserveInstalledAppsUseCaseTest {
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
-            errorRepository,
-            installedAppsStateRepository,
+            SyncInstalledAppsToHolder(errorRepository, installedAppsStateRepository),
         )
 
         useCaseWithError().test {
@@ -141,8 +140,7 @@ class ObserveInstalledAppsUseCaseTest {
             override suspend fun purgeRepository() {}
         }
         val useCaseWithSequence = ObserveInstalledAppsUseCase(
-            sequencedRepository,
-            installedAppsStateRepository,
+            SyncInstalledAppsToHolder(sequencedRepository, installedAppsStateRepository),
         )
 
         useCaseWithSequence().test {
@@ -167,8 +165,7 @@ class ObserveInstalledAppsUseCaseTest {
             RuntimeException("Database error")
         )
         val useCaseWithError = ObserveInstalledAppsUseCase(
-            errorRepository,
-            installedAppsStateRepository,
+            SyncInstalledAppsToHolder(errorRepository, installedAppsStateRepository),
         )
 
         useCaseWithError().test {

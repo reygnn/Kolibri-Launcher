@@ -35,6 +35,12 @@ class NyxApplication : Application() {
     @Inject
     lateinit var packageEvents: PackageEventCoordinator
 
+    // Drives the shared installed-apps holder (Option A: nyx adopts the central
+    // in-RAM holder + keep-last-good, SIA-INV-5). Started in onCreate; keeps the
+    // holder warm so the drawer point-read and HomeViewModel.installedKeys read it.
+    @Inject
+    lateinit var installedAppsHolderPump: InstalledAppsHolderPump
+
     // App-scoped wallpaper layer bitmap cache (@Singleton). Released on memory
     // pressure / backgrounding below, since it holds up to ~64 MB of HARDWARE bitmaps
     // that are only needed while the home screen is visible.
@@ -92,6 +98,7 @@ class NyxApplication : Application() {
         }
 
         packageEvents.start()
+        installedAppsHolderPump.start()
     }
 
     override fun onTrimMemory(level: Int) {

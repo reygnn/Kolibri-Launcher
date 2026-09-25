@@ -1,37 +1,42 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * The drawer reads the SHARED reactive loader via the prime pattern (first non-empty
- * [AppLoad.Loaded]) and projects to LauncherApp, sorting by display name. Custom
- * names are NOT wired here post-migration (the shared [AppInfo] carries none — see
- * the OVERLAY GAP TODO in GetDrawerAppsUseCase); the old Nyx impl already produced
- * `customName = null`, so this is behaviour-preserving, not a regression.
+ * Option A: the drawer reads the shared in-RAM HOLDER (not the loader), projecting to
+ * LauncherApp and sorting by display name. The holder's keep-last-good (SIA-INV-5) is
+ * the point: a transient empty snapshot after a real load still yields the last-good
+ * list, so the drawer never blanks on a reload glitch — the gap the old pull-on-open
+ * path had. Custom names are still NOT wired here (the shared [AppInfo] carries none —
+ * OVERLAY GAP TODO); the projection produces `customName = null`.
  *
- * Uses a hot [MutableStateFlow]-backed fake (never completes), so the empty/Failed
- * cases exercise the real `withTimeoutOrNull` fallback rather than a completing flow
- * (which would make `.first {}` throw instead of time out).
+ * Uses a hot [MutableStateFlow]-backed fake holder (never completes), so the empty
+ * case exercises the real `withTimeoutOrNull` fallback rather than a completing flow.
  */
 class GetDrawerAppsUseCaseTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private class FakeSharedLoader(initial: AppLoad) : InstalledAppsRepository {
-        val flow = MutableStateFlow(initial)
-        override fun getInstalledApps(): Flow<AppLoad> = flow
-        override suspend fun triggerAppsUpdate() = Unit
-        override suspend fun purgeRepository() = Unit
+    /** Inline holder fake with the same last-good fallback as the impl (SIA-INV-5). */
+    private class FakeHolder : InstalledAppsStateRepository {
+        private val state = MutableStateFlow<List<AppInfo>>(emptyList())
+        private var lastGood: List<AppInfo> = emptyList()
+        override val rawAppsFlow: StateFlow<List<AppInfo>> = state
+        override fun updateApps(newApps: List<AppInfo>) {
+            if (newApps.isNotEmpty()) lastGood = newApps
+            state.value = newApps
+        }
+        override fun getCurrentApps(): List<AppInfo> = state.value.ifEmpty { lastGood }
+        override suspend fun purgeRepository() { state.value = emptyList(); lastGood = emptyList() }
     }
 
     private fun appInfo(label: String) = AppInfo(
@@ -43,26 +48,31 @@ class GetDrawerAppsUseCaseTest {
 
     @Test
     fun sorts_by_display_name_case_insensitively() = runTest(mainDispatcherRule.dispatcher) {
-        val repo = FakeSharedLoader(AppLoad.Loaded(listOf(appInfo("banana"), appInfo("Apple"), appInfo("cherry"))))
-        val result = GetDrawerAppsUseCase(repo, mainDispatcherRule.dispatcher)()
+        val holder = FakeHolder().apply {
+            updateApps(listOf(appInfo("banana"), appInfo("Apple"), appInfo("cherry")))
+        }
+        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()
         assertThat(result.map { it.label }).containsExactly("Apple", "banana", "cherry").inOrder()
-        // Post-migration projection: the shared AppInfo carries no custom name.
         assertThat(result.all { it.customName == null }).isTrue()
     }
 
     @Test
-    fun failed_load_yields_empty_drawer() = runTest(mainDispatcherRule.dispatcher) {
-        // A persistent Failed never satisfies the non-empty-Loaded prime, so the
-        // prime times out and the drawer falls back to empty (never throws).
-        val repo = FakeSharedLoader(AppLoad.Failed(RuntimeException("enumeration boom")))
-        assertThat(GetDrawerAppsUseCase(repo, mainDispatcherRule.dispatcher)()).isEmpty()
+    fun empty_holder_times_out_to_empty_drawer() = runTest(mainDispatcherRule.dispatcher) {
+        // Holder never fed (cold start before the pump lands anything): the non-empty
+        // prime never satisfies, times out, getCurrentApps() is empty → empty drawer.
+        val holder = FakeHolder()
+        assertThat(GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()).isEmpty()
     }
 
     @Test
-    fun empty_load_times_out_to_empty_drawer() = runTest(mainDispatcherRule.dispatcher) {
-        // [F4] The conflated initial Loaded(emptyList()) never satisfies the prime;
-        // it falls through the timeout to an empty drawer — a latency edge, not a hang.
-        val repo = FakeSharedLoader(AppLoad.Loaded(emptyList()))
-        assertThat(GetDrawerAppsUseCase(repo, mainDispatcherRule.dispatcher)()).isEmpty()
+    fun transient_empty_after_a_real_load_still_shows_last_good() = runTest(mainDispatcherRule.dispatcher) {
+        // The Option A win: a load lands, then a transient empty snapshot arrives; the
+        // drawer must still show the last-good list, not blank.
+        val holder = FakeHolder().apply {
+            updateApps(listOf(appInfo("Apple"), appInfo("banana")))
+            updateApps(emptyList())
+        }
+        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()
+        assertThat(result.map { it.label }).containsExactly("Apple", "banana").inOrder()
     }
 }

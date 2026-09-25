@@ -24,11 +24,11 @@ cost/risk of making the two launchers match (see the summary right after the tab
 | No-auto-prune regression guard | `KolibriNoAutoPruneTest` | `NyxNoAutoPruneTest` (shared `NoAutoPruneContract`) | [shared] |
 | Adapter list-diffing | `HomeFavoritesAdapter` (`ListAdapter`) | grid/dock/drawer (`DiffUtil`) | [shared] |
 | Home model | flat favorites list | grid + dock + folders + structural reconciler | [intentional] |
-| Freshness posture | central holder + keep-last-good | loader-direct pull-on-open + warm `installedKeys` | [intentional] |
+| Freshness posture | central holder + keep-last-good | central holder + keep-last-good (shared machinery; Option A) | [shared] |
 | Cold-start "missing" paint | grey immediately (provisional) | normal → grey on load | [asymmetry] |
 | Drawer custom-name overlay | applied | not applied yet | [asymmetry] |
 | Missing folder members | n/a (no home folders) | greyed + removable in the open folder; the folder container itself is neutral | [intentional] |
-| Warm enumeration while home visible | holder is the norm | `installedKeys` `WhileSubscribed` (posture break) | [open] |
+| Warm enumeration while home visible | holder is the norm | always-warm holder via shared pump (Option A resolved the [open]) | [shared] |
 | Gone-app launch feedback | swipe slot pre-checks + specific toast | any launch path catches `ComponentGone` → generic toast | [asymmetry] (wording only) |
 
 ---
@@ -110,22 +110,25 @@ Deliberate per-launcher designs; not defects and not targets for convergence.
 - **Align:** n/a by design — matching this means rewriting one launcher's home. This is
   the point of having two launchers.
 
-### 1.2 Freshness architecture — [intentional, verified]
-- **kolibri:** holder-centric. `InstalledAppsStateRepository` is the canonical in-RAM
-  holder with a value-based keep-last-good fallback (SIA-INV-5). Favorites, swipe,
-  recent and the drawer all read the holder, so a transient empty/failed load never
-  blanks a consumer.
-- **nyx:** does **not** use the holder (its `GetDrawerAppsUseCase` KDoc states it reads
-  "the shared LOADER directly, not the shared holder"). The drawer is pull-on-open (it
-  re-primes the loader each open, no keep-last-good), and the home tiles read a warm
-  `installedKeys` StateFlow (`HomeViewModel`). SIA-INV-5 explicitly does not cover nyx.
-- **Consequence:** identical load *policy*, different *retention*: kolibri survives a
-  transient empty via the holder's last-good; nyx relies on re-priming and on the
-  package-event refresh.
-- **Align:** ugly, and probably wrong. Full alignment = nyx adopts the holder — a deep
-  refactor (drawer load path, cold-start, keep-last-good) against a deliberate divergence
-  (SIA-INV-5 excludes nyx). A bounded middle-ground exists if a need arises: give only the
-  nyx *drawer* a keep-last-good fallback without the full holder.
+### 1.2 Freshness architecture — [shared, Option A]
+Now converged. Both launchers sit on the same in-RAM holder
+(`InstalledAppsStateRepository`) with the value-based keep-last-good fallback
+(SIA-INV-5, **now cross-launcher**), fed by the same shared pump
+(`core/SyncInstalledAppsToHolder`).
+- **Shared machinery:** the loader → holder feed + the empty/failed arbitration live once
+  in `core/SyncInstalledAppsToHolder`. kolibri drives it via `ObserveInstalledAppsUseCase`
+  (adds the `AppLoadResult` emit + the ACRA no-cache report on top); nyx drives it via an
+  app-scoped `InstalledAppsHolderPump` started from `NyxApplication` (drains the outcomes,
+  needs no reaction). Parity by construction, like `LazySlotMembership` for the missing rule.
+- **nyx consumers now read the holder:** `GetDrawerAppsUseCase` point-reads
+  `getCurrentApps()` (last-good on a transient empty — the drawer no longer blanks on a
+  reload glitch); `HomeViewModel.installedKeys` maps `rawAppsFlow` (raw view, so greying
+  still reflects the genuine current set, empty-guarded by `LazySlotMembership`).
+- **Posture:** nyx is now an always-warm holder (the pump keeps the loader subscribed),
+  the deliberate trade chosen in Option A — this also resolves the former §3.1 [open].
+- **Overlays still diverge, by design:** the shared machinery ends at the raw list; each
+  app applies its own overlays in its `Get*UseCase` (kolibri: favorite/hidden/customName/
+  sort; nyx: hidden, no customName store yet). That is the intended seam, not a gap.
 
 ---
 
@@ -194,15 +197,14 @@ trade-off; none is currently a correctness bug.
 
 ## 3. Open / undecided
 
-### 3.1 Warm enumeration vs. pull-on-open — [open]
-nyx's `installedKeys` keeps the shared loader warm (`WhileSubscribed`) while home is
-visible — a deliberate break from nyx's historical pull-on-open posture, needed so a
-tile greys live on uninstall. The trade-off (live-graying vs. always-warm enumeration)
-is flagged in the root `TODO.md` and not yet decided. kolibri has always been
-holder/reactive-centric, so the question is nyx-local.
-- **Align:** small, nyx-local — a decision plus a small change. The package-event refresh
-  (now wired) already provides the event-driven signal, so switching `installedKeys` from
-  the always-warm `WhileSubscribed` to "event-driven + refresh-on-show" is cheap now.
+### 3.1 Warm enumeration vs. pull-on-open — [resolved: Option A]
+Decided. nyx adopted the shared holder (§1.2): `InstalledAppsHolderPump` keeps the loader
+subscribed for the process lifetime, so the holder is always warm and every nyx consumer
+reads it. This is the always-warm end of the former trade-off, chosen deliberately over
+the historical pull-on-open. The package-event refresh (`triggerAppsUpdate()`) drives the
+re-enumeration that the pump then lands in the holder. (If battery telemetry ever argues
+against always-warm, the fallback is to gate the pump on process-foreground rather than
+revert to per-consumer pull-on-open.)
 
 ---
 

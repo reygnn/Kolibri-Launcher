@@ -10,8 +10,10 @@ import com.github.reygnn.nyx_launcher.data.home.HomeLayoutSerializer
 // in Nyx exactly like Kolibri (decision B: no auto-aggregated :common-data module).
 import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
+import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsStateRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
@@ -80,6 +82,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindInstalledAppsRepository(impl: InstalledAppsRepositoryImpl): InstalledAppsRepository
+
+    // Option A: nyx now binds the shared in-RAM holder too (product-neutral impl in
+    // :common-data, already used by kolibri). Fed by InstalledAppsHolderPump; read by
+    // GetDrawerAppsUseCase (point-read + last-good) and HomeViewModel.installedKeys
+    // (rawAppsFlow). SIA-INV-5 now covers nyx.
+    @Binds
+    @Singleton
+    abstract fun bindInstalledAppsStateRepository(
+        impl: InstalledAppsStateRepositoryImpl,
+    ): InstalledAppsStateRepository
 
     @Binds
     @Singleton
