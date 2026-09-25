@@ -9,6 +9,7 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -50,6 +51,11 @@ class GestureDelegate(
             }
             is HandleSwipeActionUseCase.Result.NoAction -> {
             }
+            is HandleSwipeActionUseCase.Result.AppNotInstalled -> {
+                // Lazy validation (Windows-shortcut model): the assigned app is gone.
+                // Toast instead of a silent no-op; the slot is not auto-cleared.
+                scope.sendEvent(UiEvent.ShowToast(R.string.swipe_app_not_installed))
+            }
         }
     }
 
@@ -59,6 +65,11 @@ class GestureDelegate(
                 scope.sendEvent(UiEvent.LaunchApp(result.app))
             }
             is HandleSwipeActionUseCase.Result.NoAction -> {
+            }
+            is HandleSwipeActionUseCase.Result.AppNotInstalled -> {
+                // Lazy validation (Windows-shortcut model): the assigned app is gone.
+                // Toast instead of a silent no-op; the slot is not auto-cleared.
+                scope.sendEvent(UiEvent.ShowToast(R.string.swipe_app_not_installed))
             }
         }
     }

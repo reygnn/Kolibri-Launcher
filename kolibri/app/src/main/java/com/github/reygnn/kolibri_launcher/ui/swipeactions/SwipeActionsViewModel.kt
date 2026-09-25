@@ -73,6 +73,13 @@ class SwipeActionsViewModel @Inject constructor(
                 val appForLeft = allApps.find { it.componentName == leftComp }
                 val appForRight = allApps.find { it.componentName == rightComp }
 
+                // A slot that holds a stored component but resolves to no installed
+                // app is "missing" (the Windows-shortcut model): the assignment is
+                // kept, and the chip shows a "not installed" hint so the user can
+                // reassign or clear it. Only meaningful once the app list has loaded.
+                val leftMissing = leftComp != null && appForLeft == null && allApps.isNotEmpty()
+                val rightMissing = rightComp != null && appForRight == null && allApps.isNotEmpty()
+
                 // 2. Filter the app list via the shared name filter.
                 val filteredApps = allApps.filterByName(query)
 
@@ -93,6 +100,8 @@ class SwipeActionsViewModel @Inject constructor(
                     selectableApps = selectableList,
                     appForLeft = appForLeft,
                     appForRight = appForRight,
+                    leftMissing = leftMissing,
+                    rightMissing = rightMissing,
                     currentSlotBeingAssigned = activeSlot
                 )
             }.collect { newState ->

@@ -144,7 +144,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
         if (namedApps.isEmpty()) {
             RawStep.Empty(favorites, savedOrder, customNames)
         } else {
-            RawStep.Resolved(processApps(namedApps, favorites, hiddenApps, savedOrder))
+            RawStep.Resolved(processApps(namedApps, favorites, hiddenApps, savedOrder, customNames))
         }
     }
 
@@ -262,15 +262,28 @@ class GetFavoriteAppsUseCase @Inject constructor(
         // Do NOT add a hidden filter to the favorites filter below
         // without revisiting the architecture rule.
         hiddenApps: Set<String>,
-        savedOrder: List<String>
+        savedOrder: List<String>,
+        customNames: Map<String, String>,
     ): FavoriteAppsResult {
-        // Filter to favorites by componentName membership. Favorite-ness is no
-        // longer stamped onto AppInfo (the isFavorite field was removed — favorite
-        // membership lives in FavoritesRepository), so consumers derive it from the
-        // favorite component set. Set.contains(String) / filter on non-null data
-        // classes cannot throw.
-        val favoriteApps = rawApps
-            .filter { favorites.contains(it.componentName) }
+        // Present favorites: those whose componentName resolves in the loaded list.
+        // Favorite-ness is no longer stamped onto AppInfo (the isFavorite field was
+        // removed — favorite membership lives in FavoritesRepository), so consumers
+        // derive it from the favorite component set. Set.contains(String) / filter
+        // on non-null data classes cannot throw.
+        val presentFavorites = rawApps.filter { favorites.contains(it.componentName) }
+        val presentComponents = presentFavorites.mapTo(HashSet()) { it.componentName }
+
+        // Missing favorites (Windows-shortcut model, root TODO.md): a favorite whose
+        // component is NOT in the loaded list is no longer silently dropped — it is
+        // KEPT as a synthesized "missing" entry (greyed on home, removable on tap).
+        // A malformed key (no "/", or a trailing "/") is not a real component and is
+        // omitted, exactly as the previous inner-join filter dropped it.
+        val missingFavorites = favorites
+            .filter { it !in presentComponents }
+            .mapNotNull { it.toMissingAppInfo(customNames) }
+        val missingComponents = missingFavorites.mapTo(HashSet()) { it.componentName }
+
+        val favoriteApps = presentFavorites + missingFavorites
 
         // Einziger Wurfkandidat: sortFavoriteComponents (suspend, Repo-Call).
         val orderedFavorites = try {
@@ -288,7 +301,11 @@ class GetFavoriteAppsUseCase @Inject constructor(
             KolibriLog.d("[DATAFLOW-FAV] Emitting ${limitedOrderedFavorites.size} favorites")
             FavoriteAppsResult(
                 apps = limitedOrderedFavorites,
-                isFallback = false
+                isFallback = false,
+                // Only those actually in the emitted (limited) list.
+                missingComponents = limitedOrderedFavorites
+                    .filter { it.componentName in missingComponents }
+                    .mapTo(HashSet()) { it.componentName },
             )
         } else {
             // Fallback: Top N sichtbare Apps
@@ -330,6 +347,31 @@ class GetFavoriteAppsUseCase @Inject constructor(
         val packageName = if (separator > 0) substring(0, separator) else this
         val className =
             if (separator in 0 until length - 1) substring(separator + 1) else ""
+        return AppInfo(
+            originalName = label,
+            displayName = label,
+            packageName = packageName,
+            className = className,
+        )
+    }
+
+    /**
+     * Rebuilds a display-only [AppInfo] for a MISSING favorite (its app is no longer
+     * installed, so it has no live label). Returns `null` for a malformed favorite
+     * key (no `/`, or a trailing `/`) — not a real component, so it is omitted just
+     * as the pre-existing inner-join filter dropped it. The label is best-effort: the
+     * user's custom name for the package if set, otherwise the package name itself
+     * (there is no persisted launcher label for an uninstalled app). The stored
+     * favorite key is always the normalized long form, so the reconstructed
+     * [AppInfo.componentName] round-trips it exactly — DiffUtil identity holds and a
+     * subsequent remove-from-favorites targets the same key.
+     */
+    private fun String.toMissingAppInfo(customNames: Map<String, String>): AppInfo? {
+        val separator = indexOf('/')
+        if (separator <= 0 || separator >= length - 1) return null
+        val packageName = substring(0, separator)
+        val className = substring(separator + 1)
+        val label = customNames[packageName] ?: packageName
         return AppInfo(
             originalName = label,
             displayName = label,

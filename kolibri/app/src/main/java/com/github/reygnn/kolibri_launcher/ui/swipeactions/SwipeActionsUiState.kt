@@ -13,6 +13,9 @@ import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
  * @property selectableApps Die gefilterte Liste aller Apps, angereichert mit ihrem Zuweisungsstatus.
  * @property appForLeft Die App, die aktuell dem "Swipe Left"-Slot zugewiesen ist (null, wenn keine).
  * @property appForRight Die App, die aktuell dem "Swipe Right"-Slot zugewiesen ist (null, wenn keine).
+ * @property leftMissing True when the "Swipe Left" slot holds an assignment whose app is no longer
+ * installed (a component stored but absent from the app list) — the Windows-shortcut "missing" state.
+ * @property rightMissing Same as [leftMissing] for the "Swipe Right" slot.
  * @property currentSlotBeingAssigned Welcher Slot ist gerade aktiv? (LEFT oder RIGHT).
  * Wenn der Benutzer jetzt eine App anklickt, wird sie
  * diesem Slot zugewiesen.
@@ -23,5 +26,7 @@ data class SwipeActionsUiState(
     val selectableApps: List<SwipeActionSelectableApp> = emptyList(),
     val appForLeft: AppInfo? = null,
     val appForRight: AppInfo? = null,
+    val leftMissing: Boolean = false,
+    val rightMissing: Boolean = false,
     val currentSlotBeingAssigned: SwipeSlot = SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT // Standardmäßig ist "Links" aktiv
 )

@@ -52,6 +52,11 @@
     <string name="favorites_sort_title">Sort favorites</string>
     <string name="error_saving_order">Error saving order</string>
 
+    <!-- Missing favorite (app no longer installed) -->
+    <string name="favorite_missing_dialog_title">App not found</string>
+    <string name="favorite_missing_dialog_message">\"%1$s\" is no longer installed. Remove it from favorites?</string>
+    <string name="favorite_missing_dialog_remove">Remove</string>
+
     <!-- AppDrawerFragment specific error messages -->
 
     <!-- Rename dialog -->
@@ -235,8 +240,10 @@
     <string name="swipe_actions_title_screen">Swipe Actions</string>
     <string name="swipe_actions_subtitle_screen">Assign apps to left and right swipe</string>
     <string name="swipe_slot_empty">None</string>
+    <string name="swipe_slot_missing">Not installed</string>
     <string name="swipe_slot_left_format">Left: %1$s</string>
     <string name="swipe_slot_right_format">Right: %1$s</string>
+    <string name="swipe_app_not_installed">The app for this swipe is no longer installed</string>
     <string name="error_saving_swipe_actions">Could not save swipe actions</string>
     
     <string name="settings_swipe_actions_title">Swipe Actions</string>

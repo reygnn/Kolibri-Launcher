@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
+import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
@@ -186,6 +187,25 @@ class GestureDelegateTest {
     }
 
     @Test
+    fun `onSwipeFromRightToLeft toasts on AppNotInstalled result`() = runTest {
+        coEvery { handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) } returns
+                HandleSwipeActionUseCase.Result.AppNotInstalled(
+                    SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT,
+                    "com.gone/com.gone.Main",
+                )
+
+        val delegate = createDelegate()
+
+        delegate.onSwipeFromRightToLeft()
+        advanceUntilIdle()
+
+        assertEquals(1, sentEvents.size)
+        val event = sentEvents.first()
+        assertTrue(event is UiEvent.ShowToast)
+        assertEquals(R.string.swipe_app_not_installed, (event as UiEvent.ShowToast).messageResId)
+    }
+
+    @Test
     fun `onSwipeFromRightToLeft does not crash on exception`() = runTest {
         coEvery { handleSwipeActionUseCase(any()) } throws RuntimeException("Boom")
 
@@ -225,6 +245,25 @@ class GestureDelegateTest {
         advanceUntilIdle()
 
         assertTrue(sentEvents.isEmpty())
+    }
+
+    @Test
+    fun `onSwipeFromLeftToRight toasts on AppNotInstalled result`() = runTest {
+        coEvery { handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT) } returns
+                HandleSwipeActionUseCase.Result.AppNotInstalled(
+                    SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT,
+                    "com.gone/com.gone.Main",
+                )
+
+        val delegate = createDelegate()
+
+        delegate.onSwipeFromLeftToRight()
+        advanceUntilIdle()
+
+        assertEquals(1, sentEvents.size)
+        val event = sentEvents.first()
+        assertTrue(event is UiEvent.ShowToast)
+        assertEquals(R.string.swipe_app_not_installed, (event as UiEvent.ShowToast).messageResId)
     }
 
     // ===========================================

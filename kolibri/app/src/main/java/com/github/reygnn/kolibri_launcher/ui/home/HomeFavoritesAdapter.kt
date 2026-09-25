@@ -51,7 +51,26 @@ import com.github.reygnn.kolibri_launcher.ui.util.toHorizontalGravity
 class HomeFavoritesAdapter(
     private val onAppClick: (AppInfo) -> Unit,
     private val onAppLongClick: (AppInfo) -> Unit,
+    // Invoked when a "missing" favorite (its app is no longer installed) is tapped
+    // or long-pressed: the host offers to remove the dead reference (Windows-shortcut
+    // model). A present favorite never routes here.
+    private val onMissingAppClick: (AppInfo) -> Unit = {},
 ) : ListAdapter<AppInfo, HomeFavoritesAdapter.ViewHolder>(AppInfoDiffCallback()) {
+
+    /**
+     * The `componentName`s in the current list whose app is no longer installed.
+     * Set (before `submitList`) by the host from `FavoriteAppsResult.missingComponents`.
+     * A row in this set renders greyed and routes its click/long-click to
+     * [onMissingAppClick]. Read on the main thread only.
+     */
+    private var missingComponents: Set<String> = emptySet()
+
+    /** Updates the missing-favorite set. Call BEFORE `submitList` for the same emission. */
+    fun setMissingComponents(components: Set<String>) {
+        missingComponents = components
+    }
+
+    private fun AppInfo.isMissing(): Boolean = componentName in missingComponents
 
     /**
      * Snapshot of the styling state that varies with theme + layout
@@ -153,8 +172,13 @@ class HomeFavoritesAdapter(
         try {
             // Text is the only per-item property; the click/long-click listeners
             // are hoisted into the ViewHolder init (AUDIT-14 F3, part 3), so a
-            // full bind sets text + styling only.
-            holder.button.text = getItem(position).displayName
+            // full bind sets text + missing-greying + styling only.
+            val item = getItem(position)
+            holder.button.text = item.displayName
+            // A "missing" favorite (app no longer installed) renders greyed. Only
+            // the full bind sets alpha; a missing→present flip changes the AppInfo,
+            // which forces a full rebind (styling-only payloads leave alpha intact).
+            holder.button.alpha = if (item.isMissing()) MISSING_ALPHA else 1f
             applyStyling(holder)
         } catch (e: Throwable) {
             // Catch kept: view setters on a torn-down/recycled holder plus the
@@ -239,10 +263,16 @@ class HomeFavoritesAdapter(
             button.setOnClickListener {
                 val app = currentItemOrNull(bindingAdapterPosition) ?: return@setOnClickListener
                 try {
-                    // User callback — may throw anything (system-callback boundary).
-                    // Traced: pins the tap timestamp for the launch-latency path.
-                    LaunchTrace.section(LaunchTrace.Names.TAP) {
-                        onAppClick(app)
+                    if (app.isMissing()) {
+                        // Dead reference: offer to remove it instead of launching a
+                        // non-existent component.
+                        onMissingAppClick(app)
+                    } else {
+                        // User callback — may throw anything (system-callback boundary).
+                        // Traced: pins the tap timestamp for the launch-latency path.
+                        LaunchTrace.section(LaunchTrace.Names.TAP) {
+                            onAppClick(app)
+                        }
                     }
                 } catch (e: Throwable) {
                     // Catch kept: callback boundary, Rule 11. no suspension point.
@@ -253,7 +283,9 @@ class HomeFavoritesAdapter(
                 val app = currentItemOrNull(bindingAdapterPosition)
                     ?: return@setOnLongClickListener false
                 try {
-                    onAppLongClick(app)
+                    // A missing favorite has no meaningful context menu; a long-press
+                    // offers the same remove affordance as a tap.
+                    if (app.isMissing()) onMissingAppClick(app) else onAppLongClick(app)
                 } catch (e: Throwable) {
                     // Catch kept: callback boundary, Rule 11. no suspension point.
                     TimberWrapper.silentError(e, "Error in onAppLongClick for ${app.packageName}")
@@ -279,6 +311,10 @@ class HomeFavoritesAdapter(
     }
 
     companion object {
+        // Alpha applied to a "missing" favorite button (app no longer installed),
+        // the text-button equivalent of a broken-shortcut greying.
+        private const val MISSING_ALPHA = 0.4f
+
         // Marker payload for notifyItemRangeChanged — see setStyling KDoc.
         // Internal + @VisibleForTesting so the payload-routing test (AUDIT-17 F1)
         // can pass the real instance rather than a stand-in Any().

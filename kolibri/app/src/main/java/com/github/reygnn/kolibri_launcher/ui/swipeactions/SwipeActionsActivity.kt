@@ -197,10 +197,14 @@ class SwipeActionsActivity : BaseActivity<UiEvent, SwipeActionsViewModel>() {
     private fun updateSlotChips(state: SwipeActionsUiState) {
         if (_binding == null) return
 
-        val leftText = state.appForLeft?.displayName ?: getString(R.string.swipe_slot_empty)
+        // A "missing" slot (stored component, app no longer installed) shows the
+        // not-installed hint instead of the empty label (Windows-shortcut model).
+        val leftText = state.appForLeft?.displayName
+            ?: getString(if (state.leftMissing) R.string.swipe_slot_missing else R.string.swipe_slot_empty)
         binding.leftSlotChip.text = getString(R.string.swipe_slot_left_format, leftText)
 
-        val rightText = state.appForRight?.displayName ?: getString(R.string.swipe_slot_empty)
+        val rightText = state.appForRight?.displayName
+            ?: getString(if (state.rightMissing) R.string.swipe_slot_missing else R.string.swipe_slot_empty)
         binding.rightSlotChip.text = getString(R.string.swipe_slot_right_format, rightText)
 
         // State setzen OHNE den Listener zu triggern

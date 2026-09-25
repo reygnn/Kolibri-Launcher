@@ -134,13 +134,15 @@ class HandleSwipeActionUseCaseTest {
     }
 
     // =========================================================================
-    // NoAction - App nicht mehr installiert (loaded list without the app)
+    // AppNotInstalled - App nicht mehr installiert (loaded list without the app)
     // =========================================================================
 
     @Test
-    fun `invoke returns NoAction when assigned app not installed`() = runTest {
-        // Arrange: app assigned but absent from the loaded, non-empty app
-        // list -> genuine uninstall.
+    fun `invoke returns AppNotInstalled when assigned app absent from a loaded list`() = runTest {
+        // Arrange: app assigned but absent from the loaded, NON-EMPTY app list ->
+        // genuine uninstall -> lazily validated (Windows-shortcut model). The list
+        // is non-empty, so "absent" is a reliable signal here (unlike the cold-start
+        // empty-list case below, which stays a silent NoAction).
         installedAppsStateRepository.updateApps(listOf(testApp2))
         swipeActionsRepository.swipeLeftApp = "com.uninstalled/com.uninstalled.Main"
 
@@ -148,7 +150,12 @@ class HandleSwipeActionUseCaseTest {
         val result = useCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Assert
-        assertThat(result).isEqualTo(HandleSwipeActionUseCase.Result.NoAction)
+        assertThat(result).isEqualTo(
+            HandleSwipeActionUseCase.Result.AppNotInstalled(
+                SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT,
+                "com.uninstalled/com.uninstalled.Main",
+            )
+        )
     }
 
     // =========================================================================

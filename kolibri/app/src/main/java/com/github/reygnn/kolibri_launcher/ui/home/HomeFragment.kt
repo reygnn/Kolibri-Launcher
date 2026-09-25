@@ -7,6 +7,8 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.net.Uri
@@ -296,8 +298,13 @@ class HomeFragment : Fragment() {
         HomeFavoritesAdapter(
             onAppClick = { app -> viewModel.onAppClicked(app) },
             onAppLongClick = { app -> showAppContextMenu(app) },
+            onMissingAppClick = { app -> showRemoveMissingFavoriteDialog(app) },
         )
     }
+
+    // Confirmation dialog for removing a "missing" favorite (its app is no longer
+    // installed). Held so it can be dismissed in onDestroyView to avoid a window leak.
+    private var missingFavoriteDialog: AlertDialog? = null
 
     // ===========================================
     // LAYOUT CACHE - COMPUTED VALUES
@@ -542,7 +549,7 @@ class HomeFragment : Fragment() {
                 is UiState.Loading -> clearAllViews()
                 is UiState.Success -> {
                     val colors = viewModel.uiColorsState.value
-                    renderFavorites(favState.data.apps, colors)
+                    renderFavorites(favState.data.apps, favState.data.missingComponents, colors)
                 }
 
                 is UiState.Error -> {
@@ -914,11 +921,15 @@ class HomeFragment : Fragment() {
      */
     private fun renderFavorites(
         apps: List<AppInfo>,
+        missingComponents: Set<String>,
         colors: UiColorsState
     ) {
         if (_binding == null) return
-        Timber.d("Rendering ${apps.size} favorites")
+        Timber.d("Rendering ${apps.size} favorites (${missingComponents.size} missing)")
         favoritesAdapter.setStyling(buildFavoritesStyling(colors))
+        // Set BEFORE submitList so the diff's binds see the current missing set
+        // (a present<->missing flip also changes the AppInfo, forcing a rebind).
+        favoritesAdapter.setMissingComponents(missingComponents)
         if (apps.isNotEmpty()) {
             // First non-empty paint of this cold start: close the favorites
             // first-paint trace one frame after the list commits (doOnPreDraw
@@ -1309,6 +1320,29 @@ class HomeFragment : Fragment() {
         viewModel.onToggleFavorite(app)
     }
 
+    /**
+     * Confirmation for removing a "missing" favorite — a pinned app that is no
+     * longer installed (Windows-shortcut model, root TODO.md). The reference is
+     * never auto-pruned; the user removes it here. On confirm we toggle the
+     * favorite off: [app] is a current favorite, so
+     * [LauncherViewModel.onToggleFavorite] removes it (reusing the existing
+     * remove path + toast). [app] carries the stored componentName, so the
+     * removal targets the right key even though the app is uninstalled.
+     */
+    private fun showRemoveMissingFavoriteDialog(app: AppInfo) {
+        if (_binding == null) return
+        missingFavoriteDialog?.dismiss()
+        missingFavoriteDialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.favorite_missing_dialog_title)
+            .setMessage(getString(R.string.favorite_missing_dialog_message, app.displayName))
+            .setPositiveButton(R.string.favorite_missing_dialog_remove) { _, _ ->
+                viewModel.onToggleFavorite(app)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener { missingFavoriteDialog = null }
+            .show()
+    }
+
     private fun showAppInfo(app: AppInfo) {
         // Narrowed Throwable→ActivityNotFoundException per Rule 11.
         // startActivity() can throw if no activity handles
@@ -1580,6 +1614,8 @@ class HomeFragment : Fragment() {
 
         // 1. Close the dialog safely.
         ContextMenuHelper.dismiss(childFragmentManager)
+        missingFavoriteDialog?.dismiss()
+        missingFavoriteDialog = null
 
         // 2. Clear our own references.
         longClickedApp = null

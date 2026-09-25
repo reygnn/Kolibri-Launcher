@@ -14,10 +14,18 @@ class HandleSwipeActionUseCase @Inject constructor(
 ) {
     /**
      * Definiert das Ergebnis: Entweder eine App zum Starten oder nichts.
+     *
+     * [AppNotInstalled] is the lazy-validation signal (Windows-shortcut model):
+     * the slot holds an assignment whose target is not in the current app list,
+     * so the gesture is validated at trigger time and the caller surfaces a
+     * "no longer installed" toast — the assignment is NEVER auto-cleared here
+     * (a stale/cold-start list is an unreliable uninstall signal). Cleanup is a
+     * user action (reassign / clear the slot in Settings).
      */
     sealed class Result {
         data class LaunchApp(val app: AppInfo) : Result()
         data object NoAction : Result()
+        data class AppNotInstalled(val slot: SwipeSlot, val componentName: String) : Result()
     }
 
     suspend operator fun invoke(slot: SwipeSlot): Result {
@@ -37,27 +45,39 @@ class HandleSwipeActionUseCase @Inject constructor(
             return Result.NoAction
         }
 
-        val appToLaunch = installedAppsStateRepository.getCurrentApps().find {
+        val currentApps = installedAppsStateRepository.getCurrentApps()
+        val appToLaunch = currentApps.find {
             it.componentName == componentName
         }
 
-        return if (appToLaunch != null) {
-            // Recording the launch ticks AppUsageRepository.usageFlow → the drawer
-            // re-sorts reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase():
-            // a swipe-launch must not force a full re-enumeration.
-            recordAppLaunchUseCase(appToLaunch)
-            Result.LaunchApp(appToLaunch)
-        } else {
-            // App not in the current list. We do NOT clear the assignment here:
-            // getCurrentApps() can return a stale last-known-good cache and the
-            // cold-start window can precede the first load, so "absent" is an
-            // unreliable uninstall signal on the launch path (it caused the
-            // AUDIT-5 data-loss). Orphan cleanup runs on the load path instead
-            // (ObserveInstalledAppsUseCase reconciles swipe assignments against
-            // the freshly loaded list after every successful load, TODO §24).
-            // Here we only launch-or-no-op and never mutate persisted state.
-            KolibriLog.w("App for swipe $slot not in current list: $componentName. No-op (cleanup runs on app load).")
-            Result.NoAction
+        return when {
+            appToLaunch != null -> {
+                // Recording the launch ticks AppUsageRepository.usageFlow → the drawer
+                // re-sorts reactively (REACTIVE_APPLIST_SPEC). No refreshAppsUseCase():
+                // a swipe-launch must not force a full re-enumeration.
+                recordAppLaunchUseCase(appToLaunch)
+                Result.LaunchApp(appToLaunch)
+            }
+
+            currentApps.isEmpty() -> {
+                // Empty list = cold-start window before the first load (or a
+                // transient failure). "Absent" is an unreliable uninstall signal
+                // here — the app may well be installed — so stay SILENT (no toast),
+                // exactly as before. This is the branch that closed the AUDIT-5
+                // cold-start data-loss; it must never mutate persisted state.
+                KolibriLog.d("Swipe $slot: app list not loaded yet, treating as no-op ($componentName)")
+                Result.NoAction
+            }
+
+            else -> {
+                // The list IS loaded (non-empty) and the assigned component is
+                // genuinely absent → lazily validate (Windows-shortcut model). The
+                // caller surfaces a "no longer installed" toast; the assignment is
+                // NEVER auto-cleared here (there is no load-path reconcile any more),
+                // the user reassigns/clears the slot in Settings.
+                KolibriLog.w("App for swipe $slot not in current list: $componentName. Lazy-validated (no auto-clear).")
+                Result.AppNotInstalled(slot, componentName)
+            }
         }
     }
 }

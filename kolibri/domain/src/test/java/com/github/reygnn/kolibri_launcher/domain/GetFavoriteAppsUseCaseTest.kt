@@ -346,7 +346,10 @@ class GetFavoriteAppsUseCaseTest {
     }
 
     @Test
-    fun `favoriteApps - when only some favorites exist in installed apps - returns existing ones`() = runTest {
+    fun `favoriteApps - a favorite whose app is uninstalled is kept as a missing entry`() = runTest {
+        // Windows-shortcut model (root TODO.md): a favorite absent from the loaded
+        // list is NOT dropped — it is kept as a synthesized "missing" entry so the
+        // user can see and remove it, instead of being silently pruned.
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
@@ -363,8 +366,15 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
 
             val result = successState.data
-            assertEquals(2, result.apps.size)
+            // Two present + one missing = three entries (the missing one is kept).
+            assertEquals(3, result.apps.size)
             assertFalse(result.isFallback)
+            // The missing favorite is flagged and carries its componentName.
+            assertEquals(setOf("com.uninstalled/App"), result.missingComponents)
+            assertTrue(result.apps.any { it.componentName == "com.uninstalled/App" })
+            // Its best-effort label is the package name (no custom name, app gone).
+            val missingEntry = result.apps.first { it.componentName == "com.uninstalled/App" }
+            assertEquals("com.uninstalled", missingEntry.displayName)
         }
     }
 
@@ -619,11 +629,12 @@ class GetFavoriteAppsUseCaseTest {
     }
 
     @Test
-    fun `favoriteApps - favorites set but all uninstalled - falls back via the filter, not a mocked-empty sort`() = runTest {
-        // Distinct from `returns default fallback apps when no favorites are set` and
-        // from the all-hidden test: here favorites ARE set and the sort is identity —
-        // the favorites list empties purely because NONE of the components are
-        // installed (the processApps filter-empty branch), which no test pinned.
+    fun `favoriteApps - favorites set but all uninstalled - keeps them as missing entries, not fallback`() = runTest {
+        // Windows-shortcut model (root TODO.md): favorites ARE set but none of the
+        // components are installed. Rather than silently replacing the user's curated
+        // set with the top-N fallback, every favorite is kept as a "missing" entry so
+        // it stays visible and removable. (Before the no-prune rebuild this fell back
+        // to top-N; that behaviour is intentionally gone.)
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } answers {
             firstArg<List<AppInfo>>()
         }
@@ -638,9 +649,16 @@ class GetFavoriteAppsUseCaseTest {
             assertTrue(successState is UiState.Success)
             val result = successState.data
 
-            assertTrue(result.isFallback, "All favorites uninstalled must fall back to top-N")
-            // Fallback = all visible apps, alphabetical.
-            assertEquals(listOf("App A", "App B", "App C"), result.apps.map { it.displayName })
+            assertFalse(result.isFallback)
+            assertEquals(
+                setOf("com.gone.one/Main", "com.gone.two/Main"),
+                result.apps.map { it.componentName }.toSet(),
+            )
+            // Both are flagged missing.
+            assertEquals(
+                setOf("com.gone.one/Main", "com.gone.two/Main"),
+                result.missingComponents,
+            )
         }
     }
 }

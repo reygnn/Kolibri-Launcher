@@ -52,6 +52,11 @@
     <string name="favorites_sort_title">Favoriten sortieren</string>
     <string name="error_saving_order">Fehler beim Speichern</string>
 
+    <!-- Missing favorite (app no longer installed) -->
+    <string name="favorite_missing_dialog_title">App nicht gefunden</string>
+    <string name="favorite_missing_dialog_message">\"%1$s\" ist nicht mehr installiert. Aus den Favoriten entfernen?</string>
+    <string name="favorite_missing_dialog_remove">Entfernen</string>
+
     <!-- AppDrawerFragment specific error messages -->
 
     <!-- Rename dialog -->
@@ -213,8 +218,10 @@
     <string name="swipe_actions_title_screen">Wisch-Aktionen</string>
     <string name="swipe_actions_subtitle_screen">Apps für Links- und Rechts-Wischen zuweisen</string>
     <string name="swipe_slot_empty">Keine</string>
+    <string name="swipe_slot_missing">Nicht installiert</string>
     <string name="swipe_slot_left_format">Links: %1$s</string>
     <string name="swipe_slot_right_format">Rechts: %1$s</string>
+    <string name="swipe_app_not_installed">Die App für diese Wischgeste ist nicht mehr installiert</string>
     <string name="error_saving_swipe_actions">Wisch-Aktionen konnten nicht gespeichert werden</string>
     
     <string name="settings_swipe_actions_title">Wisch-Aktionen</string>
