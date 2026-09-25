@@ -12,10 +12,6 @@ import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
-import com.github.reygnn.launcher.common.data.installedapps.PackageManagerInstallSessions
-import com.github.reygnn.launcher.common.data.installedapps.PackageManagerPresence
-import com.github.reygnn.launcher.core.AppPresence
-import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
@@ -88,19 +84,6 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAppEnumerator(impl: LauncherAppsEnumerator): AppEnumerator
-
-    // Reconcile deletion gate (AUDIT-1 F7, RHL-INV-6). Two independent signals, ORed in
-    // the use-case: cross-surface presence over PackageManager (fix 2 — a DIFFERENT subsystem
-    // from the LauncherApps enumeration, so a LauncherApps transient can't poison the check)
-    // and an install/restore-session probe (fix 3 — Launcher3-style promise: keep a placement
-    // whose package is mid-restore even though it is absent right now).
-    @Binds
-    @Singleton
-    abstract fun bindAppPresence(impl: PackageManagerPresence): AppPresence
-
-    @Binds
-    @Singleton
-    abstract fun bindInstallSessionInspector(impl: PackageManagerInstallSessions): InstallSessionInspector
 
     // Home-info subsystem (HIE Phase C): the narrow settings port is Nyx's
     // PreferencesRepository; the calendar/alarm reader is the shared :common-data impl.

@@ -1,14 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.usecase
 
-import com.github.reygnn.launcher.core.AppEnumerator
-import com.github.reygnn.launcher.core.AppPresence
-import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.DefaultDispatcher
-import com.github.reygnn.launcher.core.DeletionGatePass
-import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.nyx_launcher.home.model.HomeItem
-import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.ReconcileOutcome
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
@@ -21,130 +14,38 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * Reconciles the persisted layout against installed apps. FAIL-CLOSED (RHL-INV-1):
- * the pure reconciler runs ONLY against a genuine, non-empty enumeration — a load
- * failure ([SkipReason.LOAD_FAILED]) or an empty result ([SkipReason.LOAD_EMPTY])
- * returns [ReconcileResult.Skipped] with zero mutation and zero save, so a transient
- * enumeration failure never empties the home screen.
+ * Structurally repairs the persisted home layout. STRUCTURAL ONLY — it does NOT
+ * prune (Windows-shortcut model, root TODO.md): a tile whose app is no longer
+ * installed is KEPT and surfaced/removed lazily in the UI, never auto-dropped. So
+ * this use case reads the layout and runs the pure [HomeLayoutReconciler]
+ * (dedup / folder-repair / trailing-page-trim) inside an atomic read-modify-write;
+ * it needs no app enumeration and no presence gate any more. The whole deletion-gate
+ * apparatus (AppEnumerator diff, AppPresence, InstallSessionInspector,
+ * DeletionGatePass, the fail-closed snapshot read, LOAD_FAILED / LOAD_EMPTY) is gone
+ * with the prune — there is nothing to silently lose, so nothing to fail-safe against.
  *
- * STORE-SIDE FAIL-CLOSED (RHL-INV-1, symmetric to the enumeration side): the layout store
- * is also read fail-closed — the candidate read ([HomeLayoutRepository.snapshot]) and the
- * atomic RMW ([HomeLayoutRepository.update]) both propagate a transient DataStore IOException
- * rather than degrading to an empty layout. [invoke] catches it and returns
- * [ReconcileResult.Skipped] ([SkipReason.STORE_FAILED]) with zero mutation, exactly like an
- * enumeration failure. So [invoke] is TOTAL: every transient fault (enumeration OR store)
- * surfaces as a Skipped value and only [CancellationException] escapes — callers
- * (PackageEventCoordinator, [ImportLayoutUseCase]) need no fault handling of their own; the
- * coordinator's `try/catch` is then defense-in-depth for its long-lived collector, not a
- * functional requirement of the reconcile.
+ * STORE-SIDE FAIL-CLOSED (RHL-INV-1): the atomic RMW ([HomeLayoutRepository.update])
+ * propagates a transient DataStore IOException rather than degrading to an empty
+ * layout. [invoke] catches it and returns [ReconcileResult.Skipped]
+ * ([SkipReason.STORE_FAILED]) with zero mutation, so [invoke] stays TOTAL — only
+ * [CancellationException] escapes. Callers (PackageEventCoordinator,
+ * [ImportLayoutUseCase]) therefore need no fault handling of their own.
  *
- * FRESHNESS (F5): a one-shot reconcile reads the SHARED [AppEnumerator] directly, NOT
- * the cached loader `Flow<AppLoad>`. The loader is a `WhileSubscribed` `StateFlow`
- * that replays a possibly-stale cached list within its sharing window, so priming it
- * (`first { … }`) could reconcile a package-removal against the pre-removal list and
- * defer the prune. `enumerate()` is a direct suspend read of the CURRENT launchable
- * set (via the same shared LauncherApps seam, SIA-INV-4), so the reconcile always
- * prunes against the fresh list — deterministically, with no StateFlow race and no
- * prime timeout. It throws on a real enumeration failure (→ LOAD_FAILED) and rethrows
- * cancellation; an empty result is the value-honest LOAD_EMPTY skip (§9.2), which
- * subsumes Nyx's former `ENUMERATION_EMPTY`.
- *
- * The drawer keeps reading the cached loader (fast quick-reopen replay); only the
- * fail-closed reconcile needs the always-fresh read.
- *
- * PARTIAL-SNAPSHOT GATE (RHL-INV-6, AUDIT-1 F7): the throw/empty gates above are
- * all-or-nothing — a non-empty but INCOMPLETE enumeration (a transient short
- * `getActivityList` mid-restore / early post-unlock, or a per-item drop in the
- * enumerator) passes both and would let the reconciler prune every app missing from
- * the partial set, permanently. So a layout key absent from the snapshot is only a
- * *candidate* for pruning, kept if EITHER of two independent signals says so:
- * [AppPresence] (cross-surface PackageManager, so a LauncherApps transient can't poison
- * it) OR [InstallSessionInspector] (a package mid-install/restore — Launcher3-style
- * promise). Both fail-safe toward keeping; a confirmed-present or being-restored key is
- * folded back into the installed set so the pure reconciler never drops it. Nyx analog of
- * Kolibri's per-target deletion gate (RECONCILE_FIX_SPEC R-INV-2): bulk snapshot proposes,
- * single-target checks dispose. A COMPLETE snapshot yields zero candidates and performs
- * zero GATE IPC — behavior on the common path is unchanged; its only added cost is the single
- * fail-closed [snapshot] read per pass (the gate arms themselves stay untouched). The session arm is read
- * once per pass and lazily (only if some candidate is absent from presence), then membership-
- * tested per key — never one enumeration per candidate (point 5). The snapshot→RMW window is
- * closed: a key that the in-lock `current` references but the (out-of-lock) snapshot did not was
- * never gated, so it is fail-safe kept rather than pruned (point 3). One residual case is
- * accepted (a restore with no discoverable session); see nyx ACCEPTED_LIMITATIONS.md.
+ * The structural passes are idempotent (RHL-INV-2), so running this on a package
+ * add/remove event is a harmless no-op unless the stored layout actually carries a
+ * structural inconsistency (only ever introduced by an edit/import) — the trigger is
+ * kept for that import/edit-cleanup path.
  */
 class ReconcileHomeLayoutUseCase @Inject constructor(
     private val layoutRepository: HomeLayoutRepository,
-    private val enumerator: AppEnumerator,
-    private val appPresence: AppPresence,
-    private val installSessions: InstallSessionInspector,
     private val idFactory: ItemIdFactory,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): ReconcileResult = withContext(dispatcher) {
-        val apps = try {
-            enumerator.enumerate()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // Fail-closed: an enumeration failure never mutates the layout (RHL-INV-1).
-            return@withContext ReconcileResult.Skipped(SkipReason.LOAD_FAILED)
-        }
-        if (apps.isEmpty()) {
-            // Fail-closed: an EMPTY load (zero launchable apps — impossible on a real
-            // device) is treated as suspicious and skipped, never a signal to prune the
-            // whole home screen (RHL-INV-1). NOTE: this guard catches ONLY the fully-empty
-            // case. A non-empty-but-PARTIAL load is NOT stopped here — it is handled by
-            // the per-candidate presence gate below (RHL-INV-6). (Former comment claimed
-            // "empty/partial … skipped" here; the partial half was never implemented — F7.)
-            return@withContext ReconcileResult.Skipped(SkipReason.LOAD_EMPTY)
-        }
-        val installed = apps.mapTo(HashSet()) { it.key }
-
-        // PARTIAL-SNAPSHOT GATE (RHL-INV-6, Nyx analog of R-INV-2). Every key the layout
-        // references but this snapshot missed is only a *candidate* for pruning; confirm
-        // each against an independent presence check (fail-safe → present) and fold the
-        // still-installed ones back into `installed`, so the pure reconciler never prunes a
-        // merely-transiently-absent app. The candidate read is fail-CLOSED ([snapshot], not
-        // the fail-open [layout] flow): a transient read error aborts this pass as a
-        // value-honest [SkipReason.STORE_FAILED] skip (see the catch below) — never a throw and
-        // never a degrade to an empty layout that drops every protection. It runs outside the atomic
-        // RMW below, which is safe because it only ever ADDS protection (it can reduce
-        // pruning, never cause a bad write) and the reconcile still runs against the fresh
-        // `current` inside the lock (A1-03 preserved). A complete snapshot → no candidates
-        // → no gate IPC (neither arm consulted).
         try {
-            val candidates = layoutRepository.snapshot()
-                .referencedKeys()
-                .filterTo(HashSet()) { it !in installed }
-            // Apply the shared per-pass deletion gate (core [DeletionGatePass]): a candidate is
-            // kept if it still resolves independently (cross-surface PackageManager presence — a
-            // LauncherApps enumeration transient can't poison it) OR its package has an install/
-            // restore session in flight (Launcher3-style promise). The gate reads the session set at
-            // most ONCE per pass and lazily — only when a candidate is absent from presence — so a
-            // complete snapshot (no candidates) or an all-present candidate set performs zero
-            // session IPC; the abnormal path pays a single PackageInstaller enumeration, not one per
-            // candidate; `null`/undetermined → fail-safe keep. Only a key BOTH absent AND
-            // session-less is pruned. This is the SAME gate kolibri's store reconciles apply, so the
-            // two launchers can't drift on the fail-safe policy (root TODO.md "Drift-Prävention" a).
-            val gate = DeletionGatePass(appPresence, installSessions)
-            for (key in candidates) {
-                if (gate.keepComponent(key)) {
-                    installed.add(key)
-                }
-            }
-
             var result: ReconcileResult = ReconcileResult.Unchanged
             layoutRepository.update { current -> // atomic RMW (A1-03)
-                // Close the snapshot()→RMW window (RHL-INV-6, AUDIT-1 F7 review point 3): the
-                // candidate set was derived from [snapshot] OUTSIDE this lock, so a key that
-                // `current` references but the snapshot did not (a placement added by a
-                // concurrent save/import in the meantime) was never gate-checked. Pruning it
-                // would reintroduce the F7 failure class on that one key. Fail-safe: fold every
-                // such NEW referenced key back into `installed` so it is kept. Deliberately-pruned
-                // keys (in `candidates`, both gate arms negative) stay excluded and still prune.
-                // Pure set work on the in-lock `current` — no IPC held under the store lock.
-                current.referencedKeys().filterTo(installed) { it !in installed && it !in candidates }
-                when (val outcome = HomeLayoutReconciler.reconcile(current, installed, idFactory::next)) {
+                when (val outcome = HomeLayoutReconciler.reconcile(current, idFactory::next)) {
                     ReconcileOutcome.Unchanged -> null
                     is ReconcileOutcome.Changed -> {
                         result = ReconcileResult.Reconciled(outcome.report)
@@ -156,44 +57,17 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // Fail-closed store I/O (RHL-INV-1), reported the SAME way as an enumeration
-            // failure: a value, not a throw. Both the fail-closed candidate read ([snapshot])
-            // and the atomic RMW ([update]) read the raw DataStore and propagate an IOException
-            // on a transient error; either one skips the pass with zero mutation rather than
-            // degrading to an empty layout and pruning. Keeping this on the value channel makes
-            // invoke() total (only CancellationException escapes), so every caller —
-            // PackageEventCoordinator and ImportLayoutUseCase — is correct without its own guard.
-            // (The gate arms themselves never land here: AppPresence / InstallSessionInspector are
-            // fail-safe-to-keep and swallow their own platform errors, rethrowing only cancellation.)
-            // reportToAcra, NOT silentError: a transient DataStore I/O error is environmental (it
-            // self-heals on the next pass), not a programmer error — silentError's DEBUG throw would
-            // re-throw out of invoke() in a DEBUG on-device build and break the "only
-            // CancellationException escapes" totality this arm documents. reportToAcra reports in
-            // RELEASE without throwing, so invoke() stays total in EVERY build (DSR-INV-3: an I/O
-            // fault must not throw in DEBUG). The LOAD_FAILED arm stays silent because an
-            // enumeration blip is far more common and benign than a persistent store read failure.
-            TimberWrapper.reportToAcra(e, "Reconcile store read/write failed; skipping pass without pruning")
+            // Fail-closed store I/O (RHL-INV-1), reported as a VALUE not a throw: the
+            // atomic RMW reads the raw DataStore and propagates an IOException on a
+            // transient error; this skips the pass with zero mutation rather than
+            // degrading to an empty layout. Keeping it on the value channel makes
+            // invoke() total (only CancellationException escapes), so every caller is
+            // correct without its own guard. reportToAcra (not silentError): a transient
+            // DataStore I/O error is environmental (self-heals next pass), and
+            // silentError's DEBUG throw would break the "only CancellationException
+            // escapes" totality in a DEBUG on-device build (DSR-INV-3).
+            TimberWrapper.reportToAcra(e, "Reconcile store read/write failed; skipping structural pass")
             ReconcileResult.Skipped(SkipReason.STORE_FAILED)
         }
     }
-}
-
-/**
- * Every [ComponentKey] the layout references, across BOTH scopes the reconciler prunes
- * (RHL-INV-4): top-level app tiles + dock apps, plus all folder members (grid and dock
- * folders). These are exactly the keys the reconciler can drop, so they are exactly the
- * set the presence gate must be able to protect (RHL-INV-6). Folder members are included
- * because `HomeLayoutReconciler.pruneMembers` prunes them the same way as top-level apps.
- */
-private fun HomeLayout.referencedKeys(): Set<ComponentKey> {
-    val keys = HashSet<ComponentKey>()
-    fun collect(item: HomeItem) {
-        when (item) {
-            is HomeItem.App -> keys.add(item.key)
-            is HomeItem.Folder -> keys.addAll(item.members)
-        }
-    }
-    items.forEach { collect(it.item) }
-    dock.forEach { collect(it) }
-    return keys
 }

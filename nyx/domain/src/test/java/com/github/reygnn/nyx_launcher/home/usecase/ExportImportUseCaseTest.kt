@@ -8,13 +8,9 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
-import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.launcher.core.installedapps.FakeAppEnumerator
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
-import com.github.reygnn.launcher.core.AppPresence
-import com.github.reygnn.launcher.core.InstallSessionInspector
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -28,7 +24,6 @@ class ExportImportUseCaseTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
-    private fun appInfo(p: String) = AppInfo(originalName = p, displayName = p, packageName = p, className = "$p.Main")
     private fun empty() = HomeLayout(grid, 1, emptyList(), emptyList())
     private fun appAt(p: String, x: Int) = PlacedItem(HomeItem.App(ItemId(p), ck(p)), CellPos(0, x, 0))
 
@@ -46,9 +41,8 @@ class ExportImportUseCaseTest {
     @Test
     fun import_invalid_data_is_rejected_without_saving() = runTest(mainDispatcherRule.dispatcher) {
         val repo = FakeHomeLayoutRepository(empty())
-        val apps = FakeAppEnumerator(result = listOf(appInfo("pa")))
         val serializer = FakeLayoutSerializer(onDeserialize = { null }) // unparseable
-        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo, apps), mainDispatcherRule.dispatcher)
+        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo), mainDispatcherRule.dispatcher)
 
         val result = useCase("garbage")
 
@@ -57,40 +51,26 @@ class ExportImportUseCaseTest {
     }
 
     @Test
-    fun import_saves_then_reconciles_pruning_missing_apps() = runTest(mainDispatcherRule.dispatcher) {
-        // Imported layout references pb, but only pa is installed here → reconcile prunes pb.
+    fun import_saves_then_structurally_reconciles_keeping_uninstalled_refs() = runTest(mainDispatcherRule.dispatcher) {
+        // Imported layout references pb, which is not installed here. No-prune model: pb is
+        // KEPT (not trimmed against installed apps). The structural reconcile leaves the
+        // clean imported layout unchanged, so both tiles survive.
         val imported = empty().copy(items = listOf(appAt("pa", 0), appAt("pb", 1)))
         val repo = FakeHomeLayoutRepository(empty())
-        val apps = FakeAppEnumerator(result = listOf(appInfo("pa")))
         val serializer = FakeLayoutSerializer(onDeserialize = { imported })
-        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo, apps), mainDispatcherRule.dispatcher)
+        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo), mainDispatcherRule.dispatcher)
 
         val result = useCase("valid")
 
         assertThat(result).isEqualTo(ImportResult.Success)
-        // saved once by import, once by reconcile (pb pruned) ⇒ final has only pa.
-        assertThat(repo.current.items.map { it.item.id }).containsExactly(ItemId("pa"))
+        assertThat(repo.current.items.map { it.item.id }).containsExactly(ItemId("pa"), ItemId("pb"))
     }
 
-    // Import reconcile prunes apps that are genuinely not installed here, so the gate
-    // must confirm ABSENCE for the missing keys (RHL-INV-6): presence resolves to false.
-    private val absentPresence = object : AppPresence {
-        override suspend fun isComponentPresent(key: ComponentKey) = false
-        override suspend fun isPackagePresent(packageName: String) = false
-    }
-
-    // …and no restore is in flight, so the session arm doesn't rescue the missing keys.
-    // emptySet (NOT null): determined "nothing active", so genuinely-absent import keys still prune.
-    private val noSessions = object : InstallSessionInspector {
-        override suspend fun activeSessionPackages(): Set<String> = emptySet()
-    }
-
-    private fun reconcileWith(repo: FakeHomeLayoutRepository, apps: FakeAppEnumerator) =
+    // Import runs a STRUCTURAL reconcile only (no prune, Windows-shortcut model): the
+    // imported layout is repaired for structure, never trimmed against installed apps.
+    private fun reconcileWith(repo: FakeHomeLayoutRepository) =
         ReconcileHomeLayoutUseCase(
             layoutRepository = repo,
-            enumerator = apps,
-            appPresence = absentPresence,
-            installSessions = noSessions,
             idFactory = ItemIdFactory { ItemId("new") },
             dispatcher = mainDispatcherRule.dispatcher,
         )

@@ -138,12 +138,12 @@ class HomeLayoutInvariantPropertyTest {
                 if (bad.isNotEmpty()) fail("run=$run step=$step $sc violations=$bad\nlayout=$cur")
 
                 if (step % 20 == 19) {
-                    val installed = sc.pool.toSet()
-                    val r1 = HomeLayoutReconciler.reconcile(cur, installed, newId)
+                    // Structural reconcile only (no prune): idempotency + invariant-safety.
+                    val r1 = HomeLayoutReconciler.reconcile(cur, newId)
                     val after1 = (r1 as? ReconcileOutcome.Changed)?.layout ?: cur
                     val rbad = after1.invariantViolations()
                     if (rbad.isNotEmpty()) fail("reconcile invalid run=$run step=$step $sc $rbad")
-                    val r2 = HomeLayoutReconciler.reconcile(after1, installed, newId)
+                    val r2 = HomeLayoutReconciler.reconcile(after1, newId)
                     assertTrue("reconcile not idempotent run=$run step=$step $sc", r2 is ReconcileOutcome.Unchanged)
                     cur = after1
                 }

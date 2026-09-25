@@ -10,12 +10,17 @@ import com.github.reygnn.nyx_launcher.home.model.ReconcileReport
 
 /**
  * Pure reconcile policy (RECONCILE_HOME_LAYOUT_SPEC §2). Android-free, total,
- * deterministic (ids via factory) — a JVM truth table. The fail-closed gate lives
- * in the use-case, so this only ever sees a genuine [installed] set.
+ * deterministic (ids via factory) — a JVM truth table.
  *
- * Passes: prune dead → dedup by precedence → repair folders (dissolve at 1 / drop
- * at 0) → trim trailing empty pages (keep >= 1). Dock capacity is NOT enforced here
- * (the regridder owns it, against the real device grid). Idempotent (RHL-INV-2).
+ * STRUCTURAL ONLY — no prune. A reference to an app that is no longer installed is
+ * KEPT (Windows-shortcut model, root TODO.md): the launcher never auto-prunes a
+ * dead tile; it is surfaced and removed lazily in the UI. This reconciler therefore
+ * needs no installed-set and does no presence gating — it only structurally repairs
+ * a stored layout after an edit/import.
+ *
+ * Passes: dedup by precedence → repair folders (dissolve at 1 / drop at 0) → trim
+ * trailing empty pages (keep >= 1). Dock capacity is NOT enforced here (the regridder
+ * owns it, against the real device grid). Idempotent (RHL-INV-2).
  *
  * Dedup is PER SCOPE (RHL-INV-4, scoped IHM-INV-7). Two independent scopes:
  *  - Top-level (grid ∪ dock): a [ComponentKey] survives once, at its most intentional
@@ -32,32 +37,18 @@ object HomeLayoutReconciler {
 
     fun reconcile(
         layout: HomeLayout,
-        installed: Set<ComponentKey>,
         newId: () -> ItemId,
     ): ReconcileOutcome {
-        var prunedApps = 0
         var dedupedApps = 0
         var dissolvedFolders = 0
         var removedEmptyFolders = 0
 
-        // ---- Pass 1: prune dead references (members filtered; folders kept) ----
-        fun pruneMembers(members: List<ComponentKey>): List<ComponentKey> {
-            val kept = members.filter { it in installed }
-            prunedApps += members.size - kept.size
-            return kept
-        }
-        val dockP: List<HomeItem> = layout.dock.mapNotNull { item ->
-            when (item) {
-                is HomeItem.App -> if (item.key in installed) item else { prunedApps++; null }
-                is HomeItem.Folder -> item.copy(members = pruneMembers(item.members))
-            }
-        }
-        val itemsP: List<PlacedItem> = layout.items.mapNotNull { placed ->
-            when (val home = placed.item) {
-                is HomeItem.App -> if (home.key in installed) placed else { prunedApps++; null }
-                is HomeItem.Folder -> placed.copy(item = home.copy(members = pruneMembers(home.members)))
-            }
-        }
+        // No prune pass (Windows-shortcut model, root TODO.md): references to
+        // uninstalled apps are KEPT, not dropped. The reconciler starts from the
+        // stored lists as-is and only performs STRUCTURAL repair below. The names
+        // dockP/itemsP are retained downstream for a minimal diff.
+        val dockP: List<HomeItem> = layout.dock
+        val itemsP: List<PlacedItem> = layout.items
 
         // ---- Pass 2: dedup PER SCOPE (RHL-INV-4, scoped IHM-INV-7) ----
         val droppedAppIds = HashSet<ItemId>()
@@ -142,14 +133,15 @@ object HomeLayoutReconciler {
         val newPages = minOf(layout.pages, maxOf(1, usedPages))
         val trimmedPages = layout.pages - newPages
 
-        val changed = prunedApps > 0 || dedupedApps > 0 || dissolvedFolders > 0 ||
+        val changed = dedupedApps > 0 || dissolvedFolders > 0 ||
             removedEmptyFolders > 0 || trimmedPages > 0
         if (!changed) return ReconcileOutcome.Unchanged
 
         return ReconcileOutcome.Changed(
             layout = layout.copy(pages = newPages, items = itemsR, dock = dockR),
             report = ReconcileReport(
-                prunedApps = prunedApps,
+                // No prune pass any more — always zero (kept for the report shape).
+                prunedApps = 0,
                 dedupedApps = dedupedApps,
                 dissolvedFolders = dissolvedFolders,
                 removedEmptyFolders = removedEmptyFolders,

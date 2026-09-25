@@ -29,14 +29,13 @@ class HomeLayoutReconcilerDedupTest {
     private fun layout(items: List<PlacedItem> = emptyList(), dock: List<HomeItem> = emptyList(), pages: Int = 1) =
         HomeLayout(grid, pages, items, dock)
     private fun ids(vararg xs: String): ItemIdFactory { val i = xs.iterator(); return ItemIdFactory { ItemId(i.next()) } }
-    private val allInstalled = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"))
 
     @Test fun duplicate_top_level_apps_keep_dock_over_grid() {
         val start = layout(
             items = listOf(placed(app("g", "pa"), 0, 0, 0)),
             dock = listOf(app("d", "pa")), // same key pa in dock
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("d")) // dock kept
         assertThat(out.layout.items).isEmpty() // grid duplicate dropped
         assertThat(out.report.dedupedApps).isEqualTo(1)
@@ -46,7 +45,7 @@ class HomeLayoutReconcilerDedupTest {
         val start = layout(
             items = listOf(placed(app("late", "pa"), 0, 2, 0), placed(app("early", "pa"), 0, 0, 0)),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         assertThat(out.layout.items.map { it.item.id }).containsExactly(ItemId("early")) // (0,0) wins
     }
 
@@ -55,7 +54,7 @@ class HomeLayoutReconcilerDedupTest {
         // apps sharing a key keep the earlier slot, the later duplicate is dropped. The other
         // dedup tests pit dock vs grid; this pins the intra-dock !seen.add branch.
         val start = layout(dock = listOf(app("first", "pa"), app("second", "pa")))
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("first")) // earlier slot wins
         assertThat(out.report.dedupedApps).isEqualTo(1)
     }
@@ -69,7 +68,7 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f", ck("pa"), ck("pb"), ck("pc")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -84,33 +83,31 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f", ck("pa"), ck("pb")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids("unused")::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids("unused")::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
     @Test fun a_key_may_live_in_two_grid_folders_at_once() {
         // Two grid folders both list pa. Each folder is its own scope → pa survives in BOTH
         // (was: dropped from the later-positioned one).
-        val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"), ck("pe"))
         val start = layout(
             items = listOf(
                 placed(folder("f1", ck("pa"), ck("pb"), ck("pc")), 0, 0, 0),
                 placed(folder("f2", ck("pa"), ck("pd"), ck("pe")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
     @Test fun a_key_may_live_in_a_dock_folder_and_a_grid_folder_at_once() {
         // pa in a dock folder AND a grid folder. Independent folder scopes → survives in both
         // (was: dropped from the grid folder by dock-over-grid precedence).
-        val installed = setOf(ck("pa"), ck("pb"), ck("pc"), ck("pd"))
         val start = layout(
             items = listOf(placed(folder("fg", ck("pa"), ck("pc"), ck("pd")), 0, 0, 0)),
             dock = listOf(folder("fd", ck("pa"), ck("pb"))),
         )
-        val out = HomeLayoutReconciler.reconcile(start, installed, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -119,8 +116,8 @@ class HomeLayoutReconcilerDedupTest {
             items = listOf(placed(app("g", "pa"), 0, 0, 0)),
             dock = listOf(app("d", "pa")),
         )
-        val first = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
-        val second = HomeLayoutReconciler.reconcile(first.layout, allInstalled, ids()::next)
+        val first = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
+        val second = HomeLayoutReconciler.reconcile(first.layout, ids()::next)
         assertThat(second).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -128,7 +125,7 @@ class HomeLayoutReconcilerDedupTest {
         // Both members of a folder are ALSO top-level grid tiles. Under the old global rule the
         // members were stripped and the folder emptied+removed; now the folder scope is
         // independent, so the members stay, the folder survives, and nothing changes. (The
-        // empty-folder REMOVAL path is still reachable via prune — see the prune tests.)
+        // empty-folder REMOVAL path is still reachable via import — see HomeLayoutReconcilerTest.)
         val start = layout(
             items = listOf(
                 placed(app("g1", "pa"), 0, 0, 0),
@@ -136,7 +133,7 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f", ck("pa"), ck("pb")), 0, 2, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -152,7 +149,7 @@ class HomeLayoutReconcilerDedupTest {
             ),
             dock = listOf(app("d", "pa")),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         assertThat(out.layout.dock.map { it.id }).containsExactly(ItemId("d")) // dock wins top-level
         assertThat(out.layout.items.any { it.item.id == ItemId("g") }).isFalse() // grid tile dropped
         val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
@@ -165,7 +162,7 @@ class HomeLayoutReconcilerDedupTest {
         // [pa, pa, pb] → [pa, pb], first occurrence kept, order preserved. The cross-source
         // tests execute the branch but never prove intra-list collapse.
         val start = layout(items = listOf(placed(folder("f", ck("pa"), ck("pa"), ck("pb")), 0, 0, 0)))
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         val f = out.layout.items.first { it.item.id == ItemId("f") }.item as HomeItem.Folder
         assertThat(f.members).containsExactly(ck("pa"), ck("pb")).inOrder()
         assertThat(out.report.dedupedApps).isEqualTo(1)
@@ -175,7 +172,7 @@ class HomeLayoutReconcilerDedupTest {
         // The dangerous sub-variant: [pa, pa] → dedup to [pa] → Pass 3 dissolves the 1-member
         // folder into a plain app. dedupedApps == 1 AND dissolvedFolders == 1 in one pass.
         val start = layout(items = listOf(placed(folder("f", ck("pa"), ck("pa")), 0, 0, 0)))
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids("solo")::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids("solo")::next) as ReconcileOutcome.Changed
         assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
         val survivor = out.layout.items.first { it.pos == CellPos(0, 0, 0) }
         assertThat((survivor.item as HomeItem.App).key).isEqualTo(ck("pa"))
@@ -189,7 +186,7 @@ class HomeLayoutReconcilerDedupTest {
             items = listOf(placed(app("a", "pa"), 0, 0, 0), placed(app("b", "pb"), 0, 1, 0)),
             dock = listOf(app("c", "pc")),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -203,7 +200,7 @@ class HomeLayoutReconcilerDedupTest {
                 folder("late", ck("pa"), ck("pc"), ck("pd")),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next)
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next)
         assertThat(out).isEqualTo(ReconcileOutcome.Unchanged)
     }
 
@@ -218,7 +215,7 @@ class HomeLayoutReconcilerDedupTest {
                 placed(folder("f", ck("pa")), 0, 1, 0),
             ),
         )
-        val out = HomeLayoutReconciler.reconcile(start, allInstalled, ids()::next) as ReconcileOutcome.Changed
+        val out = HomeLayoutReconciler.reconcile(start, ids()::next) as ReconcileOutcome.Changed
         assertThat(out.layout.items.any { it.item.id == ItemId("f") }).isFalse() // folder gone
         val paTiles = out.layout.items.filter { (it.item as? HomeItem.App)?.key == ck("pa") }
         assertThat(paTiles.map { it.item.id }).containsExactly(ItemId("tile")) // one, the original
@@ -226,7 +223,7 @@ class HomeLayoutReconcilerDedupTest {
         assertThat(out.report.dedupedApps).isEqualTo(1)
         assertThat(out.report.dissolvedFolders).isEqualTo(0) // suppressed promotion, not a dissolve
         // idempotent: a second pass over the result changes nothing
-        val second = HomeLayoutReconciler.reconcile(out.layout, allInstalled, ids()::next)
+        val second = HomeLayoutReconciler.reconcile(out.layout, ids()::next)
         assertThat(second).isEqualTo(ReconcileOutcome.Unchanged)
     }
 }
