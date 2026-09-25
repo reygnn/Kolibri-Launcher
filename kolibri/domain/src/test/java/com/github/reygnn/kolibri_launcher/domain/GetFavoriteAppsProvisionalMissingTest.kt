@@ -70,7 +70,7 @@ class GetFavoriteAppsProvisionalMissingTest {
 
         useCase(resolver).favoriteApps.test {
             val state = awaitItem()
-            assertTrue("expected a provisional Success, not Loading", state is UiState.Success)
+            assertTrue(state is UiState.Success, "expected a provisional Success, not Loading")
             val result = state.data
 
             // The gone favorite SURVIVES the provisional paint (not dropped) …

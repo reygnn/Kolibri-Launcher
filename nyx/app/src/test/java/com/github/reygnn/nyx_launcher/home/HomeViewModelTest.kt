@@ -25,6 +25,7 @@ import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerContentUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.MoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.ObserveHomeLayoutUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.PlaceItemUseCase
+import com.github.reygnn.nyx_launcher.home.usecase.DeleteFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RenameFolderUseCase
@@ -63,6 +64,7 @@ class HomeViewModelTest {
     private val moveItem = mockk<MoveItemUseCase>(relaxed = true)
     private val placeItem = mockk<PlaceItemUseCase>(relaxed = true)
     private val removeFromFolder = mockk<RemoveFromFolderUseCase>(relaxed = true)
+    private val deleteFromFolder = mockk<DeleteFromFolderUseCase>(relaxed = true)
     private val removeItem = mockk<RemoveItemUseCase>(relaxed = true)
     private val renameFolder = mockk<RenameFolderUseCase>(relaxed = true)
     private val fitHomeGrid = mockk<FitHomeGridUseCase>(relaxed = true)
@@ -101,6 +103,7 @@ class HomeViewModelTest {
             moveItem,
             placeItem,
             removeFromFolder,
+            deleteFromFolder,
             removeItem,
             renameFolder,
             fitHomeGrid,

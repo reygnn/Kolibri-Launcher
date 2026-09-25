@@ -2,10 +2,12 @@ package com.github.reygnn.launcher.core
 
 import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -60,7 +62,7 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launchCollect(SyncInstalledAppsToHolder(loader, holder), seen)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
             advanceUntilIdle()
 
             assertEquals(apps, holder.rawAppsFlow.value)
@@ -73,7 +75,7 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launchCollect(SyncInstalledAppsToHolder(loader, holder), seen)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
             advanceUntilIdle()
 
             loader.flow.value = AppLoad.Loaded(emptyList())
@@ -92,7 +94,7 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Failed(cause))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launchCollect(SyncInstalledAppsToHolder(loader, holder), seen)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
             advanceUntilIdle()
 
             val outcome = seen.last()
@@ -107,7 +109,7 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launchCollect(SyncInstalledAppsToHolder(loader, holder), seen)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
             advanceUntilIdle()
 
             loader.flow.value = AppLoad.Failed(RuntimeException("glitch"))
@@ -116,11 +118,4 @@ class SyncInstalledAppsToHolderTest {
             assertEquals(SyncInstalledAppsToHolder.Outcome.FailedKeptLastGood, seen.last())
             assertEquals(apps, holder.getCurrentApps())
         }
-
-    private fun kotlinx.coroutines.CoroutineScope.launchCollect(
-        sync: SyncInstalledAppsToHolder,
-        into: MutableList<SyncInstalledAppsToHolder.Outcome>,
-    ) {
-        kotlinx.coroutines.launch { sync.outcomes().collect { into += it } }
-    }
 }
