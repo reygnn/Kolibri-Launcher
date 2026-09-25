@@ -40,7 +40,15 @@ custom drag engine.
 
 ## A home item can be pruned during a restore that exposes no install session
 
-**What:** After the fail-closed reconcile (AUDIT-1 F7, RHL-INV-6), a home/dock
+> ✅ **RESOLVED** (Branch `feature/lazy-slot-validation`): the auto-prune this residual
+> belonged to is GONE. `ReconcileHomeLayoutUseCase` no longer prunes the layout against
+> the app enumeration (Windows-shortcut model, root TODO.md) — a tile whose app is
+> uninstalled/mid-restore is KEPT and rendered greyed, removable by the user. With nothing
+> to silently prune, the restore-loss class is gone and the two-arm gate
+> (`PackageManagerPresence` / `PackageManagerInstallSessions` / `DeletionGatePass`) was
+> deleted. The historical description below is kept for context.
+
+**What (historical):** After the fail-closed reconcile (AUDIT-1 F7, RHL-INV-6), a home/dock
 placement is pruned only when its package is BOTH absent from a fresh app
 enumeration AND fails two independent keep-checks: cross-surface presence
 (`PackageManagerPresence`) and an active-install/restore-session probe

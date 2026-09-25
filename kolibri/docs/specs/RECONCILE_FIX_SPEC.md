@@ -1,5 +1,10 @@
 # RECONCILE_FIX_SPEC.md
 
+> ⚠️ **SUPERSEDED** (Branch `feature/lazy-slot-validation`): the reconcile this spec hardens no longer
+> exists — Kolibri does not auto-prune stored assignments any more (no-prune / lazy-validation, the
+> Windows-shortcut model; see root `TODO.md` "✅ UMGESETZT"). R-INV-2 and the deletion gate are moot.
+> Kept as a historical design record.
+
 **Fix-Spec für das R-INV-Loch im Verifikations-Veto (`RECONCILE_SPEC.md` §3, as-built).**
 
 Der Multi-Agent-Code-Review des Reconcile-Rewrites (Range `33a09a89..7bd7a77e`, 12 Agents,

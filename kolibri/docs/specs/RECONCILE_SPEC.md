@@ -1,5 +1,11 @@
 # RECONCILE_SPEC.md
 
+> ⚠️ **SUPERSEDED** (Branch `feature/lazy-slot-validation`): Kolibri no longer reconciles/prunes any
+> store against the app load. The whole reconcile mechanism this spec describes — the four store
+> `reconcile*` methods, the fail-closed candidate read, the deletion gate — has been removed in favour
+> of the no-prune / lazy-validation (Windows-shortcut) model; see root `TODO.md` ("✅ UMGESETZT"). Kept
+> as a historical design record.
+
 **Implementierungs-Spec für den App-Listen-Reconcile-Rewrite — grüne Wiese, noch kein Code.**
 
 Dieses Dokument ist der Plan für einen gezielten Rewrite des Reconcile-Pfads

@@ -668,13 +668,16 @@ Reopen this entry if any of the following changes:
 
 ## 11. A component-bound assignment can be pruned during a restore that exposes no install session
 
-- **Status:** 🟡 Accepted residual (AUDIT-1 F7, RECONCILE_FIX_SPEC R-INV-2); the
-  common restore case is covered by the install-session arm added in the F7
-  Patch-12 alignment
-- **Frequency:** Only the narrow conjunction below; steady state prunes nothing a
-  presence/session check keeps
-- **Affected:** Favorites, swipe actions, hidden components and custom names — the
-  four component-/package-bound stores reconciled by `ObserveInstalledAppsUseCase`
+- **Status:** ✅ RESOLVED (Branch `feature/lazy-slot-validation`): the auto-prune this
+  residual belonged to is GONE. Kolibri no longer reconciles/prunes any store against the
+  app load (the Windows-shortcut model, root TODO.md) — a stored assignment for an
+  uninstalled/mid-restore app is simply KEPT and validated lazily at the point of use. With
+  nothing to silently prune, there is no restore-loss class left, so the two-arm gate
+  (`PackageManagerPresence` / `PackageManagerInstallSessions` / `DeletionGatePass`) was
+  deleted entirely. The historical description below is kept for context.
+- **Was:** 🟡 Accepted residual (AUDIT-1 F7, RECONCILE_FIX_SPEC R-INV-2)
+- **Affected (historically):** Favorites, swipe actions, hidden components and custom names —
+  the four component-/package-bound stores formerly reconciled by `ObserveInstalledAppsUseCase`
 
 **What:** After the fail-closed store reconcile (AUDIT-1 F7), a stored assignment
 (a favorite, a swipe target, a hidden entry, a custom name) is pruned only when its

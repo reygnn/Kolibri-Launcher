@@ -131,6 +131,12 @@ Aufwand wert.
 
 ### Presence-Naht teilen (F7-Gate) — Option B + C erledigt (2026-09-24)
 
+> ⚠️ **Obsolet** (Branch `feature/lazy-slot-validation`): das gesamte F7-Gate ist mit dem
+> Auto-Prune gelöscht. `ReconcileHomeLayoutUseCase` prunt nicht mehr (nur noch Struktur-
+> Repair), `AppPresence`/`InstallSessionInspector`/`DeletionGatePass`/`PackageManager*`
+> existieren nicht mehr — ein fehlender Layout-Key wird schlicht als „missing"-Tile behalten
+> (Windows-Verknüpfungs-Modell, root TODO.md „✅ UMGESETZT"). Bleibt als Referenz.
+
 Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (RHL-INV-6, das nyx-Analog
 zu Kolibris R-INV-2). `ReconcileHomeLayoutUseCase` prunt einen fehlenden Layout-Key nicht
 mehr blind, sondern behält ihn, wenn *eine* von zwei unabhängigen Prüfungen anschlägt —

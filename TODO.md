@@ -10,6 +10,10 @@ gemeinsame Ebene darüber.
 
 ## Rule-9-Nuance: `silentError` vs. `reportToAcra` an fail-safe-to-keep-Grenzen (2026-09-24)
 
+> ⚠️ **Obsolet** (Branch `feature/lazy-slot-validation`): die hier beschriebenen fail-safe-to-keep-Seams
+> (`PackageManagerPresence`/`PackageManagerInstallSessions`) sind mit dem Auto-Prune gelöscht — siehe
+> „✅ UMGESETZT" weiter unten. Bleibt als Referenz für die `silentError`-vs-`reportToAcra`-Regel selbst.
+
 **Gilt für beide Launcher — der Code lebt im geteilten `:common-data`.**
 
 **Merke (die Regel):** `TimberWrapper.silentError` **wirft in DEBUG** (`crashInDebug`) — es ist der
@@ -55,6 +59,10 @@ sind gleich betroffen (ein geteiltes Impl).
 ---
 
 ## Drift-Prävention App-Verwaltung: geteilter Gate-Helfer + Cross-Launcher-Parity-Test (offen, 2026-09-24)
+
+> ⚠️ **Obsolet** (Branch `feature/lazy-slot-validation`): (a) der geteilte `DeletionGatePass` und (b) der
+> Cross-Launcher-Parity-Test sind gelöscht — es gibt kein Delete-Gate mehr, gegen dessen Drift sie
+> schützen müssten. Siehe „✅ UMGESETZT" weiter unten. Bleibt als Referenz für die Duplikations-Analyse.
 
 **Ausgangslage (gemessen 2026-09-24, LOC ohne Tests).** Die App-Verwaltung (Enumeration → Laden
 → In-RAM-State → Delete-Gate → Reconcile der User-Zuweisungen) ist zu **~50 %** geteilt: die
@@ -189,15 +197,46 @@ dazukommt**, erst fragen „muss der überhaupt auto-prunen, oder reicht Slot + 
 count-floor (ACCEPTED_LIMITATIONS-Re-Eval): ein Sanity-Floor ist ein *Pflaster auf dem Auto-Prune* —
 die tiefere Frage ist, ob der Auto-Prune am jeweiligen Store überhaupt gerechtfertigt ist.
 
-### OPTION (nicht beschlossen): Auto-Prune ganz raus → lazy, user-bestätigtes Entfernen
+### ✅ UMGESETZT (Branch `feature/lazy-slot-validation`): Auto-Prune ganz raus → lazy, user-bestätigtes Entfernen
 
-Die radikale Konsequenz der Reflexion oben, hier als **abwägbare Option** festgehalten, nicht als
-Richtungsentscheidung. Idee: die kuratierten Stores (**home-layout/nyx, favorites/kolibri, custom
-names, hidden apps**) werden **nie automatisch geprunt**. Eine Referenz auf eine verschwundene App
-bleibt stehen; sichtbare Stores markieren sie als „missing" und bieten „App nicht gefunden.
-Entfernen?" an (Windows-Verknüpfung-Modell), unsichtbare lassen sie einfach liegen. Der Membership-
-Check ist ein In-Memory `key in currentApps` — **kein IPC, kein Gate**, weil eine nicht-destruktive
-/ user-bestätigte Aktion kein Fail-safe braucht.
+Die radikale Option ist umgesetzt (windows-style). Die kuratierten Stores (**home-layout/nyx,
+favorites/kolibri, custom names, hidden apps, swipe slots**) werden **nie mehr automatisch geprunt**.
+Eine Referenz auf eine verschwundene App bleibt stehen; sichtbare Stores markieren sie als „missing"
+und bieten „App nicht gefunden. Entfernen?" an (Windows-Verknüpfung-Modell), unsichtbare lassen sie
+einfach liegen. Der Membership-Check ist ein In-Memory `key in currentApps` — **kein IPC, kein Gate**.
+
+**Was umgesetzt wurde (staged, ein Commit pro Stufe):**
+
+- **A — kolibri no-prune:** die vier `reconcile*`-Methoden (favorites/swipe/hidden/custom-names) samt
+  Interface/Impl/Fake/Contract/Impl-Tests gelöscht; `ObserveInstalledAppsUseCase` reconcilet nicht
+  mehr (kein `DeletionGatePass`, kein `AppPresence`/`InstallSessionInspector`), nur noch load →
+  keep-last-good → state → emit.
+- **B — kolibri lazy-UI:** `GetFavoriteAppsUseCase` hält einen Favoriten mit deinstallierter App als
+  synthetischen „missing"-Eintrag (Best-Effort-Label: Custom-Name, sonst Package) statt ihn zu
+  droppen; `HomeFavoritesAdapter` graut die Zeile aus und bietet auf Tap „App nicht gefunden.
+  Entfernen?"; Swipe-Slot validiert lazy beim Auslösen (Toast + „nicht installiert" im Settings-Chip).
+- **C — nyx no-prune:** `HomeLayoutReconciler` verliert Pass 1 (Prune) + den `installed`-Parameter
+  (nur noch dedup/folder-repair/page-trim, erreichbar via Import); `ReconcileHomeLayoutUseCase` ist ein
+  reiner Struktur-Pass (kein Enumerate/Gate/`snapshot`-fail-closed, nur `STORE_FAILED`).
+- **D — nyx missing-Tiles:** `HomeCell.App.missing` + installed-Set aus dem reaktiven Loader
+  (`HomeViewModel.installedKeys`); Tile grau + Platzhalter, Tap → „App nicht gefunden. Entfernen?"
+  → `viewModel.remove(id)`.
+- **E — tote Infra:** `core/{AppPresence,InstallSessionInspector,DeletionGatePass}` +
+  `DeletionGateParityContract` + `common-data/PackageManager{Presence,InstallSessions}` + Tests + DI-Binds
+  gelöscht. Die gesamte F7-/Drift-Prävention-Maschinerie ist damit weg.
+
+Damit sind die Abschnitte oben (Rule-9-Nuance an den fail-safe-Seams, Drift-Prävention (a)/(b), der
+count-floor) **gegenstandslos** — die dort beschriebenen `AppPresence`/`InstallSessionInspector`/
+`DeletionGatePass`-Nähte existieren nicht mehr. Die ACCEPTED_LIMITATIONS-Restore-Restrisiko-Einträge
+beider Launcher sind ebenfalls moot (es gibt keinen Auto-Prune mehr, der still verlieren könnte).
+
+**Verbleibende bewusste Grenze (neu):** tote Einträge sammeln sich an, bis der User sie entfernt —
+veraltetes Label/Icon (missing-Platzhalter), Toast beim Tippen. Das ist der akzeptierte Trade-off der
+Option (kein stiller Verlust dafür manuelle Bereinigung). Missing-Folder-*Member* in nyx bekommen
+(noch) keine eigene missing-Markierung — sie sind über ihren Folder erreichbar; nur top-level Tiles +
+Dock werden ausgegraut.
+
+<details><summary>Ursprüngliche Option-Notiz (Referenz)</summary>
 
 **Was dadurch WEGFÄLLT** (~1.300–1.700 LOC prod+test, praktisch die gesamte F7-Arbeit + der Alt-
 Reconcile-Prune):
@@ -244,3 +283,5 @@ transienten Anzeige-Flicker bleibt.
 self-healing) den Preis von ~1.500 Zeilen Korrektheits-Maschinerie + einem unbewiesenen Verlust-Vektor?
 Für kleine, user-kuratierte Mengen (8 Home-Slots, paar Favoriten) spricht viel für die Option; dagegen
 spricht die UI-Arbeit und der Verlust der guten Domain-Testbarkeit. **Bewusst offen gelassen.**
+
+</details>

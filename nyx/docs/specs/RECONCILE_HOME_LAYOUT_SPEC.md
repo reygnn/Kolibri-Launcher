@@ -1,5 +1,12 @@
 # RECONCILE_HOME_LAYOUT_SPEC — Layout gegen Ground-Truth abgleichen, fail-closed (Sig + Contract)
 
+> ⚠️ **Teilweise überholt** (Branch `feature/lazy-slot-validation`): der **Prune** gegen die
+> Enumeration ist entfernt (no-prune / Windows-Verknüpfungs-Modell, root `TODO.md` "✅ UMGESETZT").
+> `HomeLayoutReconciler` macht nur noch **strukturelle** Reparatur (dedup / folder-dissolve /
+> page-trim); `ReconcileHomeLayoutUseCase` enumeriert/gatet nicht mehr (kein `AppPresence`/
+> `InstallSessionInspector`/`DeletionGatePass`, kein Partial-Snapshot-Gate). Die §2-Passes 2/3/5
+> gelten weiter; der Prune-Pass (Pass 1) und das F7-Gate sind Historie.
+
 > **Erzeugt** gegen `main` @ `<HEAD-Hash einsetzen>`. Konsumiert `ICON_HOME_MODEL_SPEC`
 > (Modell + IHM-INV-*), wiederverwendet die Dissolve-Semantik aus
 > `REMOVE_FROM_FOLDER_SPEC` (RFF-INV-1/-2) und das Fehler-Envelope aus
