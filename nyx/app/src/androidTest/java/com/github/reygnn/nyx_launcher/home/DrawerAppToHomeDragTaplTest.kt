@@ -7,6 +7,7 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.launcher.testing.awaitUntil
+import com.github.reygnn.nyx_launcher.InstalledAppsHolderPump
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
@@ -49,6 +50,7 @@ class DrawerAppToHomeDragTaplTest {
 
     @Inject lateinit var homeLayout: HomeLayoutRepository
     @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
+    @Inject lateinit var installedAppsHolderPump: InstalledAppsHolderPump
     @Inject @ApplicationContext lateinit var context: Context
 
     private val placeholderKey = ComponentKey("com.example.tapl.absent", "com.example.tapl.absent.Nope")
@@ -57,6 +59,13 @@ class DrawerAppToHomeDragTaplTest {
 
     @Before fun setUp() {
         hiltRule.inject()
+        // Option A: the drawer reads the shared in-RAM holder, which is fed by
+        // InstalledAppsHolderPump. In production that pump is started from
+        // NyxApplication.onCreate, but the instrumented harness runs HiltTestApplication,
+        // so NyxApplication never runs. Start it here to warm the holder (mirrors the
+        // production wiring); without it getDrawerApps() returns empty and the test
+        // silently skips via assumeTrue below.
+        installedAppsHolderPump.start()
         InstrumentationRegistry.getInstrumentation().targetContext.packageManager
             .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
 
