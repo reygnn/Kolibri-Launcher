@@ -5,6 +5,7 @@ import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
@@ -285,10 +286,9 @@ class HomeViewModel @Inject constructor(
     fun requestSelfUninstall(id: ItemId, packageName: String) {
         launchSafe {
             val gone = withTimeoutOrNull(SELF_UNINSTALL_TIMEOUT_MS) {
-                // Non-empty guard: an empty set is "not loaded yet", not "app gone".
-                installedKeys.first { installed ->
-                    installed.isNotEmpty() && installed.none { it.packageName == packageName }
-                }
+                // The one membership rule (package-grain) — carries the "empty = not loaded"
+                // guard, so this doesn't re-derive it (SSOT with the greying decision).
+                installedKeys.first { installed -> LazySlotMembership.isPackageMissing(packageName, installed) }
                 true
             }
             if (gone == true) removeItem(id)

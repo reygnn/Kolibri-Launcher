@@ -46,4 +46,29 @@ class LazySlotMembershipTest {
         assertFalse(LazySlotMembership.isMissing(Key(1), setOf(Key(1), Key(2))))
         assertFalse(LazySlotMembership.isMissing(Key(9), emptySet()))
     }
+
+    // ---- isPackageMissing (package-grain variant, same empty-view guard) ----
+
+    @Test
+    fun `a package with no installed component is missing when the view is non-empty`() {
+        assertTrue(
+            LazySlotMembership.isPackageMissing("com.gone", setOf(ComponentKey("com.here", "com.here.Main"))),
+        )
+    }
+
+    @Test
+    fun `a package is present if any installed component belongs to it`() {
+        // Multi-activity package: matching by packageName, so any component counts.
+        assertFalse(
+            LazySlotMembership.isPackageMissing(
+                "com.here",
+                setOf(ComponentKey("com.here", "com.here.Alt"), ComponentKey("com.other", "com.other.Main")),
+            ),
+        )
+    }
+
+    @Test
+    fun `an empty installed view flags no package (not-loaded)`() {
+        assertFalse(LazySlotMembership.isPackageMissing("com.gone", emptySet()))
+    }
 }

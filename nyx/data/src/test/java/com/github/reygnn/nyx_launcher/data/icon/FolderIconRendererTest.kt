@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
-import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +45,7 @@ class FolderIconRendererTest {
     @Test
     fun second_render_of_same_folder_is_cached() = runTest(mainDispatcherRule.dispatcher) {
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
 
         renderer.render(members, 96)
         val afterFirst = loader.calls // two members composed
@@ -59,7 +58,7 @@ class FolderIconRendererTest {
     @Test
     fun clear_forces_a_recompose() = runTest(mainDispatcherRule.dispatcher) {
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
 
         renderer.render(members, 96)
         renderer.clear()
@@ -73,7 +72,7 @@ class FolderIconRendererTest {
         // F11: one member fails to load transiently → the composite is incomplete and must NOT
         // be cached (else a blank quadrant sticks until an unrelated invalidation).
         val loader = CountingIconLoader().apply { failFor = setOf(ck("pb")) }
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
 
         renderer.render(members, 96)
         val afterIncomplete = loader.calls // pa ok + pb failed = 2
@@ -91,7 +90,7 @@ class FolderIconRendererTest {
         // F12: the composite cache is keyed by IconLoader.currentStyle, so flipping the style
         // authority is a cache miss (a mixed-style composite can't be served).
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
 
         renderer.render(members, 96)
         val afterFirst = loader.calls // 2

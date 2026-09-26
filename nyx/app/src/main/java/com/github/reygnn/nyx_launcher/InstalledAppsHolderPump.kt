@@ -80,7 +80,8 @@ class InstalledAppsHolderPump @Inject constructor(
         }
     }
 
-    private companion object {
-        const val RESTART_DELAY_MS = 1000L
+    companion object {
+        // internal (not private) so the test references this value instead of hand-copying it.
+        internal const val RESTART_DELAY_MS = 1000L
     }
 }

@@ -52,9 +52,8 @@ class InstalledAppsHolderPumpTest {
 
     private val loggedErrors = mutableListOf<LoggedError>()
 
-    // Mirrors the production private const InstalledAppsHolderPump.RESTART_DELAY_MS (1s
-    // backoff). Kept in sync by hand because the production constant is private.
-    private val restartDelayMs = 1000L
+    // The production backoff (now internal), referenced directly so there's no hand-copied value.
+    private val restartDelayMs = InstalledAppsHolderPump.RESTART_DELAY_MS
 
     @Before
     fun installLogHandlerAndPreventCrash() {

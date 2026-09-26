@@ -7,7 +7,6 @@ import android.graphics.RectF
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
-import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -32,16 +31,15 @@ import javax.inject.Singleton
 class FolderIconRenderer @Inject constructor(
     private val iconLoader: IconLoader,
     @IoDispatcher dispatcher: CoroutineDispatcher,
-    preferences: PreferencesRepository,
 ) {
     init {
-        // Promptly drop cached previews when the style changes so old-style composites
-        // don't linger in memory until LRU eviction. This is a memory optimisation, NOT
-        // the correctness mechanism: render() keys by IconLoader.currentStyle (the same
-        // authority the member bitmaps decode under), so even if this collector leads or
-        // lags IconLoader's own, a style switch always yields a cache miss under the new
-        // style and recomposes — a mixed-style composite can never stick (F12).
-        preferences.iconStyle()
+        // Promptly drop cached previews when the style changes so old-style composites don't
+        // linger until LRU eviction. Observes the SAME authority the composite key uses
+        // (iconLoader.currentStyle) rather than a separate preferences collector — one style
+        // source (SSOT). This is a memory optimisation, NOT the correctness mechanism:
+        // render() keys by currentStyle, so a style switch always misses under the new key and
+        // recomposes regardless of clear() timing — a mixed-style composite can never stick (F12).
+        iconLoader.currentStyle
             .onEach { clear() }
             .launchIn(CoroutineScope(SupervisorJob() + dispatcher))
     }

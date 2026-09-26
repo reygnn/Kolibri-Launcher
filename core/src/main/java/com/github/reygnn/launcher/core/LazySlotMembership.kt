@@ -33,4 +33,15 @@ object LazySlotMembership {
      */
     fun <T> isMissing(key: T, installed: Set<T>): Boolean =
         installed.isNotEmpty() && key !in installed
+
+    /**
+     * Package-grain variant of [isMissing]: whether NO installed component belongs to
+     * [packageName], given the current [installed] ([ComponentKey]) view — same
+     * "empty = not loaded, flag nothing" guard. Use this where the question is "did the whole
+     * package go away?" (e.g. a user-initiated uninstall completing) rather than the
+     * component-grain "is this exact tile's reference gone?". Kept here so both grains — and
+     * the load-bearing non-empty guard — live in the ONE membership rule, never re-derived.
+     */
+    fun isPackageMissing(packageName: String, installed: Set<ComponentKey>): Boolean =
+        installed.isNotEmpty() && installed.none { it.packageName == packageName }
 }
