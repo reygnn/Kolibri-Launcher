@@ -123,14 +123,23 @@ fun bindLaunchableCell(
         is HomeCell.Folder -> {
             itemView.setOnClickListener { onOpenFolder(cell.id) }
             itemView.setOnLongClickListener { onIconLongPress(itemView, cell.id); true }
-            // Reset alpha in case this holder was recycled from a greyed missing tile.
-            icon.alpha = 1f
-            icon.loadIconGated(scope, tokenAtBind, currentToken) {
-                // presentMembers (installed-only), NOT members: an uninstalled member must
-                // drop out of the 2×2 composite so the icons compact, instead of leaving a
-                // blank quadrant (FolderIconRenderer can't decode the gone app). presentMembers
-                // is also what drives the DiffUtil re-render on un/reinstall (see [HomeCell]).
-                folderRenderer.render(cell.presentMembers, iconSizePx)
+            if (cell.presentMembers.isEmpty()) {
+                // Every member is uninstalled: there is nothing to composite (an empty render
+                // is just a faint background box that reads as broken). Show the same greyed
+                // missing-icon look as a dead app tile so it's a recognizable "dead" affordance;
+                // the folder still opens (its members are removable inside the overlay).
+                icon.alpha = MISSING_ICON_ALPHA
+                icon.setImageResource(android.R.drawable.sym_def_app_icon)
+            } else {
+                // Reset alpha in case this holder was recycled from a greyed missing tile.
+                icon.alpha = 1f
+                icon.loadIconGated(scope, tokenAtBind, currentToken) {
+                    // presentMembers (installed-only), NOT members: an uninstalled member must
+                    // drop out of the 2×2 composite so the icons compact, instead of leaving a
+                    // blank quadrant (FolderIconRenderer can't decode the gone app). presentMembers
+                    // is also what drives the DiffUtil re-render on un/reinstall (see [HomeCell]).
+                    folderRenderer.render(cell.presentMembers, iconSizePx)
+                }
             }
         }
     }

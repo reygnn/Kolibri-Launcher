@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -271,6 +272,29 @@ class HomeViewModel @Inject constructor(
         launchSafe { removeItem(id) }
     }
 
+    /**
+     * The user chose "Uninstall" on the home TILE [id] (package [packageName]). Uninstalling
+     * from the tile is unambiguous intent to be rid of it, so once the app actually leaves the
+     * installed set (the user confirmed the system dialog) remove the now-dead placement instead
+     * of leaving a greyed "missing" orphan the user must remove a second time. A cancelled
+     * uninstall never satisfies the wait, so the tile stays; the wait is bounded so a coroutine
+     * can't linger indefinitely (on timeout the tile just remains, greyed — the old behaviour).
+     * This is scoped to a tile the user themselves uninstalled — an EXTERNAL uninstall still
+     * keeps its greyed tile (the no-prune Windows-shortcut model).
+     */
+    fun requestSelfUninstall(id: ItemId, packageName: String) {
+        launchSafe {
+            val gone = withTimeoutOrNull(SELF_UNINSTALL_TIMEOUT_MS) {
+                // Non-empty guard: an empty set is "not loaded yet", not "app gone".
+                installedKeys.first { installed ->
+                    installed.isNotEmpty() && installed.none { it.packageName == packageName }
+                }
+                true
+            }
+            if (gone == true) removeItem(id)
+        }
+    }
+
     fun renameFolder(folder: ItemId, title: String) {
         launchSafe { renameFolderUseCase(folder, title) }
     }
@@ -374,5 +398,11 @@ class HomeViewModel @Inject constructor(
      */
     fun applyDeviceGrid(columns: Int, rows: Int) {
         launchSafe { fitHomeGrid(GridSpec(columns, rows)) }
+    }
+
+    private companion object {
+        // Bounded wait for a self-initiated uninstall to complete before giving up (the tile
+        // then stays greyed). Generous enough to cover reading the system confirm dialog.
+        const val SELF_UNINSTALL_TIMEOUT_MS = 300_000L
     }
 }

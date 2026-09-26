@@ -652,7 +652,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         if (isFinishing || isDestroyed) return
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.home_missing_dialog_title)
-            .setMessage(getString(R.string.home_missing_dialog_message, key.packageName))
+            .setMessage(getString(R.string.home_missing_folder_member_dialog_message, key.packageName))
             .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ ->
                 viewModel.removeMissingFolderMember(folder, key)
                 folderOverlayController.close()
@@ -1541,7 +1541,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         is HomeContextMenuAction.RemoveFromHome ->
             ContextMenuItem(getString(R.string.menu_remove_from_home)) { viewModel.remove(action.id) }
         is HomeContextMenuAction.Uninstall ->
-            ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(action.packageName) }
+            ContextMenuItem(getString(R.string.menu_uninstall)) { uninstallApp(action.packageName, action.id) }
         is HomeContextMenuAction.AddToHome ->
             ContextMenuItem(getString(R.string.menu_add_to_home)) { addToHome(action.key) }
         is HomeContextMenuAction.HideApp ->
@@ -1576,11 +1576,16 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // FLAG_ACTIVITY_NEW_TASK is required (as in openAppInfo): the system uninstaller has its
     // own taskAffinity, and launching it from the launcher's home task without NEW_TASK can be
     // silently dropped (observed on One UI) — the menu entry then "does nothing".
-    private fun uninstallApp(pkg: String) = startActivitySafe(
-        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        },
-    )
+    // [id] is the home placement (null for a drawer app): a from-tile uninstall removes the tile
+    // once the app actually leaves the installed set, so it doesn't linger as a greyed orphan.
+    private fun uninstallApp(pkg: String, id: ItemId?) {
+        startActivitySafe(
+            Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            },
+        )
+        if (id != null) viewModel.requestSelfUninstall(id, pkg)
+    }
 
     private fun isSystemApp(pkg: String): Boolean = try {
         (packageManager.getApplicationInfo(pkg, 0).flags and ApplicationInfo.FLAG_SYSTEM) != 0

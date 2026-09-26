@@ -113,4 +113,6 @@
     <string name="home_missing_dialog_title">App nicht gefunden</string>
     <string name="home_missing_dialog_message">\"%1$s\" ist nicht mehr installiert. Vom Startbildschirm entfernen?</string>
     <string name="home_missing_dialog_remove">Entfernen</string>
+    <!-- Missing folder member (app no longer installed); removed from the folder, not the home screen -->
+    <string name="home_missing_folder_member_dialog_message">\"%1$s\" ist nicht mehr installiert. Aus dem Ordner entfernen?</string>
 </resources>

@@ -25,7 +25,7 @@ class HomeContextMenuTest {
         assertThat(actions(DragPayload.Existing(id))).containsExactly(
             HomeContextMenuAction.AppInfo(key.packageName),
             HomeContextMenuAction.RemoveFromHome(id),
-            HomeContextMenuAction.Uninstall(key.packageName),
+            HomeContextMenuAction.Uninstall(key.packageName, id),
         ).inOrder()
     }
 
@@ -58,7 +58,7 @@ class HomeContextMenuTest {
         assertThat(actions(DragPayload.Existing(id), isHidden = true)).containsExactly(
             HomeContextMenuAction.AppInfo(key.packageName),
             HomeContextMenuAction.RemoveFromHome(id),
-            HomeContextMenuAction.Uninstall(key.packageName),
+            HomeContextMenuAction.Uninstall(key.packageName, id),
         ).inOrder()
     }
 

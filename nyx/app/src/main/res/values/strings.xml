@@ -123,4 +123,6 @@
     <string name="home_missing_dialog_title">App not found</string>
     <string name="home_missing_dialog_message">\"%1$s\" is no longer installed. Remove it from the home screen?</string>
     <string name="home_missing_dialog_remove">Remove</string>
+    <!-- Missing folder member (app no longer installed); removed from the folder, not the home screen -->
+    <string name="home_missing_folder_member_dialog_message">\"%1$s\" is no longer installed. Remove it from the folder?</string>
 </resources>

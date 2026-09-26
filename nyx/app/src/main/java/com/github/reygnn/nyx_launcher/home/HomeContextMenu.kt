@@ -14,7 +14,9 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 internal sealed interface HomeContextMenuAction {
     data class AppInfo(val packageName: String) : HomeContextMenuAction
     data class RemoveFromHome(val id: ItemId) : HomeContextMenuAction
-    data class Uninstall(val packageName: String) : HomeContextMenuAction
+    // [id] is the home placement to remove once a from-tile uninstall completes (null for a
+    // drawer app, which has no placement).
+    data class Uninstall(val packageName: String, val id: ItemId? = null) : HomeContextMenuAction
     data class AddToHome(val key: ComponentKey) : HomeContextMenuAction
     data class HideApp(val key: ComponentKey) : HomeContextMenuAction
     data class UnhideApp(val key: ComponentKey) : HomeContextMenuAction
@@ -53,7 +55,8 @@ internal fun buildHomeContextMenuActions(
     is DragPayload.Existing -> buildList {
         if (packageName != null && isInstalled) add(HomeContextMenuAction.AppInfo(packageName))
         add(HomeContextMenuAction.RemoveFromHome(payload.id))
-        if (packageName != null && isInstalled && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName))
+        // Carry the placement id: a from-tile uninstall removes the tile once the app is gone.
+        if (packageName != null && isInstalled && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName, payload.id))
     }
     is DragPayload.NewApp -> buildList {
         add(HomeContextMenuAction.AddToHome(payload.key))
