@@ -10,7 +10,6 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
-import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
 import com.github.reygnn.nyx_launcher.home.model.DropTarget
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
@@ -103,9 +102,6 @@ class HomeViewModel @Inject constructor(
     val installedKeys: StateFlow<Set<ComponentKey>> = installedAppsStateRepository.rawAppsFlow
         .map { apps -> apps.mapTo(HashSet()) { it.key } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
-
-    val iconStyle: StateFlow<IconStyle> = preferences.iconStyle()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle.COLOR)
 
     /**
      * Packages that should show a notification dot RIGHT NOW, gated by the user toggle:
@@ -280,7 +276,11 @@ class HomeViewModel @Inject constructor(
      * uninstall never satisfies the wait, so the tile stays; the wait is bounded so a coroutine
      * can't linger indefinitely (on timeout the tile just remains, greyed — the old behaviour).
      * This is scoped to a tile the user themselves uninstalled — an EXTERNAL uninstall still
-     * keeps its greyed tile (the no-prune Windows-shortcut model).
+     * keeps its greyed tile (the no-prune Windows-shortcut model). It is also ID-scoped by
+     * design: only THIS placement [id] is removed. If the same app also sits on other home
+     * tiles or inside a folder, those independent placements stay as greyed "missing" tiles for
+     * the user to remove (each placement is its own reference — removing one does not imply the
+     * others were meant to go).
      */
     fun requestSelfUninstall(id: ItemId, packageName: String) {
         launchSafe {

@@ -64,20 +64,22 @@ sealed interface ReconcileOutcome {
 }
 
 // Beobachtbarkeit: was hat der Pass getan? Kein stiller Verlust.
+// REMOVED (no-prune / structural-only, see banner): `prunedApps` and `dockTrimmed`
+// no longer exist — reconcile enumerates nothing and runs no dock-trim, so both
+// counts were always zero and were dropped. Live type = the four fields below
+// (matches ReconcileResult.kt).
 data class ReconcileReport(
-    val prunedApps: Int,          // tote Referenzen entfernt
     val dedupedApps: Int,         // überzählige Vorkommen entfernt (IHM-INV-7)
     val dissolvedFolders: Int,    // 2→1 Member ⇒ Survivor promotet
     val removedEmptyFolders: Int, // 0 Member ⇒ Folder entfernt
     val trimmedPages: Int,        // leere Endseiten entfernt
-    val dockTrimmed: Int,         // Dock-Übermaß gekappt
 )
 
 // Use-Case-Ausgabe (Envelope inkl. fail-closed).
 sealed interface ReconcileResult {
     data class Reconciled(val report: ReconcileReport) : ReconcileResult
     data object Unchanged : ReconcileResult
-    data class Skipped(val reason: AppLoadResult.ErrorReason) : ReconcileResult  // §INSTALLED_APPS_LOAD
+    data class Skipped(val reason: SkipReason) : ReconcileResult  // SkipReason.STORE_FAILED only (store-side fail-closed)
 }
 ```
 
@@ -85,7 +87,9 @@ sealed interface ReconcileResult {
 
 ## §2 Reihenfolge der Operationen (bestimmt Korrektheit + Idempotenz)
 
-1. **Prune** — jede `ComponentKey ∉ installed` aus `dock`, `items`, Folder-`members`.
+1. ~~**Prune**~~ — **REMOVED** (no-prune / structural-only, see banner): reconcile no
+   longer enumerates apps, so no dead-reference prune runs. Number kept so the banner's
+   "Passes 2/3/5 still apply" reference stays stable.
 2. **Dedup** — verbleibende Duplikate **pro Scope** (RHL-INV-4) auf ein Vorkommen
    reduzieren: Top-Level (`items` ∪ `dock`) Dock > Grid, jeder Folder für sich.
    Cross-Scope-Duplikate bleiben (App darf Kachel *und* Folder-Member sein).
@@ -99,8 +103,9 @@ sealed interface ReconcileResult {
    zweites Top-Level-Vorkommen, das ein erneuter Lauf wegdeduplizieren würde (nicht
    idempotent). Cross-Scope-Koexistenz (Kachel **und** Folder-Member) bleibt erlaubt; die
    Unterdrückung greift nur, wenn der 1-Member-Folder ohnehin verschwinden muss.
-4. **Dock kappen** — `dock` auf `grid.columns` kürzen (Import-Sicherheit; erste
-   `columns` behalten).
+4. ~~**Dock kappen**~~ — **REMOVED** (structural-only, see banner): no dock-trim pass
+   runs; the removed `dockTrimmed` count was always zero. Number kept for the banner's
+   pass-reference.
 5. **Endseiten trimmen** — hinten liegende **leere** Seiten entfernen, mindestens **1**
    Seite behalten. **Innere** Leerseiten bleiben (bewusste Leerseite = User-Absicht).
 

@@ -114,7 +114,8 @@ nicht.
   jedes Event zu `refreshAppsUseCase()`; **„the payload is not yet consulted"**
   (`:264-265`). Event-getarget-Reconcile ist RECONCILE_SPEC §3 und **nicht gebaut**.
 - **Bus 2:** `appsUpdateTrigger` (`MutableSharedFlow<Unit>`,
-  `AppUpdateModule:16`). `RefreshAppsUseCase` → `triggerAppsUpdate` emittiert,
+  `AppModule.provideAppsUpdateTrigger`, `@AppsUpdateTrigger`).
+  `RefreshAppsUseCase` → `triggerAppsUpdate` emittiert,
   **und** `CustomNamesRepositoryImpl:204` emittiert **direkt** (an Bus 1 vorbei).
 - **Consumer:** `appsStateFlow` (`flatMapLatest` → reload).
 

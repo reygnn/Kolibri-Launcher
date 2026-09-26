@@ -10,7 +10,7 @@
 # emitted from a lifecycle-independent producer (a BroadcastReceiver, a
 # process just being started by the very broadcast it must react to), that is
 # a latent lost-update bug — exactly AUDIT-9 #5 (`AppUpdateSignal`), whose
-# correctly-buffered siblings (`AppUpdateModule` extraBufferCapacity = 1,
+# correctly-buffered siblings (`AppModule` @AppsUpdateTrigger extraBufferCapacity = 1,
 # `ErrorEventBus` replay = 5) show the intended shape.
 #
 # This makes the buffering discipline enforceable. GLOBAL scan over main

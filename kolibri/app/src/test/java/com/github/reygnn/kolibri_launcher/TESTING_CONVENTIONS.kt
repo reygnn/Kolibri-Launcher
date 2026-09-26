@@ -471,7 +471,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  *   nie einer. Resultat: Der Test hängt, JUnit-Timeout nach 60s.
  *
  *   Auch mit `extraBufferCapacity = 1` (wie in Produktion via
- *   AppUpdateModule) ist das nur bis zur ERSTEN Emission sicher. Der
+ *   AppModule (@AppsUpdateTrigger)) ist das nur bis zur ERSTEN Emission sicher. Der
  *   zweite `emit` füllt den Buffer wieder und suspendiert.
  *
  * Zwei Fixes, je nach Kontext:

@@ -157,8 +157,8 @@ geteilten Modul gelegt, das jede App implementiert.
   neutral; nur das *Schema* der serialisierten Nutzlast ist produktspezifisch. →
   `:feature-backup` definiert `interface BackupSchema<T>` (serialize/deserialize +
   Versionierung); `:app-nyx` liefert das `HomeLayout`-Schema, `:app-kolibri` das
-  Favoriten-Schema. Nyx hat mit `home/usecase/ExportLayoutUseCase` +
-  `ImportLayoutUseCase` bereits die passende Andockstelle.
+  Favoriten-Schema. Nyx hat mit `home/usecase/ExportLayoutUseCase` (export) and
+  `data/home/NyxBackupManager` (restore/import) bereits die passende Andockstelle.
 - **Wallpaper-Rebuild.** Compositing/Decode ist neutral; der Trigger „Layout hat
   sich geändert, rebuild Scrim/Composite" hängt am Home-Rebuild. →
   `:feature-wallpaper` exponiert einen `WallpaperRebuildTrigger`-Port; jede App

@@ -259,9 +259,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private var pagerAdapter: HomePagerAdapter? = null
     private var currentGrid: GridSpec? = null
     // Last icon style actually applied to the grid. Lives OUTSIDE repeatOnLifecycle so it
-    // survives the STOPPED→STARTED re-subscription: iconStyle is a StateFlow and replays its
-    // current value to each new collector, so without this a mere return-to-home would
-    // re-decode every grid icon (see the iconStyle collector).
+    // survives the STOPPED→STARTED re-subscription: iconLoader.currentStyle is a StateFlow and
+    // replays its current value to each new collector, so without this a mere return-to-home
+    // would re-decode every grid icon (see the currentStyle collector).
     private var appliedIconStyle: IconStyle? = null
     private lateinit var dockAdapter: DockAdapter
 
@@ -1605,10 +1605,13 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             TimberWrapper.silentError(e, "No activity for $intent")
             showToastSafe(R.string.app_launch_failed)
         } catch (e: SecurityException) {
-            // Some OEM/managed-profile ROMs reject launching the system uninstaller / app-info
-            // details from a launcher; report + toast instead of crashing the launcher process
-            // (mirrors runLaunchCatching's SecurityException handling for app launches).
-            TimberWrapper.silentError(e, "SecurityException starting $intent")
+            // An EXPECTED condition on some OEM/managed-profile ROMs that reject launching the
+            // system uninstaller / app-info from a launcher — so reportToAcra (a RELEASE
+            // breadcrumb, no DEBUG crash), NOT silentError: this is called from a plain
+            // main-thread click listener, where silentError's crashInDebug would take the
+            // process down, and it would over-report a benign condition in RELEASE. Toast the
+            // user (like runLaunchCatching's PermissionDenied handling).
+            TimberWrapper.reportToAcra(e, "SecurityException starting $intent")
             showToastSafe(R.string.app_launch_failed)
         }
     }

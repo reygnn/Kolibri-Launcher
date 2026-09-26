@@ -184,7 +184,7 @@ beide fail-safe Richtung „behalten". Umgesetzte Schichten:
   `ReconcileResult.Skipped(STORE_FAILED)` zurück, statt zu werfen (neuer `SkipReason`,
   observability-only wie `LOAD_FAILED`). Damit ist `invoke()` total (nur
   `CancellationException` entkommt), und beide Aufrufer (`PackageEventCoordinator`,
-  `ImportLayoutUseCase`) sind ohne eigenen Guard korrekt — vorher hing der Import-Pfad am
+  `NyxBackupManager` — restore path) sind ohne eigenen Guard korrekt — vorher hing der Import-Pfad am
   weit entfernten `runCatching` im `SettingsFragment`. Der `try/catch` im Coordinator bleibt
   als Defense-in-Depth für seinen langlebigen Collector.
 - **fix 5 — fail-safe-Logging via `reportToAcra` statt `silentError` (Medium-Review-Follow-up,

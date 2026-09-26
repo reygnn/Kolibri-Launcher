@@ -74,6 +74,7 @@ class DockAdapter(
     override fun onViewRecycled(holder: DockHolder) {
         holder.bindToken++
         holder.icon.setImageDrawable(null)
+        holder.icon.alpha = 1f // parity with grid/folder recycle; defensive vs a leaked missing-tile alpha
     }
 
     class DockHolder(view: View) : RecyclerView.ViewHolder(view) {

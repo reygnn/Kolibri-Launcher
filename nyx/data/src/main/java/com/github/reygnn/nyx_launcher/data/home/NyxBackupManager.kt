@@ -138,7 +138,12 @@ class NyxBackupManager @Inject constructor(
                     var entry = zip.nextEntry
                     while (entry != null) {
                         if (entry.name == MANIFEST) {
-                            manifest = zip.readBytes().toString(Charsets.UTF_8)
+                            // Bounded read: a real manifest (layout + prefs JSON) is a few KB; cap
+                            // it so a crafted/oversized/zip-bomb manifest can't OOM the import.
+                            // readNBytes(cap+1) returns >cap only if the entry exceeds the cap.
+                            val bytes = zip.readNBytes(MAX_MANIFEST_BYTES + 1)
+                            if (bytes.size > MAX_MANIFEST_BYTES) return@withContext ImportResult.InvalidData
+                            manifest = bytes.toString(Charsets.UTF_8)
                         } else if (options.importWallpaper && entry.name.startsWith(WALLPAPER_DIR)) {
                             // Extract only when actually importing wallpaper — else the
                             // blobs would land in internal storage unreferenced (leak).
@@ -251,5 +256,8 @@ class NyxBackupManager @Inject constructor(
     private companion object {
         const val MANIFEST = "backup.json"
         const val WALLPAPER_DIR = "wallpapers/"
+        // Defensive cap for the manifest JSON entry (a real one is a few KB); guards against a
+        // crafted/oversized/zip-bomb manifest OOMing the import (input is user-chosen via SAF).
+        const val MAX_MANIFEST_BYTES = 5 * 1024 * 1024 // 5 MiB
     }
 }

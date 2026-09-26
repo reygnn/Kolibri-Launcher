@@ -29,6 +29,7 @@ import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -87,10 +88,14 @@ class NyxBackupManagerTest {
     private val drawerFoldersRepository = FakeDrawerFoldersRepository()
     private val hiddenAppsRepository = FakeHiddenAppsRepository()
 
+    // Named (not inline) so the layout-restore post-step can be verified: import saves the
+    // layout THEN reconciles it, and reconcile is gated behind the importLayout toggle.
+    private val reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true)
+
     private val manager = NyxBackupManager(
         homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
         wallpaperRepository, fabPositionStore, fileManager, NyxBackupSerializer(),
-        mockk<ReconcileHomeLayoutUseCase>(relaxed = true), mainDispatcherRule.dispatcher,
+        reconcileHomeLayout, mainDispatcherRule.dispatcher,
     )
 
 
@@ -197,6 +202,37 @@ class NyxBackupManagerTest {
 
         coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
         coVerify(exactly = 0) { preferences.setIconStyle(any()) }
+    }
+
+    @Test
+    fun import_saves_the_layout_then_reconciles_it() = runTest(mainDispatcherRule.dispatcher) {
+        // A restored layout must be reconciled AFTER it lands, not before: reconcile()
+        // is a structural-only cleanup of what was just saved (dedup keys, 0-1 folders,
+        // over-capacity dock). Order is the contract, so a cross-device backup renders
+        // clean tiles this session, not on the next cold start only.
+        val backup = NyxBackup(layout = layout.toDto())
+        val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        coVerifyOrder {
+            homeLayoutRepository.save(any())
+            reconcileHomeLayout()
+        }
+    }
+
+    @Test
+    fun import_does_not_reconcile_when_layout_import_is_off() = runTest(mainDispatcherRule.dispatcher) {
+        // reconcile() is scoped to the layout restore; with importLayout=false the layout is
+        // never saved, so there is nothing to reconcile — it must not run.
+        val backup = NyxBackup(layout = layout.toDto())
+        val result = manager.import(
+            ByteArrayInputStream(zipOf(backup)),
+            NyxBackupOptions(importLayout = false),
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
+        coVerify(exactly = 0) { reconcileHomeLayout() }
     }
 
     // ---- restoreWallpaper branches (import path; pure JVM — Uri is mocked, not parsed) ----

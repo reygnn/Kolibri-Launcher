@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,9 +41,14 @@ import javax.inject.Singleton
  *   The quiet outcomes (Loaded / EmptyLoaded / FailedKeptLastGood) need no reaction.
  * - A freak upstream error must not permanently freeze the holder. Unlike kolibri's
  *   ViewModel-lifecycle collection (which self-heals when the UI returns), this pump is a
- *   process-lifetime @Singleton with one collection, so [retryWhen] re-subscribes it (which
- *   re-primes the feed) after a short backoff, reporting via [TimberWrapper.silentError].
- *   Cancellation always propagates. Own [SupervisorJob] scope on the IO dispatcher (Rule 7).
+ *   process-lifetime @Singleton with one collection, so [retryWhen] re-subscribes after a
+ *   short backoff, reporting via [TimberWrapper.silentError]. The [RESTART_DELAY_MS] backoff
+ *   (1s) is inside the loader's WhileSubscribed keep-alive window (5s), so the re-subscribe
+ *   re-attaches to the still-warm shared feed and replays its current value rather than
+ *   forcing a fresh enumeration — enough to unfreeze the drain; the next package event
+ *   drives the actual re-enumerate. Cancellation always propagates. Own [SupervisorJob]
+ *   scope on the IO dispatcher (Rule 7). [start] is idempotent (guarded), so the single-
+ *   writer invariant on the holder is enforced by construction, not just by the one call site.
  */
 @Singleton
 class InstalledAppsHolderPump @Inject constructor(
@@ -50,8 +56,13 @@ class InstalledAppsHolderPump @Inject constructor(
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+    private val started = AtomicBoolean(false)
 
     fun start() {
+        // Idempotent: a second start() would launch a second collection = a second writer of
+        // the shared holder, breaking the single-writer invariant. Enforce it here rather than
+        // relying on the single NyxApplication.onCreate call site.
+        if (!started.compareAndSet(false, true)) return
         scope.launch {
             sync.outcomes()
                 .onEach { outcome ->

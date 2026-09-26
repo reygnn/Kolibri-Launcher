@@ -38,7 +38,7 @@ class HomePagerAdapter(
     fun submit(pageCells: List<List<HomeCell>>) {
         // Value-equal pages (a pure icon-style change re-renders the SAME cells): skip
         // notifyDataSetChanged so it doesn't wipe a pending ICON_STYLE_PAYLOAD in the same
-        // frame — the iconStyle collector calls renderLayout()→submit() then refreshIcons(),
+        // frame — the currentStyle collector calls renderLayout()→submit() then refreshIcons(),
         // and a notifyDataSetChanged here would swallow that payload → grid keeps old-style
         // icons (dock/drawer repaint via their own rebinds). A real layout change produces
         // non-equal lists and rebinds as before; the per-page DiffUtil in HomeGridAdapter is
@@ -59,7 +59,7 @@ class HomePagerAdapter(
      * Icon-style change: re-decode every live page's icons. The cell data is unchanged, so
      * this rides an icon-style payload straight to each page's [HomeGridAdapter.refreshIcons]
      * (offscreen pages re-decode naturally when next bound). Called from MainActivity's
-     * iconStyle collector — without it the grid keeps the old-style bitmaps.
+     * currentStyle collector — without it the grid keeps the old-style bitmaps.
      */
     fun refreshIcons() = notifyItemRangeChanged(0, pages.size, ICON_STYLE_PAYLOAD)
 
