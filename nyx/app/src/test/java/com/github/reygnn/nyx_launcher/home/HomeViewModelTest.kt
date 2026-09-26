@@ -430,7 +430,72 @@ class HomeViewModelTest {
             assertThat(viewModel.addableVendorGroups(setOf(g1, g2))).isEmpty()
         }
 
+    @Test
+    fun installedKeys_maps_rawAppsFlow_to_the_component_key_set() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            viewModel.installedKeys.test {
+                assertThat(awaitItem()).isEmpty() // seed: empty = "not loaded"
+                installedAppsStateRepository.updateApps(listOf(appInfo("pa"), appInfo("pb")))
+                assertThat(awaitItem()).containsExactly(
+                    ComponentKey("pa", "pa.Main"),
+                    ComponentKey("pb", "pb.Main"),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun remove_missing_folder_member_forwards_to_delete_from_folder() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+
+            viewModel.removeMissingFolderMember(ItemId("f"), KEY)
+            advanceUntilIdle()
+
+            coVerify { deleteFromFolder(ItemId("f"), KEY) }
+        }
+
+    @Test
+    fun self_uninstall_removes_the_tile_once_the_app_leaves_the_installed_set() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            installedAppsStateRepository.updateApps(listOf(appInfo("pa"), appInfo("other")))
+            advanceUntilIdle()
+
+            viewModel.requestSelfUninstall(ITEM, packageName = "pa")
+            // runCurrent (NOT advanceUntilIdle): let the wait-coroutine subscribe and suspend
+            // without advancing virtual time through its 300s timeout.
+            runCurrent()
+            coVerify(exactly = 0) { removeItem(ITEM) } // pa still installed → tile kept
+
+            // The system uninstall completed: pa leaves the (still non-empty) installed set.
+            installedAppsStateRepository.updateApps(listOf(appInfo("other")))
+            advanceUntilIdle()
+            coVerify(exactly = 1) { removeItem(ITEM) }
+        }
+
+    @Test
+    fun self_uninstall_keeps_the_tile_if_the_app_stays_installed() =
+        runTest(mainDispatcherRule.dispatcher) {
+            coEvery { getDrawerApps() } returns emptyList()
+            val viewModel = createViewModel()
+            installedAppsStateRepository.updateApps(listOf(appInfo("pa")))
+            advanceUntilIdle()
+
+            // A cancelled system uninstall: pa never leaves the set → the bounded wait times
+            // out and the placement is NOT removed (the greyed tile stays).
+            viewModel.requestSelfUninstall(ITEM, packageName = "pa")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { removeItem(ITEM) }
+        }
+
     private companion object {
+        fun appInfo(pkg: String) = com.github.reygnn.launcher.core.AppInfo(pkg, pkg, pkg, "$pkg.Main")
         val KEY = ComponentKey("pa", "pa.Main")
         val APP_A = LauncherApp(KEY, label = "A")
         val APP_B = LauncherApp(ComponentKey("pb", "pb.Main"), label = "B")

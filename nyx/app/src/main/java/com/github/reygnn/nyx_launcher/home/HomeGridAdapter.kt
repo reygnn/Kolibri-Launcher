@@ -67,14 +67,9 @@ class HomeGridAdapter(
         // no-prune "missing" model: an uninstall flips one App(missing=…) and only that one
         // tile re-decodes/greys, instead of notifyDataSetChanged re-decoding the whole page.
         // The dot-only update path (submitNotificationDots) is separate and untouched.
-        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize(): Int = old.size
-            override fun getNewListSize(): Int = newCells.size
-            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                oldItemPosition == newItemPosition
-            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                old[oldItemPosition] == newCells[newItemPosition]
-        })
+        // Diff policy (positional identity + `==` contents) lives in the pure, JVM-testable
+        // HomeGridCellDiff; the length invariant above guarantees equal sizes here.
+        val diff = DiffUtil.calculateDiff(HomeGridCellDiff.callback(old, newCells))
         dispatchCountingDiff(diff)
     }
 

@@ -22,11 +22,11 @@ class FolderIconRendererTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private class CountingIconLoader(
-        // null members model a transient icon-load failure (drives compose completeness).
-        private val failFor: Set<ComponentKey> = emptySet(),
-    ) : IconLoader {
+    private class CountingIconLoader : IconLoader {
         var calls = 0
+        // Members whose load should fail this call (a transient icon-load failure). Mutable so a
+        // test can clear it to model the failure clearing up on retry.
+        var failFor: Set<ComponentKey> = emptySet()
         val styleFlow = MutableStateFlow(IconStyle.COLOR)
         override val currentStyle: StateFlow<IconStyle> = styleFlow
         override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
@@ -66,5 +66,40 @@ class FolderIconRendererTest {
         renderer.render(members, 96)
 
         assertThat(loader.calls).isEqualTo(4) // recomposed after clear
+    }
+
+    @Test
+    fun an_incomplete_composite_is_not_cached_and_the_next_bind_retries() = runTest(mainDispatcherRule.dispatcher) {
+        // F11: one member fails to load transiently → the composite is incomplete and must NOT
+        // be cached (else a blank quadrant sticks until an unrelated invalidation).
+        val loader = CountingIconLoader().apply { failFor = setOf(ck("pb")) }
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+
+        renderer.render(members, 96)
+        val afterIncomplete = loader.calls // pa ok + pb failed = 2
+
+        loader.failFor = emptySet() // the failure clears up
+        renderer.render(members, 96) // not cached → recompose, now complete
+        assertThat(loader.calls).isEqualTo(afterIncomplete + 2)
+
+        renderer.render(members, 96) // complete composite is now cached
+        assertThat(loader.calls).isEqualTo(afterIncomplete + 2) // no extra member loads
+    }
+
+    @Test
+    fun a_style_change_recomposes_under_the_new_key() = runTest(mainDispatcherRule.dispatcher) {
+        // F12: the composite cache is keyed by IconLoader.currentStyle, so flipping the style
+        // authority is a cache miss (a mixed-style composite can't be served).
+        val loader = CountingIconLoader()
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher, FakePreferencesRepository())
+
+        renderer.render(members, 96)
+        val afterFirst = loader.calls // 2
+        renderer.render(members, 96)
+        assertThat(loader.calls).isEqualTo(afterFirst) // served from cache under COLOR
+
+        loader.styleFlow.value = IconStyle.MONOCHROME
+        renderer.render(members, 96) // new key → miss → recompose
+        assertThat(loader.calls).isEqualTo(afterFirst + 2)
     }
 }

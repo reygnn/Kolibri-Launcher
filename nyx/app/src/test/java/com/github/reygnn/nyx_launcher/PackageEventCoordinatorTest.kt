@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.AppConstants
@@ -160,5 +161,51 @@ class PackageEventCoordinatorTest {
 
         coVerify(exactly = 1) { installedAppsRepository.triggerAppsUpdate() }
         verify(exactly = 1) { iconLoader.evict("com.example.gone") } // targeted eviction still happens
+        // A member app's icon may have changed, so the folder-composite cache is dropped
+        // once per package event too (a stale folder icon must not survive an event).
+        verify(exactly = 1) { folderRenderer.clear() }
+    }
+
+    @Test
+    fun package_added_reinstall_drives_the_refresh_and_reconcile() = runTest(mainDispatcherRule.dispatcher) {
+        // The un-grey path: a reinstall (PackageEvent.Added) must run the SAME funnel as a
+        // removal — evict the (now stale) icon, drop the folder composite, refresh the shared
+        // loader so HomeViewModel.installedKeys re-emits and the tile un-greys, then a
+        // debounced structural reconcile. Pins that Added is not silently ignored.
+        coEvery { reconcile() } returns ReconcileResult.Unchanged
+
+        coordinator.start()
+        advanceUntilIdle() // collectors subscribe; drain the cold-start reconcile
+        coVerify(exactly = 1) { reconcile() } // baseline: only the cold-start reconcile so far
+
+        appUpdateSignal.send(PackageEvent.Added("com.example.back"))
+        advanceUntilIdle() // package-event handling + the debounced reconcile fire
+
+        verify(exactly = 1) { iconLoader.evict("com.example.back") }
+        verify(exactly = 1) { folderRenderer.clear() }
+        coVerify(exactly = 1) { installedAppsRepository.triggerAppsUpdate() }
+        // cold-start (1) + the Added event's coalesced reconcile (1)
+        coVerify(exactly = 2) { reconcile() }
+    }
+
+    @Test
+    fun on_trim_memory_mild_level_trims_icons_but_keeps_the_folder_cache() {
+        // Below UI_HIDDEN the composites are cheap and still on screen: trim the icon cache
+        // but do NOT nuke the folder-composite cache, or a home folder icon blanks + re-renders
+        // on transient foreground pressure. onTrimMemory is a plain fun — no coroutine needed.
+        coordinator.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) // 10
+
+        verify(exactly = 1) { iconLoader.trim(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) }
+        verify(exactly = 0) { folderRenderer.clear() }
+    }
+
+    @Test
+    fun on_trim_memory_ui_hidden_trims_icons_and_clears_the_folder_cache() {
+        // At UI_HIDDEN (or heavier) the icon cache fully evicts, so the all-or-nothing
+        // folder-composite cache is dropped too — nothing is on screen to blank.
+        coordinator.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) // 20
+
+        verify(exactly = 1) { iconLoader.trim(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) }
+        verify(exactly = 1) { folderRenderer.clear() }
     }
 }
