@@ -40,6 +40,7 @@
                  §10 D-3); a blank query restores the folder view. -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/search_input_layout"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
