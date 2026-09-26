@@ -5,10 +5,15 @@ uninstalled/"missing" references, and the curated stores (favorites / home layou
 swipe / hidden / custom names). It does **not** cover unrelated subsystems (wallpaper,
 backup, clock/events).
 
-This reflects the state **after** the lazy-slot rebuild and the parity patch set
+This reflects the state **after** the lazy-slot rebuild, the parity patch set
 (`LazySlotMembership`, the nyx package-event refresh, the `NoAutoPruneContract` seam,
-the DiffUtil adapters, and the provisional-missing change). Where a row was changed or
-introduced by that work it is noted.
+the DiffUtil adapters, and the provisional-missing change), **and** the two multi-agent
+review rounds that followed (merged to `main`). The review follow-ups that touch this
+doc's scope: nyx now removes a home placement after a *user-initiated* uninstall
+(`HomeViewModel.requestSelfUninstall`), an all-members-uninstalled folder renders a greyed
+placeholder, the shared `PackageUpdateReceiver` registration is single-sourced, and the
+"is the app gone?" question is single-sourced in `LazySlotMembership` (both grains). Where
+a row was changed or introduced by that work it is noted.
 
 Legend: **[shared]** one implementation, **[intentional]** a deliberate per-launcher
 design, **[asymmetry]** a behavioural difference that could be closed, **[open]** a
@@ -19,15 +24,16 @@ cost/risk of making the two launchers match (see the summary right after the tab
 |---|---|---|---|
 | Installed-apps motor | `:common-data` `InstalledAppsRepositoryImpl` (`AppEnumerator`) | same | [shared] |
 | Auto-prune of curated stores | none | none | [shared] |
-| "missing" membership rule | `LazySlotMembership.isMissing` | `LazySlotMembership.isMissing` | [shared] |
-| Package-event → loader refresh | `KolibriLauncherApp` / `AppManagementDelegate` → `triggerAppsUpdate()` | `PackageEventCoordinator` → `triggerAppsUpdate()` | [shared] |
+| "missing" membership rule | `LazySlotMembership.isMissing` | `LazySlotMembership.isMissing` (+ `isPackageMissing` for uninstall-completion) | [shared] |
+| Package-event → loader refresh | `KolibriLauncherApp` → `triggerAppsUpdate()` | `PackageEventCoordinator` → `triggerAppsUpdate()` (both register via shared `PackageUpdateReceiver.register()`) | [shared] |
 | No-auto-prune regression guard | `KolibriNoAutoPruneTest` | `NyxNoAutoPruneTest` (shared `NoAutoPruneContract`) | [shared] |
 | Adapter list-diffing | `HomeFavoritesAdapter` extends framework `ListAdapter` | `HomeGridAdapter` (plain `RecyclerView.Adapter`, hand-rolled `DiffUtil.calculateDiff`) | [intentional] |
 | Home model | flat favorites list | grid + dock + folders + structural reconciler | [intentional] |
 | Freshness posture | central holder + keep-last-good | central holder + keep-last-good (shared machinery; Option A) | [shared] |
 | Cold-start "missing" paint | grey immediately (provisional) | normal → grey on load | [asymmetry] |
 | Drawer custom-name overlay | applied | not applied yet | [asymmetry] |
-| Missing folder members | n/a (no home folders) | greyed + removable in the open folder; the folder container itself is neutral | [intentional] |
+| Missing folder members | n/a (no home folders) | greyed + removable in the open folder; an all-members-gone folder tile shows a greyed placeholder (still no `missing` field on the container) | [intentional] |
+| Self-uninstall → tile removal | n/a (no home placements) | a user-initiated (from-tile) uninstall removes the tapped placement once the app leaves the installed set (id-scoped); an external uninstall keeps the greyed tile | [intentional] |
 | Warm enumeration while home visible | holder is the norm | always-warm holder via shared pump (Option A resolved the [open]) | [shared] |
 | Gone-app launch feedback | swipe slot pre-checks + specific toast | any launch path catches `ComponentGone` → generic toast | [asymmetry] (wording only) |
 
@@ -79,12 +85,18 @@ These are a single policy or a single implementation used by both launchers.
   means "not loaded", flag nothing; a non-empty view means an absent reference is
   missing* — lives once in `core/LazySlotMembership.isMissing(key, installed)` and is
   called by nyx `HomeCell.toCell`, kolibri `GetFavoriteAppsUseCase.processApps`, and
-  kolibri `HandleSwipeActionUseCase`. Parity by construction, not by mirrored code.
+  kolibri `HandleSwipeActionUseCase`. Its package-grain sibling `isPackageMissing`
+  (nyx self-uninstall waits on it) lives in the same object, so the load-bearing
+  "empty = not loaded" guard is defined exactly once. Parity by construction, not by
+  mirrored code.
 - **Freshness on package events.** Both bridge `PackageUpdateReceiver` →
   `AppUpdateSignal` → `InstalledAppsRepository.triggerAppsUpdate()`, so the reactive
-  loader re-enumerates on install/uninstall. (nyx gained this in the patch set; before,
-  its `PackageEventCoordinator` only evicted icons + ran the now-structural reconcile,
-  so the loader never refreshed on a package event.)
+  loader re-enumerates on install/uninstall. Both register the receiver through the shared
+  `PackageUpdateReceiver.register(context)` companion (`:common-data`), which single-sources
+  the `PACKAGE_ADDED/REMOVED/CHANGED` filter and the `RECEIVER_NOT_EXPORTED` flag so the two
+  apps can't drift. (nyx gained the refresh in the patch set; before, its
+  `PackageEventCoordinator` only evicted icons + ran the now-structural reconcile, so the
+  loader never refreshed on a package event.)
 - **No-auto-prune regression guard.** A shared `core` test-fixtures
   `NoAutoPruneContract` with two subclasses (`KolibriNoAutoPruneTest`,
   `NyxNoAutoPruneTest`) pins that a reference absent from a non-empty view survives —
@@ -118,8 +130,11 @@ Now converged. Both launchers sit on the same in-RAM holder
 - **Shared machinery:** the loader → holder feed + the empty/failed arbitration live once
   in `core/SyncInstalledAppsToHolder`. kolibri drives it via `ObserveInstalledAppsUseCase`
   (adds the `AppLoadResult` emit + the ACRA no-cache report on top); nyx drives it via an
-  app-scoped `InstalledAppsHolderPump` started from `NyxApplication` (drains the outcomes,
-  needs no reaction). Parity by construction, like `LazySlotMembership` for the missing rule.
+  app-scoped `InstalledAppsHolderPump` started from `NyxApplication`. The pump drains the
+  outcomes and, in parity with kolibri, reports `FailedNoCache` to ACRA; it also re-subscribes
+  on a freak upstream error (`retryWhen`) and its `start()` is idempotent, so the holder's
+  single-writer invariant holds by construction. Parity by construction, like
+  `LazySlotMembership` for the missing rule.
 - **nyx consumers now read the holder:** `GetDrawerAppsUseCase` point-reads
   `getCurrentApps()` (last-good on a transient empty — the drawer no longer blanks on a
   reload glitch); `HomeViewModel.installedKeys` maps `rawAppsFlow` (raw view, so greying
@@ -139,14 +154,17 @@ things a folder *holds*, never of the folder itself. Accordingly:
   `LazySlotMembership` rule: a member whose app is gone renders greyed with a placeholder
   and, on tap, offers removal from the folder (`HomeLayoutTransition.deleteFromFolder` —
   no placement, auto-dissolve below two members). Long-press still extracts.
-- **The folder container** carries no `missing` state (`HomeCell.Folder` has no such
-  field) and its composite tile is never greyed — deliberately, since the folder has no
-  target app to be "gone". A folder that ends up with only dead members is an
-  import/edit anomaly the user clears via the members (or the structural reconciler
-  dissolves once it drops below two members); it is not a container-level condition.
+- **The folder container** carries no `missing` *field* (`HomeCell.Folder` has none) — it
+  has no target app to be "gone". Its composite normally draws the installed members
+  (`presentMembers`); when a member is uninstalled it simply drops out and the icons
+  compact. The one visual exception (review follow-up): a folder whose members are **all**
+  uninstalled has nothing to composite, so its tile renders the same greyed placeholder as a
+  dead app tile (visual consistency, not a container-level `missing` state) and still opens so
+  the dead members are removable. Such an all-dead folder is an import/edit anomaly; the
+  structural reconciler also dissolves a folder once it drops below two members.
 - **kolibri:** no analog (no home folders).
-- **Align:** n/a — already resolved. The member level is closed (greyed + removable); the
-  container level is intentionally neutral. Nothing to match.
+- **Align:** n/a — resolved. The member level is closed (greyed + removable); the container
+  has no `missing` field, only the all-members-gone placeholder for legibility. Nothing to match.
 
 ---
 
@@ -210,19 +228,19 @@ revert to per-consumer pull-on-open.)
 
 ## 4. Verification status
 
-The pure-Kotlin layers were compiled and exercised with a standalone `kotlinc` (the Gradle
-build is unavailable in this environment — Maven Central / Google Maven are unreachable, so
-`androidx` / `mockk` / `truth` / `turbine` and the `:app` Android modules cannot be built):
+Fully built and tested via Gradle; the branch is merged to `main`. As of the last review
+follow-ups, the whole tree is green:
 
-- **Compiled clean, with the patch set applied:** all of `:core`, `:nyx:domain` and
-  `:kolibri:domain` (minus the independent backup / serialization / DI files, which need
-  blocked artifacts).
-- **Executed against the real compiled code:** `LazySlotMembership` (the shared rule);
-  `HomeLayoutTransition.deleteFromFolder` (shrink / dissolve+promote-survivor / tile-reuse /
-  no-op); and `GetFavoriteAppsUseCase.favoriteApps` for both the cold-start
-  provisional-missing paint **and** the authoritative missing path (with the real project
-  fakes). All green.
-- **Not run here:** the JUnit / Robolectric test *files* themselves and everything in the
-  `:app` modules — they need the blocked artifacts. Their behaviour was confirmed via the
-  harnesses above, but the test files' own compilation / turbine sequencing is unconfirmed;
-  run `./gradlew :core:test :nyx:domain:test :kolibri:domain:test …` to close that.
+- **Unit tests:** `:core`, `:nyx:domain`, `:nyx:data`, `:nyx:app`, `:kolibri:domain`,
+  `:kolibri:data`, `:kolibri:app`, `:common-data`, `:common-ui` all pass. The shared/changed
+  behaviour is pinned directly — `LazySlotMembershipTest` (both `isMissing` and
+  `isPackageMissing`, incl. the empty-view guard), `NoAutoPruneContract` (kolibri + nyx
+  subclasses), `HomeLayoutTransition.deleteFromFolder`, `FolderIconRendererTest` (complete-
+  composite caching + `currentStyle` keying), `InstalledAppsHolderPumpTest` (FailedNoCache →
+  ACRA, retryWhen restart, idempotent start, cancellation), `PackageEventCoordinatorTest`
+  (onTrimMemory gating, package-event refresh), `NyxBackupManagerTest` (save → structural
+  reconcile order), `HomeContextMenuTest` / `HomeGridCellDiffTest` / `HomeViewModelTest`.
+- **Convention linters:** `./gradlew :nyx:app:checkConventions :kolibri:app:checkConventions`
+  and `checkRule13` pass for both launchers.
+- **On-device:** the nyx daily-driver AAB was exercised on a physical device (missing-tile
+  greying, DiffUtil single-tile rebind, icon-style repaint, the uninstall-menu fix).
