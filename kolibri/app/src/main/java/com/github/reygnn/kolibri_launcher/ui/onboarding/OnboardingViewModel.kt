@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -147,7 +148,17 @@ class OnboardingViewModel @Inject constructor(
                         // omitted (no dummy entries). An empty result stays legitimate:
                         // the save-gate exempts INITIAL_SETUP, so preselectState stays
                         // NotLoaded and is never consulted for this mode.
-                        val availableApps = onboardingAppsUseCase.onboardingAppsFlow.first()
+                        //
+                        // The installed-apps StateFlow replays an initial empty
+                        // Loaded(emptyList()) sentinel (there is no Loading state) before
+                        // the asynchronous PackageManager enumeration finishes. A plain
+                        // .first() wins that race on a cold start and preselects nothing,
+                        // so wait for the first POPULATED emission instead. Bounded by a
+                        // timeout so a (pathological) genuinely app-less device degrades to
+                        // "no preselect" rather than hanging — same legitimate empty result.
+                        val availableApps = withTimeoutOrNull(APPS_LOAD_TIMEOUT_MS) {
+                            onboardingAppsUseCase.onboardingAppsFlow.first { it.isNotEmpty() }
+                        }.orEmpty()
                         selectedComponents.value =
                             getDefaultFavoriteComponentsUseCase(availableApps).toSet()
                     }
@@ -327,5 +338,13 @@ class OnboardingViewModel @Inject constructor(
     private fun failRestore(messageResId: Int) {
         _uiState.update { it.copy(isRestoring = false) }
         sendOnboardingEvent(OnboardingEvent.ShowError(messageResId))
+    }
+
+    private companion object {
+        // Upper bound for the first-run wait on the installed-apps enumeration
+        // (see loadInitialData / INITIAL_SETUP). Generous vs. a normal PM query so
+        // it never trims a real preselect, yet bounded so an app-less device can't
+        // hang the load.
+        const val APPS_LOAD_TIMEOUT_MS = 5_000L
     }
 }

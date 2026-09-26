@@ -98,6 +98,33 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `loadInitialData - INITIAL_SETUP - preselects defaults after the app list settles, skipping the initial empty emission`() =
+        runTest {
+            // Reproduce the real StateFlow race: the installed-apps flow first replays an
+            // empty Loaded(emptyList()) sentinel, then the populated list once the async
+            // PackageManager enumeration finishes. A plain .first() would grab the empty
+            // one and preselect nothing (the bug); the fix waits for the populated emission.
+            every { onboardingAppsUseCase.onboardingAppsFlow } returns flowOf(emptyList(), testApps)
+            coEvery { getDefaultFavoriteComponentsUseCase(testApps) } returns
+                listOf(app1.componentName, app3.componentName)
+
+            setupViewModel()
+            viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
+            viewModel.loadInitialData()
+            advanceUntilIdle()
+
+            val uiState = viewModel.uiState.value
+            // The two resolved defaults are pre-selected; the third app is not.
+            assertEquals(
+                setOf("pkg1", "pkg3"),
+                uiState.selectedApps.map { it.packageName }.toSet(),
+            )
+            assertTrue(uiState.selectableApps.first { it.appInfo.packageName == "pkg1" }.isSelected)
+            assertFalse(uiState.selectableApps.first { it.appInfo.packageName == "pkg2" }.isSelected)
+            assertTrue(uiState.selectableApps.first { it.appInfo.packageName == "pkg3" }.isSelected)
+        }
+
+    @Test
     fun `onAppToggled - adds app to selection correctly`() = runTest {
         setupViewModel()
         advanceUntilIdle()
