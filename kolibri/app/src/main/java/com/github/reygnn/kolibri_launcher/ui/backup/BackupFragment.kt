@@ -228,8 +228,20 @@ class BackupFragment : Fragment() {
                     ).filter { it.isVisible }
                     checkboxSelectAll.isVisible = topicCheckboxes.size >= 2
                     var syncingChecks = false
+                    // Label mirrors the action the tap will perform: "Deselect all" while all
+                    // are on, "Select all" otherwise. Refreshed at the top of the master
+                    // listener, so it updates both on a direct tap and when the per-topic
+                    // listener drives the master's state during aggregate sync.
+                    val refreshSelectAllLabel = {
+                        checkboxSelectAll.setText(
+                            if (checkboxSelectAll.isChecked) R.string.import_option_deselect_all
+                            else R.string.import_option_select_all,
+                        )
+                    }
                     checkboxSelectAll.isChecked = topicCheckboxes.all { it.isChecked }
+                    refreshSelectAllLabel()
                     checkboxSelectAll.setOnCheckedChangeListener { _, isChecked ->
+                        refreshSelectAllLabel()
                         if (syncingChecks) return@setOnCheckedChangeListener
                         syncingChecks = true
                         topicCheckboxes.forEach { it.isChecked = isChecked }
