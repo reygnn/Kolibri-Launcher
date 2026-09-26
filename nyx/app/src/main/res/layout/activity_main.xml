@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.github.reygnn.nyx_launcher.home.drag.DragLayer
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/home_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -41,91 +42,97 @@
 
         <!-- Home-info header (HIE Phase C): clock, date, battery. Bound to the
              shared ClockDelegate's StateFlows in MainActivity. White text follows
-             the launcher-over-wallpaper convention (see remove_bar). -->
-        <LinearLayout
+             the launcher-over-wallpaper convention (see remove_bar).
+             ConstraintLayout (not a vertical LinearLayout): the clock stays
+             HORIZONTALLY CENTRED (time + event-indicator slot as a packed, centred
+             pair) while the date row is pinned to the clock's LEFT edge
+             (start_toStartOf clock_time). Two rows centred independently would not
+             share a left edge — the time row is wider (it carries the indicator
+             slot), so a centred date drifted right of the clock's start. -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/clock_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
             android:paddingTop="@dimen/spacing_xlarge"
             android:paddingBottom="@dimen/spacing_medium">
 
-            <!-- Clock row: the time plus the two passive event indicators stacked
-                 next to it (HIE Phase C3, mirrors Kolibri's fragment_home.xml —
-                 alarm on top, calendar below, spacing_medium past the time). Each
-                 icon shows only when an upcoming event of its type exists; INVISIBLE
-                 (not GONE) so it holds a fixed slot and the clock never shifts.
-                 Signals only — a double-tap on the home opens the full list. -->
-            <LinearLayout
+            <!-- Clock: the time. Centred horizontally as a packed pair with the
+                 event-indicator column just past its end (HIE Phase C3, mirrors
+                 Kolibri's fragment_home.xml — alarm on top, calendar below,
+                 spacing_medium past the time). Each icon shows only when an upcoming
+                 event of its type exists; INVISIBLE (not GONE) so it holds a fixed
+                 slot and the clock never shifts. Signals only — a double-tap on the
+                 home opens the full list. -->
+            <TextView
+                android:id="@+id/clock_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/clock_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-light"
-                    android:text="@string/time_placeholder"
-                    android:textColor="@android:color/white"
-                    android:textSize="@dimen/text_size_time" />
-
-                <LinearLayout
-                    android:id="@+id/event_indicators"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/spacing_medium"
-                    android:layout_marginTop="@dimen/events_indicators_top_nudge"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <ImageView
-                        android:id="@+id/event_alarm_indicator"
-                        android:layout_width="@dimen/events_icon_size"
-                        android:layout_height="@dimen/events_icon_size"
-                        android:padding="@dimen/events_icon_padding"
-                        android:contentDescription="@string/show_alarm_title"
-                        android:src="@drawable/ic_alarm"
-                        android:visibility="invisible" />
-
-                    <ImageView
-                        android:id="@+id/event_calendar_indicator"
-                        android:layout_width="@dimen/events_icon_size"
-                        android:layout_height="@dimen/events_icon_size"
-                        android:padding="@dimen/events_icon_padding"
-                        android:contentDescription="@string/show_calendar_event_title"
-                        android:src="@drawable/ic_event"
-                        android:visibility="invisible" />
-                </LinearLayout>
-            </LinearLayout>
+                android:fontFamily="sans-serif-light"
+                android:text="@string/time_placeholder"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/text_size_time"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/event_indicators"
+                app:layout_constraintHorizontal_chainStyle="packed" />
 
             <LinearLayout
+                android:id="@+id/event_indicators"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/spacing_medium"
+                android:layout_marginTop="@dimen/events_indicators_top_nudge"
+                android:orientation="vertical"
+                android:gravity="center"
+                app:layout_constraintStart_toEndOf="@id/clock_time"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@id/clock_time"
+                app:layout_constraintBottom_toBottomOf="@id/clock_time">
+
+                <ImageView
+                    android:id="@+id/event_alarm_indicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:contentDescription="@string/show_alarm_title"
+                    android:src="@drawable/ic_alarm"
+                    android:visibility="invisible" />
+
+                <ImageView
+                    android:id="@+id/event_calendar_indicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:contentDescription="@string/show_calendar_event_title"
+                    android:src="@drawable/ic_event"
+                    android:visibility="invisible" />
+            </LinearLayout>
+
+            <!-- Date row: pinned to the clock's LEFT edge, not centred, so the date
+                 starts exactly under the time. Battery sits after it on the same
+                 baseline. -->
+            <TextView
+                android:id="@+id/clock_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_small"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:text="@string/date_placeholder"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/text_size_secondary_info"
+                app:layout_constraintTop_toBottomOf="@id/clock_time"
+                app:layout_constraintStart_toStartOf="@id/clock_time" />
 
-                <TextView
-                    android:id="@+id/clock_date"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/date_placeholder"
-                    android:textColor="@android:color/white"
-                    android:textSize="@dimen/text_size_secondary_info" />
-
-                <TextView
-                    android:id="@+id/clock_battery"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/spacing_medium"
-                    android:text="@string/battery_placeholder"
-                    android:textColor="@android:color/white"
-                    android:textSize="@dimen/text_size_secondary_info" />
-            </LinearLayout>
-        </LinearLayout>
+            <TextView
+                android:id="@+id/clock_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/spacing_medium"
+                android:text="@string/battery_placeholder"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/text_size_secondary_info"
+                app:layout_constraintStart_toEndOf="@id/clock_date"
+                app:layout_constraintBaseline_toBaselineOf="@id/clock_date" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/home_pager"
