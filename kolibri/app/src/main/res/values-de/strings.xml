@@ -301,6 +301,7 @@
 
     <string name="category_advanced_title">Erweiterte Einstellungen</string>
     <string name="import_option_power_user">Power-User-Einstellungen</string>
+    <string name="import_option_select_all">Alle auswählen</string>
     
     <string name="customize_layout_title">Layout &amp; Größe</string>
     <string name="layout_text_size">Textgröße</string>

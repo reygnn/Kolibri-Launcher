@@ -213,6 +213,36 @@ class BackupFragment : Fragment() {
                     checkboxImportPowerUserSettings.text = getString(R.string.import_option_power_user)
                     checkboxImportPowerUserSettings.isVisible = uiState.powerUserSettings.visible
                     checkboxImportPowerUserSettings.isChecked = uiState.powerUserSettings.checked
+
+                    // Master "select all / none" toggle over the VISIBLE topics: the common
+                    // case is "restore only one topic", so tap it once to clear everything and
+                    // then tick the single wanted topic. It reflects the aggregate — checked
+                    // only while every visible topic is — and is hidden when fewer than two
+                    // topics are offered (nothing to bulk-toggle). The syncing guard stops the
+                    // master and per-topic listeners from ping-ponging when one sets the other.
+                    val topicCheckboxes = listOf(
+                        checkboxImportFavorites, checkboxImportOrder, checkboxImportHiddenApps,
+                        checkboxImportCustomNames, checkboxImportSwipeActions, checkboxImportThemeSettings,
+                        checkboxImportWallpaper, checkboxImportTimeBasedEvents, checkboxImportQualityOfLife,
+                        checkboxImportPowerUserSettings,
+                    ).filter { it.isVisible }
+                    checkboxSelectAll.isVisible = topicCheckboxes.size >= 2
+                    var syncingChecks = false
+                    checkboxSelectAll.isChecked = topicCheckboxes.all { it.isChecked }
+                    checkboxSelectAll.setOnCheckedChangeListener { _, isChecked ->
+                        if (syncingChecks) return@setOnCheckedChangeListener
+                        syncingChecks = true
+                        topicCheckboxes.forEach { it.isChecked = isChecked }
+                        syncingChecks = false
+                    }
+                    topicCheckboxes.forEach { box ->
+                        box.setOnCheckedChangeListener { _, _ ->
+                            if (syncingChecks) return@setOnCheckedChangeListener
+                            syncingChecks = true
+                            checkboxSelectAll.isChecked = topicCheckboxes.all { it.isChecked }
+                            syncingChecks = false
+                        }
+                    }
                 }
 
                 // 4. Dialog anzeigen

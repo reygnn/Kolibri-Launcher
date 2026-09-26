@@ -325,7 +325,8 @@
     <string name="category_advanced_title">Advanced Settings</string>
     
     <string name="import_option_power_user">Power User Settings</string>
-    
+    <string name="import_option_select_all">Select all</string>
+
     <string name="customize_layout_title">Layout &amp; Size</string>
     <string name="layout_text_size">Text Size</string>
     <string name="layout_vertical_spacing">Line Spacing</string>
