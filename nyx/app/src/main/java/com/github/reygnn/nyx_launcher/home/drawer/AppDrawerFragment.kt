@@ -25,6 +25,7 @@ import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.HomeViewModel
 import com.github.reygnn.nyx_launcher.home.model.DrawerAppSearch
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerSearchResult
 import dagger.hilt.android.AndroidEntryPoint
@@ -89,6 +90,11 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
     private var drawerList: RecyclerView? = null
     private var adapter: AppDrawerAdapter? = null
     private var searchBox: EditText? = null
+
+    // Last icon style repainted into the drawer. Skips the repeatOnLifecycle re-subscription
+    // replay (StateFlow) so merely reopening the drawer doesn't re-decode every icon; only a
+    // real style change repaints. Mirrors MainActivity's grid dedupe.
+    private var appliedIconStyle: IconStyle? = null
 
     // Tells a genuine keystroke apart from a StateFlow replay so only a real user
     // narrowing can auto-launch (shared :common-ui logic).
@@ -173,9 +179,15 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
                         if (q.isNotBlank()) renderForQuery(q, allowAutoLaunch = false)
                     }
                 }
-                // Re-render icons in the current variant when the icon-style mode changes.
+                // Re-render icons when the icon-style mode changes. Driven off the loader's
+                // currentStyle (single authority) and deduped so a drawer reopen (StateFlow
+                // replay under repeatOnLifecycle) doesn't needlessly re-decode all icons.
                 launch {
-                    viewModel.iconStyle.collect { drawerAdapter.notifyDataSetChanged() }
+                    iconLoader.currentStyle.collect { style ->
+                        if (style == appliedIconStyle) return@collect
+                        appliedIconStyle = style
+                        drawerAdapter.notifyDataSetChanged()
+                    }
                 }
                 // Notification dots (gated by the toggle): re-bind so drawer app + folder
                 // tiles show/hide the dot reactively.

@@ -52,9 +52,11 @@ class FolderIconRenderer @Inject constructor(
     }
 
     suspend fun render(members: List<ComponentKey>, sizePx: Int): Bitmap {
-        // Key by IconLoader's current style — the SAME snapshot the member bitmaps below
-        // decode under — so the composite key can never disagree with its contents (F12).
-        val key = IconCacheKey.folder(members, sizePx, iconLoader.currentStyle)
+        // Key by IconLoader's current style — the same authority the member bitmaps below
+        // decode under. A disagreeing entry (style flips mid-compose) is never read back
+        // under the new style (later lookups key by the then-current style) and is dropped
+        // by clear(), so a mixed-style composite can't stick (F12).
+        val key = IconCacheKey.folder(members, sizePx, iconLoader.currentStyle.value)
         synchronized(lock) { cache[key]?.let { return it } }
         val (composed, complete) = compose(members, sizePx)
         // Only cache a COMPLETE composite. If a member icon failed to load transiently it

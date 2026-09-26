@@ -7,6 +7,8 @@ import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -20,11 +22,18 @@ class FolderIconRendererTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private class CountingIconLoader : IconLoader {
+    private class CountingIconLoader(
+        // null members model a transient icon-load failure (drives compose completeness).
+        private val failFor: Set<ComponentKey> = emptySet(),
+    ) : IconLoader {
         var calls = 0
-        override val currentStyle = IconStyle.COLOR
+        val styleFlow = MutableStateFlow(IconStyle.COLOR)
+        override val currentStyle: StateFlow<IconStyle> = styleFlow
         override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
             calls++
+            val key = (ref as? IconRef.System)?.key
+            // A transient load failure surfaces as an exception (compose() runCatching's it).
+            if (key != null && key in failFor) error("transient load failure for $key")
             return Bitmap.createBitmap(sizePx.coerceAtLeast(1), sizePx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         }
         override fun evict(pkg: String) = Unit

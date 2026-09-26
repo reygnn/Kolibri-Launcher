@@ -452,11 +452,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
                 launchGuarded {
-                    viewModel.iconStyle.collect { style ->
-                        // Only act on a REAL style change. iconStyle is a StateFlow, and
-                        // repeatOnLifecycle re-subscribes on every return to STARTED, so it
-                        // replays the current (unchanged) style on each resume — without this
-                        // guard a mere return-to-home would re-decode all grid icons.
+                    // Drive the re-decode off IconLoader.currentStyle (the SINGLE decode
+                    // authority), not the raw preference: when this emits Y the loader already
+                    // decodes Y, so the repaint can't render old-style bitmaps (fixes the
+                    // multi-collector ordering hazard). Dedupe on the authority's value so the
+                    // repeatOnLifecycle re-subscription replay on return-to-home is a no-op.
+                    iconLoader.currentStyle.collect { style ->
                         if (style == appliedIconStyle) return@collect
                         appliedIconStyle = style
                         // renderLayout refreshes the dock (DockAdapter full rebind) and keeps

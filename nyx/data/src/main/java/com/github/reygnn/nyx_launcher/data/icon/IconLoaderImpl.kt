@@ -14,6 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -61,18 +64,20 @@ class IconLoaderImpl @Inject constructor(
     // At most one disk prune runs at a time; writes just re-arm it (§5, A1-07).
     private val pruneScheduled = AtomicBoolean(false)
 
-    @Volatile
-    private var style = IconStyle.COLOR
-
-    override val currentStyle: IconStyle get() = style
+    // Single style authority (ICL): the preference is collected here and published as a
+    // StateFlow. bitmap() reads _currentStyle.value for its variant, and UI re-decode
+    // triggers + FolderIconRenderer's composite key observe the same flow — so a repaint
+    // can never be driven before this has flipped (no old-style-sticky hazard).
+    private val _currentStyle = MutableStateFlow(IconStyle.COLOR)
+    override val currentStyle: StateFlow<IconStyle> = _currentStyle.asStateFlow()
 
     init {
-        preferences.iconStyle().onEach { style = it }.launchIn(scope)
+        preferences.iconStyle().onEach { _currentStyle.value = it }.launchIn(scope)
         schedulePrune() // cold-start sweep of files accumulated across runs
     }
 
     override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
-        val currentStyle = style
+        val currentStyle = _currentStyle.value
         val variant = when (currentStyle) {
             IconStyle.COLOR -> IconVariant.ADAPTIVE
             IconStyle.MONOCHROME -> IconVariant.THEMED

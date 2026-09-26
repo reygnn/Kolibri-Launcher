@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.data.icon
 import android.graphics.Bitmap
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The single read path for rendered icons (ICON_LOADER_SPEC §1). [bitmap] is
@@ -16,12 +17,15 @@ import com.github.reygnn.nyx_launcher.home.model.IconStyle
 interface IconLoader {
 
     /**
-     * The style snapshot member bitmaps are currently decoded under. Exposed so a
-     * derived renderer ([FolderIconRenderer]) can key its composite cache by the SAME
-     * style authority as the member icons, instead of a separate iconStyle() collector
-     * that could lead/lag this one and pin a mixed-style composite (would not self-heal).
+     * The style the loader currently decodes member bitmaps under, as the SINGLE authority
+     * for icon style. Exposed as a [StateFlow] so both the composite cache
+     * ([FolderIconRenderer] keys by `currentStyle.value`) AND the UI re-decode triggers
+     * (MainActivity / drawer collect it) derive from the same source the decode reads —
+     * a UI repaint driven off this can never run before the decode authority has flipped,
+     * so it cannot pin/keep an old-style bitmap (the multi-collector ordering hazard). It
+     * is updated from the icon-style preference inside the loader.
      */
-    val currentStyle: IconStyle
+    val currentStyle: StateFlow<IconStyle>
 
     /** Cache-backed icon for [ref] at [sizePx]; resolves + composites on a miss. */
     suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap
