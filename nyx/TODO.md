@@ -226,3 +226,41 @@ eine Rolle. Daher kein `CustomNamesRepository` und keine Umbenennen-UI. Das
 `customName`-Feld auf `LauncherApp` (+ `displayName = customName ?: label`) bleibt
 harmlos bestehen — von der Sortierung genutzt, aber nie befüllt, also effektiv
 immer `label`. (Ersetzt den früheren offenen Punkt „Custom Names portieren".)
+
+### Multi-Agent-Review (lazy-slot) — bewusst NICHT umgesetzte Punkte
+
+Aus den beiden 12-Agenten-Reviews des `feature/lazy-slot-review-patches`-Branches.
+Alle A–G-Findings + Härtung (Runde 2) sind umgesetzt; die folgenden Punkte wurden
+**bewusst zurückgestellt** (keine Bugs — Design-Calls, seltene Kanten oder Refactors mit
+Regressionsrisiko, die einen eigenen Task verdienen):
+
+- **Dock: value-equal/payload-Short-Circuit fehlt.** `DockAdapter.submit` macht bei jedem
+  `renderLayout` ein bedingungsloses `notifyDataSetChanged()` (Re-Decode pro Dock-Holder),
+  während `HomePagerAdapter.submit` bei wertgleichen Seiten früh zurückkehrt. Ein `==`-Guard
+  am Dock allein wäre **falsch** (der Dock-Stil-Repaint hängt an genau diesem unbedingten
+  Rebind, da der Dock — anders als das Grid — keinen ICON_STYLE-Payload-Pfad hat). Korrekter
+  Fix = dem Dock einen eigenen `refreshIcons(payload)`-Pfad geben **und dann** submit guarden.
+  Eigener Task, nicht als drive-by. Icon-Loads treffen den Memory-Cache, also heute nur
+  minorer Main-Thread-Rebind-Overhead.
+
+- **Folder-Overlay ist ein Snapshot.** Ein offenes Folder-Overlay reagiert nicht live auf
+  Stilwechsel oder Un-/Reinstall eines Members (baut `FolderMemberAdapter` einmal beim Öffnen
+  aus `installedKeys.value`). Selten (Stil wird von Home aus gewechselt, meist ohne offenes
+  Folder). Fix bräuchte ein Re-Submit/Re-Observe im Overlay-Controller. Low.
+
+- **self-uninstall id-scoped vs. alle Platzierungen.** Uninstall von einer Home-Kachel entfernt
+  nur DIESE Platzierung; Duplikate derselben App auf anderen Kacheln / in Foldern bleiben grau
+  (im KDoc dokumentiert). Falls stattdessen „alle Platzierungen der deinstallierten App
+  entfernen" gewünscht ist, wäre das eine bewusste Produkt-Änderung (nach `packageName` statt
+  `id` reapen) — nicht rein technisch.
+
+- **Folder-Dot nutzt `members` statt `presentMembers`** (`IconBinding.hasNotificationDot`).
+  Ein Folder mit nur deinstalliertem dot-tragendem Member zeigt weiterhin einen Dot (auch auf
+  dem grauen Empty-Placeholder). Pre-existing, kosmetisch.
+
+- **Kleinere SPEC-/Kosmetik-Punkte (low, kein Fix):** Cold-Start-COLOR-Flash bis die
+  iconStyle-Preference geladen ist (pre-existing Seed); `GetDrawerAppsUseCase.getCurrentApps()`
+  Doppel-Read im Warm-Path (Cold-Path liest bewusst erneut); kein Report-Dedup bei
+  wiederholtem `FailedNoCache` (kolibri-Parität); `InstalledAppsHolderPump.onEach`-Report ist
+  ungeguarded (nur relevant, falls `reportToAcra` — per Vertrag CANT_THROW — je wirft →
+  gedrosselte 1 Hz-Schleife). Alle als „nicht wert" eingestuft.
