@@ -78,8 +78,10 @@ class DragToDismissCore(private val host: ViewGroup) {
     private val flingDismissVelocity =
         ViewConfiguration.get(host.context).scaledMinimumFlingVelocity * 3f
 
-    /** Rubber-band cap: how far past the dismiss point the finger can outrun. */
-    private val maxDragOvershootFraction = 0.6f
+    /** Rubber-band cap: how far (fraction of host height) the sheet follows the finger
+     *  down before it stops. 0.8 lets it travel most of the height, closer to the Pixel
+     *  launcher's near-full follow, while keeping a short resistance before the edge. */
+    private val maxDragOvershootFraction = 0.8f
 
     private var dragOffset = 0f
     private var settling = false
