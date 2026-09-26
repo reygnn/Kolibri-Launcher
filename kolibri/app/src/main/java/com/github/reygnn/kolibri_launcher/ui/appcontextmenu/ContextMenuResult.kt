@@ -49,6 +49,9 @@ sealed interface ContextMenuResult {
     /** [AppContextMenuAction.ACTION_ID_RESET_USAGE] */
     data object ResetUsage : ContextMenuResult
 
+    /** [AppContextMenuAction.ACTION_ID_UNINSTALL] */
+    data object Uninstall : ContextMenuResult
+
     /**
      * Catch-all for null bundles, unknown action strings, and known IDs
      * that no consumer of this type handles (RENAME_APP, RESTORE_NAME).
@@ -80,6 +83,7 @@ sealed interface ContextMenuResult {
             AppContextMenuAction.ACTION_ID_HIDE_APP -> HideApp
             AppContextMenuAction.ACTION_ID_UNHIDE_APP -> UnhideApp
             AppContextMenuAction.ACTION_ID_RESET_USAGE -> ResetUsage
+            AppContextMenuAction.ACTION_ID_UNINSTALL -> Uninstall
             else -> Unknown(action)
         }
     }

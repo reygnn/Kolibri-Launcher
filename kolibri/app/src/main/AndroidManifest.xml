@@ -5,6 +5,10 @@
     <!-- Diese Berechtigung ist für die LauncherApps API unerlässlich -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
+    <!-- Show the system uninstall dialog from the app context menu (ACTION_DELETE).
+         The V2 package installer (Android 14+/One UI) refuses the request and closes
+         silently without this; normal permission, auto-granted, no runtime prompt. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />

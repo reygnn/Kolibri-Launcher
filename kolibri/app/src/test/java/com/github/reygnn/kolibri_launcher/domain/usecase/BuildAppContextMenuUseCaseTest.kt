@@ -93,20 +93,22 @@ class BuildAppContextMenuUseCaseTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `default state on home screen produces favorite, rename, hide, app-info in order`() =
+    fun `default state on home screen produces favorite, rename, hide, app-info, uninstall in order`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(
                 appInfo = app,
                 menuContext = MenuContext.HOME_SCREEN,
                 hasUsageData = false,
+                isSystemApp = false,
             )
 
-            // No shortcuts → no separator.
-            assertEquals(4, result.size)
+            // No shortcuts → no separator. Non-system app → uninstall is last.
+            assertEquals(5, result.size)
             assertEquals(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE, launcherAction(result[0]).id)
             assertEquals(AppContextMenuAction.ACTION_ID_RENAME_APP, launcherAction(result[1]).id)
             assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, launcherAction(result[2]).id)
             assertEquals(AppContextMenuAction.ACTION_ID_APP_INFO, launcherAction(result[3]).id)
+            assertEquals(AppContextMenuAction.ACTION_ID_UNINSTALL, launcherAction(result[4]).id)
         }
 
     // ------------------------------------------------------------------
@@ -120,19 +122,19 @@ class BuildAppContextMenuUseCaseTest {
             val s2 = LauncherShortcut(id = "s2", packageName = app.packageName, shortLabel = "S2")
             every { shortcutRepository.getShortcutsForPackage(app.packageName) } returns listOf(s1, s2)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
 
             assertEquals(AppContextMenuAction.Shortcut(s1), result[0])
             assertEquals(AppContextMenuAction.Shortcut(s2), result[1])
             assertEquals(AppContextMenuAction.Separator, result[2])
-            // Then favorite, rename, hide, app-info — total 7.
-            assertEquals(7, result.size)
+            // Then favorite, rename, hide, app-info, uninstall — total 8.
+            assertEquals(8, result.size)
         }
 
     @Test
     fun `no separator emitted when there are no shortcuts`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
 
             assertTrue(result.none { it is AppContextMenuAction.Separator })
         }
@@ -146,7 +148,7 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             fakeFavorites.favorites = setOf(app.componentName)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val toggleFavorite = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
@@ -157,7 +159,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `favorite action label is add_to_favorites when not currently a favorite`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val toggleFavorite = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
@@ -174,7 +176,7 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             assertTrue(
                 result.any {
                     it is AppContextMenuAction.LauncherAction &&
@@ -187,7 +189,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `restore-original-name action is absent when no custom name is set`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             assertTrue(
                 result.none {
                     it is AppContextMenuAction.LauncherAction &&
@@ -205,7 +207,7 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             fakeHidden.hiddenApps = setOf(app.componentName)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val hideAction = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
@@ -218,7 +220,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `hide action stays as hide when not hidden`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val hideAction = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
@@ -235,7 +237,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `reset-usage action is present in app drawer when usage data exists`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true)
+            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true, isSystemApp = false)
             assertTrue(
                 result.any {
                     it is AppContextMenuAction.LauncherAction &&
@@ -247,7 +249,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `reset-usage action is absent in app drawer when no usage data`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = false)
+            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = false, isSystemApp = false)
             assertTrue(
                 result.none {
                     it is AppContextMenuAction.LauncherAction &&
@@ -259,7 +261,7 @@ class BuildAppContextMenuUseCaseTest {
     @Test
     fun `reset-usage action is absent on home screen even with usage data`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = true)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = true, isSystemApp = false)
             assertTrue(
                 result.none {
                     it is AppContextMenuAction.LauncherAction &&
@@ -277,11 +279,11 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             every { shortcutRepository.getShortcutsForPackage(any()) } throws RuntimeException("boom")
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             // No shortcuts, no separator, but the rest is present.
             assertTrue(result.none { it is AppContextMenuAction.Shortcut })
             assertTrue(result.none { it is AppContextMenuAction.Separator })
-            assertEquals(4, result.size)
+            assertEquals(5, result.size)
         }
 
     @Test
@@ -292,7 +294,7 @@ class BuildAppContextMenuUseCaseTest {
             }
             useCase = newUseCase(favoritesRepo = brokenFavorites)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val toggleFavorite = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
@@ -309,7 +311,7 @@ class BuildAppContextMenuUseCaseTest {
             }
             useCase = newUseCase(customNamesRepo = brokenCustomNames)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             assertTrue(
                 result.none {
                     it is AppContextMenuAction.LauncherAction &&
@@ -326,7 +328,7 @@ class BuildAppContextMenuUseCaseTest {
             }
             useCase = newUseCase(hiddenRepo = brokenHidden)
 
-            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false)
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             val hideAction = result.first {
                 it is AppContextMenuAction.LauncherAction &&
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
@@ -349,9 +351,9 @@ class BuildAppContextMenuUseCaseTest {
             fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")
             fakeHidden.hiddenApps = setOf(app.componentName)
 
-            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true)
+            val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true, isSystemApp = false)
 
-            assertEquals(8, result.size)
+            assertEquals(9, result.size)
             assertEquals(AppContextMenuAction.Shortcut(s1), result[0])
             assertEquals(AppContextMenuAction.Separator, result[1])
             assertEquals(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE, launcherAction(result[2]).id)
@@ -360,5 +362,38 @@ class BuildAppContextMenuUseCaseTest {
             assertEquals(AppContextMenuAction.ACTION_ID_UNHIDE_APP, launcherAction(result[5]).id)
             assertEquals(AppContextMenuAction.ACTION_ID_RESET_USAGE, launcherAction(result[6]).id)
             assertEquals(AppContextMenuAction.ACTION_ID_APP_INFO, launcherAction(result[7]).id)
+            assertEquals(AppContextMenuAction.ACTION_ID_UNINSTALL, launcherAction(result[8]).id)
+        }
+
+    // ------------------------------------------------------------------
+    // Uninstall branch (last entry, gated on non-system app)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `uninstall action is present and last for a non-system app`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
+
+            assertEquals(
+                AppContextMenuAction.ACTION_ID_UNINSTALL,
+                launcherAction(result.last()).id,
+            )
+            assertEquals(
+                LauncherActionLabel.Uninstall,
+                launcherAction(result.last()).label,
+            )
+        }
+
+    @Test
+    fun `uninstall action is absent for a system app`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = true)
+
+            assertTrue(
+                result.none {
+                    it is AppContextMenuAction.LauncherAction &&
+                        it.id == AppContextMenuAction.ACTION_ID_UNINSTALL
+                },
+            )
         }
 }

@@ -37,6 +37,7 @@ import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
 import com.github.reygnn.launcher.common.ui.SearchQueryChangeTracker
 import com.github.reygnn.launcher.common.ui.collectOnStarted
+import com.github.reygnn.launcher.common.ui.startActivitySafely
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
 import com.github.reygnn.kolibri_launcher.ui.main.LauncherViewModel
@@ -367,6 +368,7 @@ class AppDrawerFragment : Fragment() {
                     is ContextMenuResult.ToggleFavorite -> toggleFavorite(app)
                     is ContextMenuResult.HideApp -> hideApp(app)
                     is ContextMenuResult.ResetUsage -> resetAppUsage(app)
+                    is ContextMenuResult.Uninstall -> uninstallApp(app)
                     // Structurally unreachable: per the architecture
                     // rule (see GetFavoriteAppsUseCase KDoc), hidden
                     // apps applies only to the AppDrawer, so
@@ -417,6 +419,14 @@ class AppDrawerFragment : Fragment() {
             TimberWrapper.silentError(e, "Error showing app info for ${app.packageName}")
             viewModel.onAppInfoError()
         }
+    }
+
+    private fun uninstallApp(app: AppInfo) {
+        // Fires the system uninstall confirmation (REQUEST_DELETE_PACKAGES in the manifest).
+        // startActivitySafely adds NEW_TASK and turns the expected failures (no handler /
+        // SecurityException on some OEM ROMs) into a toast instead of a crash.
+        val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
+        requireContext().startActivitySafely(intent, R.string.uninstall_failed)
     }
 
     private fun resetAppUsage(app: AppInfo) {

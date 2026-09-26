@@ -42,6 +42,7 @@ class BuildAppContextMenuUseCase @Inject constructor(
         appInfo: AppInfo,
         menuContext: MenuContext,
         hasUsageData: Boolean,
+        isSystemApp: Boolean,
     ): List<AppContextMenuAction> {
         val actions = mutableListOf<AppContextMenuAction>()
 
@@ -111,13 +112,24 @@ class BuildAppContextMenuUseCase @Inject constructor(
             )
         }
 
-        // 7. App info — always last.
+        // 7. App info.
         actions.add(
             AppContextMenuAction.LauncherAction(
                 id = AppContextMenuAction.ACTION_ID_APP_INFO,
                 label = LauncherActionLabel.AppInfo,
             ),
         )
+
+        // 8. Uninstall — last, and only for a non-system app (system apps can't be uninstalled;
+        // the caller resolves isSystemApp so this stays JVM-testable).
+        if (!isSystemApp) {
+            actions.add(
+                AppContextMenuAction.LauncherAction(
+                    id = AppContextMenuAction.ACTION_ID_UNINSTALL,
+                    label = LauncherActionLabel.Uninstall,
+                ),
+            )
+        }
 
         return actions
     }

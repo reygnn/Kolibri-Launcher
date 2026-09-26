@@ -36,6 +36,7 @@ sealed class AppContextMenuAction {
         const val ACTION_ID_RESET_USAGE = "reset_usage"
         const val ACTION_ID_RENAME_APP = "rename_app"
         const val ACTION_ID_RESTORE_NAME = "restore_name"
+        const val ACTION_ID_UNINSTALL = "uninstall"
     }
 }
 
@@ -53,4 +54,5 @@ sealed class LauncherActionLabel {
     object HideAppFromDrawer : LauncherActionLabel()
     object ResetUsage : LauncherActionLabel()
     object AppInfo : LauncherActionLabel()
+    object Uninstall : LauncherActionLabel()
 }

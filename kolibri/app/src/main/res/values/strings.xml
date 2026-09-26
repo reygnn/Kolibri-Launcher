@@ -387,5 +387,7 @@
 <string name="unhide_app_in_drawer">Show in app drawer</string>
 <string name="hide_app_from_drawer">Hide from app drawer</string>
 <string name="action_reset_sorting">Reset sorting</string>
+<string name="uninstall">Uninstall</string>
+<string name="uninstall_failed">Could not open the uninstall dialog</string>
 
 </resources>

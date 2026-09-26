@@ -364,5 +364,7 @@
 <string name="unhide_app_in_drawer">Im App Drawer anzeigen</string>
 <string name="hide_app_from_drawer">Im App Drawer ausblenden</string>
 <string name="action_reset_sorting">Sortierung zurücksetzen</string>
+<string name="uninstall">Deinstallieren</string>
+<string name="uninstall_failed">Deinstallations-Dialog konnte nicht geöffnet werden</string>
 
 </resources>

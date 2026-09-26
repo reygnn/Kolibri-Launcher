@@ -55,6 +55,7 @@ import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.AppContextMenuDialog
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuHelper
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
 import com.github.reygnn.launcher.common.ui.collectOnStarted
+import com.github.reygnn.launcher.common.ui.startActivitySafely
 import com.github.reygnn.kolibri_launcher.ui.extensions.handleShortcutLaunch
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.usecase.LaunchShortcutUseCase
@@ -1310,6 +1311,7 @@ class HomeFragment : Fragment() {
                 // practice — but the branch is required for
                 // sealed-when exhaustiveness.
                 ContextMenuResult.ResetUsage -> Unit
+                ContextMenuResult.Uninstall -> uninstallApp(app)
                 is ContextMenuResult.Unknown ->
                     Timber.w("Unknown context menu action: ${result.action}")
             }
@@ -1359,6 +1361,14 @@ class HomeFragment : Fragment() {
             TimberWrapper.silentError(e, "Error showing app info")
             viewModel.onAppInfoError()
         }
+    }
+
+    private fun uninstallApp(app: AppInfo) {
+        // System uninstall confirmation (REQUEST_DELETE_PACKAGES in the manifest).
+        // startActivitySafely adds NEW_TASK and toasts on the expected failures (no handler /
+        // SecurityException on some OEM ROMs) instead of crashing.
+        val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
+        requireContext().startActivitySafely(intent, R.string.uninstall_failed)
     }
 
     private fun showAppContextMenu(app: AppInfo) {

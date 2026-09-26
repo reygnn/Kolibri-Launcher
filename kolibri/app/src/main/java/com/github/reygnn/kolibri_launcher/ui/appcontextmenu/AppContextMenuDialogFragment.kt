@@ -1,6 +1,8 @@
 package com.github.reygnn.kolibri_launcher.ui.appcontextmenu
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -284,7 +286,16 @@ class AppContextMenuDialogFragment : BottomSheetDialogFragment() {
             appInfo = appInfo,
             menuContext = menuContext,
             hasUsageData = hasUsageData,
+            isSystemApp = isSystemApp(appInfo.packageName),
         )
+    }
+
+    /** System apps can't be uninstalled, so the Uninstall entry is gated on this. */
+    private fun isSystemApp(packageName: String): Boolean = try {
+        (requireContext().packageManager.getApplicationInfo(packageName, 0).flags and
+            ApplicationInfo.FLAG_SYSTEM) != 0
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
     }
 
     private fun handleActionClick(action: AppContextMenuAction) {

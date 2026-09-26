@@ -27,6 +27,7 @@ fun LauncherActionLabel.toStringResId(): Int = when (this) {
     LauncherActionLabel.HideAppFromDrawer -> R.string.hide_app_from_drawer
     LauncherActionLabel.ResetUsage -> R.string.action_reset_sorting
     LauncherActionLabel.AppInfo -> R.string.app_info
+    LauncherActionLabel.Uninstall -> R.string.uninstall
 }
 
 @StringRes
