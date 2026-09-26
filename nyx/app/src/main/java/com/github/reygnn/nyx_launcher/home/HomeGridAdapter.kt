@@ -5,11 +5,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.core.view.updateLayoutParams
+import androidx.recyclerview.widget.AdapterListUpdateCallback
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListUpdateCallback
 import androidx.recyclerview.widget.RecyclerView
+import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
+import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import kotlinx.coroutines.CoroutineScope
@@ -71,7 +75,44 @@ class HomeGridAdapter(
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
                 old[oldItemPosition] == newCells[newItemPosition]
         })
-        diff.dispatchUpdatesTo(this)
+        dispatchCountingDiff(diff)
+    }
+
+    /**
+     * Dev-only: dispatch the diff through a counter so a toast shows how many tiles the
+     * DiffUtil actually rebound — the visible proof that a change (e.g. an uninstall)
+     * touches only the affected tile(s), not the whole page. Gated on
+     * [BuildConfig.SHOW_DEV_COMMANDS] (always on in debug; in release only for a personal
+     * `-PdailyDriver`/`-PdevCommands` build, off for public release), so it can be verified
+     * on the daily-driver release AAB. Otherwise a plain
+     * [DiffUtil.DiffResult.dispatchUpdatesTo]. Remove before merging to main.
+     */
+    private fun dispatchCountingDiff(diff: DiffUtil.DiffResult) {
+        if (!BuildConfig.SHOW_DEV_COMMANDS) {
+            diff.dispatchUpdatesTo(this)
+            return
+        }
+        val target = AdapterListUpdateCallback(this)
+        var changed = 0
+        var moved = 0
+        var inserted = 0
+        var removed = 0
+        diff.dispatchUpdatesTo(object : ListUpdateCallback {
+            override fun onInserted(position: Int, count: Int) { inserted += count; target.onInserted(position, count) }
+            override fun onRemoved(position: Int, count: Int) { removed += count; target.onRemoved(position, count) }
+            override fun onMoved(fromPosition: Int, toPosition: Int) { moved++; target.onMoved(fromPosition, toPosition) }
+            override fun onChanged(position: Int, count: Int, payload: Any?) { changed += count; target.onChanged(position, count, payload) }
+        })
+        val total = changed + moved + inserted + removed
+        if (total > 0) {
+            debugToast("grid diff: $changed changed, $moved moved, $inserted ins, $removed rem")
+        }
+    }
+
+    /** Dev-only toast (daily-driver flag, [BuildConfig.SHOW_DEV_COMMANDS]) routed through the page RecyclerView's context. */
+    private fun debugToast(message: String) {
+        if (!BuildConfig.SHOW_DEV_COMMANDS) return
+        recyclerView?.context?.showToastSafe(message)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CellHolder {
@@ -90,7 +131,12 @@ class HomeGridAdapter(
      * nothing, yet each icon must re-decode under the new style (IconLoader / FolderIconRenderer
      * key their caches by style). Mirrors the dock's and drawer's full-rebind-on-style.
      */
-    fun refreshIcons() = notifyItemRangeChanged(0, cells.size)
+    fun refreshIcons() {
+        notifyItemRangeChanged(0, cells.size)
+        // Dev-only (daily-driver flag): confirms the icon-style repaint actually reaches
+        // this page (F1) — the whole grid re-decodes on a style change. Remove before merge.
+        debugToast("icon-style: ${cells.size} repainted")
+    }
 
     override fun onBindViewHolder(holder: CellHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isDotOnlyPayload()) {
