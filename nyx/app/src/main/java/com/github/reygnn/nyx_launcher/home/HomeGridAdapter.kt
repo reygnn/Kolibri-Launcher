@@ -85,7 +85,7 @@ class HomeGridAdapter(
      * [BuildConfig.SHOW_DEV_COMMANDS] (always on in debug; in release only for a personal
      * `-PdailyDriver`/`-PdevCommands` build, off for public release), so it can be verified
      * on the daily-driver release AAB. Otherwise a plain
-     * [DiffUtil.DiffResult.dispatchUpdatesTo]. Remove before merging to main.
+     * [DiffUtil.DiffResult.dispatchUpdatesTo] — a permanent daily-driver diagnostic.
      */
     private fun dispatchCountingDiff(diff: DiffUtil.DiffResult) {
         if (!BuildConfig.SHOW_DEV_COMMANDS) {
@@ -134,7 +134,7 @@ class HomeGridAdapter(
     fun refreshIcons() {
         notifyItemRangeChanged(0, cells.size)
         // Dev-only (daily-driver flag): confirms the icon-style repaint actually reaches
-        // this page (F1) — the whole grid re-decodes on a style change. Remove before merge.
+        // this page (F1) — the whole grid re-decodes on a style change. Kept as a diagnostic.
         debugToast("icon-style: ${cells.size} repainted")
     }
 
