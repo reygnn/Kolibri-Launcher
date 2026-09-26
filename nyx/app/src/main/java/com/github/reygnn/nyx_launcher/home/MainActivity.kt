@@ -73,6 +73,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.LazySlotMembership
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditCoordinator
 import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
@@ -256,6 +257,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     }
     private var pagerAdapter: HomePagerAdapter? = null
     private var currentGrid: GridSpec? = null
+    // Last icon style actually applied to the grid. Lives OUTSIDE repeatOnLifecycle so it
+    // survives the STOPPED→STARTED re-subscription: iconStyle is a StateFlow and replays its
+    // current value to each new collector, so without this a mere return-to-home would
+    // re-decode every grid icon (see the iconStyle collector).
+    private var appliedIconStyle: IconStyle? = null
     private lateinit var dockAdapter: DockAdapter
 
     private var gridIconPx = 0
@@ -446,7 +452,13 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launchGuarded { viewModel.layout.collect(::renderLayout) }
                 launchGuarded {
-                    viewModel.iconStyle.collect {
+                    viewModel.iconStyle.collect { style ->
+                        // Only act on a REAL style change. iconStyle is a StateFlow, and
+                        // repeatOnLifecycle re-subscribes on every return to STARTED, so it
+                        // replays the current (unchanged) style on each resume — without this
+                        // guard a mere return-to-home would re-decode all grid icons.
+                        if (style == appliedIconStyle) return@collect
+                        appliedIconStyle = style
                         // renderLayout refreshes the dock (DockAdapter full rebind) and keeps
                         // the layout consistent, but the grid's positional DiffUtil sees no cell
                         // change on a style switch — so force the pages to re-decode their icons.
