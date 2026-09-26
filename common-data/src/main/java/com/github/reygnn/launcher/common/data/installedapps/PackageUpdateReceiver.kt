@@ -56,10 +56,13 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 try {
                     pendingResult?.finish()
                 } catch (e: Throwable) {
+                    // no suspension point (finish() is synchronous)
                     TimberWrapper.silentError(e, "$TAG Error finishing pendingResult")
                 }
             }
         } catch (e: Throwable) {
+            // no suspension point (handleReceive is a plain fun; the coroutine it starts is
+            // fire-and-forget and guards its own cancellation)
             TimberWrapper.silentError(e, "$TAG CRITICAL error in onReceive")
             try {
                 pendingResult?.finish()
@@ -120,6 +123,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                 }
             }
         } catch (e: Throwable) {
+            // no suspension point (synchronous setup; scope.launch does not suspend the caller)
             TimberWrapper.silentError(e, "$TAG CRITICAL error in handleReceive")
             safeOnFinish(onFinish)
         }
@@ -148,6 +152,8 @@ class PackageUpdateReceiver : BroadcastReceiver() {
                     InstalledAppsEntryPoint::class.java,
                 )
             } catch (e: Throwable) {
+                // no suspension point (EntryPointAccessors.fromApplication is synchronous); the
+                // suspend send() below carries its own CancellationException-first arm
                 TimberWrapper.silentError(e, "$TAG Failed to access Hilt entry point")
                 return
             }
@@ -174,6 +180,7 @@ class PackageUpdateReceiver : BroadcastReceiver() {
         try {
             onFinish()
         } catch (e: Throwable) {
+            // no suspension point (onFinish is a plain () -> Unit callback)
             TimberWrapper.silentError(e, "$TAG Error in onFinish callback")
         }
     }

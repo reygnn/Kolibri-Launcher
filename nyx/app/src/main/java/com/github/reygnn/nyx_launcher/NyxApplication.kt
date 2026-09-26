@@ -103,6 +103,15 @@ class NyxApplication : Application() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        // Rule 7: a throw from a cache op must not crash the process from a system callback.
+        try {
+            trimMemoryInternal(level)
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "NyxApplication.onTrimMemory failed")
+        }
+    }
+
+    private fun trimMemoryInternal(level: Int) {
         packageEvents.onTrimMemory(level)
         // Once the launcher's UI is hidden (a plain app switch already delivers
         // UI_HIDDEN, no memory pressure required) drop the wallpaper layer bitmaps: they

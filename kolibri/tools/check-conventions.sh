@@ -246,6 +246,8 @@ cancel_files=(
   "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/timeinfo/TimeBasedEventsRepositoryImpl.kt" # shared to :common-data (HIE Phase B)
   "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/FlowCollection.kt" # moved to :common-ui in the monorepo merge; still the highest-blast-radius collector
   "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/installedapps/InstalledAppsRepositoryImpl.kt" # shared to :common-data; broad catches around suspend emit() must keep their CancellationException-first arms (the invisible-flip shape)
+  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/installedapps/PackageUpdateReceiver.kt" # shared to :common-data; broad catch in suspend processPackageUpdate (withTimeout) must keep its CancellationException-first arm
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/DataStoreMaintenanceRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseActivity.kt"

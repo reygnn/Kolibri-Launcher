@@ -1593,6 +1593,13 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             TimberWrapper.silentError(e, "No activity for $intent")
+            showToastSafe(R.string.app_launch_failed)
+        } catch (e: SecurityException) {
+            // Some OEM/managed-profile ROMs reject launching the system uninstaller / app-info
+            // details from a launcher; report + toast instead of crashing the launcher process
+            // (mirrors runLaunchCatching's SecurityException handling for app launches).
+            TimberWrapper.silentError(e, "SecurityException starting $intent")
+            showToastSafe(R.string.app_launch_failed)
         }
     }
 

@@ -55,10 +55,11 @@ import javax.inject.Singleton
  * [AppLoad.Failed]. [CancellationException] is always re-thrown — including from
  * the hand-written `try { emit } catch` arms inside `Flow.catch { }`, where `emit`
  * is a suspension point. This is the house broad-catch-at-a-suspension-point idiom
- * (Kolibri Rule 11 `cancel_files`); `checkConventions` currently scans only the
- * Kolibri `app`/`domain`/`data` roots, so `:common-data` is not walked and no
- * whitelist entry is required — the CancellationException-first arms are kept
- * regardless, since they are load-bearing, not lint-appeasement.
+ * (Kolibri Rule 11 `cancel_files`): this file is listed in that positive-list
+ * detector by its `:common-data` path (alongside the other shared impls, e.g.
+ * `WallpaperRepositoryImpl`), so the guard IS enforced. The global `Flow.catch`
+ * scan roots only on the kolibri/nyx app/domain/data trees, not `:common-data` —
+ * but the CancellationException-first arms are load-bearing regardless of lint.
  *
  * **Empty (§9.2).** `Loaded(emptyList())` is a legitimate value; the motor never
  * treats empty as failure. "empty ⇒ suspicious" is a per-app reconcile policy.

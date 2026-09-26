@@ -7,7 +7,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,13 +33,16 @@ import javax.inject.Singleton
  * loader to re-enumerate; this pump then lands the fresh list in the holder, so a tile
  * greys live on uninstall and the drawer stays fresh without re-priming on open.
  *
- * Crash-safety mirrors [PackageEventCoordinator] / kolibri's `ObserveInstalledAppsUseCase`:
- * its own [SupervisorJob] scope on the IO dispatcher and a terminal `catch` that keeps a
- * freak upstream error from taking the process down (the shared pump's feed is total, so
- * this is a defensive net — Rule 7). The error is NOT swallowed silently: it goes through
- * [TimberWrapper.silentError] (crash in DEBUG, ACRA report in RELEASE via the SILENT_ERROR
- * intent tag), so a pump that dies is visible instead of a quietly frozen holder. Like
- * kolibri's use case this does not itself restart the collection.
+ * Reporting + resilience (kolibri parity, plus a nyx-specific restart):
+ * - [SyncInstalledAppsToHolder.Outcome.FailedNoCache] (a cold-start load failed and the
+ *   holder never held apps → the launcher shows no apps) is the single report site, sent
+ *   through [TimberWrapper.reportToAcra] exactly like kolibri's `ObserveInstalledAppsUseCase`.
+ *   The quiet outcomes (Loaded / EmptyLoaded / FailedKeptLastGood) need no reaction.
+ * - A freak upstream error must not permanently freeze the holder. Unlike kolibri's
+ *   ViewModel-lifecycle collection (which self-heals when the UI returns), this pump is a
+ *   process-lifetime @Singleton with one collection, so [retryWhen] re-subscribes it (which
+ *   re-primes the feed) after a short backoff, reporting via [TimberWrapper.silentError].
+ *   Cancellation always propagates. Own [SupervisorJob] scope on the IO dispatcher (Rule 7).
  */
 @Singleton
 class InstalledAppsHolderPump @Inject constructor(
@@ -49,11 +54,22 @@ class InstalledAppsHolderPump @Inject constructor(
     fun start() {
         scope.launch {
             sync.outcomes()
-                .catch { e ->
-                    if (e is CancellationException) throw e
-                    TimberWrapper.silentError(e, "InstalledAppsHolderPump: outcomes flow failed")
+                .onEach { outcome ->
+                    if (outcome is SyncInstalledAppsToHolder.Outcome.FailedNoCache) {
+                        TimberWrapper.reportToAcra(outcome.cause, "App load failed and no cache available")
+                    }
                 }
-                .collect { /* feed is the side effect inside outcomes(); nyx needs no reaction */ }
+                .retryWhen { cause, _ ->
+                    if (cause is CancellationException) return@retryWhen false // propagate cancellation
+                    TimberWrapper.silentError(cause, "InstalledAppsHolderPump: outcomes flow failed, restarting")
+                    delay(RESTART_DELAY_MS)
+                    true
+                }
+                .collect { /* feed is the side effect inside outcomes(); the report above is the only reaction */ }
         }
+    }
+
+    private companion object {
+        const val RESTART_DELAY_MS = 1000L
     }
 }
