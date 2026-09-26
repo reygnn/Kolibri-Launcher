@@ -11,7 +11,7 @@ interface CustomNamesRepository : Purgeable {
      * Reactive view of all custom names as `packageName -> customName`
      * (REACTIVE_APPLIST_SPEC RAL-1). Emits the current mapping and re-emits
      * on every change, so consumers can fold the name in via `combine`
-     * instead of forcing a full PackageManager re-enumeration on rename.
+     * instead of forcing a full app re-enumeration on rename.
      * Distinct-until-changed: no emission when the mapping is unchanged.
      */
     val customNamesFlow: Flow<Map<String, String>>

@@ -6,7 +6,7 @@ package com.github.reygnn.kolibri_launcher.domain.service
  *
  * This is the first-paint accelerator for the home-screen favorites
  * (`GetFavoriteAppsUseCase`): on a cold start the authoritative favorites list is
- * gated by the whole PackageManager enumeration (queryIntentActivities + one
+ * gated by the whole LauncherApps enumeration (one `getActivityList` call + one
  * `loadLabel` IPC per installed app, ~150 ms). Favorites are pure text buttons, so
  * the only thing needed to paint one provisionally is its label — and there are at
  * most `MAX_FAVORITES_ON_HOME` of them. Resolving just those handful of labels
@@ -35,8 +35,9 @@ interface ComponentLabelResolver {
      * flattened launcher-entry form used across the app), or `null` if the component
      * does not currently resolve as a launcher activity or its label could not be
      * determined (fail-closed, see the interface KDoc). A blank label falls back to
-     * the package name, mirroring the bulk enumeration in
-     * `InstalledAppsRepositoryImpl`. Suspends: the impl hops to IO for the
+     * the package name, mirroring the bulk enumeration in `LauncherAppsEnumerator`
+     * (kolibri's `InstalledAppsRepositoryImpl` was moved to `:common-data`, and the
+     * blank-label -> package-name fallback now lives there). Suspends: the impl hops to IO for the
      * PackageManager query so callers never block the main thread.
      */
     suspend fun resolveLabel(componentName: String): String?

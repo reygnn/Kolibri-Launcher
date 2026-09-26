@@ -21,6 +21,9 @@
 > **Status:** ENTWURF v1.0. Review-Runde 1 ausstehend. Die Enumeration-API
 > (`PackageManager` vs. `LauncherApps`) ist bewusst als offener Punkt geführt
 > (§9), damit der Rest des Schnitts nicht darauf wartet.
+> _as-built: resolved — §9.1 (enumeration) and §9.2 (empty-as-value) are
+> settled in code; the enumeration API is `LauncherAppsEnumerator` in
+> `:common-data`. See §9._
 >
 > **Verhältnis zum Dach:** dieselbe Grundhaltung wie `MONOREPO_MERGE_SPEC` —
 > „Architektur erben, nicht die Produkt-Philosophie". Geteilt wird der *Motor*,
@@ -70,7 +73,7 @@ bedient und heute doppelt existiert.
 | **Ergebnis-Envelope** | `AppLoad.{Loaded(apps), Failed(cause)}` | `AppLoadResult.{Loaded, Error(Reason)}`, `Reason ∈ {ENUMERATION_FAILED, ENUMERATION_EMPTY}` | Ein kanonischer `AppLoad` in `:core` (Klasse C, `MONOREPO_MERGE_SPEC §2`). Empty-Policy → §9. |
 | **Empty-Behandlung** | `Loaded(emptyList())` ist legitim | leere Enumeration = `Error(ENUMERATION_EMPTY)` (fail-closed für Reconcile) | Offener Punkt §9: Empty als Wert vs. als Fehler. Vorschlag: Loader bleibt Wert-ehrlich (`Loaded(empty)`), „empty ⇒ verdächtig" ist Policy am Reconcile-Rand pro App, nicht im geteilten Loader. |
 | **Freshness** | `PackageUpdateReceiver` → `AppUpdateSignal` (in `:core`) → `RefreshAppsUseCase` → `triggerAppsUpdate` → debounced reload | `LauncherApps.Callback` (nur Icons/Reconcile) | Auf Kolibris Broadcast→`AppUpdateSignal`-Pipeline vereinheitlichen. Der `AppUpdateSignal` liegt bereits geteilt in `:core`. |
-| **Enumeration** | `PackageManager.queryIntentActivities` + `loadLabel` | `LauncherApps.getActivityList` (primary-user-aware) | **Offen (§9).** Hinter einen `AppEnumerator`-Port (§3) gelegt, damit die Wahl den Rest des Schnitts nicht blockiert. |
+| **Enumeration** | `PackageManager.queryIntentActivities` + `loadLabel` | `LauncherApps.getActivityList` (primary-user-aware) | _as-built: resolved (§9.1)_ — `LauncherApps` won; one shared `LauncherAppsEnumerator` (`:common-data`) behind the `AppEnumerator` port (§3). |
 | **CustomName** | via `ObserveInstalledAppsUseCase` (Reconcile gegen CustomNames-Store) auf `displayName` gemappt | direkt im `LauncherApp.customName` gefaltet | Geteilter Halter hält die **rohe** Liste (`rawAppsFlow`); CustomName/Hidden/Favorit sind Overlays pro App (Klasse B) — deckt sich mit Kolibris heutigem `rawAppsFlow`-Design. |
 
 ---
@@ -178,14 +181,23 @@ Dach-Specs). Jede Stufe hält MRG-INV-2 (beide Apps grün).
 
 ## §9 Offene Punkte (für Review-Runde 1)
 
+> _as-built: §9.1 and §9.2 are RESOLVED in code (see notes below); §9.3 is
+> confirmed by SIA-INV-3 (the shared holder stays raw, CustomName is overlay
+> only). No open points remain._
+
 1. **Enumeration-API kanonisch: `PackageManager` oder `LauncherApps`?**
    LauncherApps ist moderner/primary-user-aware und liefert
    `LauncherActivityInfo` direkt; PackageManager ist Kolibris battle-tested
    Pfad. Bis entschieden: `AppEnumerator`-Port, jede App bindet den eigenen.
+   _as-built: RESOLVED — `LauncherApps` won; one shared `LauncherAppsEnumerator`
+   in `:common-data` binds the `AppEnumerator` port for both apps._
 2. **Empty-Policy.** Empty als legitimer Wert (Kolibri) oder als Fehler
    (Nyx `ENUMERATION_EMPTY`)? Vorschlag: Loader Wert-ehrlich, „empty ⇒
    verdächtig" als Reconcile-Policy pro App — dann braucht der geteilte
    `AppLoad` keinen `Reason`-Enum.
+   _as-built: RESOLVED — empty is a legitimate value (`Loaded(emptyList())`);
+   "empty is suspicious" is a per-app reconcile-edge policy, not the shared
+   loader's concern._
 3. **CustomName-Overlay-Ort.** Kolibri mappt im `ObserveInstalledAppsUseCase`;
    Nyx faltet in `LauncherApp`. Bestätigen, dass der geteilte Halter roh bleibt
    (SIA-INV-3) und CustomName ausschließlich Overlay ist.

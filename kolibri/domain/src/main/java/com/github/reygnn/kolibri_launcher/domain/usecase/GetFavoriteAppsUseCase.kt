@@ -71,7 +71,7 @@ import javax.inject.Singleton
  *
  * == First-paint provisional favorites (live label resolution) ==
  * On a cold start the authoritative favorites are gated by the full
- * PackageManager enumeration ([InstalledAppsStateRepository.rawAppsFlow]).
+ * LauncherApps enumeration ([InstalledAppsStateRepository.rawAppsFlow]).
  * While that list is still empty, [buildProvisional] resolves the handful
  * of favorite labels DIRECTLY via [ComponentLabelResolver] — an order of
  * magnitude cheaper than the bulk enumeration — and emits a provisional
@@ -102,7 +102,7 @@ class GetFavoriteAppsUseCase @Inject constructor(
      * The authoritative combine over the five app-state sources. Emits a
      * [RawStep.Empty] marker (carrying the favorite set / saved order / custom names
      * needed to build a provisional first paint) while the installed-app list is
-     * still empty (cold start, before the PackageManager enumeration finishes),
+     * still empty (cold start, before the full app enumeration finishes),
      * otherwise a [RawStep.Resolved] carrying the finished favorites result.
      */
     private val rawStepFlow: Flow<RawStep> = combine(

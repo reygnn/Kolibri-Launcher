@@ -7,7 +7,7 @@ import com.github.reygnn.launcher.core.AppInfo
  * (REACTIVE_APPLIST_SPEC RAL-1). The single name-application LOGIC, applied at
  * every source boundary (Site 1 = getInstalledApps family, Site 2 =
  * drawer/favorites over `rawAppsFlow`, Site 3 = recents point-read) so a rename
- * is a `combine` re-derivation instead of a full PackageManager re-enumeration.
+ * is a `combine` re-derivation instead of a full app re-enumeration.
  *
  * A package with a custom name gets a rewritten copy (`displayName = names[pkg]`);
  * every other app is returned UNCHANGED — it already carries its original label,

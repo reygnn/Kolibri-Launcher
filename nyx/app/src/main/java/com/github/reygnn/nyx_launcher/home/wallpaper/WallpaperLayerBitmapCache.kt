@@ -35,8 +35,8 @@ import javax.inject.Singleton
  * be on screen (the never-recycle invariant the shared cache also holds); GC
  * reclaims it once the view releases it too. A single oversized layer is kept
  * rather than evicted-to-empty. [clear] releases everything when the wallpaper is
- * removed AND when the app is backgrounded / under memory pressure
- * (`NyxApplication.onTrimMemory` >= TRIM_MEMORY_BACKGROUND), so an app-scoped
+ * removed AND when the app's UI is hidden (a plain app switch) or heavier
+ * (`NyxApplication.onTrimMemory` >= TRIM_MEMORY_UI_HIDDEN), so an app-scoped
  * lifetime never means "held forever" or "held through background".
  *
  * Access is [Synchronized]: the binder calls [get] on the render (main) thread and

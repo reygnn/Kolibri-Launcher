@@ -35,9 +35,10 @@ battle-tested Infra; die Produkt-Domäne (Grid-Home vs. Favoriten-Home) bleibt p
   mit injizierbarem Tie-Break; Settings-Keys nur im Settings-Backup.
 
 ## Offene Punkte
-Bündel-weit keine mehr — außer den drei in `SHARED_INSTALLED_APPS_SPEC §9`
-(Enumeration-API `PackageManager` vs. `LauncherApps`, Empty-Policy,
-CustomName-Overlay-Ort). Dieser Spec hebt zudem den In-Memory-App-Store aus
+Bündel-weit keine mehr. _as-built: the three former open points in
+`SHARED_INSTALLED_APPS_SPEC §9` are resolved — enumeration API =
+`LauncherAppsEnumerator` (§9.1), empty-as-value (§9.2), and the CustomName
+overlay confirmed by SIA-INV-3 (§9.3)._ Dieser Spec hebt zudem den In-Memory-App-Store aus
 Klasse C in die geteilte Klasse-A-Teilmenge — eine vorgeschlagene Erweiterung
 von `MONOREPO_MERGE_SPEC §3.5`, noch nicht im Dach-Spec übernommen.
 
