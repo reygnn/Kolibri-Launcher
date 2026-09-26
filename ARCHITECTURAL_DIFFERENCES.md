@@ -22,7 +22,7 @@ cost/risk of making the two launchers match (see the summary right after the tab
 | "missing" membership rule | `LazySlotMembership.isMissing` | `LazySlotMembership.isMissing` | [shared] |
 | Package-event → loader refresh | `KolibriLauncherApp` / `AppManagementDelegate` → `triggerAppsUpdate()` | `PackageEventCoordinator` → `triggerAppsUpdate()` | [shared] |
 | No-auto-prune regression guard | `KolibriNoAutoPruneTest` | `NyxNoAutoPruneTest` (shared `NoAutoPruneContract`) | [shared] |
-| Adapter list-diffing | `HomeFavoritesAdapter` (`ListAdapter`) | grid/dock/drawer (`DiffUtil`) | [shared] |
+| Adapter list-diffing | `HomeFavoritesAdapter` extends framework `ListAdapter` | `HomeGridAdapter` (plain `RecyclerView.Adapter`, hand-rolled `DiffUtil.calculateDiff`) | [intentional] |
 | Home model | flat favorites list | grid + dock + folders + structural reconciler | [intentional] |
 | Freshness posture | central holder + keep-last-good | central holder + keep-last-good (shared machinery; Option A) | [shared] |
 | Cold-start "missing" paint | grey immediately (provisional) | normal → grey on load | [asymmetry] |
@@ -48,9 +48,9 @@ What each *difference* would take to make the two launchers match, and whether i
 4. **Cold-start "missing" paint (§2.1) — ugly; leave it.** True symmetry needs a new nyx
    live-resolve first-paint path (fights the layout-vs-live-favorites home-model split); the
    difference is cosmetic (~150 ms, no data impact).
-5. **Freshness architecture (§1.2) — ugly; probably wrong to align.** nyx adopting the holder
-   is a deep refactor against a deliberate divergence (SIA-INV-5 excludes nyx). A targeted
-   keep-last-good just for the nyx drawer is a smaller middle-ground if ever needed.
+5. **Freshness architecture (§1.2) — converged on Option A.** nyx adopted the shared central
+   holder + value-based keep-last-good (SIA-INV-5, now cross-launcher), fed by the shared pump
+   (`core/SyncInstalledAppsToHolder`). No longer a divergence to align — see §1.2 / §3.1.
 6. **Home model (§1.1) / folder members (§1.3) — n/a by design.** Aligning §1.1 = rewriting a
    launcher; §1.3 is already resolved (a folder is a container, not an app reference).
 

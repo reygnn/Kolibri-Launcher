@@ -1,8 +1,8 @@
 package com.github.reygnn.nyx_launcher
 
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.SyncInstalledAppsToHolder
+import com.github.reygnn.launcher.core.TimberWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -31,10 +31,13 @@ import javax.inject.Singleton
  * loader to re-enumerate; this pump then lands the fresh list in the holder, so a tile
  * greys live on uninstall and the drawer stays fresh without re-priming on open.
  *
- * Crash-safety mirrors [PackageEventCoordinator]: its own [SupervisorJob] scope on the
- * IO dispatcher and a `catch` that swallows non-cancellation throwables (the shared
- * pump's feed is total, but a defensive net keeps a freak upstream error from taking
- * the process down — Rule 7).
+ * Crash-safety mirrors [PackageEventCoordinator] / kolibri's `ObserveInstalledAppsUseCase`:
+ * its own [SupervisorJob] scope on the IO dispatcher and a terminal `catch` that keeps a
+ * freak upstream error from taking the process down (the shared pump's feed is total, so
+ * this is a defensive net — Rule 7). The error is NOT swallowed silently: it goes through
+ * [TimberWrapper.silentError] (crash in DEBUG, ACRA report in RELEASE via the SILENT_ERROR
+ * intent tag), so a pump that dies is visible instead of a quietly frozen holder. Like
+ * kolibri's use case this does not itself restart the collection.
  */
 @Singleton
 class InstalledAppsHolderPump @Inject constructor(
@@ -48,7 +51,7 @@ class InstalledAppsHolderPump @Inject constructor(
             sync.outcomes()
                 .catch { e ->
                     if (e is CancellationException) throw e
-                    KolibriLog.w(e, "InstalledAppsHolderPump: outcomes flow failed")
+                    TimberWrapper.silentError(e, "InstalledAppsHolderPump: outcomes flow failed")
                 }
                 .collect { /* feed is the side effect inside outcomes(); nyx needs no reaction */ }
         }

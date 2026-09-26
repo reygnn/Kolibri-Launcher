@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -42,7 +43,8 @@ import javax.inject.Singleton
  * - [start] also runs one reconcile for cold-start catch-up (a structural cleanup of
  *   the stored layout). The device grid is re-fit separately, from the real
  *   home-grid area, in MainActivity.
- * - [onTrimMemory] forwards to [IconLoader.trim] (ICL-INV-7).
+ * - [onTrimMemory] forwards to [IconLoader.trim] (ICL-INV-7) and, only at UI_HIDDEN or
+ *   heavier pressure, fully clears the folder-composite cache.
  *
  * **Freshness source (SHARED_INSTALLED_APPS_SPEC §2, F2 route (a)):** package
  * events arrive over the SHARED pipeline that both apps now use — the
@@ -117,10 +119,11 @@ class PackageEventCoordinator @Inject constructor(
         // The shared freshness bus (F2 route (a)): broadcast → :common-data
         // PackageUpdateReceiver → AppUpdateSignal → here. Each PackageEvent carries
         // the changed package, so this does everything the old LauncherApps.Callback
-        // did — per-package icon eviction — and then requests a debounced reconcile.
-        // The reconcile reads the shared enumerator directly (a one-shot enumerate()),
-        // so no explicit re-enumeration trigger is needed here. Same guard idiom as
-        // the reconcile pump.
+        // did — per-package icon eviction — plus the explicit re-enumeration trigger
+        // and a debounced reconcile. The re-enumeration is NOT implicit: the reconcile
+        // is structural-only and reads no installed set / enumerates nothing, so the
+        // fresh app list comes solely from the triggerAppsUpdate() call below (which
+        // re-enumerates the shared loader). Same guard idiom as the reconcile pump.
         scope.launch {
             appUpdateSignal.events.collect { event ->
                 try {
@@ -150,7 +153,14 @@ class PackageEventCoordinator @Inject constructor(
 
     fun onTrimMemory(level: Int) {
         iconLoader.trim(level)
-        folderRenderer.clear()
+        // Honour the pressure level instead of nuking the folder-composite cache on every
+        // callback: folderRenderer.clear() is all-or-nothing, so only fully drop it when the
+        // icon cache also fully evicts (UI hidden or heavier). Under mild FOREGROUND pressure
+        // (RUNNING_MODERATE/LOW/CRITICAL) the composites are cheap and still on screen — keep
+        // them so a home-screen folder icon doesn't blank + re-render on transient pressure.
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            folderRenderer.clear()
+        }
     }
 
     private fun registerReceiver() {

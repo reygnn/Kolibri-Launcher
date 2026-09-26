@@ -36,6 +36,14 @@ class HomePagerAdapter(
     private var currentDots: Set<String> = emptySet()
 
     fun submit(pageCells: List<List<HomeCell>>) {
+        // Value-equal pages (a pure icon-style change re-renders the SAME cells): skip
+        // notifyDataSetChanged so it doesn't wipe a pending ICON_STYLE_PAYLOAD in the same
+        // frame — the iconStyle collector calls renderLayout()→submit() then refreshIcons(),
+        // and a notifyDataSetChanged here would swallow that payload → grid keeps old-style
+        // icons (dock/drawer repaint via their own rebinds). A real layout change produces
+        // non-equal lists and rebinds as before; the per-page DiffUtil in HomeGridAdapter is
+        // untouched (this only gates the pager-level full rebind).
+        if (pages == pageCells) return
         pages = pageCells
         notifyDataSetChanged()
     }
@@ -56,12 +64,16 @@ class HomePagerAdapter(
     fun refreshIcons() = notifyItemRangeChanged(0, pages.size, ICON_STYLE_PAYLOAD)
 
     override fun onBindViewHolder(holder: PageHolder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isDotOnlyPayload()) {
-            holder.gridAdapter.refreshDots()
+        // ICON_STYLE first: refreshIcons() is a full (payload-less) rebind, so it also
+        // refreshes dots. Checking dot-only first would let a coalesced [DOT, ICON_STYLE]
+        // payload satisfy NEITHER all{}-guard and fall through to super → a silent no-op
+        // (neither dots nor icons update). "Contains ICON_STYLE" covers the mixed case.
+        if (payloads.hasIconStylePayload()) {
+            holder.gridAdapter.refreshIcons()
             return
         }
-        if (payloads.isIconStylePayload()) {
-            holder.gridAdapter.refreshIcons()
+        if (payloads.isDotOnlyPayload()) {
+            holder.gridAdapter.refreshDots()
             return
         }
         super.onBindViewHolder(holder, position, payloads)

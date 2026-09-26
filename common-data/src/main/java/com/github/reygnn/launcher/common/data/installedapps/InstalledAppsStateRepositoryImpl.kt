@@ -21,6 +21,16 @@ import javax.inject.Singleton
  * Rule 11). [rawAppsFlow] itself still reflects the explicit current value
  * (including empty), so a reactive consumer that wants to react to "genuinely
  * empty" can.
+ *
+ * **Concurrency (SINGLE-WRITER invariant).** [updateApps] does two independent field
+ * writes ([lastSuccessfulAppList] then [rawAppsFlow]); the pair is intentionally NOT
+ * atomic. Correctness relies on a single, serialized writer — in practice one
+ * long-lived collection of the shared sync outcomes per app (kolibri's
+ * `ObserveInstalledAppsUseCase`, nyx's `InstalledAppsHolderPump`). Under that invariant
+ * a reader can never observe a torn (different-load) pair. The [Volatile] on
+ * [lastSuccessfulAppList] guarantees only per-field visibility, not cross-field
+ * atomicity: if a second concurrent writer is ever introduced, add a lock around the two
+ * writes (and the [getCurrentApps] read) — do not assume this holder is lock-safe.
  */
 @Singleton
 class InstalledAppsStateRepositoryImpl @Inject constructor() : InstalledAppsStateRepository {

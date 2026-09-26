@@ -104,13 +104,14 @@ class NyxApplication : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         packageEvents.onTrimMemory(level)
-        // Once the launcher is backgrounded (or the system is reclaiming), drop the
-        // wallpaper layer bitmaps: they are only needed while the home is visible, and
-        // clear() only releases references (never recycles), so a still-drawn bitmap is
-        // safe. A returning home re-decodes lazily. This is the counterpart the
-        // @Singleton cache needs so its process-lifetime scope never means "held
-        // through background".
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+        // Once the launcher's UI is hidden (a plain app switch already delivers
+        // UI_HIDDEN, no memory pressure required) drop the wallpaper layer bitmaps: they
+        // are only needed while the home is visible, and clear() only releases references
+        // (never recycles), so a still-drawn bitmap is safe. A returning home re-decodes
+        // lazily. Threshold aligned with the icon cache's full evict (LruBudget at
+        // UI_HIDDEN) so ~64 MB of hardware bitmaps don't sit resident across an app switch
+        // waiting for the later BACKGROUND level that only fires under memory pressure.
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
             wallpaperLayerCache.clear()
         }
     }

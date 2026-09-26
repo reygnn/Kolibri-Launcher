@@ -6,7 +6,7 @@ import android.os.Trace
 import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.KolibriLog
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.util.concurrent.CancellationException
@@ -44,9 +44,10 @@ import javax.inject.Singleton
  *   §9.2). "empty ⇒ suspicious" is each app's reconcile policy.
  *
  * Per-item resilience: a single malformed entry (missing component, throwing
- * `label`) is skipped (`continue`) with a silent breadcrumb, not fatal to the
- * whole enumeration — the wholesale failure path is a thrown
- * `getActivityList`/processing error reaching the motor.
+ * `label`) is skipped with a non-fatal warning breadcrumb (a non-throwing
+ * `KolibriLog.w`, NOT `silentError` — silentError crashes in DEBUG and would make one
+ * bad entry fatal to the whole enumeration in DEBUG). The only wholesale failure path
+ * is a thrown `getActivityList`/processing error reaching the motor.
  *
  * [launcherApps] is injected so the fail-closed policy is unit-testable without a
  * device (see `LauncherAppsEnumeratorTest`).
@@ -94,7 +95,12 @@ class LauncherAppsEnumerator @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    TimberWrapper.silentError(e, "Error reading label for $packageName")
+                    // A malformed third-party label is an EXPECTED external degradation, not
+                    // our bug: log a non-fatal breadcrumb and fall back to the package name.
+                    // Must NOT be silentError — that crashes in DEBUG, so one broken app would
+                    // make the whole enumeration fatal in DEBUG, contradicting the skip-one-bad-
+                    // entry contract below (and diverging from RELEASE behaviour).
+                    KolibriLog.w(e, "Error reading label for $packageName")
                     packageName
                 }
 
@@ -112,8 +118,10 @@ class LauncherAppsEnumerator @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // Per-item resilience: skip one bad entry, keep enumerating.
-                TimberWrapper.silentError(e, "Error processing LauncherActivityInfo")
+                // Per-item resilience: skip one bad entry, keep enumerating. Non-throwing
+                // (KolibriLog.w, not silentError) so a single malformed entry never aborts
+                // the whole loop in DEBUG — see the label catch above.
+                KolibriLog.w(e, "Error processing LauncherActivityInfo")
             }
         }
         result

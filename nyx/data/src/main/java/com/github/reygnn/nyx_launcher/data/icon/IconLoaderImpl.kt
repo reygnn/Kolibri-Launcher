@@ -64,6 +64,8 @@ class IconLoaderImpl @Inject constructor(
     @Volatile
     private var style = IconStyle.COLOR
 
+    override val currentStyle: IconStyle get() = style
+
     init {
         preferences.iconStyle().onEach { style = it }.launchIn(scope)
         schedulePrune() // cold-start sweep of files accumulated across runs

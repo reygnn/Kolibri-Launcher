@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.data.icon
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
@@ -21,6 +22,7 @@ class FolderIconRendererTest {
 
     private class CountingIconLoader : IconLoader {
         var calls = 0
+        override val currentStyle = IconStyle.COLOR
         override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
             calls++
             return Bitmap.createBitmap(sizePx.coerceAtLeast(1), sizePx.coerceAtLeast(1), Bitmap.Config.ARGB_8888)

@@ -64,6 +64,13 @@ val ICON_STYLE_PAYLOAD = Any()
 fun List<Any>.isIconStylePayload(): Boolean = isNotEmpty() && all { it === ICON_STYLE_PAYLOAD }
 
 /**
+ * True if a payload list CONTAINS an icon-style refresh (possibly coalesced with a dot
+ * payload). The pager treats this as a full icon re-decode, which also covers dots — so a
+ * mixed [NOTIFICATION_DOT_PAYLOAD, ICON_STYLE_PAYLOAD] batch isn't dropped on the floor.
+ */
+fun List<Any>.hasIconStylePayload(): Boolean = any { it === ICON_STYLE_PAYLOAD }
+
+/**
  * Whether [this] cell should show a notification dot given [dotPackages] (the set of
  * packages with a dot-worthy notification): an app matches its own package, a folder
  * matches if any member does. Pure — unit-tested (see HomeCellDotTest).
@@ -119,7 +126,11 @@ fun bindLaunchableCell(
             // Reset alpha in case this holder was recycled from a greyed missing tile.
             icon.alpha = 1f
             icon.loadIconGated(scope, tokenAtBind, currentToken) {
-                folderRenderer.render(cell.members, iconSizePx)
+                // presentMembers (installed-only), NOT members: an uninstalled member must
+                // drop out of the 2×2 composite so the icons compact, instead of leaving a
+                // blank quadrant (FolderIconRenderer can't decode the gone app). presentMembers
+                // is also what drives the DiffUtil re-render on un/reinstall (see [HomeCell]).
+                folderRenderer.render(cell.presentMembers, iconSizePx)
             }
         }
     }

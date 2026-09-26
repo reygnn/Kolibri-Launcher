@@ -10,9 +10,10 @@ import javax.inject.Inject
 
 /**
  * Imports a backed-up layout: parse → save → reconcile. The reconcile pass is
- * where an imported layout's duplicates get de-duplicated (RHL-INV-4) and any
- * apps not installed on this device get pruned — fail-closed, so a broken import
- * (or a transient enumeration failure) can't leave a half-applied home screen.
+ * STRUCTURAL ONLY (dedup RHL-INV-4 / folder-repair / trailing-page-trim); it does
+ * NOT prune and does NOT enumerate installed apps. A reference to an app not
+ * installed on this device is KEPT (Windows-shortcut model) — it renders greyed as
+ * a "missing" tile and is removed lazily in the UI, never auto-dropped on import.
  * Unparseable input is rejected before any save.
  */
 class ImportLayoutUseCase @Inject constructor(
@@ -25,10 +26,10 @@ class ImportLayoutUseCase @Inject constructor(
         val layout = serializer.deserialize(raw) ?: return@withContext ImportResult.InvalidData
         repository.save(layout)
         // reconcile() is total (fail-closed to a ReconcileResult.Skipped value, only
-        // CancellationException escapes), so no guard is needed here: a transient store/
-        // enumeration fault leaves the just-saved layout in place and de-dup/prune simply
-        // defers to the next reconcile (cold start / package event). The saved import is the
-        // success; the cleanup pass is best-effort.
+        // CancellationException escapes), so no guard is needed here: a transient store
+        // fault leaves the just-saved layout in place and the structural cleanup (dedup /
+        // folder-repair / page-trim) simply defers to the next reconcile (edit / cold start
+        // / package event). The saved import is the success; the cleanup pass is best-effort.
         reconcile()
         ImportResult.Success
     }
