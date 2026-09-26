@@ -1550,8 +1550,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         },
     )
 
-    private fun uninstallApp(pkg: String) =
-        startActivitySafe(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)))
+    // FLAG_ACTIVITY_NEW_TASK is required (as in openAppInfo): the system uninstaller has its
+    // own taskAffinity, and launching it from the launcher's home task without NEW_TASK can be
+    // silently dropped (observed on One UI) — the menu entry then "does nothing".
+    private fun uninstallApp(pkg: String) = startActivitySafe(
+        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+    )
 
     private fun isSystemApp(pkg: String): Boolean = try {
         (packageManager.getApplicationInfo(pkg, 0).flags and ApplicationInfo.FLAG_SYSTEM) != 0
