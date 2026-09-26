@@ -3,6 +3,7 @@ package com.github.reygnn.launcher.common.data.installedapps
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.launcher.core.PackageEvent
 import com.github.reygnn.launcher.core.TimberWrapper
@@ -35,6 +36,24 @@ class PackageUpdateReceiver : BroadcastReceiver() {
     companion object {
         private const val SIGNAL_TIMEOUT_MS = 3000L
         private const val TAG = "[INSTALLED_APPS]"
+
+        /**
+         * Register a process-lifetime receiver for the package add/remove/change broadcasts.
+         * Single-sources the action/scheme set + export flag so the two launchers can't drift
+         * (both register at runtime — there is no manifest `<receiver>` — see the class KDoc).
+         * All three actions are protected broadcasts, so [Context.RECEIVER_NOT_EXPORTED] still
+         * receives them (least privilege). The receiver is process-lifetime; callers keep no
+         * reference and never unregister.
+         */
+        fun register(context: Context) {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+            context.registerReceiver(PackageUpdateReceiver(), filter, Context.RECEIVER_NOT_EXPORTED)
+        }
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {

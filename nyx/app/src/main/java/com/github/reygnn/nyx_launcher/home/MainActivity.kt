@@ -103,6 +103,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -450,7 +451,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // BaseActivity's own per-collector arms.
         lifecycleScope.launch(coroutineExceptionHandler) {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launchGuarded { viewModel.layout.collect(::renderLayout) }
+                // Render on any change to the layout OR the installed set (a freshly
+                // uninstalled app's tile greys / a reinstall un-greys). One collector, not two:
+                // renderLayout reads installedKeys.value internally, so combining avoids the
+                // double render both collectors used to run on every return-to-home.
+                launchGuarded {
+                    combine(viewModel.layout, viewModel.installedKeys) { layout, _ -> layout }
+                        .collect(::renderLayout)
+                }
                 launchGuarded {
                     // Drive the re-decode off IconLoader.currentStyle (the SINGLE decode
                     // authority), not the raw preference: when this emits Y the loader already
@@ -467,9 +475,6 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                         pagerAdapter?.refreshIcons()
                     }
                 }
-                // Re-render when the installed-apps set changes so a freshly uninstalled
-                // app's tile greys out (missing state) and a reinstall un-greys it.
-                launchGuarded { viewModel.installedKeys.collect { renderLayout(viewModel.layout.value) } }
                 // Notification dots (gated by the toggle): push the package set into the
                 // grid pages + dock so their icons show/hide the dot reactively.
                 launchGuarded {

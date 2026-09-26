@@ -5,9 +5,7 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
-import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.model.ItemId
-import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
@@ -17,6 +15,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Export path only. The layout IMPORT path lives in `:nyx:data`'s NyxBackupManager (which
+ * saves the restored layout then runs the structural-only [ReconcileHomeLayoutUseCase]); the
+ * no-prune "keep uninstalled refs" property of that reconcile is pinned by
+ * `ReconcileHomeLayoutUseCaseTest` and `NyxNoAutoPruneTest`.
+ */
 class ExportImportUseCaseTest {
 
     @get:Rule
@@ -37,41 +41,4 @@ class ExportImportUseCaseTest {
 
         assertThat(result).isEqualTo("BLOB:1")
     }
-
-    @Test
-    fun import_invalid_data_is_rejected_without_saving() = runTest(mainDispatcherRule.dispatcher) {
-        val repo = FakeHomeLayoutRepository(empty())
-        val serializer = FakeLayoutSerializer(onDeserialize = { null }) // unparseable
-        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo), mainDispatcherRule.dispatcher)
-
-        val result = useCase("garbage")
-
-        assertThat(result).isEqualTo(ImportResult.InvalidData)
-        assertThat(repo.saveCount).isEqualTo(0)
-    }
-
-    @Test
-    fun import_saves_then_structurally_reconciles_keeping_uninstalled_refs() = runTest(mainDispatcherRule.dispatcher) {
-        // Imported layout references pb, which is not installed here. No-prune model: pb is
-        // KEPT (not trimmed against installed apps). The structural reconcile leaves the
-        // clean imported layout unchanged, so both tiles survive.
-        val imported = empty().copy(items = listOf(appAt("pa", 0), appAt("pb", 1)))
-        val repo = FakeHomeLayoutRepository(empty())
-        val serializer = FakeLayoutSerializer(onDeserialize = { imported })
-        val useCase = ImportLayoutUseCase(repo, serializer, reconcileWith(repo), mainDispatcherRule.dispatcher)
-
-        val result = useCase("valid")
-
-        assertThat(result).isEqualTo(ImportResult.Success)
-        assertThat(repo.current.items.map { it.item.id }).containsExactly(ItemId("pa"), ItemId("pb"))
-    }
-
-    // Import runs a STRUCTURAL reconcile only (no prune, Windows-shortcut model): the
-    // imported layout is repaired for structure, never trimmed against installed apps.
-    private fun reconcileWith(repo: FakeHomeLayoutRepository) =
-        ReconcileHomeLayoutUseCase(
-            layoutRepository = repo,
-            idFactory = ItemIdFactory { ItemId("new") },
-            dispatcher = mainDispatcherRule.dispatcher,
-        )
 }

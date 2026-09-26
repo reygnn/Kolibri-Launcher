@@ -6,6 +6,7 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableSharedFlow
+import com.github.reygnn.launcher.core.AppsUpdateTrigger
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
@@ -49,12 +50,13 @@ object AppModule {
     fun provideLauncherApps(@ApplicationContext context: Context): LauncherApps =
         context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
 
-    // Reload-trigger bus feeding the installed-apps motor(s). replay=0,
+    // Reload-trigger bus feeding the shared installed-apps motor. replay=0,
     // extraBufferCapacity=1 — robust for an "event" trigger. Moved here from the
-    // deleted AppUpdateModule; the shared motor and Kolibri's own motor both inject
-    // this one MutableSharedFlow<Unit>.
+    // deleted AppUpdateModule. Qualified (@AppsUpdateTrigger) so this generic
+    // MutableSharedFlow<Unit> can't collide with an unrelated future binding.
     @Provides
     @Singleton
+    @AppsUpdateTrigger
     fun provideAppsUpdateTrigger(): MutableSharedFlow<Unit> =
         MutableSharedFlow(replay = 0, extraBufferCapacity = 1)
 

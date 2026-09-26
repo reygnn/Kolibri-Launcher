@@ -140,13 +140,10 @@ object HomeLayoutReconciler {
         return ReconcileOutcome.Changed(
             layout = layout.copy(pages = newPages, items = itemsR, dock = dockR),
             report = ReconcileReport(
-                // No prune pass any more — always zero (kept for the report shape).
-                prunedApps = 0,
                 dedupedApps = dedupedApps,
                 dissolvedFolders = dissolvedFolders,
                 removedEmptyFolders = removedEmptyFolders,
                 trimmedPages = trimmedPages,
-                dockTrimmed = 0,
             ),
         )
     }

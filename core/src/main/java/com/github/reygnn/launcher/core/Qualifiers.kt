@@ -28,3 +28,13 @@ annotation class MainDispatcher
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
+
+/**
+ * The installed-apps reload trigger [kotlinx.coroutines.flow.MutableSharedFlow]`<Unit>` shared
+ * between the package-event producer and the installed-apps loader. Qualified so this
+ * maximally-generic type can't be silently shared with (or collide against) any other
+ * unqualified `MutableSharedFlow<Unit>` binding a future consumer might add.
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AppsUpdateTrigger

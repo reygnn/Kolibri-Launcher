@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.di
 
 import android.content.Context
 import android.content.pm.LauncherApps
+import com.github.reygnn.launcher.core.AppsUpdateTrigger
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,6 +29,7 @@ object SystemServiceModule {
     // Nyx had no such provider (it self-enumerated); the shared motor injects it.
     @Provides
     @Singleton
+    @AppsUpdateTrigger
     fun provideAppsUpdateTrigger(): MutableSharedFlow<Unit> =
         MutableSharedFlow(replay = 0, extraBufferCapacity = 1)
 }

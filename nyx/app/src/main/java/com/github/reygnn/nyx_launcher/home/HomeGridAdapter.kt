@@ -93,19 +93,20 @@ class HomeGridAdapter(
             return
         }
         val target = AdapterListUpdateCallback(this)
+        // No `moved` counter: this grid uses positional identity (areItemsTheSame = position ==
+        // position), so DiffUtil never emits onMoved — onMoved only delegates, it can't fire.
         var changed = 0
-        var moved = 0
         var inserted = 0
         var removed = 0
         diff.dispatchUpdatesTo(object : ListUpdateCallback {
             override fun onInserted(position: Int, count: Int) { inserted += count; target.onInserted(position, count) }
             override fun onRemoved(position: Int, count: Int) { removed += count; target.onRemoved(position, count) }
-            override fun onMoved(fromPosition: Int, toPosition: Int) { moved++; target.onMoved(fromPosition, toPosition) }
+            override fun onMoved(fromPosition: Int, toPosition: Int) = target.onMoved(fromPosition, toPosition)
             override fun onChanged(position: Int, count: Int, payload: Any?) { changed += count; target.onChanged(position, count, payload) }
         })
-        val total = changed + moved + inserted + removed
+        val total = changed + inserted + removed
         if (total > 0) {
-            debugToast("grid diff: $changed changed, $moved moved, $inserted ins, $removed rem")
+            debugToast("grid diff: $changed changed, $inserted ins, $removed rem")
         }
     }
 
@@ -190,6 +191,7 @@ class HomeGridAdapter(
     override fun onViewRecycled(holder: CellHolder) {
         holder.bindToken++
         holder.icon.setImageDrawable(null)
+        holder.icon.alpha = 1f // don't leak a greyed missing-tile alpha onto a reused holder
     }
 
     class CellHolder(view: View) : RecyclerView.ViewHolder(view) {

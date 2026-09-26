@@ -1,13 +1,15 @@
 package com.github.reygnn.nyx_launcher.home.model
 
-/** What a reconcile pass changed — for observability (no silent prune, RHL-INV-5). */
+/**
+ * What a reconcile pass changed — for observability (no silent prune, RHL-INV-5).
+ * The reconcile is structural-only, so there is no prune/dock-trim count (those were
+ * always zero and are dropped).
+ */
 data class ReconcileReport(
-    val prunedApps: Int,
     val dedupedApps: Int,
     val dissolvedFolders: Int,
     val removedEmptyFolders: Int,
     val trimmedPages: Int,
-    val dockTrimmed: Int,
 )
 
 /** Pure-policy output of the reconciler. */

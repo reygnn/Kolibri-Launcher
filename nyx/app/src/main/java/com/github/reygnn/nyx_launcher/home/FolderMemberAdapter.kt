@@ -72,7 +72,7 @@ class FolderMemberAdapter(
             // Dead reference (Windows-shortcut model): a launch is impossible, so a tap offers
             // to remove it from the folder; long-press still extracts (it becomes a greyed
             // top-level tile, removable there too). Greyed placeholder instead of the icon.
-            holder.icon.alpha = MISSING_MEMBER_ALPHA
+            holder.icon.alpha = MISSING_ICON_ALPHA
             holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
             holder.itemView.setOnClickListener { onMissingApp(key) }
         } else {
@@ -87,16 +87,12 @@ class FolderMemberAdapter(
     override fun onViewRecycled(holder: MemberHolder) {
         holder.bindToken++
         holder.icon.setImageDrawable(null)
+        holder.icon.alpha = 1f // don't leak a greyed missing-member alpha onto a reused holder
     }
 
     class MemberHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.member_icon)
         val dot: View = view.findViewById(R.id.member_dot)
         var bindToken: Int = 0
-    }
-
-    private companion object {
-        /** Alpha for a "missing" member (app no longer installed) — matches the grid/dock tiles. */
-        const val MISSING_MEMBER_ALPHA = 0.35f
     }
 }

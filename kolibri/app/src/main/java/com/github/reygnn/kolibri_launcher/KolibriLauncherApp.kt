@@ -13,8 +13,6 @@ import android.app.Application
 import android.app.WallpaperColors
 import android.app.WallpaperManager
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
@@ -67,7 +65,6 @@ class KolibriLauncherApp : Application() {
     lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val packageUpdateReceiver = PackageUpdateReceiver()
 
     /**
      * Last known locale tags, to detect a system locale change in
@@ -257,21 +254,10 @@ class KolibriLauncherApp : Application() {
 
     private fun registerPackageUpdateReceiver() {
         try {
-            val intentFilter = IntentFilter().apply {
-                addAction(Intent.ACTION_PACKAGE_ADDED)
-                addAction(Intent.ACTION_PACKAGE_REMOVED)
-                // ACTION_PACKAGE_CHANGED: enable/disable of an app or a launcher
-                // component (AUDIT-19 F5) — makes that case reactive instead of
-                // relying on the per-onStart re-enumeration that used to catch it.
-                addAction(Intent.ACTION_PACKAGE_CHANGED)
-                addDataScheme("package")
-            }
-
-            registerReceiver(
-                packageUpdateReceiver,
-                intentFilter,
-                RECEIVER_EXPORTED
-            )
+            // Shared registration (filter + NOT_EXPORTED flag single-sourced in :common-data,
+            // so kolibri and nyx can't drift). ACTION_PACKAGE_CHANGED is included there to make
+            // an app/component enable-disable reactive (AUDIT-19 F5).
+            PackageUpdateReceiver.register(this)
             Timber.d("[LIFECYCLE] PackageUpdateReceiver registered successfully.")
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "[LIFECYCLE] Could not register PackageUpdateReceiver")

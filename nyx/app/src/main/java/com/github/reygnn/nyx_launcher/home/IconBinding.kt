@@ -60,9 +60,6 @@ fun List<Any>.isDotOnlyPayload(): Boolean = isNotEmpty() && all { it === NOTIFIC
  */
 val ICON_STYLE_PAYLOAD = Any()
 
-/** True if a payload list is exactly an icon-style-only refresh. */
-fun List<Any>.isIconStylePayload(): Boolean = isNotEmpty() && all { it === ICON_STYLE_PAYLOAD }
-
 /**
  * True if a payload list CONTAINS an icon-style refresh (possibly coalesced with a dot
  * payload). The pager treats this as a full icon re-decode, which also covers dots — so a
@@ -81,8 +78,9 @@ fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this)
     is HomeCell.Folder -> members.any { it.packageName in dotPackages }
 }
 
-/** Alpha for a "missing" tile (app no longer installed) — a greyed broken-shortcut look. */
-private const val MISSING_ICON_ALPHA = 0.35f
+/** Alpha for a "missing" tile (app no longer installed) — a greyed broken-shortcut look.
+ *  Shared by the grid/dock (here) and the folder-member adapter. */
+internal const val MISSING_ICON_ALPHA = 0.35f
 
 fun bindLaunchableCell(
     itemView: View,

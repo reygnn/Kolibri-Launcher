@@ -267,7 +267,7 @@ class HomeLayoutRegridderTest {
         // storm guard short-circuits on a matching grid, but an item whose x (or y) sits
         // outside the grid bounds must still override that. The regridder never emits such
         // an item, but an imported/restored/hand-edited blob is saved verbatim with no
-        // coordinate clamp (ImportLayoutUseCase, NyxBackupManager) — so a blob whose stored
+        // coordinate clamp (NyxBackupManager restore) — so a blob whose stored
         // grid equals the measured device grid can carry one. Left in place it would be
         // mis-rendered (pageCells aliases y*cols+x onto a foreign cell or drops it); it must
         // be relocated onto a reachable cell instead. Page and dock are both fine here, so

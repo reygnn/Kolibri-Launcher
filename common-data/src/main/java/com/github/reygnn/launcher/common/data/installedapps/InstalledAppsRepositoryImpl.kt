@@ -5,6 +5,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.launcher.core.InstalledAppsRepository
+import com.github.reygnn.launcher.core.AppsUpdateTrigger
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import kotlinx.coroutines.CoroutineDispatcher
@@ -68,7 +69,7 @@ import javax.inject.Singleton
 @Singleton
 class InstalledAppsRepositoryImpl @Inject constructor(
     private val enumerator: AppEnumerator,
-    private val appsUpdateTrigger: MutableSharedFlow<Unit>,
+    @AppsUpdateTrigger private val appsUpdateTrigger: MutableSharedFlow<Unit>,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : InstalledAppsRepository {
 

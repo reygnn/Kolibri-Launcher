@@ -18,6 +18,7 @@ import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
@@ -54,6 +55,7 @@ class NyxBackupManager @Inject constructor(
     private val fabPositionStore: NyxFabPositionStore,
     private val fileManager: WallpaperFileManager,
     private val serializer: NyxBackupSerializer,
+    private val reconcileHomeLayout: ReconcileHomeLayoutUseCase,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     /** Writes a full backup ZIP to [out]. Returns true on success. */
@@ -167,7 +169,15 @@ class NyxBackupManager @Inject constructor(
                     backup.hiddenApps?.let { dto ->
                         hiddenAppsRepository.update { dto.map { it.toDomain() }.toSet() }
                     }
-                    backup.layout?.toDomain()?.let { homeLayoutRepository.save(it) }
+                    backup.layout?.toDomain()?.let {
+                        homeLayoutRepository.save(it)
+                        // Structural-only cleanup of the restored layout NOW (not just on the
+                        // next cold start): a cross-device backup can carry duplicate keys /
+                        // 0-1-member folders / an over-capacity dock, which would otherwise render
+                        // as duplicate/malformed tiles for the rest of this session. reconcile()
+                        // is total (fail-closed) and no-prune, so it never drops uninstalled refs.
+                        reconcileHomeLayout()
+                    }
                 }
 
                 ImportResult.Success

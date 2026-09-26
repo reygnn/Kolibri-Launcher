@@ -2,8 +2,6 @@ package com.github.reygnn.nyx_launcher
 
 import android.content.ComponentCallbacks2
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import androidx.annotation.VisibleForTesting
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
@@ -89,10 +87,6 @@ class PackageEventCoordinator @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    // Registered in start(); no unregister — the coordinator is a process-lifetime
-    // @Singleton, same as the former callback (and Kolibri's receiver).
-    private val packageUpdateReceiver = PackageUpdateReceiver()
-
     @OptIn(FlowPreview::class) // Flow.debounce(Long)
     fun start() {
         // The debounced reconcile pump: cold-start catch-up (immediate) + coalesced
@@ -165,13 +159,9 @@ class PackageEventCoordinator @Inject constructor(
 
     private fun registerReceiver() {
         try {
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_PACKAGE_ADDED)
-                addAction(Intent.ACTION_PACKAGE_REMOVED)
-                addAction(Intent.ACTION_PACKAGE_CHANGED)
-                addDataScheme("package")
-            }
-            context.registerReceiver(packageUpdateReceiver, filter, Context.RECEIVER_EXPORTED)
+            // Shared registration (filter + NOT_EXPORTED flag single-sourced in :common-data,
+            // so nyx and kolibri can't drift).
+            PackageUpdateReceiver.register(context)
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "PackageEventCoordinator: could not register PackageUpdateReceiver")
         }
