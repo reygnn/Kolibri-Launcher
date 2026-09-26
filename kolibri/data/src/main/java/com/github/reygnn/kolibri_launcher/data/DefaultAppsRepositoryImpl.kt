@@ -24,6 +24,12 @@ import javax.inject.Singleton
  * cannot perform. The public resolvers below return the same "who is the default"
  * answer at our permission level: `TelecomManager` / `Telephony` for dialer + SMS,
  * `PackageManager.resolveActivity` for email (a `mailto:` intent), browser and camera.
+ *
+ * When no user default is set for an intent, `resolveActivity` returns the
+ * disambiguation ("resolver") activity rather than an app. For that case the
+ * resolveActivity-based roles fall back to `queryIntentActivities` and take the
+ * first concrete handler, so a role with installed-but-not-defaulted apps (e.g.
+ * email) still pre-selects one instead of dropping out.
  */
 @Singleton
 class DefaultAppsRepositoryImpl @Inject constructor(
@@ -67,7 +73,22 @@ class DefaultAppsRepositoryImpl @Inject constructor(
     }
 
     private fun resolvedPackage(intent: Intent): String? = try {
-        context.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+        val direct = context.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+        if (direct != null && direct != ANDROID_RESOLVER_PACKAGE) {
+            direct
+        } else {
+            // No user default set for this intent: resolveActivity returns the
+            // disambiguation ("resolver") activity, which the caller drops — so the
+            // role would silently vanish (e.g. email when no default mail app is
+            // picked, yet Gmail / ProtonMail are installed). Fall back to the
+            // concrete handlers and take the first real one (the list is in the
+            // platform's own priority order). It is only a first-run pre-selection
+            // the user can deselect, so a best-effort pick is acceptable.
+            context.packageManager.queryIntentActivities(intent, 0)
+                .firstNotNullOfOrNull { resolveInfo ->
+                    resolveInfo.activityInfo?.packageName?.takeIf { it != ANDROID_RESOLVER_PACKAGE }
+                }
+        }
     } catch (e: Throwable) {
         TimberWrapper.silentError(e, "Failed to resolve default app for ${intent.action}")
         null
