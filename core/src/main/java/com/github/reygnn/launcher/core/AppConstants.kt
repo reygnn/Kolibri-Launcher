@@ -49,7 +49,10 @@ object AppConstants {
     const val DEFAULT_ROTATION_LOCKED = false
 
     const val MAX_APP_TEXT_SCALE_RELATIVE_TO_TIME = 0.75f
-    const val DEFAULT_LAYOUT_SCALE = 0.05f
+    // Default home favorites text/layout scale (interpolated between
+    // LAYOUT_SCALE_MIN..MAX). 0.05 rendered the favorites too small on first
+    // run; 0.6 is the readable default until the user adjusts the slider.
+    const val DEFAULT_LAYOUT_SCALE = 0.6f
     // Opt-in: scrim off by default keeps already-dark wallpapers untouched.
     const val DEFAULT_WALLPAPER_SCRIM_ALPHA = 0.0f
     const val DEFAULT_VERTICAL_PADDING_FACTOR = 0.6f
