@@ -33,6 +33,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import com.github.reygnn.launcher.common.ui.base.BaseActivity
 import androidx.appcompat.widget.PopupMenu
+import androidx.annotation.StringRes
 import androidx.core.view.isVisible
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -637,31 +638,33 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * package name is available for a gone app, so the message uses it.
      */
     private fun confirmRemoveMissingApp(id: ItemId, key: ComponentKey) {
-        if (isFinishing || isDestroyed) return
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.home_missing_dialog_title)
-            .setMessage(getString(R.string.home_missing_dialog_message, key.packageName))
-            .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ -> viewModel.remove(id) }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        showTrackedDialog(dialog)
+        confirmRemoveMissing(R.string.home_missing_dialog_message, key.packageName) { viewModel.remove(id) }
     }
 
     /**
      * Confirmation for removing a "missing" MEMBER from the open folder — a member whose app
-     * is no longer installed (Windows-shortcut model). Reuses the top-level missing dialog
-     * strings; removal goes through the folder-delete path (auto-dissolves below two members)
-     * and closes the overlay, since its snapshot member list may have shrunk or dissolved.
+     * is no longer installed (Windows-shortcut model). Uses the folder-specific message;
+     * removal goes through the folder-delete path (auto-dissolves below two members) and closes
+     * the overlay, since its snapshot member list may have shrunk or dissolved.
      */
     private fun confirmRemoveMissingFolderMember(folder: ItemId, key: ComponentKey) {
+        confirmRemoveMissing(R.string.home_missing_folder_member_dialog_message, key.packageName) {
+            viewModel.removeMissingFolderMember(folder, key)
+            folderOverlayController.close()
+        }
+    }
+
+    /**
+     * Shared "app not found — remove?" confirmation for a missing tile/member: same title,
+     * remove label, cancel, and tracked-dialog handling; only the [messageRes] and the
+     * [onRemove] action differ.
+     */
+    private fun confirmRemoveMissing(@StringRes messageRes: Int, packageName: String, onRemove: () -> Unit) {
         if (isFinishing || isDestroyed) return
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.home_missing_dialog_title)
-            .setMessage(getString(R.string.home_missing_folder_member_dialog_message, key.packageName))
-            .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ ->
-                viewModel.removeMissingFolderMember(folder, key)
-                folderOverlayController.close()
-            }
+            .setMessage(getString(messageRes, packageName))
+            .setPositiveButton(R.string.home_missing_dialog_remove) { _, _ -> onRemove() }
             .setNegativeButton(android.R.string.cancel, null)
             .create()
         showTrackedDialog(dialog)

@@ -82,6 +82,16 @@ fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this)
  *  Shared by the grid/dock (here) and the folder-member adapter. */
 internal const val MISSING_ICON_ALPHA = 0.35f
 
+/**
+ * Reset a recycled icon view: clear the drawable and undo any greyed missing-tile alpha
+ * ([MISSING_ICON_ALPHA]) so a reused holder never inherits it. Shared by the grid/dock/
+ * folder-member adapters' onViewRecycled (the bind-token bump stays per-holder).
+ */
+internal fun ImageView.resetForRecycle() {
+    setImageDrawable(null)
+    alpha = 1f
+}
+
 fun bindLaunchableCell(
     itemView: View,
     icon: ImageView,

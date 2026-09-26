@@ -4,10 +4,10 @@ import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.util.Log
-import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
+import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
 import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
 import dagger.hilt.android.HiltAndroidApp
@@ -72,17 +72,10 @@ class NyxApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Hand BuildConfig.DEBUG to :core's TimberWrapper and wire KolibriLog to
-        // Timber (both are pure-Kotlin in :core with no Timber on their classpath).
-        TimberWrapper.isDebugBuild = BuildConfig.DEBUG
-        KolibriLog.dHandler = { message -> Timber.d(message) }
-        KolibriLog.wHandler = { throwable, message ->
-            if (throwable != null) Timber.w(throwable, message) else Timber.w(message)
-        }
-        KolibriLog.taggedErrorHandler = { tag, throwable, message ->
-            val tree = Timber.tag(tag)
-            if (throwable != null) tree.e(throwable, message) else tree.e(message)
-        }
+        // Hand BuildConfig.DEBUG to :core's TimberWrapper and wire KolibriLog to Timber
+        // (both pure-Kotlin in :core with no Timber on their classpath). Shared with kolibri
+        // so the routing can't drift.
+        wireKolibriLogToTimber(BuildConfig.DEBUG)
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())

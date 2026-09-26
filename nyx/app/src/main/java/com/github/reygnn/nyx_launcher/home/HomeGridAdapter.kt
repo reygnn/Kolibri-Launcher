@@ -185,8 +185,7 @@ class HomeGridAdapter(
 
     override fun onViewRecycled(holder: CellHolder) {
         holder.bindToken++
-        holder.icon.setImageDrawable(null)
-        holder.icon.alpha = 1f // don't leak a greyed missing-tile alpha onto a reused holder
+        holder.icon.resetForRecycle()
     }
 
     class CellHolder(view: View) : RecyclerView.ViewHolder(view) {

@@ -86,8 +86,7 @@ class FolderMemberAdapter(
 
     override fun onViewRecycled(holder: MemberHolder) {
         holder.bindToken++
-        holder.icon.setImageDrawable(null)
-        holder.icon.alpha = 1f // don't leak a greyed missing-member alpha onto a reused holder
+        holder.icon.resetForRecycle()
     }
 
     class MemberHolder(view: View) : RecyclerView.ViewHolder(view) {

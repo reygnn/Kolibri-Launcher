@@ -24,7 +24,7 @@ import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceive
 import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
 import com.github.reygnn.launcher.common.ui.LaunchTrace
-import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
 import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
@@ -123,23 +123,11 @@ class KolibriLauncherApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Hand BuildConfig.DEBUG to :domain/TimberWrapper (which has no
-        // BuildConfig of its own as a pure-Kotlin module). Must run before
-        // any code path that may invoke silentError.
-        TimberWrapper.isDebugBuild = BuildConfig.DEBUG
-
-        // Wire :domain's KolibriLog to Timber. :domain is a pure-Kotlin
-        // module without a Timber dependency on its compile classpath
-        // (Timber 5.x is .aar-only); KolibriLog forwards through these
-        // lambdas. Must run before any :domain code path can log.
-        KolibriLog.dHandler = { message -> Timber.d(message) }
-        KolibriLog.wHandler = { throwable, message ->
-            if (throwable != null) Timber.w(throwable, message) else Timber.w(message)
-        }
-        KolibriLog.taggedErrorHandler = { tag, throwable, message ->
-            val tree = Timber.tag(tag)
-            if (throwable != null) tree.e(throwable, message) else tree.e(message)
-        }
+        // Wire the pure-Kotlin :core logging seam (TimberWrapper + KolibriLog) to Timber.
+        // :core has no Timber on its compile classpath (Timber 5.x is .aar-only); it forwards
+        // through these lambdas. Must run before any code path that may log / invoke
+        // silentError. Shared with nyx so the routing can't drift.
+        wireKolibriLogToTimber(BuildConfig.DEBUG)
 
         // Setup Timber with crash protection
         try {

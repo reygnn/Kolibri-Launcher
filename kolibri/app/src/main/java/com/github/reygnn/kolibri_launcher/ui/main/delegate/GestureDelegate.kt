@@ -45,22 +45,15 @@ class GestureDelegate(
     // --- Swipe ---
 
     fun onSwipeFromRightToLeft() = scope.launchSafe("Error in onSwipeFromRightToLeft") {
-        when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)) {
-            is HandleSwipeActionUseCase.Result.LaunchApp -> {
-                scope.sendEvent(UiEvent.LaunchApp(result.app))
-            }
-            is HandleSwipeActionUseCase.Result.NoAction -> {
-            }
-            is HandleSwipeActionUseCase.Result.AppNotInstalled -> {
-                // Lazy validation (Windows-shortcut model): the assigned app is gone.
-                // Toast instead of a silent no-op; the slot is not auto-cleared.
-                scope.sendEvent(UiEvent.ShowToast(R.string.swipe_app_not_installed))
-            }
-        }
+        handleSwipe(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
     }
 
     fun onSwipeFromLeftToRight() = scope.launchSafe("Error in onSwipeFromLeftToRight") {
-        when (val result = handleSwipeActionUseCase(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)) {
+        handleSwipe(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+    }
+
+    private suspend fun handleSwipe(slot: SwipeSlot) {
+        when (val result = handleSwipeActionUseCase(slot)) {
             is HandleSwipeActionUseCase.Result.LaunchApp -> {
                 scope.sendEvent(UiEvent.LaunchApp(result.app))
             }
