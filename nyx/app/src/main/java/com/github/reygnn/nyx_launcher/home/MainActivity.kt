@@ -289,8 +289,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             onShown = { animate ->
                 if (animate) viewModel.refreshDrawer() // pick up installs/removals since last open (A1-04)
                 drawerFragment?.onDrawerShown() // arm drag-to-dismiss
+                // Stop the DragLayer's gesture core from detecting (and cancelling) touches
+                // under the open drawer — otherwise a fast list flick freezes the scroll.
+                setHomeGestureDetectionActive(active = false)
             },
-            onHidden = { drawerFragment?.onDrawerHidden() }, // disarm before the hide slide
+            onHidden = {
+                drawerFragment?.onDrawerHidden() // disarm before the hide slide
+                setHomeGestureDetectionActive(active = true)
+            },
         )
         removeBar = findViewById(R.id.remove_bar)
         addToHomeBar = findViewById(R.id.add_to_home_bar)
@@ -975,22 +981,47 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // it fires even over the ViewPager2 / dock RecyclerViews (which would
         // eat an OnTouchListener-based fling mid-scroll). Horizontal page
         // swipes fall through untouched via the analyzer's axis dominance.
-        homeRoot.onSwipeUp = { if (homeGesturesAllowed()) showDrawer() }
-
-        // Long-press on empty home space opens the live-preview customization
-        // sheet (scrim/dim, monochrome, wallpaper, → full Settings). The shared
-        // core's hit-test suppresses this over app icons and dock icons (they
-        // keep their own long-press → drag), so it only fires on the wallpaper /
-        // empty area.
-        homeRoot.onLongPress = { if (homeGesturesAllowed()) showCustomizationDialog() }
-
-        // Double-tap on empty home space shows the upcoming events (HIE Phase C3,
-        // mirrors Kolibri); the two indicators next to the clock just signal that
-        // events exist. Suppressed over icons by the shared core's hit-test.
-        homeRoot.onDoubleTap = { if (homeGesturesAllowed()) showEventsDialog() }
+        //
+        // Long-press on empty home space opens the live-preview customization sheet
+        // (scrim/dim, monochrome, wallpaper, → full Settings); double-tap shows the
+        // upcoming events (HIE Phase C3). The shared core's hit-test suppresses both over
+        // app / dock icons (they keep their own long-press → drag), so they only fire on
+        // the wallpaper / empty area.
+        //
+        // All three are wired through setHomeGestureDetectionActive so they can be NULLED
+        // while the drawer overlay is open — see that method for why nulling (not just
+        // body-guarding with homeGesturesAllowed) is required, or the drawer's scroll
+        // freezes on a fast flick.
+        setHomeGestureDetectionActive(active = true)
 
         // The drawer's own swipe-down dismiss lives in AppDrawerFragment (its
         // root is a GestureFrameLayout), so it isn't wired here.
+    }
+
+    private val homeSwipeUpAction: () -> Unit = { if (homeGesturesAllowed()) showDrawer() }
+    private val homeLongPressAction: () -> Unit = { if (homeGesturesAllowed()) showCustomizationDialog() }
+    private val homeDoubleTapAction: () -> Unit = { if (homeGesturesAllowed()) showEventsDialog() }
+
+    /**
+     * Wires (or NULLS) the home swipe-up / long-press / double-tap callbacks on the
+     * DragLayer's gesture core.
+     *
+     * Nulling — not merely body-guarding with [homeGesturesAllowed] — is load-bearing.
+     * The drawer overlay lives INSIDE the DragLayer, whose [GestureDispatchCore] inspects
+     * every touch in `dispatchTouchEvent`. A fast scroll flick in the open drawer crosses
+     * the swipe-up threshold; the core then flips `triggered`, sends `ACTION_CANCEL` to the
+     * drawer RecyclerView and consumes the rest of the gesture — freezing the list until
+     * the next `ACTION_DOWN` (release + re-scroll). The guard inside the callback body runs
+     * too late: the freeze is a side effect of DETECTION, before the body is consulted. A
+     * null callback makes the core resolve the swipe to no callback, so it never triggers
+     * and never cancels the child. The drag/armed branches don't use these callbacks, so
+     * app drag-to-home from the drawer keeps working — unlike `gesturesEnabled = false`,
+     * which would also kill dragging. Disabled while the drawer is open, re-enabled on hide.
+     */
+    private fun setHomeGestureDetectionActive(active: Boolean) {
+        homeRoot.onSwipeUp = if (active) homeSwipeUpAction else null
+        homeRoot.onLongPress = if (active) homeLongPressAction else null
+        homeRoot.onDoubleTap = if (active) homeDoubleTapAction else null
     }
 
     // ---- rendering ----
