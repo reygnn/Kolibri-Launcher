@@ -11,6 +11,8 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.Configuration
 import android.content.res.Resources
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
@@ -1044,6 +1046,9 @@ class HomeFragment : Fragment() {
         binding.protectedIndicator.setIconColor(textColor)
         binding.protectedIndicator.setOutline(outlineWidthPx, outlineColor)
         updateFavoriteButtonColors(colors)
+        // The opaque-inset measurement needs the icons tinted; a first color emission can
+        // arrive after the initial layout, so re-anchor now that the marks are visible.
+        anchorEventIndicators()
     }
 
     /**
@@ -1214,40 +1219,97 @@ class HomeFragment : Fragment() {
     /** Reused across [anchorEventIndicators] calls — tight glyph bounds of the clock. */
     private val timeGlyphBounds = Rect()
 
+    // Cached opaque insets of the two indicator icons (px from the box edge to the first/
+    // last drawn row), plus the icon size they were measured at. Recomputed only when the
+    // icon size changes (e.g. a density/config change), not on every layout tick. -1 = not
+    // yet measured (e.g. before the icon tint is applied — anchorEventIndicators retries).
+    private var alarmOpaqueInsetTop = -1
+    private var calendarOpaqueInsetBottom = -1
+    private var indicatorInsetSizeKey = -1
+
     /**
-     * Keeps the event-indicator pair vertically centred on the clock's VISIBLE digit
-     * band (TODO §24), replacing the old hand-tuned `vertical_bias`. Recomputes on any
-     * layout of the clock or the indicator container — so it survives minute ticks,
+     * Anchors the event indicators to the clock's VISIBLE digit band (TODO §24), replacing
+     * the old hand-tuned `vertical_bias`: the alarm's visible top edge sits flush with the
+     * digit top and the calendar's visible bottom edge flush with the digit bottom.
+     * Recomputes on any layout of the clock or the icons — so it survives minute ticks,
      * config changes and system-font-scale changes — and once before the first draw.
-     * Setting `translationY` does not re-trigger layout, so this cannot loop. The math
-     * lives in [EventIndicatorAnchor]; this is the thin view glue.
+     * Setting `translationY` does not re-trigger layout, so this cannot loop. The flush
+     * math lives in [EventIndicatorAnchor]; this is the thin view glue.
      */
     private fun setupEventIndicatorAnchoring() {
         val relayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             anchorEventIndicators()
         }
         binding.timeText.addOnLayoutChangeListener(relayout)
-        binding.eventIndicators.addOnLayoutChangeListener(relayout)
-        binding.eventIndicators.doOnPreDraw { anchorEventIndicators() }
+        binding.alarmIndicator.addOnLayoutChangeListener(relayout)
+        binding.calendarIndicator.addOnLayoutChangeListener(relayout)
+        binding.calendarIndicator.doOnPreDraw { anchorEventIndicators() }
     }
 
     private fun anchorEventIndicators() {
         val binding = _binding ?: return
         val clock = binding.timeText
-        val pair = binding.eventIndicators
+        val alarm = binding.alarmIndicator
+        val calendar = binding.calendarIndicator
         val text = clock.text?.toString().orEmpty()
         val baseline = clock.baseline
-        val pairHeight = pair.height
-        // Not laid out yet (baseline == -1) or nothing to measure — a later layout
-        // pass fires the listener again. getTextBounds / property reads can't throw.
-        if (text.isEmpty() || baseline < 0 || pairHeight == 0) return
+        // Not laid out yet (baseline == -1) or nothing to measure — a later layout pass
+        // fires the listener again. getTextBounds / property reads can't throw.
+        if (text.isEmpty() || baseline < 0) return
+        if (alarm.width == 0 || alarm.height == 0 || calendar.height == 0) return
+        ensureIndicatorInsets(alarm, calendar)
+        if (alarmOpaqueInsetTop < 0 || calendarOpaqueInsetBottom < 0) return
+
         clock.paint.getTextBounds(text, 0, text.length, timeGlyphBounds)
-        pair.translationY = EventIndicatorAnchor.translationY(
-            baselinePx = baseline,
-            glyphTopPx = timeGlyphBounds.top,
-            glyphBottomPx = timeGlyphBounds.bottom,
-            pairHeightPx = pairHeight,
+        val digitTop = baseline + timeGlyphBounds.top
+        val digitBottom = baseline + timeGlyphBounds.bottom
+        alarm.translationY = EventIndicatorAnchor.alarmTranslationY(digitTop, alarmOpaqueInsetTop)
+        calendar.translationY = EventIndicatorAnchor.calendarTranslationY(
+            digitBottomPx = digitBottom,
+            calendarBoxHeightPx = calendar.height,
+            calendarOpaqueInsetBottomPx = calendarOpaqueInsetBottom,
         )
+    }
+
+    /**
+     * Measures each icon's opaque vertical inset once per size (rasterise the laid-out,
+     * already-tinted view and scan alpha). Cached; only recomputed when the icon size
+     * changes, so it is not repeated on every layout tick.
+     */
+    private fun ensureIndicatorInsets(alarm: View, calendar: View) {
+        val key = alarm.width * 131071 + alarm.height
+        if (indicatorInsetSizeKey == key && alarmOpaqueInsetTop >= 0) return
+        val alarmRows = opaqueRowRange(alarm) ?: return
+        val calendarRows = opaqueRowRange(calendar) ?: return
+        alarmOpaqueInsetTop = alarmRows[0]
+        calendarOpaqueInsetBottom = calendar.height - 1 - calendarRows[1]
+        indicatorInsetSizeKey = key
+    }
+
+    /**
+     * First and last opaque (alpha above threshold) row of [view] as it actually renders,
+     * or null if nothing is drawn yet (e.g. the icon tint has not been applied) — a later
+     * pass retries. Rasterises to an offscreen bitmap, so it captures the true visible
+     * extent (icon shape + tonal outline rim), not just the padded box.
+     */
+    private fun opaqueRowRange(view: View): IntArray? {
+        val w = view.width
+        val h = view.height
+        if (w <= 0 || h <= 0) return null
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        var first = -1
+        var last = -1
+        val rowPixels = IntArray(w)
+        for (y in 0 until h) {
+            bitmap.getPixels(rowPixels, 0, w, 0, y, w, 1)
+            if (rowPixels.any { (it ushr 24) and 0xFF > OPAQUE_ALPHA_THRESHOLD }) {
+                if (first < 0) first = y
+                last = y
+            }
+        }
+        bitmap.recycle()
+        return if (first < 0) null else intArrayOf(first, last)
     }
 
     /**
@@ -1776,6 +1838,13 @@ class HomeFragment : Fragment() {
         /** Async begin/end cookie for the favorites first-paint span (matched by
          * [Trace][android.os.Trace]; arbitrary but stable per call site). */
         const val FAVORITES_FIRST_PAINT_COOKIE = 0xF00D
+
+        /**
+         * Alpha (0..255) above which a rasterised pixel counts as "drawn" when measuring an
+         * indicator icon's opaque bounds (see opaqueRowRange). >16 ignores the
+         * near-transparent anti-alias fringe so the flush edge tracks the solid mark.
+         */
+        const val OPAQUE_ALPHA_THRESHOLD = 16
 
         /**
          * Process-scoped one-shot for the cold-start favorites first-paint trace.

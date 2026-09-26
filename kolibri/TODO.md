@@ -1661,14 +1661,17 @@ zuerst** (Zieldesign vs. Mittelweg), dann umsetzen.
 
 > **✅ Umgesetzt (Branch `feature/kolibri-event-indicator-fontmetric-anchor`).** Das
 > Indikator-Paar (Wecker + Kalender) wird nicht mehr per hand-getuntem
-> `vertical_bias=0.58` platziert. Es sitzt jetzt in einem `eventIndicators`-Container
-> (Top an `timeText.top` gepinnt), dessen `translationY` `HomeFragment.anchorEventIndicators()`
-> aus den **Font-Metriken** der Uhr berechnet (`baseline` + `Paint.getTextBounds`), sodass das
-> Paar auf der **sichtbaren Ziffern-Bandmitte** zentriert bleibt — font-skalierungs-fest. Die
-> reine Rechen-Invariante lebt in `EventIndicatorAnchor` (JVM-getestet,
-> `EventIndicatorAnchorTest`); die View-Anbindung (Layout-Listener auf `timeText` +
-> Container) ist dünne Glue. Der Text unten beschreibt den früheren Ist-Zustand (90dp-Overlay
-> bzw. 0.58-Bias) als Referenz.
+> `vertical_bias=0.58` platziert. Beide Icons sind **unabhängig** verankert (Box-Top je an
+> `timeText.top`), und `HomeFragment.anchorEventIndicators()` setzt pro Icon eine
+> `translationY`, sodass die **Wecker-Oberkante bündig mit der sichtbaren Ziffern-Oberkante**
+> und die **Kalender-Unterkante bündig mit der Ziffern-Unterkante** sitzt (das Paar spannt das
+> Ziffernband auf, die Lücke dazwischen nimmt die Differenz auf). Beide Kanten kommen aus den
+> **Font-Metriken** der Uhr (`baseline` + `Paint.getTextBounds`) plus dem **gemessenen
+> Opaque-Inset** jedes Icons (View rastern → Alpha-Grenzen, gecached, nur bei Größenänderung
+> neu) — font- und dichte-robust. Die reine Flush-Rechnung lebt in `EventIndicatorAnchor`
+> (JVM-getestet, `EventIndicatorAnchorTest`); die View-Anbindung (Layout-Listener + Rasterung)
+> ist dünne Glue. Der Text unten beschreibt den früheren Ist-Zustand (90dp-Overlay bzw.
+> 0.58-Bias) als Referenz.
 
 
 **Ist-Zustand.** Die Glocke (`eventsIndicator`) ist ein Ecken-Overlay oben rechts

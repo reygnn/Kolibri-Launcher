@@ -4,56 +4,60 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * Pins the defining invariant of the event-indicator anchoring (TODO §24): the
- * indicator pair is vertically CENTRED on the clock's visible digit band, at any font
- * scale. This is the testable replacement for the old eyeballed `vertical_bias=0.58`.
+ * Pins the defining invariant of the event-indicator anchoring (TODO §24): the ALARM's
+ * visible top edge is flush with the clock's visible digit top, and the CALENDAR's visible
+ * bottom edge is flush with the digit bottom — at any font scale. This is the testable
+ * replacement for the old eyeballed `vertical_bias=0.58`.
+ *
+ * Both icon boxes have their top pinned to the clock top, so a box's top equals its
+ * `translationY`. "Visible" edges sit inset inside the box by the measured opaque inset.
  */
 class EventIndicatorAnchorTest {
 
-    // A representative 60sp @ 1× clock: baseline 100px down from the view top, digits
-    // reach 70px above the baseline (glyph top) and sit on it (no descender), and the
-    // 2×28dp icon pair measures ~56px tall.
-    private val baseline = 100
-    private val glyphTop = -70
-    private val glyphBottom = 0
-    private val pairHeight = 56
-
-    private fun bandCentre(base: Int, top: Int, bottom: Int) = base + (top + bottom) / 2f
+    // Representative 60sp @ 1× px: digits span 30..100 from the view top; each 74px icon
+    // box has ~18px of transparent margin before its drawn mark.
+    private val digitTop = 30
+    private val digitBottom = 100
+    private val boxHeight = 74
+    private val insetTop = 18
+    private val insetBottom = 18
 
     @Test
-    fun `translationY places the pair centre exactly on the digit-band centre`() {
-        val ty = EventIndicatorAnchor.translationY(baseline, glyphTop, glyphBottom, pairHeight)
-        val pairCentreAfter = ty + pairHeight / 2f
-        assertThat(pairCentreAfter).isEqualTo(bandCentre(baseline, glyphTop, glyphBottom))
+    fun `alarm visible top lands flush on the digit top`() {
+        val ty = EventIndicatorAnchor.alarmTranslationY(digitTop, insetTop)
+        // visible top = boxTop (== translationY) + opaque inset top
+        assertThat(ty + insetTop).isEqualTo(digitTop.toFloat())
     }
 
     @Test
-    fun `concrete value matches the hand-computed offset`() {
-        // digitCentre = 100 + (-70+0)/2 = 65 ; translationY = 65 - 56/2 = 37
-        assertThat(EventIndicatorAnchor.translationY(baseline, glyphTop, glyphBottom, pairHeight))
-            .isEqualTo(37f)
+    fun `alarm concrete value matches the hand-computed offset`() {
+        // 30 - 18 = 12
+        assertThat(EventIndicatorAnchor.alarmTranslationY(digitTop, insetTop)).isEqualTo(12f)
     }
 
     @Test
-    fun `when the pair spans the band, top and bottom are flush with the digits`() {
-        // The original design intent (alarm top = digit top, calendar bottom = digit
-        // bottom) falls out for free when the pair height equals the band height.
-        val bandHeight = glyphBottom - glyphTop // 70
-        val ty = EventIndicatorAnchor.translationY(baseline, glyphTop, glyphBottom, bandHeight)
-        val pairTop = ty                       // container top is pinned to clock top
-        val pairBottom = ty + bandHeight
-        assertThat(pairTop).isEqualTo((baseline + glyphTop).toFloat())     // flush with digit top
-        assertThat(pairBottom).isEqualTo((baseline + glyphBottom).toFloat()) // flush with digit bottom
+    fun `calendar visible bottom lands flush on the digit bottom`() {
+        val ty = EventIndicatorAnchor.calendarTranslationY(digitBottom, boxHeight, insetBottom)
+        // visible bottom = boxTop (translationY) + boxHeight - opaque inset bottom
+        assertThat(ty + boxHeight - insetBottom).isEqualTo(digitBottom.toFloat())
     }
 
     @Test
-    fun `stays centred under a larger system font (font-scale robust)`() {
-        // Scale the clock up ~1.3× (bigger baseline + taller glyphs) while the icon pair
-        // keeps its fixed dp size — the pair must still centre on the (lower, taller) band.
-        val bigBaseline = 130
-        val bigGlyphTop = -91
-        val ty = EventIndicatorAnchor.translationY(bigBaseline, bigGlyphTop, glyphBottom, pairHeight)
-        val pairCentreAfter = ty + pairHeight / 2f
-        assertThat(pairCentreAfter).isEqualTo(bandCentre(bigBaseline, bigGlyphTop, glyphBottom))
+    fun `calendar concrete value matches the hand-computed offset`() {
+        // 100 - 74 + 18 = 44
+        assertThat(EventIndicatorAnchor.calendarTranslationY(digitBottom, boxHeight, insetBottom))
+            .isEqualTo(44f)
+    }
+
+    @Test
+    fun `both edges stay flush under a larger system font (font-scale robust)`() {
+        // A bigger clock: the digit band moves down and grows; the fixed-size icons must
+        // still land flush at both ends (the gap between them absorbs the extra span).
+        val bigTop = 40
+        val bigBottom = 130
+        val alarmTy = EventIndicatorAnchor.alarmTranslationY(bigTop, insetTop)
+        val calTy = EventIndicatorAnchor.calendarTranslationY(bigBottom, boxHeight, insetBottom)
+        assertThat(alarmTy + insetTop).isEqualTo(bigTop.toFloat())
+        assertThat(calTy + boxHeight - insetBottom).isEqualTo(bigBottom.toFloat())
     }
 }

@@ -58,16 +58,19 @@
 
             <!-- Clock row: the clock glyph plus the two passive events indicators
                  (alarm + calendar icons) pinned to its trailing side. A ConstraintLayout
-                 (not a horizontal LinearLayout) so the two icons can form a packed
-                 vertical chain, centred against the clock as a tight pair in one column
-                 just past its end (alarm on top, calendar directly below).
+                 (not a horizontal LinearLayout) so the two icons can be anchored
+                 independently against the clock, one column just past its end (alarm on
+                 top, calendar directly below).
                  Kept INSIDE timeContainer (not a rootLayout corner overlay) so the
                  indicators travel with the START / CENTER / END alignment that
                  HomeFragment.applyTimeContainerAlignment mirrors onto timeContainer
-                 — the corner overlay was overlapped by the block when END-aligned. -->
+                 — the corner overlay was overlapped by the block when END-aligned.
+                 clipChildren=false so the code-set translationY (which can push the
+                 calendar icon a few px past the clock's line box) is never clipped. -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:clipChildren="false">
 
                 <com.github.reygnn.kolibri_launcher.ui.util.OutlinedTextView
                     android:id="@+id/timeText"
@@ -81,51 +84,46 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent" />
 
-                <!-- Alarm (top) + calendar (bottom) as one vertical pair, wrapped in a
-                     LinearLayout so HomeFragment can shift the pair as a single unit.
-                     The pair is NO LONGER placed by a hand-tuned vertical_bias: its top
-                     is pinned to timeText.top, and HomeFragment.anchorEventIndicators()
-                     sets the container's translationY (via EventIndicatorAnchor) so the
-                     pair stays vertically CENTRED on the clock's VISIBLE digit band,
-                     derived at runtime from the font metrics (baseline + tight glyph
-                     bounds). That is font-scale robust — the old 0.58 bias was tuned to
-                     60sp @ 1× and drifted under a larger system font (TODO §24).
-                     The gap between the two marks is their two paddings
-                     (2×events_icon_padding). Each icon shows only when an upcoming event
-                     of its type exists; INVISIBLE (not GONE) so the container keeps a
-                     fixed width slot and the clock never shifts horizontally. The icons
-                     are pure status graphics (NOT clickable) — the dialog opens via the
-                     home double-tap. OutlinedImageViews inherit the SAME adaptive
-                     icon-outline + text-colour treatment as the clock/date/battery
-                     (HomeFragment.updateAllColors). Each contentDescription supplies the
-                     TalkBack label. -->
-                <LinearLayout
-                    android:id="@+id/eventIndicators"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                <!-- Alarm (top) + calendar (bottom) indicators, each anchored
+                     INDEPENDENTLY next to the clock. Both boxes are constrained with
+                     their top at timeText.top and share the same column (calendar start =
+                     alarm start); HomeFragment.anchorEventIndicators() then sets each
+                     icon's translationY (via EventIndicatorAnchor) so the ALARM's visible
+                     top edge is flush with the clock's visible digit top and the
+                     CALENDAR's visible bottom edge is flush with the digit bottom. Both
+                     edges are derived at runtime from the clock font metrics (baseline +
+                     tight glyph bounds) and each icon's measured opaque inset — font-scale
+                     robust, replacing the old eyeballed vertical_bias (TODO §24). The pair
+                     spans the digit band; the gap between the two absorbs the slack.
+                     Each icon shows only when an upcoming event of its type exists;
+                     INVISIBLE (not GONE) so it keeps a fixed width slot and the clock never
+                     shifts horizontally. The icons are pure status graphics (NOT clickable)
+                     — the dialog opens via the home double-tap. OutlinedImageViews inherit
+                     the SAME adaptive icon-outline + text-colour treatment as the
+                     clock/date/battery (HomeFragment.updateAllColors). Each
+                     contentDescription supplies the TalkBack label. -->
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/alarmIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_alarm_outlined"
+                    android:contentDescription="@string/events_indicator_alarm_content_description"
+                    android:visibility="invisible"
                     android:layout_marginStart="@dimen/spacing_medium"
                     app:layout_constraintStart_toEndOf="@id/timeText"
-                    app:layout_constraintTop_toTopOf="@id/timeText">
+                    app:layout_constraintTop_toTopOf="@id/timeText" />
 
-                    <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
-                        android:id="@+id/alarmIndicator"
-                        android:layout_width="@dimen/events_icon_size"
-                        android:layout_height="@dimen/events_icon_size"
-                        android:padding="@dimen/events_icon_padding"
-                        android:src="@drawable/ic_alarm_outlined"
-                        android:contentDescription="@string/events_indicator_alarm_content_description"
-                        android:visibility="invisible" />
-
-                    <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
-                        android:id="@+id/calendarIndicator"
-                        android:layout_width="@dimen/events_icon_size"
-                        android:layout_height="@dimen/events_icon_size"
-                        android:padding="@dimen/events_icon_padding"
-                        android:src="@drawable/ic_calendar_outlined"
-                        android:contentDescription="@string/events_indicator_calendar_content_description"
-                        android:visibility="invisible" />
-                </LinearLayout>
+                <com.github.reygnn.kolibri_launcher.ui.util.OutlinedImageView
+                    android:id="@+id/calendarIndicator"
+                    android:layout_width="@dimen/events_icon_size"
+                    android:layout_height="@dimen/events_icon_size"
+                    android:padding="@dimen/events_icon_padding"
+                    android:src="@drawable/ic_calendar_outlined"
+                    android:contentDescription="@string/events_indicator_calendar_content_description"
+                    android:visibility="invisible"
+                    app:layout_constraintStart_toStartOf="@id/alarmIndicator"
+                    app:layout_constraintTop_toTopOf="@id/timeText" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <LinearLayout
