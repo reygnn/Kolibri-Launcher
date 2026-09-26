@@ -32,12 +32,15 @@ internal sealed interface HomeContextMenuAction {
  * - [isHidden]: whether the app is currently in the hidden set (only consulted
  *   for a drawer app, where hide/unhide is offered).
  * - [isSystemApp]: gates the uninstall entry (system apps cannot be uninstalled).
+ * - [isInstalled]: whether the app is currently installed. A MISSING tile (a kept
+ *   reference to an uninstalled app, Windows-shortcut model) drops both App info and
+ *   Uninstall — there is nothing to open or uninstall — leaving only Remove from home.
  *
  * Order matches the shipped UI:
- * - Existing home item: App info (if resolvable), Remove from home, Uninstall
- *   (if a non-system app).
- * - New app from the drawer: Add to home, Hide/Unhide, App info, Uninstall
- *   (if a non-system app).
+ * - Existing home item: App info (if resolvable + installed), Remove from home,
+ *   Uninstall (if installed + non-system).
+ * - New app from the drawer: Add to home, Hide/Unhide, App info (if installed),
+ *   Uninstall (if installed + non-system).
  * - Folder member: none (folder members extract by drag only).
  */
 internal fun buildHomeContextMenuActions(
@@ -45,11 +48,12 @@ internal fun buildHomeContextMenuActions(
     packageName: String?,
     isHidden: Boolean,
     isSystemApp: Boolean,
+    isInstalled: Boolean,
 ): List<HomeContextMenuAction> = when (payload) {
     is DragPayload.Existing -> buildList {
-        if (packageName != null) add(HomeContextMenuAction.AppInfo(packageName))
+        if (packageName != null && isInstalled) add(HomeContextMenuAction.AppInfo(packageName))
         add(HomeContextMenuAction.RemoveFromHome(payload.id))
-        if (packageName != null && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName))
+        if (packageName != null && isInstalled && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName))
     }
     is DragPayload.NewApp -> buildList {
         add(HomeContextMenuAction.AddToHome(payload.key))
@@ -57,8 +61,8 @@ internal fun buildHomeContextMenuActions(
             if (isHidden) HomeContextMenuAction.UnhideApp(payload.key)
             else HomeContextMenuAction.HideApp(payload.key),
         )
-        if (packageName != null) add(HomeContextMenuAction.AppInfo(packageName))
-        if (packageName != null && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName))
+        if (packageName != null && isInstalled) add(HomeContextMenuAction.AppInfo(packageName))
+        if (packageName != null && isInstalled && !isSystemApp) add(HomeContextMenuAction.Uninstall(packageName))
     }
     is DragPayload.FolderMember -> emptyList()
 }

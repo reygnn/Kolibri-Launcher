@@ -72,6 +72,7 @@ import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitm
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditCoordinator
 import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
@@ -1392,11 +1393,18 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private fun showContextMenu(payload: DragPayload, source: View) {
         val pkg = payloadPackage(payload)
         val newAppKey = (payload as? DragPayload.NewApp)?.key
+        // A missing tile (kept reference to an uninstalled app) drops App info + Uninstall.
+        // LazySlotMembership treats an EMPTY installed set as "not loaded yet" → nothing is
+        // missing during the cold-start window, so actions aren't hidden spuriously.
+        val payloadKey = payloadKey(payload)
+        val isInstalled = payloadKey == null ||
+            !LazySlotMembership.isMissing(payloadKey, viewModel.installedKeys.value)
         val standard = buildHomeContextMenuActions(
             payload = payload,
             packageName = pkg,
             isHidden = newAppKey != null && newAppKey in viewModel.hiddenApps.value,
             isSystemApp = pkg != null && isSystemApp(pkg),
+            isInstalled = isInstalled,
         ).map(::contextMenuItemFor)
         if (standard.isEmpty() && pkg == null) return
         val generation = ++contextMenuGeneration
@@ -1464,13 +1472,15 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         }
     }
 
-    private fun payloadPackage(payload: DragPayload): String? = when (payload) {
+    /** The ComponentKey a payload points at, or null (a folder / stale id). */
+    private fun payloadKey(payload: DragPayload): ComponentKey? = when (payload) {
         is DragPayload.Existing ->
-            (viewModel.layout.value?.allHomeItems()?.firstOrNull { it.id == payload.id } as? HomeItem.App)
-                ?.key?.packageName
-        is DragPayload.NewApp -> payload.key.packageName
-        is DragPayload.FolderMember -> payload.key.packageName
+            (viewModel.layout.value?.allHomeItems()?.firstOrNull { it.id == payload.id } as? HomeItem.App)?.key
+        is DragPayload.NewApp -> payload.key
+        is DragPayload.FolderMember -> payload.key
     }
+
+    private fun payloadPackage(payload: DragPayload): String? = payloadKey(payload)?.packageName
 
     /**
      * The app's launcher shortcuts (dynamic + manifest + pinned), tap-to-launch —

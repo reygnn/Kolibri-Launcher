@@ -16,7 +16,8 @@ class HomeContextMenuTest {
         packageName: String? = key.packageName,
         isHidden: Boolean = false,
         isSystemApp: Boolean = false,
-    ) = buildHomeContextMenuActions(payload, packageName, isHidden, isSystemApp)
+        isInstalled: Boolean = true,
+    ) = buildHomeContextMenuActions(payload, packageName, isHidden, isSystemApp, isInstalled)
 
     // ---- Existing home item ----
 
@@ -38,6 +39,14 @@ class HomeContextMenuTest {
     @Test fun existing_folder_offers_only_remove() {
         // A folder (or a stale id) resolves to no package → info/uninstall drop out.
         assertThat(actions(DragPayload.Existing(id), packageName = null)).containsExactly(
+            HomeContextMenuAction.RemoveFromHome(id),
+        )
+    }
+
+    @Test fun existing_missing_app_offers_only_remove() {
+        // A kept reference to an uninstalled app (missing tile): App info + Uninstall are
+        // dead actions (nothing to open/uninstall), so only Remove from home remains.
+        assertThat(actions(DragPayload.Existing(id), isInstalled = false)).containsExactly(
             HomeContextMenuAction.RemoveFromHome(id),
         )
     }
