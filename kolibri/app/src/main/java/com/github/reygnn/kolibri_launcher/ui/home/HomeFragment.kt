@@ -11,6 +11,7 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.Configuration
 import android.content.res.Resources
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -469,6 +470,7 @@ class HomeFragment : Fragment() {
         setupFavoritesRecyclerView()
         setupHomeGestures()
         setupDoubleTapActions()
+        setupEventIndicatorAnchoring()
         setupFragmentResultListener()
         setupHomeWindowInsets()
 
@@ -1207,6 +1209,45 @@ class HomeFragment : Fragment() {
         // clickable. The events dialog opens only via the home double-tap
         // (GestureDelegate.onDoubleTap); the bell just signals that upcoming
         // alarms/events exist. See updateEventsIndicator.
+    }
+
+    /** Reused across [anchorEventIndicators] calls — tight glyph bounds of the clock. */
+    private val timeGlyphBounds = Rect()
+
+    /**
+     * Keeps the event-indicator pair vertically centred on the clock's VISIBLE digit
+     * band (TODO §24), replacing the old hand-tuned `vertical_bias`. Recomputes on any
+     * layout of the clock or the indicator container — so it survives minute ticks,
+     * config changes and system-font-scale changes — and once before the first draw.
+     * Setting `translationY` does not re-trigger layout, so this cannot loop. The math
+     * lives in [EventIndicatorAnchor]; this is the thin view glue.
+     */
+    private fun setupEventIndicatorAnchoring() {
+        val relayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            anchorEventIndicators()
+        }
+        binding.timeText.addOnLayoutChangeListener(relayout)
+        binding.eventIndicators.addOnLayoutChangeListener(relayout)
+        binding.eventIndicators.doOnPreDraw { anchorEventIndicators() }
+    }
+
+    private fun anchorEventIndicators() {
+        val binding = _binding ?: return
+        val clock = binding.timeText
+        val pair = binding.eventIndicators
+        val text = clock.text?.toString().orEmpty()
+        val baseline = clock.baseline
+        val pairHeight = pair.height
+        // Not laid out yet (baseline == -1) or nothing to measure — a later layout
+        // pass fires the listener again. getTextBounds / property reads can't throw.
+        if (text.isEmpty() || baseline < 0 || pairHeight == 0) return
+        clock.paint.getTextBounds(text, 0, text.length, timeGlyphBounds)
+        pair.translationY = EventIndicatorAnchor.translationY(
+            baselinePx = baseline,
+            glyphTopPx = timeGlyphBounds.top,
+            glyphBottomPx = timeGlyphBounds.bottom,
+            pairHeightPx = pairHeight,
+        )
     }
 
     /**

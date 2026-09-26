@@ -1657,7 +1657,19 @@ zuerst** (Zieldesign vs. Mittelweg), dann umsetzen.
 
 ---
 
-## 24. (offen) Events-Indikator: „saubere" Vertikal-Verankerung an die Uhr statt Fixwert
+## 24. (✅ umgesetzt) Events-Indikator: „saubere" Vertikal-Verankerung an die Uhr statt Fixwert
+
+> **✅ Umgesetzt (Branch `feature/kolibri-event-indicator-fontmetric-anchor`).** Das
+> Indikator-Paar (Wecker + Kalender) wird nicht mehr per hand-getuntem
+> `vertical_bias=0.58` platziert. Es sitzt jetzt in einem `eventIndicators`-Container
+> (Top an `timeText.top` gepinnt), dessen `translationY` `HomeFragment.anchorEventIndicators()`
+> aus den **Font-Metriken** der Uhr berechnet (`baseline` + `Paint.getTextBounds`), sodass das
+> Paar auf der **sichtbaren Ziffern-Bandmitte** zentriert bleibt — font-skalierungs-fest. Die
+> reine Rechen-Invariante lebt in `EventIndicatorAnchor` (JVM-getestet,
+> `EventIndicatorAnchorTest`); die View-Anbindung (Layout-Listener auf `timeText` +
+> Container) ist dünne Glue. Der Text unten beschreibt den früheren Ist-Zustand (90dp-Overlay
+> bzw. 0.58-Bias) als Referenz.
+
 
 **Ist-Zustand.** Die Glocke (`eventsIndicator`) ist ein Ecken-Overlay oben rechts
 — ein ConstraintLayout-Geschwister von `rootLayout` in `HomeGestureLayout`,
