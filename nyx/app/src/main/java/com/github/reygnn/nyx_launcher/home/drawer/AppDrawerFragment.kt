@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.drawer
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -18,6 +19,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.launcher.common.ui.SearchQueryChangeTracker
 import com.github.reygnn.launcher.common.ui.gesture.GestureFrameLayout
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.textfield.TextInputLayout
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.R
@@ -115,6 +118,18 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
         root.onDismissDrag = { host.hideDrawer() }
 
         view.findViewById<EditText>(R.id.search_edit_text).also { searchBox = it }
+        // Make the search field's outline AND floating label the Material3 primary colour in
+        // ALL states. Set here, not via app:boxStrokeColor: a single colour/attr only tints
+        // the FOCUSED stroke, so the resting border fell back to the dark default outline —
+        // invisible on the always-dark drawer scrim (black-on-black). Primary reads on the
+        // scrim in day and night, matching Kolibri's framed search field.
+        view.findViewById<TextInputLayout>(R.id.search_input_layout).also { input ->
+            val primary = ColorStateList.valueOf(
+                MaterialColors.getColor(input, androidx.appcompat.R.attr.colorPrimary),
+            )
+            input.setBoxStrokeColorStateList(primary)
+            input.setHintTextColor(primary)
+        }
         val topBar = view.findViewById<View>(R.id.drawer_top_bar)
         val list = view.findViewById<RecyclerView>(R.id.drawer_panel).also { drawerList = it }
         view.findViewById<View>(R.id.drawer_overflow).setOnClickListener { host.showDrawerOverflowMenu(it) }
