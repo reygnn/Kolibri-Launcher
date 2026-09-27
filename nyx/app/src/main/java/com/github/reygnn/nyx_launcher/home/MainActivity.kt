@@ -193,6 +193,10 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private lateinit var folderMembers: RecyclerView
     private lateinit var folderOverlayController: FolderOverlayController
     private var openFolderId: ItemId? = null
+    // The member adapter of the currently-open folder overlay, so it can be driven live
+    // (icon-style / installed-set / dots) instead of snapshotting at open. Guarded on
+    // folderOverlayController.isVisible at each use; replaced on every open.
+    private var openFolderMemberAdapter: FolderMemberAdapter? = null
     private var openFolderTitle: String = ""
 
     // In-DragLayer long-press context menu (Launcher3-style).
@@ -464,7 +468,15 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 // double render both collectors used to run on every return-to-home.
                 launchGuarded {
                     combine(viewModel.layout, viewModel.installedKeys) { layout, _ -> layout }
-                        .collect(::renderLayout)
+                        .collect { layout ->
+                            renderLayout(layout)
+                            // An open home-folder overlay greys/un-greys a member live when its
+                            // app is uninstalled/reinstalled (drawer folders are pre-reconciled
+                            // with an empty installed set → openFolderId is null there).
+                            if (folderOverlayController.isVisible && openFolderId != null) {
+                                openFolderMemberAdapter?.updateInstalled(viewModel.installedKeys.value)
+                            }
+                        }
                 }
                 launchGuarded {
                     // Drive the re-decode off IconLoader.currentStyle (the SINGLE decode
@@ -481,6 +493,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                         // new style via its dedicated refreshIcons path.
                         pagerAdapter?.refreshIcons()
                         dockAdapter.refreshIcons()
+                        // An open folder overlay re-decodes its members too (both folder types).
+                        if (folderOverlayController.isVisible) openFolderMemberAdapter?.refreshIcons()
                     }
                 }
                 // Notification dots (gated by the toggle): push the package set into the
@@ -489,6 +503,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     viewModel.notificationDots.collect { dots ->
                         pagerAdapter?.submitNotificationDots(dots)
                         dockAdapter.submitNotificationDots(dots)
+                        // An open folder overlay tracks member dots live too.
+                        if (folderOverlayController.isVisible) openFolderMemberAdapter?.submitNotificationDots(dots)
                     }
                 }
                 launchGuarded { clockDelegate.timeString.collect { clockTime.text = it } }
@@ -1192,6 +1208,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 folderOverlayController.close()
             },
         ).also { it.submit(members); it.submitNotificationDots(viewModel.notificationDots.value) }
+        openFolderMemberAdapter = adapter
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,
@@ -1381,6 +1398,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             installed = viewModel.installedKeys.value,
             onMissingApp = { key -> confirmRemoveMissingFolderMember(folderId, key) },
         ).also { it.submit(folder.members); it.submitNotificationDots(viewModel.notificationDots.value) }
+        openFolderMemberAdapter = adapter
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,

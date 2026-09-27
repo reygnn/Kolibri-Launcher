@@ -27,7 +27,7 @@ class FolderMemberAdapter(
     private val iconSizePx: Int,
     private val onLaunch: (ComponentKey) -> Unit,
     private val onStartDrag: (view: View, key: ComponentKey) -> Unit,
-    private val installed: Set<ComponentKey> = emptySet(),
+    private var installed: Set<ComponentKey> = emptySet(),
     private val onMissingApp: (ComponentKey) -> Unit = {},
 ) : RecyclerView.Adapter<FolderMemberAdapter.MemberHolder>() {
 
@@ -43,6 +43,26 @@ class FolderMemberAdapter(
         if (dotPackages == newDots) return
         dotPackages = newDots
         notifyItemRangeChanged(0, members.size, NOTIFICATION_DOT_PAYLOAD)
+    }
+
+    /**
+     * Re-decode every member icon (full rebind, no payload) on an icon-style change: the
+     * member DATA is unchanged, but each icon must re-decode under the new style. Lets an OPEN
+     * overlay track a style switch live (it used to snapshot the style at open). Mirrors the
+     * grid/dock refreshIcons.
+     */
+    fun refreshIcons() = notifyItemRangeChanged(0, members.size)
+
+    /**
+     * Update the installed-key set live so an OPEN overlay reflects a member being uninstalled
+     * (greys, offers removal) or reinstalled (un-greys) — instead of snapshotting [installed]
+     * at open. Value-equal guard skips the rebind when nothing changed. Drawer folders pass an
+     * empty set (pre-reconciled), so they never call this.
+     */
+    fun updateInstalled(newInstalled: Set<ComponentKey>) {
+        if (installed == newInstalled) return
+        installed = newInstalled
+        notifyItemRangeChanged(0, members.size)
     }
 
     override fun onBindViewHolder(holder: MemberHolder, position: Int, payloads: MutableList<Any>) {
