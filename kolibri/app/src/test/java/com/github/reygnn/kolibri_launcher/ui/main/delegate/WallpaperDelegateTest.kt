@@ -9,7 +9,6 @@ import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
-import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
@@ -255,7 +254,6 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { flattener.decodeSingle(any()) }
         coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
     }
 
@@ -328,9 +326,8 @@ class WallpaperDelegateTest {
         // §25 P4 guard (finding 3): warmComposite is the SOLE producer of the composite-luminance
         // signal the AUTO surface classifier consumes, and no test guarded that feed. This pins the
         // CLEAR half — removing the wallpaper must drop the signal to null so the classifier stops
-        // using the removed wallpaper's value. The positive warm -> emit(value) half needs the
-        // Bitmap.copy(HARDWARE) path (Robolectric), so it is deferred; WAH-INV-6 (never delete
-        // warmComposite) is the standing tripwire.
+        // using the removed wallpaper's value. The positive warm -> emit(value) half is pinned by
+        // the sibling test below; WAH-INV-6 (never delete warmComposite) is the standing tripwire.
         val luminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
         val delegate = createDelegate(compositeLuminanceSignal = luminanceSignal)
 
@@ -338,6 +335,49 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         verify { luminanceSignal.emit(null) }
+    }
+
+    @Test
+    fun `a successful multi-layer warm emits the composite luminance for the AUTO classifier`() = runTest {
+        // §25 review T3: the POSITIVE half of the luminance feed (warmComposite success ->
+        // emit(luminance)), the value the AUTO surface classifier reads for a multi-layer wallpaper.
+        // Pure-JVM after all: the flatten result and its HARDWARE copy are relaxed Bitmap mocks and
+        // computeFromBitmap is stubbed, so no real Bitmap.copy(HARDWARE) / Robolectric is needed. A
+        // regression that dropped or mis-valued WallpaperDelegate.warmComposite's emit(luminance)
+        // would leave the classifier on a stale LIGHT/DARK surface with no crash — now caught here.
+        val multi = WallpaperState(
+            layers = listOf(
+                WallpaperLayerState(imageUri = "file:///l1.jpg"),
+                WallpaperLayerState(imageUri = "file:///l2.jpg"),
+            )
+        )
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(multi)
+
+        val flattener: WallpaperFlattener = mockk()
+        coEvery { flattener.flatten(any(), any(), any()) } returns mockk<Bitmap>(relaxed = true)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        every { cache.get(any()) } returns null // miss -> the warm fires
+
+        val bitmapLuminance: com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl =
+            mockk(relaxed = true)
+        every { bitmapLuminance.computeFromBitmap(any()) } returns 0.73f
+
+        val luminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            wallpaperFlattener = flattener,
+            compositeCache = cache,
+            bitmapLuminance = bitmapLuminance,
+            compositeLuminanceSignal = luminanceSignal,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        verify { luminanceSignal.emit(0.73f) } // the sampled composite luminance is published
     }
 
     /**

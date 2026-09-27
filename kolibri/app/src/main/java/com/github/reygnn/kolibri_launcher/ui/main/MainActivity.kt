@@ -90,11 +90,14 @@ import timber.log.Timber
  *                    MainActivity — Catch-Sweep & Frame Notes
  * =============================================================================
  *
- * Status: Post catch-sweep (2026-05-04). 24 try/catch blocks (20
- * Throwable), 972 lines. Down from 48 / 40 / 797 on origin/main —
- * catch reduction 50% / 50%. The line count grew because the audit-
- * style header KDoc and the inline rationale comments on every kept
- * catch are part of the deal: each remaining catch carries a one-
+ * Status: Post catch-sweep (2026-05-04). At that sweep: 24 try/catch blocks
+ * (20 Throwable), 972 lines — down from 48 / 40 / 797 on origin/main, a
+ * 50% / 50% catch reduction. Those counts are the 2026-05-04 SNAPSHOT, not a
+ * maintained live tally: the file has grown since (e.g. §25 added the
+ * Activity-hosted wallpaper render/edit catches), so what stays authoritative
+ * is the four-category frame below, not the numbers. The line count grew
+ * because the audit-style header KDoc and the inline rationale comments on
+ * every kept catch are part of the deal: each remaining catch carries a one-
  * paragraph reason that names its four-category frame slot, so a
  * future reader knows why it is there before they ask.
  *
@@ -255,9 +258,10 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
 
     // ---- app-drawer overlay (nyx-style: visibility toggle, not navigation) ----
 
-    // Null-safe: the container is absent before setContentView (onboarding
-    // redirect) and the cast is guarded so a torn-down FragmentManager can
-    // never crash show/hide — callers early-return on null instead.
+    // Null-safe (defensive): setContentView always runs in setupMainContent before anything
+    // reads this, so the container is normally present; the View? getter keeps show/hide from
+    // crashing if the id is ever absent or the FragmentManager is torn down — callers
+    // early-return on null instead.
     private val drawerContainer: View? get() = findViewById(R.id.drawer_container)
 
     private val drawerFragment: AppDrawerFragment?
@@ -287,8 +291,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     // Shared overlay controller (common-ui): owns the slide, the intended-open
     // state, the cancel-safe visibility hand-off and config-change persistence,
     // identical to Nyx. App-specific open/close work lives in the hooks. Built
-    // once the content view exists (setupMainContent); null on the onboarding-
-    // redirect path where setContentView never runs.
+    // in setupMainContent once the content view exists; stays null only if the
+    // drawer container is absent (defensive — setContentView always runs).
     private var drawerOverlay: DrawerOverlayController? = null
 
     private fun buildDrawerOverlay(container: View) = DrawerOverlayController(
@@ -540,9 +544,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
 
         super.onCreate(savedInstanceState)
 
-        if (!setupMainContent()) {
-            return
-        }
+        // setupMainContent binds the render views or calls silentDeath (Nothing) — it never
+        // returns without a bound content view, so onCreate can proceed unconditionally.
+        setupMainContent()
 
         observeWallpaperBackdrop()
         setupWallpaperRendering()
@@ -727,9 +731,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
 
     /**
      * The `composite://<key>` cache key for [state] IF a warmed composite is currently cached for
-     * it, else null. Display-mode multi-layer only. Uses [android.content.res.Resources.getDisplayMetrics]
-     * — the same pinned metric source the delegate's warm-write side reads (its context is this
-     * Activity), so the read key matches the write key exactly (WAH-INV-5).
+     * it, else null. Display-mode multi-layer only. Reads this Activity's
+     * [android.content.res.Resources.getDisplayMetrics]; the delegate's warm-write side keys off its
+     * own `@ApplicationContext` resources. The two metrics coincide — so the read key matches the
+     * write key (WAH-INV-5) — for a fullscreen launcher on the primary display, which a HOME/LAUNCHER
+     * activity always is. They would diverge only in multi-window/freeform or on a secondary display
+     * with a different resolution, where a miss silently drops multi-layer render to the slow
+     * per-layer path (no crash). This is unchanged from the pre-§25 fragment read side (its context
+     * was the host Activity, same asymmetry).
      */
     private fun compositeCacheKeyIfHit(state: WallpaperState): String? {
         if (viewModel.isWallpaperEditMode.value) return null
@@ -784,8 +793,12 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
-    private fun setupMainContent(): Boolean {
-        return try {
+    // Returns Unit, not Boolean: every non-success path ends in TimberWrapper.silentDeath(...)
+    // (`: Nothing` — exitProcess in prod, throw under preventCrashForTesting), so the only way
+    // this returns normally is the success branch. setContentView therefore always runs and the
+    // three render lateinits are always bound before onCreate proceeds — the caller needs no guard.
+    private fun setupMainContent() {
+        try {
             setContentView(R.layout.activity_main)
             // Activity-hosted wallpaper surface (§25 P3): bind the persistent render views now
             // that the content view exists; they outlive the fragment view lifecycle.
@@ -807,7 +820,6 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
             if (navHostFragment != null) {
                 navController = navHostFragment.navController
                 WindowCompat.setDecorFitsSystemWindows(window, false)
-                true
             } else {
                 // finish() würde nichts bringen: Kolibri ist als HOME registriert,
                 // Android startet die Activity sofort wieder → Endlos-Loop mit

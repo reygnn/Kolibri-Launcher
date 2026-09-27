@@ -29,8 +29,9 @@ import timber.log.Timber
  * Owns the wallpaper-edit-mode UI surface. After the speed-dial FAB
  * refactor (May 2026) this class wires the [SpeedDialFabCluster] +
  * `CommandsPanel` controls instead of the legacy two-row bottom
- * toolbar; the public API and lifetime (created in `onViewCreated`,
- * nulled in `onDestroyView`) are unchanged.
+ * toolbar. Since the §25 P3 Activity re-host the controller is created in
+ * `MainActivity.setupWallpaperRendering` and nulled in `MainActivity.onDestroy`
+ * (Activity-persistent lifetime — no per-view teardown/recreation).
  *
  * The cluster's main `Save` FAB is also the drag handle for the
  * cluster's on-screen position. Position is persisted via
@@ -57,7 +58,8 @@ internal class WallpaperEditController(
 ) {
 
     // The edit overlay (interceptor, hint, CommandsPanel, SpeedDialFabCluster)
-    // lives behind a <ViewStub> in fragment_home and is inflated lazily on the
+    // lives behind a <ViewStub> in activity_main.xml (R.id.wallpaper_edit_overlay_stub,
+    // §25 P3) and is inflated lazily on the
     // first entry into edit mode — see [ensureOverlayInflated]. Null until then;
     // ~47ms of inflation is thus kept off every launcher cold start (the UI is
     // only ever used in edit mode). All view access goes through the accessors
@@ -135,7 +137,7 @@ internal class WallpaperEditController(
     /**
      * Repositions the speed-dial cluster to the persisted user
      * placement. Called when the [LauncherViewModel.fabPosition] flow
-     * emits — currently driven by the Fragment's lifecycle observer.
+     * emits — driven by MainActivity's Activity-lifecycle observer (§25 P3).
      */
     fun applyFabPosition(position: FabPosition) {
         val o = overlay
@@ -151,8 +153,8 @@ internal class WallpaperEditController(
 
     /**
      * Updates the CommandsPanel backdrop-toggle icon to reflect the current
-     * [WallpaperBackdrop]. Driven by the Fragment's observer of
-     * [LauncherViewModel.wallpaperBackdrop]. No-op until the overlay (and thus
+     * [WallpaperBackdrop]. Driven by MainActivity's Activity-lifecycle observer of
+     * [LauncherViewModel.wallpaperBackdrop] (§25 P3). No-op until the overlay (and thus
      * the panel) has been inflated — the icon is re-applied on the next emit
      * once the user enters edit mode, and the flow is a StateFlow so a current
      * value is always available.
@@ -165,10 +167,10 @@ internal class WallpaperEditController(
         if (overlay != null) {
             commandsPanel.setBackdropToggleIcon(iconRes)
         } else {
-            // Overlay not built yet — stash and apply on inflation, like
-            // pendingFabPosition. wallpaperBackdrop is a StateFlow, so the
-            // Fragment's collector re-emits the current value on STARTED after a
-            // view rebuild, keeping this fresh.
+            // Overlay not built yet (never entered edit mode) — an emission can
+            // arrive before the overlay is first inflated. Stash it and apply on
+            // inflation, like pendingFabPosition; wallpaperBackdrop is a StateFlow,
+            // so the current value is always available to re-apply.
             pendingBackdrop = backdrop
         }
     }

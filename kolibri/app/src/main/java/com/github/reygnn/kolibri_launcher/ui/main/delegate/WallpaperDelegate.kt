@@ -825,9 +825,12 @@ class WallpaperDelegate(
         if (state.hasWallpaper && state.layerCount >= 2) compositeKey(state) else null
 
     /**
-     * The composite cache key for [state] at the CURRENT display metrics. The one pinned metric
-     * source (spec §3a): both this warm-write side and the fragment's render-read side MUST read
-     * `context.resources.displayMetrics`, or the two keys diverge and the hit never lands.
+     * The composite cache key for [state] at the CURRENT display metrics (spec §3a). This warm-write
+     * side reads its `@ApplicationContext` `context.resources.displayMetrics`; MainActivity's
+     * render-read side ([MainActivity.compositeCacheKeyIfHit]) reads the Activity's resources. The
+     * two coincide — so write key == read key and the hit lands — for a fullscreen launcher on the
+     * primary display (which a HOME activity always is); they would diverge only in
+     * multi-window/freeform or on a secondary display (WAH-INV-5).
      */
     private fun compositeKey(state: WallpaperState): String {
         val m = context.resources.displayMetrics

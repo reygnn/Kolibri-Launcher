@@ -504,6 +504,10 @@ oom_files=(
   # WallpaperFileManager, WallpaperRepositoryImpl, WallpaperBitmapLuminanceImpl) moved to
   # tools/shared-lint-files.sh (SHARED_OOM_FILES) so both apps enforce them.
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
+  # MainActivity hosts the wallpaper bitmap-decode allocation boundary (loadBitmapFromUri ->
+  # decodeBoundedWallpaperBitmap) since §25 P3; its broad catches are all Throwable today, so
+  # this locks that boundary against a future Exception-narrowing that would miss OutOfMemoryError.
+  "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"

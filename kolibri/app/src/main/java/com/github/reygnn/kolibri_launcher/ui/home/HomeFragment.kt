@@ -70,10 +70,14 @@ import javax.inject.Inject
  *                    HomeFragment — Size & Refactoring Notes
  * =============================================================================
  *
- * Status: Post-Brocken-A (2026-05-03) + later trimming. Now 1593 lines,
- * 11 try/catch blocks (7 Throwable). Down from 2657 / 59 / 51. The file
- * is at its structural floor — see "Why the floor is here" below
- * before proposing further size reduction.
+ * Status: Post-Brocken-A (2026-05-03) + later trimming, incl. the §25 P3 move
+ * of the wallpaper render + edit surface to MainActivity (~370 lines out,
+ * including the loadBitmapFromUri/updateWallpaper Throwable catch and the
+ * onCreate/onConfigurationChanged overrides). Post-Brocken-A the file was 1593
+ * lines / 11 try/catch (7 Throwable), down from 2657 / 59 / 51; those are era
+ * SNAPSHOTS, not a maintained live tally (the §25 move shrank it again). The
+ * file is at its structural floor — see "Why the floor is here" below before
+ * proposing further size reduction.
  *
  *
  * Why the floor is here
@@ -86,16 +90,17 @@ import javax.inject.Inject
  *
  *   ~150 lines  this header KDoc — documentation, not code
  *   ~60 lines   imports
- *   ~80 lines   onDestroyView teardown — 14 setListener(null) calls
- *               plus wallpaperView callback nulls plus _binding
- *               nulling. Each listener must be released explicitly;
- *               nothing here folds into a loop without losing type
- *               information or making the teardown harder to audit.
- *   ~120 lines  eight Android lifecycle overrides (onCreate,
- *               onCreateView, onViewCreated, onConfigurationChanged,
- *               onStart, onResume, onPause, onDestroyView). These are
- *               Android Fragment contract — they cannot live anywhere
- *               but in the Fragment subclass.
+ *   ~80 lines   onDestroyView teardown — setListener(null) calls plus
+ *               _binding nulling (the wallpaperView callback nulls moved to
+ *               MainActivity.onDestroy with the render surface, §25 P3). Each
+ *               listener must be released explicitly; nothing here folds into a
+ *               loop without losing type information or making the teardown
+ *               harder to audit.
+ *   ~120 lines  six Android lifecycle overrides (onCreateView, onViewCreated,
+ *               onStart, onResume, onPause, onDestroyView; onCreate and
+ *               onConfigurationChanged moved to MainActivity with the wallpaper
+ *               surface, §25 P3). These are Android Fragment contract — they
+ *               cannot live anywhere but in the Fragment subclass.
  *   ~280 lines  eight collectOnStarted observer blocks, each tied to
  *               a specific ViewModel flow with its own dispatch logic.
  *               The Fragment.collectOnStarted helper (in ui.flow)
@@ -104,7 +109,8 @@ import javax.inject.Inject
  *               their minimum-information form.
  *   ~150 lines  setup methods (setupGestures, setupDoubleTapActions,
  *               setupBackPressHandler, setupHomeWindowInsets,
- *               setupFragmentResultListener, registerLayerImagePicker).
+ *               setupFragmentResultListener; registerLayerImagePicker moved to
+ *               MainActivity with the render surface, §25 P3).
  *               Each requires binding, viewLifecycleOwner, or
  *               childFragmentManager — Fragment-bound by definition.
  *               Moving them to a sibling class adds construction and
@@ -169,16 +175,17 @@ import javax.inject.Inject
  *   Expected errors (I/O, parse, missing package) — caught with
  *     specific exception types, surfaced where they matter, otherwise
  *     logged at the appropriate level. Never swallowed. Examples in
- *     this file: loadBitmapFromUri (FileNotFoundException +
- *     SecurityException + OutOfMemoryError under the Throwable
- *     umbrella), showAppInfo (ActivityNotFoundException),
+ *     this file: showAppInfo (ActivityNotFoundException),
  *     getDimensionPixelSize sites (Resources.NotFoundException under
- *     ProGuard).
+ *     ProGuard). (The former loadBitmapFromUri example — FileNotFound +
+ *     Security + OutOfMemoryError under a Throwable umbrella — moved to
+ *     MainActivity with the render surface, §25 P3.)
  *
  *   Teardown races (fragment gone, coroutine still delivering) —
  *     prevented structurally via viewLifecycleOwner.lifecycleScope
  *     and local _binding snapshots, not masked with a post-hoc
- *     catch. Example: updateWallpaper.
+ *     catch. (The former updateWallpaper example moved to MainActivity,
+ *     §25 P3, onto the Activity lifecycleScope + persistent surface.)
  *
  *   Programmer errors (NPE, IllegalState, IndexOutOfBounds) — bugs,
  *     not conditions. Crash loudly in DEBUG via silentError;
