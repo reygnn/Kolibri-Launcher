@@ -2,7 +2,6 @@ package com.github.reygnn.nyx_launcher.home
 
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -59,12 +58,12 @@ import com.github.reygnn.nyx_launcher.home.drag.DropZone
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerAdapter
 import com.github.reygnn.nyx_launcher.home.drawer.AppDrawerFragment
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
+import com.github.reygnn.launcher.common.ui.AppLauncher
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.EventRowsAdapter
 import com.github.reygnn.launcher.common.ui.openBatterySettings
 import com.github.reygnn.launcher.common.ui.openCalendarApp
 import com.github.reygnn.launcher.common.ui.openClockApp
-import com.github.reygnn.launcher.common.ui.runLaunchCatching
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
@@ -130,6 +129,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     override val viewModel: HomeViewModel by viewModels()
 
     @Inject lateinit var iconLoader: IconLoader
+    @Inject lateinit var appLauncher: AppLauncher
     @Inject lateinit var folderRenderer: FolderIconRenderer
     @Inject lateinit var observeTimeBasedEventsUseCase: ObserveTimeBasedEventsUseCase
 
@@ -1671,17 +1671,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     }
 
     private fun launchApp(key: ComponentKey) {
-        val intent = Intent(Intent.ACTION_MAIN)
-            .addCategory(Intent.CATEGORY_LAUNCHER)
-            .setComponent(ComponentName(key.packageName, key.className))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        // no suspension point — launchApp is synchronous (startActivity).
-        // Shared launch taxonomy (:common-ui): a failed tap now toasts instead of
-        // silently doing nothing (ActivityNotFoundException) or crashing
-        // (SecurityException) — Pixel / Kolibri parity. Usage is recorded only on a
-        // real launch, so an uninstalled-since-last-refresh package never bumps it.
-        // Component-gone cleanup is handled reactively by PackageEventCoordinator.
-        when (val result = runLaunchCatching { startActivity(intent) }) {
+        // Shared launcher-idiomatic execution (:common-ui AppLauncher →
+        // LauncherApps.startMainActivity), replacing the former explicit ACTION_MAIN Intent +
+        // startActivity — Kolibri / Launcher3 parity, work-profile-capable. The shared launch
+        // taxonomy still drives the reaction: a failed tap toasts instead of silently doing
+        // nothing (ActivityNotFoundException) or crashing (SecurityException). Usage is recorded
+        // only on a real launch, so an uninstalled-since-last-refresh package never bumps it;
+        // component-gone cleanup is handled reactively by PackageEventCoordinator.
+        when (val result = appLauncher.launch(this, key)) {
             AppLaunchResult.Launched -> viewModel.recordLaunch(key)
             AppLaunchResult.ComponentGone,
             AppLaunchResult.PermissionDenied -> showToastSafe(R.string.app_launch_failed)

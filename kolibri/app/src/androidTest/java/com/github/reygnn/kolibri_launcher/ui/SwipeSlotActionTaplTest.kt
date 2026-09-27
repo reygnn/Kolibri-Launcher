@@ -10,8 +10,9 @@ import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.tapl.Launcher
-import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
+import com.github.reygnn.launcher.common.ui.AppLauncher
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentBootstrap
 import com.github.reygnn.launcher.testing.awaitUntil
@@ -95,21 +96,21 @@ class SwipeSlotActionTaplTest {
 
             awaitUntil(
                 timeoutMs = 10_000,
-                describe = { "swipe never launched the assigned app; launched=${recordingLauncher.launched?.componentName}" },
+                describe = { "swipe never launched the assigned app; launched=${recordingLauncher.launched?.flat}" },
             ) {
-                recordingLauncher.launched?.componentName == target.componentName
+                recordingLauncher.launched?.flat == target.componentName
             }
         }
 
-        assertThat(recordingLauncher.launched?.componentName).isEqualTo(expectedComponent)
+        assertThat(recordingLauncher.launched?.flat).isEqualTo(expectedComponent)
     }
 }
 
-/** Records the app handed to [launch] instead of hitting LauncherApps. */
+/** Records the component handed to [launch] instead of hitting LauncherApps. */
 private class RecordingAppLauncher : AppLauncher {
-    @Volatile var launched: AppInfo? = null
-    override fun launch(activity: Activity, appInfo: AppInfo): AppLaunchResult {
-        launched = appInfo
+    @Volatile var launched: ComponentKey? = null
+    override fun launch(activity: Activity, key: ComponentKey): AppLaunchResult {
+        launched = key
         return AppLaunchResult.Launched
     }
 }

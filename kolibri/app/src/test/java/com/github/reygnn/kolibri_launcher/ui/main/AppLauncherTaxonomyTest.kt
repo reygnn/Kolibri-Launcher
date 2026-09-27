@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.LauncherApps
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
+import com.github.reygnn.launcher.common.ui.AppLauncherImpl
 import com.github.reygnn.launcher.common.ui.runLaunchCatching
 import io.mockk.Runs
 import io.mockk.every
@@ -94,7 +95,7 @@ class AppLauncherTaxonomyTest {
             className = "com.example.x.Main",
         )
 
-        val result = AppLauncherImpl().launch(activity, appInfo)
+        val result = AppLauncherImpl().launch(activity, appInfo.key)
 
         assertTrue(result is AppLaunchResult.Failed)
         assertTrue((result as AppLaunchResult.Failed).cause is IllegalStateException)
@@ -120,7 +121,7 @@ class AppLauncherTaxonomyTest {
             className = ".Main",
         )
 
-        val result = AppLauncherImpl().launch(activity, appInfo)
+        val result = AppLauncherImpl().launch(activity, appInfo.key)
 
         assertEquals(AppLaunchResult.Launched, result)
         assertEquals("com.example.x", component.captured.packageName)

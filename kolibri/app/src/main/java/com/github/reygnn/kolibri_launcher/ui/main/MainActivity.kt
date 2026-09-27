@@ -44,6 +44,7 @@ import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
+import com.github.reygnn.launcher.common.ui.AppLauncher
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
 import com.github.reygnn.launcher.common.ui.EventRowsAdapter
 import com.github.reygnn.launcher.common.ui.LaunchTrace
@@ -1005,7 +1006,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // The LauncherApps / ActivityOptions runtime glue now lives behind
         // [AppLauncher]; this method only reacts to the typed result. The
         // former inline triple-catch moved into AppLauncherImpl.
-        val result = appLauncher.launch(this, appInfo)
+        val result = appLauncher.launch(this, appInfo.key)
         when (result) {
             is AppLaunchResult.Launched -> {
                 if (BuildConfig.DEBUG) {

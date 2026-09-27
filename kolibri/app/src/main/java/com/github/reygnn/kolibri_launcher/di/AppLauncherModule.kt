@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.di
 
-import com.github.reygnn.kolibri_launcher.ui.main.AppLauncher
-import com.github.reygnn.kolibri_launcher.ui.main.AppLauncherImpl
+import com.github.reygnn.launcher.common.ui.AppLauncher
+import com.github.reygnn.launcher.common.ui.AppLauncherImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
