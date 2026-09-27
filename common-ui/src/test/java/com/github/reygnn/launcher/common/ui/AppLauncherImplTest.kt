@@ -62,6 +62,19 @@ class AppLauncherImplTest {
         assertEquals(boom, (result as AppLaunchResult.Failed).cause)
     }
 
+    @Test
+    fun `an Error (OutOfMemoryError) maps to Failed too - the catch is Throwable, not Exception`() {
+        // Restores the guard the deleted AppLauncherTaxonomyTest carried: the catch in
+        // runLaunchCatching is `Throwable`, so an Error (not an Exception) escaping the launch —
+        // e.g. OutOfMemoryError from startMainActivity — still maps to Failed rather than crashing
+        // the launch. This is the ONLY taxonomy test that throws an Error, so a future narrowing of
+        // that catch to `Exception` (which would miss OOM) turns it red instead of slipping through.
+        val oom = OutOfMemoryError("boom")
+        val result = runLaunchCatching { throw oom }
+        assertTrue(result is AppLaunchResult.Failed)
+        assertEquals(oom, (result as AppLaunchResult.Failed).cause)
+    }
+
     // --- AppLauncherImpl ---
 
     @Test

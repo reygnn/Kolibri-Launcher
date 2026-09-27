@@ -74,6 +74,6 @@ echo
 echo " Triage: if the init-launched coroutine can reach the later property (e.g."
 echo " via a method it calls), it is a real init-order race — move the state ABOVE"
 echo " the init block, then add the file to the initorder_files list to lock it."
-echo " Detail per file:  awk -f kolibri/tools/check-init-order-launch.awk <file>"
+echo " Detail per file:  awk -f tools/check-init-order-launch.awk <file>"
 echo "════════════════════════════════════════════════════════════════════════"
 exit 0
