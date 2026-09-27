@@ -134,6 +134,16 @@ class HomeGridAdapter(
         debugToast("icon-style: ${cells.size} repainted")
     }
 
+    /**
+     * Targeted re-decode: repaint only the cells that render [pkg]'s icon (an in-place icon update
+     * evicted its cache entry, but the cell is value-equal so [submit]'s DiffUtil skips it). Full
+     * (payload-less) rebind of just the matching positions → re-decode; other icons untouched.
+     * Driven per-page by the pager on a targeted icon invalidation.
+     */
+    fun refreshIconsFor(pkg: String) {
+        cells.forEachIndexed { i, cell -> if (cell.rendersPackage(pkg)) notifyItemChanged(i) }
+    }
+
     override fun onBindViewHolder(holder: CellHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isDotOnlyPayload()) {
             holder.dot.visibility =

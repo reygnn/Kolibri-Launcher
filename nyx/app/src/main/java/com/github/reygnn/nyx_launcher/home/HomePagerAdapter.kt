@@ -63,6 +63,14 @@ class HomePagerAdapter(
      */
     fun refreshIcons() = notifyItemRangeChanged(0, pages.size, ICON_STYLE_PAYLOAD)
 
+    /**
+     * Targeted icon invalidation: re-decode only the tiles that render [pkg] on every live page
+     * (an in-place icon update evicted its cache entry; the cells are value-equal so [submit]'s
+     * DiffUtil would skip them). Offscreen pages re-decode naturally when next bound. Called from
+     * MainActivity's pending-icon-repaint collector.
+     */
+    fun refreshIconsFor(pkg: String) = notifyItemRangeChanged(0, pages.size, IconRepaintPayload(pkg))
+
     override fun onBindViewHolder(holder: PageHolder, position: Int, payloads: MutableList<Any>) {
         // ICON_STYLE first: refreshIcons() is a full (payload-less) rebind, so it also
         // refreshes dots. Checking dot-only first would let a coalesced [DOT, ICON_STYLE]
@@ -70,6 +78,15 @@ class HomePagerAdapter(
         // (neither dots nor icons update). "Contains ICON_STYLE" covers the mixed case.
         if (payloads.hasIconStylePayload()) {
             holder.gridAdapter.refreshIcons()
+            return
+        }
+        // Targeted per-package repaint (possibly coalesced with a dot payload): re-decode the
+        // matching tiles, and if a dot payload rode along, refresh the (whole-page) dots too so
+        // the coalesced dot update isn't dropped.
+        val repaintPackages = payloads.iconRepaintPackages()
+        if (repaintPackages.isNotEmpty()) {
+            repaintPackages.forEach { holder.gridAdapter.refreshIconsFor(it) }
+            if (payloads.any { it === NOTIFICATION_DOT_PAYLOAD }) holder.gridAdapter.refreshDots()
             return
         }
         if (payloads.isDotOnlyPayload()) {

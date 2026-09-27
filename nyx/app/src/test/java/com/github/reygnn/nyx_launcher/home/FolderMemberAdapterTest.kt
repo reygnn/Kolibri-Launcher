@@ -67,4 +67,19 @@ class FolderMemberAdapterTest {
         adapter.refreshIcons()
         assertThat(counter.rebinds).isEqualTo(1)
     }
+
+    @Test
+    fun `refreshIconsFor rebinds only the matching member, not the rest`() {
+        // F1 targeted repaint: an in-place icon update for com.a must re-decode only a's tile,
+        // leaving b untouched (so the value-equal short-circuit's win is preserved).
+        val adapter = adapter(installed = emptySet())
+        adapter.submit(listOf(a, b))
+        val counter = RebindCounter().also { adapter.registerAdapterDataObserver(it) }
+
+        adapter.refreshIconsFor("com.a")   // one matching position → one item-change
+        assertThat(counter.rebinds).isEqualTo(1)
+
+        adapter.refreshIconsFor("com.z")   // no member matches → no rebind
+        assertThat(counter.rebinds).isEqualTo(1)
+    }
 }

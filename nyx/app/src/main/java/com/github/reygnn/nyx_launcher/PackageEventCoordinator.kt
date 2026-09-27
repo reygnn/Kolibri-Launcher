@@ -20,9 +20,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -87,6 +91,17 @@ class PackageEventCoordinator @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
+    // Packages whose icons were just evicted (below) and whose on-screen tiles may still hold the
+    // stale bitmap. A StateFlow (accumulating SET, not a rendezvous event) on purpose: an in-place
+    // icon update — same package, still installed, so installedKeys is value-equal and the render
+    // collector never re-fires — commonly lands while home is BACKGROUNDED (a Play-Store update),
+    // when no UI collector is active. A transient event would be dropped and the stale icon would
+    // survive the return to home; the accumulating StateFlow replays the pending set on the UI's
+    // STARTED re-subscription instead. The UI ([MainActivity]) repaints only the matching tiles and
+    // then drains what it consumed via [consumeIconRepaints], so a normal render never re-decodes.
+    private val _pendingIconRepaints = MutableStateFlow<Set<String>>(emptySet())
+    val pendingIconRepaints: StateFlow<Set<String>> = _pendingIconRepaints.asStateFlow()
+
     @OptIn(FlowPreview::class) // Flow.debounce(Long)
     fun start() {
         // The debounced reconcile pump: cold-start catch-up (immediate) + coalesced
@@ -123,6 +138,10 @@ class PackageEventCoordinator @Inject constructor(
                 try {
                     iconLoader.evict(event.packageName) // ICL-INV-3, targeted
                     folderRenderer.clear() // a member's icon may have changed
+                    // AFTER the evict (so a UI repaint re-decodes fresh, not the stale entry):
+                    // mark this package for a targeted on-screen repaint. Fixes the in-place
+                    // icon-update case that installedKeys / the render collector cannot see.
+                    _pendingIconRepaints.update { it + event.packageName }
                     // Refresh the SHARED installed-apps loader (the documented
                     // PackageUpdateReceiver → AppUpdateSignal → triggerAppsUpdate funnel,
                     // InstalledAppsRepository KDoc). This is what makes the no-prune model
@@ -171,5 +190,14 @@ class PackageEventCoordinator @Inject constructor(
     @VisibleForTesting
     internal fun requestReconcile() {
         reconcileRequests.tryEmit(Unit)
+    }
+
+    /**
+     * Drop [packages] from [pendingIconRepaints] once the UI has repainted their tiles, so a later
+     * STARTED re-subscription (return to home) does not repaint them again. Idempotent; a package
+     * re-invalidated after consumption is re-added by the next event.
+     */
+    fun consumeIconRepaints(packages: Set<String>) {
+        _pendingIconRepaints.update { it - packages }
     }
 }

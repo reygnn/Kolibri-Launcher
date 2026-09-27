@@ -54,6 +54,15 @@ class FolderMemberAdapter(
     fun refreshIcons() = notifyItemRangeChanged(0, members.size)
 
     /**
+     * Targeted re-decode: repaint only the member tiles of [pkg] (an in-place icon update evicted
+     * its cache entry; the member DATA is value-equal so it would otherwise keep the stale bitmap).
+     * Full (payload-less) rebind of just the matching positions → re-decode; other members untouched.
+     */
+    fun refreshIconsFor(pkg: String) {
+        members.forEachIndexed { i, key -> if (key.packageName == pkg) notifyItemChanged(i) }
+    }
+
+    /**
      * Update the installed-key set live so an OPEN overlay reflects a member being uninstalled
      * (greys, offers removal) or reinstalled (un-greys) — instead of snapshotting [installed]
      * at open. Value-equal guard skips the rebind when nothing changed. Drawer folders pass an

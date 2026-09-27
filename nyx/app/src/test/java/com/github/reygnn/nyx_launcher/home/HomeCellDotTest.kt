@@ -51,4 +51,38 @@ class HomeCellDotTest {
         // A present member with a dot still shows one.
         assertThat(cell.hasNotificationDot(setOf("com.a"))).isTrue()
     }
+
+    // --- rendersPackage (targeted icon-repaint matching, F1) ---
+
+    @Test
+    fun `empty cell never renders a package`() {
+        assertThat(HomeCell.Empty.rendersPackage("com.a")).isFalse()
+    }
+
+    @Test
+    fun `app cell renders its own package only`() {
+        val cell = HomeCell.App(ItemId("1"), key("com.a"))
+        assertThat(cell.rendersPackage("com.a")).isTrue()
+        assertThat(cell.rendersPackage("com.b")).isFalse()
+    }
+
+    @Test
+    fun `folder cell renders a present member's package`() {
+        val cell = HomeCell.Folder(ItemId("f"), listOf(key("com.a"), key("com.b")))
+        assertThat(cell.rendersPackage("com.b")).isTrue()
+        assertThat(cell.rendersPackage("com.z")).isFalse()
+    }
+
+    @Test
+    fun `folder cell does not render an uninstalled member's package (presentMembers)`() {
+        // com.b is a member but uninstalled (absent from presentMembers): the composite does not
+        // draw it, so a com.b icon change must not repaint this folder tile.
+        val cell = HomeCell.Folder(
+            ItemId("f"),
+            members = listOf(key("com.a"), key("com.b")),
+            presentMembers = listOf(key("com.a")),
+        )
+        assertThat(cell.rendersPackage("com.b")).isFalse()
+        assertThat(cell.rendersPackage("com.a")).isTrue()
+    }
 }

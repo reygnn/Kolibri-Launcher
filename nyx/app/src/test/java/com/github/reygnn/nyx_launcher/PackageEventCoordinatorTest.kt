@@ -13,6 +13,7 @@ import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -187,6 +188,49 @@ class PackageEventCoordinatorTest {
         // cold-start (1) + the Added event's coalesced reconcile (1)
         coVerify(exactly = 2) { reconcile() }
     }
+
+    @Test
+    fun package_event_marks_the_package_for_a_targeted_icon_repaint_then_drains() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // F1: an in-place icon update (PackageEvent.Changed — same package, still installed)
+            // evicts the icon but leaves installedKeys value-equal, so the render collector never
+            // repaints and the tile keeps the stale bitmap. The coordinator must expose the changed
+            // package via pendingIconRepaints (accumulating, so a background update is caught on the
+            // UI's return-to-home) for a targeted on-screen repaint.
+            coEvery { reconcile() } returns ReconcileResult.Unchanged
+            coordinator.start()
+            advanceUntilIdle()
+            assertThat(coordinator.pendingIconRepaints.value).isEmpty()
+
+            appUpdateSignal.send(PackageEvent.Changed("com.example.updated"))
+            advanceUntilIdle()
+
+            // Marked for repaint, AFTER the eviction (so the UI re-decodes fresh).
+            assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.example.updated")
+            verify(exactly = 1) { iconLoader.evict("com.example.updated") }
+
+            // The UI drains what it repainted; a later STARTED re-subscription must not repaint again.
+            coordinator.consumeIconRepaints(setOf("com.example.updated"))
+            assertThat(coordinator.pendingIconRepaints.value).isEmpty()
+        }
+
+    @Test
+    fun multiple_package_events_accumulate_until_consumed() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // The set accumulates across events (a storm / several updates while backgrounded),
+            // and a partial drain leaves the rest pending.
+            coEvery { reconcile() } returns ReconcileResult.Unchanged
+            coordinator.start()
+            advanceUntilIdle()
+
+            appUpdateSignal.send(PackageEvent.Changed("com.a"))
+            appUpdateSignal.send(PackageEvent.Added("com.b"))
+            advanceUntilIdle()
+            assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.a", "com.b")
+
+            coordinator.consumeIconRepaints(setOf("com.a"))
+            assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.b")
+        }
 
     @Test
     fun on_trim_memory_mild_level_trims_icons_but_keeps_the_folder_cache() {

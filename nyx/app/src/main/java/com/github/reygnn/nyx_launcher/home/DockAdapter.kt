@@ -46,6 +46,17 @@ class DockAdapter(
      */
     fun refreshIcons() = notifyItemRangeChanged(0, items.size)
 
+    /**
+     * Targeted re-decode: repaint only the dock tiles that render [pkg]'s icon. An in-place icon
+     * update (same package, still installed) evicts the cache entry but leaves the HomeCells
+     * value-equal, so [submit]'s `==` guard would skip the rebind and keep the stale bitmap. A
+     * full (payload-less) rebind of just the matching positions re-decodes them; other icons are
+     * untouched, so the value-equal short-circuit's win is preserved.
+     */
+    fun refreshIconsFor(pkg: String) {
+        items.forEachIndexed { i, cell -> if (cell.rendersPackage(pkg)) notifyItemChanged(i) }
+    }
+
     fun submitNotificationDots(newDots: Set<String>) {
         if (dotPackages == newDots) return
         dotPackages = newDots

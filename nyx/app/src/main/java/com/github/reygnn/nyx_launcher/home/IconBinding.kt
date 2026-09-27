@@ -68,6 +68,19 @@ val ICON_STYLE_PAYLOAD = Any()
 fun List<Any>.hasIconStylePayload(): Boolean = any { it === ICON_STYLE_PAYLOAD }
 
 /**
+ * Payload marking a TARGETED icon invalidation for one package: an in-place icon update (same
+ * package, still installed) evicted the cache entry, but the cells are value-equal so DiffUtil /
+ * the `==` guards would skip the rebind and keep the stale bitmap. Carried per-page by the pager;
+ * the page re-decodes only the tiles that render [pkg]. A data class (value identity) so coalesced
+ * payloads for distinct packages stay distinct.
+ */
+data class IconRepaintPayload(val pkg: String)
+
+/** The distinct packages named by [IconRepaintPayload]s in a (possibly coalesced) payload list. */
+fun List<Any>.iconRepaintPackages(): Set<String> =
+    mapNotNull { (it as? IconRepaintPayload)?.pkg }.toSet()
+
+/**
  * Whether [this] cell should show a notification dot given [dotPackages] (the set of
  * packages with a dot-worthy notification): an app matches its own package, a folder
  * matches if any member does. Pure — unit-tested (see HomeCellDotTest).
@@ -78,6 +91,20 @@ fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this)
     // presentMembers (installed-only), NOT members: a folder whose only dot-carrying member is
     // uninstalled must not show a dot on its (greyed) composite — the gone app can't notify.
     is HomeCell.Folder -> presentMembers.any { it.packageName in dotPackages }
+}
+
+/**
+ * Whether [this] cell RENDERS [pkg]'s icon: an app of that package, or a folder whose drawn
+ * (present) members include it. Used to repaint ONLY the tiles affected by a targeted icon
+ * invalidation — an in-place icon update (same package, still installed) evicts the cache entry
+ * but leaves the cell value-equal, so the adapters' value-equal short-circuit would keep the stale
+ * bitmap. Repainting just the matching positions re-decodes them without touching every icon. Pure
+ * — unit-tested (see HomeCellDotTest). presentMembers (installed-only) matches [hasNotificationDot].
+ */
+fun HomeCell.rendersPackage(pkg: String): Boolean = when (this) {
+    HomeCell.Empty -> false
+    is HomeCell.App -> key.packageName == pkg
+    is HomeCell.Folder -> presentMembers.any { it.packageName == pkg }
 }
 
 /** Alpha for a "missing" tile (app no longer installed) — a greyed broken-shortcut look.

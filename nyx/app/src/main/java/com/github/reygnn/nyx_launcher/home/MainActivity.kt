@@ -46,6 +46,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.nyx_launcher.R
+import com.github.reygnn.nyx_launcher.PackageEventCoordinator
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
@@ -152,6 +153,10 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // folder) so a fresh install isn't a blank screen. One-shot; each seed no-ops on a
     // returning install (gated in its repository). See onCreate.
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
+
+    // The app-lifecycle package-event singleton (also held by NyxApplication). Injected here only
+    // to observe its pendingIconRepaints signal for the targeted on-screen icon repaint.
+    @Inject lateinit var packageEvents: PackageEventCoordinator
 
     // Drives the shared first-launch ACRA consent dialog (see onCreate); all builds.
     @Inject lateinit var consentController: ConsentController
@@ -495,6 +500,24 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                         dockAdapter.refreshIcons()
                         // An open folder overlay re-decodes its members too (both folder types).
                         if (folderOverlayController.isVisible) openFolderMemberAdapter?.refreshIcons()
+                    }
+                }
+                // Targeted icon repaint: a package whose icon changed in place (same package, still
+                // installed) evicts its cache entry, but installedKeys is value-equal so the render
+                // collector above never re-fires and the tiles keep the stale bitmap. The coordinator
+                // accumulates such packages in a StateFlow that replays here on STARTED (so an update
+                // that landed while home was backgrounded is caught on return), we repaint ONLY the
+                // matching tiles on each live surface, then drain what we consumed so a normal render
+                // never re-decodes. Empty set (the steady state) is a no-op.
+                launchGuarded {
+                    packageEvents.pendingIconRepaints.collect { pending ->
+                        if (pending.isEmpty()) return@collect
+                        pending.forEach { pkg ->
+                            dockAdapter.refreshIconsFor(pkg)
+                            pagerAdapter?.refreshIconsFor(pkg)
+                            if (folderOverlayController.isVisible) openFolderMemberAdapter?.refreshIconsFor(pkg)
+                        }
+                        packageEvents.consumeIconRepaints(pending)
                     }
                 }
                 // Notification dots (gated by the toggle): push the package set into the
