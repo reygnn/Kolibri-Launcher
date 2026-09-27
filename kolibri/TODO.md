@@ -21,7 +21,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 7 | Selbst-Linter für die 13 Rules | teilumgesetzt (4 von 6 Rules: 9, 12, Naming seit 2026-05-03; Rule 11 annotation discipline seit 2026-05-04), Memo bleibt | — |
 | 8 | Time-basierte Test-Konvention | erledigt 2026-05-03 (Konvention dokumentiert + 1 Pin), Memo bleibt | — |
 | 9 | Architektur-Schritte für 9+ Score | erledigt 2026-05-03 (alle Subteile), Memo bleibt | — |
-| 10 | Lib-Pinning regelmäßig revisit | Format etabliert 2026-05-03, nächster Recheck 2026-Q3 | klein, periodisch |
+| 10 | Lib-Pinning regelmäßig revisit | Q3-Pass durch (2026-05-06, alle 33 Pins), nächster Recheck 2026-Q4 | klein, periodisch |
 | 11 | Brocken C — `:domain` Source Pure-Kotlin | erledigt 2026-05-03 (alle 16 Files Android-frei); Modul-Type-Switch in §12 nachgezogen | — |
 | 12 | `:domain` Modul-Type-Switch (§11-Followup) | erledigt 2026-05-03 — Plugin-Switch zu `kotlin("jvm")` durch `KolibriLog`-Indirektion (Timber-AAR-Blocker aufgelöst), Memo unten | — |
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
@@ -32,7 +32,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
 | 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | **erledigt** — Phase 1 (2026-05-08, commit `9828def`) + Phase 2 (Backup-Schema, 2026-05-08). Tabellen-Status hing hinterher; die Detail-Sektion §21 unten stand längst auf ✅, und der Code ist verdrahtet (BackupDataAssembler Export/Import + BackupSerializer). Verifiziert 2026-08-14. | — |
 | 22 | Coverage-Threshold im Wallpaper-Classifier (`huggie.png`-Anker) | **offen (trigger-basiert zurückgestellt)** — `MIN_OPAQUE_COVERAGE = 0.5f`-Gate; `huggie.png` sitzt mit 48.7 % direkt auf dem Routing-Zaun, beide Pfade konvergieren aber zufällig. Erst angehen, wenn ein 40–60-%-Borderline-Bild AUTO falsch klassifiziert oder eine Asset-Pipeline-Änderung Coverage verschiebt. Detail-Sektion §22 unten. | klein-mittel, empirisch |
-| 26 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, Geräte-Verifikation im Monorepo steht noch aus. | klein-mittel |
+| 26 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, **auf A17 verifiziert (2026-09-27):** SettingsActivity + Backup-Sub-Screen rendern edge-to-edge mit MaterialToolbar korrekt (Top-Inset ok, kein Clipping/Crash). | klein-mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -42,7 +42,7 @@ ist 2026-05-03 ebenfalls gelandet (`d5c5ce3 → 0b7a21c → 986d478 → 78903ec`
 Bug-Fix für die Rule-9-DEBUG-Throw-Semantik, `InitialSetupAction`-Pure-
 Logic-Extraktion, Catch-Sweep mit Vier-Kategorien-Frame-Annotation
 (37 → 21 Throwable). §10 ist als wiederkehrender Quartals-Termin etabliert
-und triggert sich von selbst — nächster Recheck 2026-Q3.
+und triggert sich von selbst — nächster Recheck 2026-Q4.
 `androidTest/` ist seit Mai gefüllt (Stand 2026-05-06: 16 Tests, siehe
 „Audit-Snapshot 2026-05-06"-Eintrag unten); der ehemalige
 „leeres `androidTest/`"-Deckler ist weg. Score ist auf 9.5 hochgesetzt
@@ -77,7 +77,7 @@ offensichtlichen Default mehr — frag was er will. Mögliche Anker: der
 einzige noch offene kleine Tabellen-Eintrag §22 (Wallpaper-Coverage-
 Threshold, trigger-basiert zurückgestellt) — §14–§17 sind seit 2026-08-20
 erledigt/geschlossen, §19 seit 2026-08-21 obsolet (Code entfernt); der
-Quartals-Recheck §10 (2026-Q3), oder ein neuer Audit-Pass für eine
+Quartals-Recheck §10 (2026-Q4, ab Okt fällig), oder ein neuer Audit-Pass für eine
 aktuelle Score-Bestandsaufnahme.
 
 ### Workflow-Defaults
