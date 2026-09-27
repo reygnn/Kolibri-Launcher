@@ -73,11 +73,55 @@ saubere Aufhänger.
   und die Navigation an.
 - **Der Flatten-Nutzen ist nicht nur Teardown.** `WallpaperFlattener` (jetzt in
   `:common-ui`) flacht N Layer → 1 Textur. Das senkt die **per-Frame-GPU-Last**
-  für Multi-Layer *unabhängig* vom Teardown. Vor dem Rückbau messen, ob ein
-  persistenter Multi-Layer-View (N Texturen live) auf schwacher GPU (A17) teurer
-  rendert als eine geflachte Textur. Falls ja: die Flatten-Optimierung erhalten
-  (einmal flatten beim Settle, auch ohne den Reattach-Cache) statt komplett
-  streichen.
+  für Multi-Layer *unabhängig* vom Teardown. **Gemessen (A17-Spike, siehe unten):
+  ja — der persistente Multi-Layer-View (N Texturen live) rendert bei aktivem
+  Redraw messbar teurer als eine geflachte Textur.** Daher gilt: den Flatten
+  **nicht** komplett streichen, sondern die Optimierung erhalten (einmal flatten
+  beim Settle, auch ohne den Reattach-Cache).
+
+### Messung: N Live-Layer vs. 1 Textur (A17-Spike, 2026-09-27)
+
+**Frage.** Rendert nyx' persistenter N-Live-Layer-View pro Frame teurer als
+Kolibris geflachte 1 Textur — und muss §25 den Flatten deshalb behalten?
+
+**Setup.** Samsung SM-A176B (A17), 1080×2340, 60 Hz. nyx mit einem 4-Layer-
+Wallpaper (vier vollflächige, opake Farb-Layer — Worst-Case-Overdraw: jeder Layer
+überzeichnet den darunter). Gemessen im **Wallpaper-Edit-Mode** (der einzige Fall
+mit aktivem per-Frame-Redraw: Pan/Zoom invalidiert den View), via
+`dumpsys gfxinfo` über ein durchgehendes, geskriptetes Pan (`input swipe`, ~325
+Frames pro Lauf). Layer über das Ebenen-Menü nacheinander entfernt (4→3→2→1) und
+bei jeder Stufe neu gemessen.
+
+| Layer | Frame 50th | 90th | 95th | Jank | GPU 50th | GPU 90th |
+|------:|-----------:|-----:|-----:|-----:|---------:|---------:|
+| **1** |     12 ms  | 13 ms| 14 ms| **0,3 %** | 9 ms  | 10 ms |
+| **2** |     20 ms  | 31 ms| 34 ms| 7,4 % | 15 ms | 25 ms |
+| **3** |     17 ms  | 27 ms| 29 ms| 6,2 % | 12 ms | 21 ms |
+| **4** |     18 ms  | 29 ms| 32 ms| 6,2 % | 13 ms | 23 ms |
+
+(1-Layer zweimal gemessen, praktisch identisch → stabiles Signal, kein Ausreißer.)
+
+**Ergebnis.** Das Signal ist eine **Stufe bei 1→2 Layern**, kein linearer
+per-Layer-Anstieg: 1 Layer hält 60 fps bombenfest (90th 13 ms, 0,3 % Jank), ab
+2 Layern verdoppelt sich die Frame-Zeit (~35 fps, 90th 27–31 ms, 6–7 % Jank), und
+2/3/4 liegen danach auf einem **Plateau** (die Reihenfolge dort — 2L zufällig am
+schlechtesten — ist Lauf-Rauschen von ~±3 ms). Das ist die Signatur eines
+**Compositing-Pfad-Wechsels** (HWUI erzwingt beim zweiten Layer einen
+Offscreen-Buffer + Blend), nicht reiner Fill-Rate.
+
+**Konsequenz für §25.**
+- Die N-Live-Kosten fallen **nur bei aktivem Redraw des Wallpaper-Views** an, also
+  im Edit-Mode-Pan/Zoom. Im Normalbetrieb ist der View statisch (HWUI cached die
+  Render-Node), Layer-Zahl irrelevant — der Activity-Umzug an sich kostet nichts.
+- Der Flatten ist damit **nicht** obsolet: er ist der Grund, warum Kolibri auch
+  bei aktivem Redraw auf dem 1-Layer-Pfad bleibt. §25 muss den Flatten für den
+  Settle-Zustand behalten (bzw. im Edit-Mode nur den aktiven Layer live +
+  geflachten Backdrop rendern), sonst erbt der Activity-hosted Multi-Layer-View
+  nyx' ~35-fps-Edit-Pan auf schwacher Hardware.
+- nyx-Seite: der ~35-fps-Edit-Pan ist ein transienter, interaktiver Zustand —
+  vertretbar, aber ein Kandidat für dieselbe „aktiver Layer live, Rest geflacht“-
+  Optimierung, falls der geteilte `WallpaperHost` (WALLPAPER_SHARE_SPEC §4)
+  ohnehin gebaut wird.
 - **Fragment-Lifecycle-Kopplungen.** `HomeFragment` nutzt `viewLifecycleOwner`
   für Scrim/Observer/Teardown-Nulling. Beim Umzug auf Activity-Level muss diese
   Lifecycle-Bindung neu gedacht werden (nyx: `MainActivity`-Lifecycle direkt).

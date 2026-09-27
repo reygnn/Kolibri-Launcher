@@ -1737,7 +1737,13 @@ kein Cache, kein Flash). Ein Umzug der Surface auf Activity-Level (dorthin, wo
 
 **Groß, riskant, an verifiziertem Code — reiner Eleganz-/Wartbarkeits-Gewinn,
 kein Bugfix.** Caveat: der `WallpaperFlattener`-Nutzen (N Layer → 1 Textur) ist
-teils per-Frame-GPU-Last, nicht nur Teardown — vor dem Rückbau messen.
+teils per-Frame-GPU-Last, nicht nur Teardown. **Gemessen (A17-Spike 2026-09-27,
+Detail in der Spec):** ja — ab dem 2. Live-Layer verdoppelt sich bei aktivem
+Redraw (Edit-Pan) die Frame-Zeit (60→~35 fps, Stufe bei 1→2, danach Plateau),
+im statischen Normalbetrieb kostet die Layer-Zahl nichts (View gecacht). Heißt:
+§25 darf den Flatten **nicht** streichen, sondern muss ihn für den Settle-Zustand
+behalten (bzw. Edit-Mode: aktiver Layer live + Rest geflacht). Der Activity-Umzug
+selbst bleibt gefahrlos.
 
 Volle Analyse, Anker, Risiken, Trigger:
 `docs/specs/WALLPAPER_ACTIVITY_HOSTING_EXPLORATION.md`.
