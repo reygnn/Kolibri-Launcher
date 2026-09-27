@@ -475,11 +475,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     iconLoader.currentStyle.collect { style ->
                         if (style == appliedIconStyle) return@collect
                         appliedIconStyle = style
-                        // renderLayout refreshes the dock (DockAdapter full rebind) and keeps
-                        // the layout consistent, but the grid's positional DiffUtil sees no cell
-                        // change on a style switch — so force the pages to re-decode their icons.
-                        renderLayout(viewModel.layout.value)
+                        // The layout is unchanged on a style switch, so don't re-submit it — both
+                        // surfaces would see no data change (the grid's positional DiffUtil; the
+                        // dock's `==` guard). Instead force each to re-decode its icons under the
+                        // new style via its dedicated refreshIcons path.
                         pagerAdapter?.refreshIcons()
+                        dockAdapter.refreshIcons()
                     }
                 }
                 // Notification dots (gated by the toggle): push the package set into the

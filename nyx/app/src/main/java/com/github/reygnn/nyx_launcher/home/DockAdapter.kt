@@ -28,9 +28,23 @@ class DockAdapter(
     private var dotPackages: Set<String> = emptySet()
 
     fun submit(newItems: List<HomeCell>) {
+        // Value-equal short-circuit: skip the full rebind (which re-decodes every dock icon)
+        // when the dock contents are unchanged. Safe now that the icon-style repaint has its
+        // own path ([refreshIcons]) instead of riding this unconditional notifyDataSetChanged —
+        // so a plain layout re-render that doesn't touch the dock no longer re-decodes it.
+        // HomeCell is value-equal (data types), same basis the grid's DiffUtil uses.
+        if (items == newItems) return
         items = newItems
         notifyDataSetChanged()
     }
+
+    /**
+     * Re-decode every dock icon (full rebind, no payload) on an icon-style change: the dock
+     * DATA is unchanged, so [submit]'s `==` guard would skip it, yet each icon must re-decode
+     * under the new style (IconLoader / FolderIconRenderer key their caches by style). Mirrors
+     * [HomeGridAdapter.refreshIcons]; driven by MainActivity's currentStyle collector.
+     */
+    fun refreshIcons() = notifyItemRangeChanged(0, items.size)
 
     fun submitNotificationDots(newDots: Set<String>) {
         if (dotPackages == newDots) return
