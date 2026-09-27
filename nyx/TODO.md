@@ -115,7 +115,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > wurde am 2026-09-18 doch umgesetzt — der Material-Blocker war überwindbar; siehe
 > „Kürzlich erledigt".)
 
-### NyxDrawer-TAPL — dokumentierte Ursache gefixt (2026-09-27); Rest: Kaltstart-Flake
+### NyxDrawer-TAPL — erledigt (Overlay-Leck + Init-Race gefixt, 2026-09-27)
 
 **Der ursprünglich hier vermutete „reine Test-Robustheit"-Befund war falsch — es war ein
 Produkt-Bug, gefixt in `6edf979`.** Die Drawer-Instrumented-Tests (`DrawerAppToHomeTaplTest`,
@@ -129,18 +129,27 @@ offen ist (`setHomeGestureDetectionActive`, getoggelt aus `DrawerOverlayControll
 onShown/onHidden) — das Leck ist damit strukturell zu. (Derselbe Fix behob auch das
 Scroll-Einfrieren bei schnellem Flick im offenen Drawer.)
 
-**A17-Verifikation (2026-09-27):** beide Drawer-Tests bestehen einzeln kalt
-(`DrawerAppToHomeTaplTest` 3×, `DrawerAppToHomeDragTaplTest` 1×). Die dokumentierte
-Long-Press-Leck-Failure trat nicht mehr auf.
+**Zweiter Bug — der „Kaltstart-Flake" war eine `FolderIconRenderer`-Init-Race, jetzt gefixt.**
+Beim wiederholten Kaltlauf von `DrawerAppToHomeTaplTest` sah `NyxHome.assertOnPage()` in ~1/8
+Läufen den `home_pager` nicht (37 s-Stall, *vor* jeder Drawer-Geste). Root-Cause: die
+`@Singleton FolderIconRenderer` startet in ihrem `init`-Block einen `currentStyle`-Collector
+(`onEach { clear() }`); `lock`/`cache` waren aber **nach** dem `init`-Block deklariert
+(Kotlin: Deklarationsreihenfolge), sodass der Collector `clear()` → `synchronized(lock)` auf
+einem noch-`null` `lock` rufen konnte → NPE in einer ungefangenen Start-Coroutine, die den
+Cold-Start mitriss. Deterministisch reproduziert (JVM, `UnconfinedTestDispatcher`) und gefixt:
+`lock`/`cache` vor den `init`-Block gezogen + `CoroutineExceptionHandler`→`reportToAcra` als
+Defense-in-Depth (Commits `6f73630` Repro/Handler, `91fbe2c` Reorder/Regression;
+`FolderIconRendererTest.construction_is_init_order_safe_even_on_an_eager_dispatcher`).
 
-**Rest (offen, klein):** ein seltener **Kaltstart-Flake** bleibt — `NyxHome.assertOnPage()`
-sah in 1 von 4 Läufen den `home_pager` nicht innerhalb des Budgets (37 s-Stall beim ersten
-Cold-Launch, *vor* jeder Drawer-Geste; im Lauf lief parallel das Play-Store-Aufräumen des
-gerade deinstallierten Builds). Das ist ein initialer Render-/Umgebungs-Flake, **nicht** die
-Drawer-Geste. Stehende Mitigation: `numFlakyTestAttempts` für `:nyx:app` (kolibris
-Standard-Flake-Mitigation, die nyx noch nicht hat). Hinweis: ein gesperrtes Gerät ist ein
-*anderer* Rotfall (der Homescreen kommt nicht in den Vordergrund) — für androidTest muss das
-Gerät entsperrt/wach sein.
+**A17-Verifikation (2026-09-27):** vor dem Fix bestanden die Drawer-Tests einzeln kalt
+(`DrawerAppToHomeTaplTest` 3×, `DrawerAppToHomeDragTaplTest` 1×), das Long-Press-Leck trat nicht
+mehr auf; der `home_pager`-Stall reproduzierte ~1/8. **Nach dem Fix:
+`DrawerAppToHomeTaplTest` 5/5 grün.** Beide Bugs sind damit erledigt.
+
+Hinweis (unverändert gültig): ein gesperrtes Gerät ist ein *anderer* Rotfall (der Homescreen
+kommt nicht in den Vordergrund) — für androidTest muss das Gerät entsperrt/wach sein.
+`numFlakyTestAttempts` für `:nyx:app` bleibt eine optionale allgemeine Flake-Mitigation
+(kolibri hat sie), ist aber für diese beiden Bugs nicht mehr nötig.
 
 ### App-Start-Ausführung teilen (Option B — offener Refactor-Kandidat, 2026-09-18)
 
