@@ -195,19 +195,17 @@ Alle A–G-Findings + Härtung (Runde 2) sind umgesetzt; die folgenden Punkte wu
 **bewusst zurückgestellt** (keine Bugs — Design-Calls, seltene Kanten oder Refactors mit
 Regressionsrisiko, die einen eigenen Task verdienen):
 
-- **Dock: value-equal/payload-Short-Circuit fehlt.** `DockAdapter.submit` macht bei jedem
-  `renderLayout` ein bedingungsloses `notifyDataSetChanged()` (Re-Decode pro Dock-Holder),
-  während `HomePagerAdapter.submit` bei wertgleichen Seiten früh zurückkehrt. Ein `==`-Guard
-  am Dock allein wäre **falsch** (der Dock-Stil-Repaint hängt an genau diesem unbedingten
-  Rebind, da der Dock — anders als das Grid — keinen ICON_STYLE-Payload-Pfad hat). Korrekter
-  Fix = dem Dock einen eigenen `refreshIcons(payload)`-Pfad geben **und dann** submit guarden.
-  Eigener Task, nicht als drive-by. Icon-Loads treffen den Memory-Cache, also heute nur
-  minorer Main-Thread-Rebind-Overhead.
+- ~~**Dock: value-equal/payload-Short-Circuit fehlt.**~~ ✅ **erledigt (2026-09-27):**
+  `DockAdapter` hat jetzt einen eigenen `refreshIcons()`-Pfad (Re-Decode bei Stilwechsel) und
+  `submit` einen `==`-Guard, sodass ein Layout-Re-Render, der den Dock nicht berührt, ihn nicht
+  mehr neu dekodiert. MainActivity's currentStyle-Collector treibt `dockAdapter.refreshIcons()`.
+  A17-verifiziert (COLOR↔MONOCHROME schaltet den Dock live um).
 
-- **Folder-Overlay ist ein Snapshot.** Ein offenes Folder-Overlay reagiert nicht live auf
-  Stilwechsel oder Un-/Reinstall eines Members (baut `FolderMemberAdapter` einmal beim Öffnen
-  aus `installedKeys.value`). Selten (Stil wird von Home aus gewechselt, meist ohne offenes
-  Folder). Fix bräuchte ein Re-Submit/Re-Observe im Overlay-Controller. Low.
+- ~~**Folder-Overlay ist ein Snapshot.**~~ ✅ **erledigt (2026-09-27):** `FolderMemberAdapter`
+  hat `refreshIcons()` (Stil) + `updateInstalled()` (Live-Greying, value-equal-guarded);
+  MainActivity treibt das offene Overlay aus denselben 3 Home-Collectors (Stil/installed/Dots),
+  geguarded auf `folderOverlayController.isVisible` — installed nur für Home-Folder (Drawer-Folder
+  sind vor-reconciled). Robolectric-Test (`FolderMemberAdapterTest`) pinnt die Entry-Points.
 
 - **self-uninstall id-scoped vs. alle Platzierungen.** Uninstall von einer Home-Kachel entfernt
   nur DIESE Platzierung; Duplikate derselben App auf anderen Kacheln / in Foldern bleiben grau
