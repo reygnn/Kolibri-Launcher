@@ -37,4 +37,18 @@ class HomeCellDotTest {
         val cell = HomeCell.Folder(ItemId("f"), listOf(key("com.a")))
         assertThat(cell.hasNotificationDot(emptySet())).isFalse()
     }
+
+    @Test
+    fun `folder dot ignores an uninstalled dot-carrying member (presentMembers, not members)`() {
+        // com.b carries a dot but is uninstalled (absent from presentMembers) — the greyed
+        // composite must not show a dot for an app that can't notify.
+        val cell = HomeCell.Folder(
+            ItemId("f"),
+            members = listOf(key("com.a"), key("com.b")),
+            presentMembers = listOf(key("com.a")),
+        )
+        assertThat(cell.hasNotificationDot(setOf("com.b"))).isFalse()
+        // A present member with a dot still shows one.
+        assertThat(cell.hasNotificationDot(setOf("com.a"))).isTrue()
+    }
 }

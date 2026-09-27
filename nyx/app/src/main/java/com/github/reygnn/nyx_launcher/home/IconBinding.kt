@@ -75,7 +75,9 @@ fun List<Any>.hasIconStylePayload(): Boolean = any { it === ICON_STYLE_PAYLOAD }
 fun HomeCell.hasNotificationDot(dotPackages: Set<String>): Boolean = when (this) {
     HomeCell.Empty -> false
     is HomeCell.App -> key.packageName in dotPackages
-    is HomeCell.Folder -> members.any { it.packageName in dotPackages }
+    // presentMembers (installed-only), NOT members: a folder whose only dot-carrying member is
+    // uninstalled must not show a dot on its (greyed) composite — the gone app can't notify.
+    is HomeCell.Folder -> presentMembers.any { it.packageName in dotPackages }
 }
 
 /** Alpha for a "missing" tile (app no longer installed) — a greyed broken-shortcut look.

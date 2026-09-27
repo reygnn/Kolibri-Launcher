@@ -45,15 +45,18 @@ class GetDrawerAppsUseCase @Inject constructor(
         // empty/failed reload (rawAppsFlow momentarily empty while getCurrentApps() still
         // carries last-good, SIA-INV-5), which the unconditional wait would have stalled
         // on for the full prime timeout.
-        if (stateRepository.getCurrentApps().isEmpty()) {
+        var apps = stateRepository.getCurrentApps()
+        if (apps.isEmpty()) {
             // Genuine cold start (holder never fed yet): wait for the first NON-EMPTY load,
-            // bounded by the prime timeout, then fall through to getCurrentApps() (still
-            // empty only on a genuinely-empty device — a latency edge, not a hang).
+            // bounded by the prime timeout, then RE-READ getCurrentApps() (the warm snapshot
+            // above was empty; the primed one may now carry apps — still empty only on a
+            // genuinely-empty device, a latency edge, not a hang).
             withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
                 stateRepository.rawAppsFlow.first { it.isNotEmpty() }
             }
+            apps = stateRepository.getCurrentApps()
         }
-        stateRepository.getCurrentApps()
+        apps
             .map { it.toLauncherApp() }
             .sortedBy { it.displayName.lowercase() }
     }
