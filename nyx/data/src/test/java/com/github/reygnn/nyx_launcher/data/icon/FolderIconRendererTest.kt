@@ -3,7 +3,6 @@ package com.github.reygnn.nyx_launcher.data.icon
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.KolibriLog
-import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
@@ -91,14 +90,14 @@ class FolderIconRendererTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun construction_hits_the_init_order_race_and_reports_to_acra() {
-        // REPRO of the FolderIconRenderer init-order race. The init block launches the
-        // currentStyle collector (onEach { clear() }) BEFORE `lock`/`cache` are declared, so
-        // their initialisers run AFTER init. With an eager (Unconfined) dispatcher the collector
-        // runs synchronously inside init and clear() touches a still-null `lock` -> NPE. In
-        // production the collector runs on Dispatchers.IO, making this a timing race (observed
-        // ~1/8 on device). The scope's CoroutineExceptionHandler must route that NPE to
-        // TimberWrapper.reportToAcra (ACRA_REPORT tag) instead of an uncaught crash.
+    fun construction_is_init_order_safe_even_on_an_eager_dispatcher() {
+        // Regression guard for the FolderIconRenderer init-order race. The init block launches
+        // the currentStyle collector (onEach { clear() }); clear() touches `lock`/`cache`, which
+        // MUST therefore be declared (and initialised) before that init block. Constructing on an
+        // eager (Unconfined) dispatcher runs the collector synchronously inside init — the worst
+        // case — so if the declaration order ever regresses, clear() synchronizes on a still-null
+        // `lock` and the scope's handler reports an NPE via TimberWrapper.reportToAcra. Assert
+        // that construction stays clean: nothing reaches reportToAcra.
         val captured = mutableListOf<Pair<String, Throwable?>>()
         val previous = KolibriLog.taggedErrorHandler
         KolibriLog.taggedErrorHandler = { tag, t, _ -> captured += tag to t }
@@ -108,9 +107,7 @@ class FolderIconRendererTest {
             KolibriLog.taggedErrorHandler = previous
         }
 
-        val reported = captured.firstOrNull { it.first == TimberWrapper.ACRA_REPORT_TAG }
-        assertThat(reported).isNotNull()
-        assertThat(reported!!.second).isInstanceOf(NullPointerException::class.java)
+        assertThat(captured).isEmpty()
     }
 
     @Test

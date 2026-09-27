@@ -34,6 +34,18 @@ class FolderIconRenderer @Inject constructor(
     private val iconLoader: IconLoader,
     @IoDispatcher dispatcher: CoroutineDispatcher,
 ) {
+    // Declared BEFORE the init block on purpose: the collector launched there calls clear(),
+    // which touches `lock`/`cache`. Kotlin runs property initialisers and init blocks in
+    // declaration order, so these must be initialised first — otherwise the collector, if it
+    // runs before construction finishes (it launches on `dispatcher`, and currentStyle replays
+    // its value immediately), synchronizes on a still-null `lock` and throws NPE. Do not move
+    // them below the init block.
+    private val lock = Any()
+    private val cache = object : LinkedHashMap<CacheKey, Bitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CacheKey, Bitmap>): Boolean =
+            size > MAX_ENTRIES
+    }
+
     init {
         // Promptly drop cached previews when the style changes so old-style composites don't
         // linger until LRU eviction. Observes the SAME authority the composite key uses
@@ -50,11 +62,6 @@ class FolderIconRenderer @Inject constructor(
         iconLoader.currentStyle
             .onEach { clear() }
             .launchIn(CoroutineScope(SupervisorJob() + dispatcher + handler))
-    }
-    private val lock = Any()
-    private val cache = object : LinkedHashMap<CacheKey, Bitmap>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CacheKey, Bitmap>): Boolean =
-            size > MAX_ENTRIES
     }
 
     suspend fun render(members: List<ComponentKey>, sizePx: Int): Bitmap {
