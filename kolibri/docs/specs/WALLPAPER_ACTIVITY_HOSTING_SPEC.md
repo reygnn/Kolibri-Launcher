@@ -1,6 +1,7 @@
 # WALLPAPER_ACTIVITY_HOSTING_SPEC
 
-> **Status: GEPLANT — noch nicht implementiert, kein Trigger formal gefeuert.**
+> **Status: IMPLEMENTIERT (P1–P6, gestapelte Branches, NOCH NICHT GEMERGT — 2026-09-27).**
+> Umsetzungsstand siehe Abschnitt gleich unten; Merge nur auf ausdrückliches Kommando.
 > Promotet die Exploration `WALLPAPER_ACTIVITY_HOSTING_EXPLORATION.md` (§25) zur
 > Implementierungs-Spec. Die Wallpaper-Render-Surface zieht von `HomeFragment`
 > (Fragment-hosted) auf Activity-Level (persistent), analog zu nyx. Vor dem Bau
@@ -16,6 +17,27 @@ Recherche-Befunde derselben Session (3 Explore-Agents), die die ursprüngliche
 Zeilennummern sind Stand 2026-09-27 und als Orientierung, nicht als Vertrag, zu lesen.
 
 ---
+
+## Umsetzungsstand (2026-09-27)
+
+Phasenweise implementiert auf gestapelten Branches
+`feature/wallpaper-activity-hosting-p1…p6` (je committet + gepusht, **noch nicht gemergt**).
+Jede Phase mit `:kolibri:app:assembleDebug` + `checkConventions` + `checkRule13` + Unit-Tests
+grün verifiziert; **P3 zusätzlich A17-device-verifiziert** (volle Edit-Session: Enter, Add-Layer,
+Save, Cancel/Exit, drawer→home-Persistenz, kein Crash).
+
+- **P1** — Layout-Gerüst (`activity_main.xml`: Container/View/Scrim/Stub, gone/unverdrahtet).
+- **P2** — Prep: `WallpaperEditController` auf explizite Views (host-agnostisch), Spec-Re-Cut.
+- **P3** — Render-Surface **+** Edit-Controller gemeinsam → `MainActivity` (Kopplung §2.4);
+  A17-verifiziert.
+- **P4** — vestigialen Single-Layer-Cache-Pfad zurückgebaut; Luminanz-Clear-Guard ergänzt.
+- **P5** — `wallpaper_backdrop`-View → `wallpaperContainer.background` (nyx-Parität).
+- **P6** — Sweep + Endverifikation (dieses Doc; voller Stack grün).
+
+Offen (Folge, **nicht** Teil dieses Umbaus): Option 2B (Single-Slot-Composite-Holder statt LRU,
+§2.5), der positive Luminanz-Emit-Guard (braucht Robolectric, §2.6), der `WallpaperHost`-Port
+(WSS §4, §2.8). Optionaler eager-BLACK-Backdrop-Seed (§2.7) — das First-Frame-Verhalten ist
+aktuell identisch zur alten View (transparent-Default), also keine Regression.
 
 ## 0. Entscheidung & warum (die ehrliche Payoff-Lage)
 
