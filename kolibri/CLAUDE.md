@@ -826,6 +826,39 @@ legitimate multi-sub-launch / nested-coroutine case the helper explicitly
 excludes. A gate there would be all-noise, against the "precise shape" rule
 the other checks hold to.
 
+### Init-order launch hazard (enforced — positive list + discovery scan)
+
+Kotlin runs property initializers and `init { }` blocks in **declaration order**.
+A coroutine launched inside `init { }` can start running before construction
+finishes (it launches on some dispatcher, and a `StateFlow` it collects replays
+its value immediately). If the launched code touches a property whose initializer
+is declared BELOW the init block, that property's backing field is still null when
+the coroutine runs → NPE. The nyx `FolderIconRenderer` hit exactly this: its
+`currentStyle` collector called `clear()` → `synchronized(lock)` while `lock` was
+still null — an intermittent startup crash (surfaced first as a flaky
+`DrawerAppToHomeTaplTest`). Fix: declare the state ABOVE the launching init.
+
+Enforced by `./gradlew checkConventions` via `tools/check-init-order-launch.awk`
+as a **positive list** (`initorder_files`), same growth model as the cancellation /
+breadth whitelists: a listed file is LOCKED against a regression that reorders a
+property initializer below a coroutine-launching init block. It is a positive list,
+not a global gate, because the awk over-approximates (it flags any initialized
+property after such an init without proving the launch touches it); the fix
+(reorder) is mechanical and safe, so a false positive costs little, but the
+opt-in keeps the gate honest. nyx locks `FolderIconRenderer.kt`; the kolibri list
+is empty today (no kolibri file has the shape). Regression-tested via
+`tools/check-init-order-launch-test.sh` (manual rerun, not a CI gate).
+
+**Discovery — `./gradlew scanInitOrderLaunch`.** Sibling of `scanCancelCandidates` /
+`scanOomCandidates` (report-only, never fails the build). Unlike those, it sweeps
+**every** module's main source repo-wide — the shared-code refactors move
+launch/init code between `:core` / `:common-*` / the apps, so the hazard can appear
+anywhere. Because the awk has no marker escape, a listed-and-clean file yields no
+hit, so the scan needs no whitelist exclusion — anything it prints is an unreviewed
+occurrence. Run it after moving a coroutine launch into an init block or reordering
+class members. Triage: if the init-launched coroutine can reach the later property,
+move the state above the init and add the file to `initorder_files`.
+
 ---
 
 ## StrictMode violations: known unfixables

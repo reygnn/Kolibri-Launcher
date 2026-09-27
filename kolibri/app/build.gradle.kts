@@ -500,6 +500,20 @@ tasks.register<Exec>("scanOomCandidates") {
     commandLine = listOf("bash", "tools/scan-oom-candidates.sh")
 }
 
+// Discovery aid for the init-order-launch gate (initorder_files positive list),
+// mirroring the scans above. A coroutine launched in an `init { }` block that
+// touches a property declared BELOW it races on a null backing field (the
+// FolderIconRenderer NPE). The gate is blind to non-listed files by design; this
+// sweeps EVERY module's main source (repo-wide — the shared-code refactors move
+// launch/init code between modules) with the same awk and lists the shape.
+// Report-only — never fails the build; NOT wired into checkConventions/CI.
+tasks.register<Exec>("scanInitOrderLaunch") {
+    group = "verification"
+    description = "Lists files that launch a coroutine in an init block followed by a property initializer (report-only)."
+    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; the script derives the repo root itself)
+    commandLine = listOf("bash", "tools/scan-init-order-launch.sh")
+}
+
 // Code coverage configuration via JaCoCo — AGGREGATES ALL THREE MODULES.
 //
 // This task used to cover :app alone: the jacoco plugin was applied only here,

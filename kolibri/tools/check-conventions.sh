@@ -287,6 +287,41 @@ if [ -n "$cancel_hits" ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Init-order launch hazard (positive list) — a coroutine launched in an `init { }`
+# block that touches a property declared BELOW it. Kotlin runs initializers and
+# init blocks in declaration order, so the property's backing field is still null
+# when the init-launched coroutine runs → NPE (the nyx FolderIconRenderer bug).
+# Listed files are LOCKED against a regression that reorders state below such an
+# init. Empty today (no kolibri file has the shape); it grows as reviewed files
+# are locked. nyx's orchestrator locks FolderIconRenderer.kt. Discovery of a NEW
+# occurrence in any module is the report-only `./gradlew scanInitOrderLaunch`
+# (repo-wide). Detector: tools/check-init-order-launch.awk; regression test:
+# tools/check-init-order-launch-test.sh (manual rerun, not a CI gate).
+# ─────────────────────────────────────────────────────────────────────────────
+initorder_files=(
+)
+initorder_awk="$script_dir/check-init-order-launch.awk"
+if [ ! -f "$initorder_awk" ]; then
+  echo "ERROR: Init-order awk script not found: $initorder_awk" >&2
+  exit 2
+fi
+initorder_hits=""
+for file in "${initorder_files[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: Init-order whitelist file not found: $file" >&2
+    exit 2
+  fi
+  hits=$(awk -f "$initorder_awk" "$file")
+  if [ -n "$hits" ]; then
+    initorder_hits="${initorder_hits}${hits}
+"
+  fi
+done
+if [ -n "$initorder_hits" ]; then
+  report "Init-order launch — property initializer declared after a coroutine-launching init block (move the state above init)" "${initorder_hits%$'\n'}"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Flow.catch cancellation-rethrow — the coroutine-operator form of the check
 # above, and the one the `catch (Type)` walker cannot see. A `Flow.catch { }`
 # arm that logs (silentError / KolibriLog.w|e / Timber.w|e) without first

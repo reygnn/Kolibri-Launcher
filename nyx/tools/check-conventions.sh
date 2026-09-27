@@ -186,6 +186,21 @@ run_awk_list "$kol_tools/check-exception-breadth.awk" \
   "Exception breadth — bare \`catch (e: Exception)\` at an allocation boundary (use \`Throwable\` for OOM, or an \`Exception sufficient\` marker)" \
   "${oom_files[@]}"
 
+# ── Init-order launch hazard (positive list) ──────────────────────────────────
+# A coroutine launched in an `init { }` block that touches a property declared
+# BELOW it: Kotlin runs initializers/init blocks in declaration order, so the
+# property is still null when the init-launched coroutine runs → NPE. This was
+# the FolderIconRenderer bug (its currentStyle collector called clear() →
+# synchronized(lock) before `lock` was initialised). Listed files are LOCKED
+# against a regression that reorders state below the launching init. Discovery of
+# a NEW occurrence in any module is the report-only `./gradlew scanInitOrderLaunch`.
+initorder_files=(
+  "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/FolderIconRenderer.kt"
+)
+run_awk_list "$kol_tools/check-init-order-launch.awk" \
+  "Init-order launch — property initializer declared after a coroutine-launching init block (move the state above init)" \
+  "${initorder_files[@]}"
+
 # ── Localization parity — values/ vs values-de/ (GLOBAL) ──────────────────────
 parity_awk="$kol_tools/check-strings-parity.awk"
 require "$parity_awk"
