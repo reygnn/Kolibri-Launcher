@@ -223,5 +223,5 @@ tasks.register<Exec>("checkRule13") {
     description = "Runs the Rule 13 (German comments) linter against Nyx's git diff."
     workingDir = projectDir.parentFile // = nyx/
     environment("RULE13_SCAN_ROOT", projectDir.parentFile.absolutePath)
-    commandLine = listOf("bash", "../kolibri/tools/check-rule13-german-comments.sh")
+    commandLine = listOf("bash", "../tools/check-rule13-german-comments.sh")
 }

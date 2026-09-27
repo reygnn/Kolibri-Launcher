@@ -439,7 +439,7 @@ tasks.register<Exec>("checkRule13") {
     group = "verification"
     description = "Runs the Rule 13 (German comments) linter against the git diff."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "tools/check-rule13-german-comments.sh")
+    commandLine = listOf("bash", "../tools/check-rule13-german-comments.sh")
 }
 
 // Discovery aid for the cancellation-rethrow whitelist. The linter (cancel_files
@@ -452,7 +452,7 @@ tasks.register<Exec>("scanCancelCandidates") {
     group = "verification"
     description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "tools/scan-cancel-candidates.sh")
+    commandLine = listOf("bash", "../tools/scan-cancel-candidates.sh")
 }
 
 // AUDIT-13 stale-replay point-read gate — a `stale_files` positive list, exactly
@@ -471,7 +471,7 @@ tasks.register<Exec>("checkStaleReplayRead") {
     group = "verification"
     description = "Verifies hot-flow point-reads in the stale_files whitelist carry a marker (AUDIT-13)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "tools/check-stale-replay-read.sh")
+    commandLine = listOf("bash", "../tools/check-stale-replay-read.sh")
 }
 
 // Discovery half of the stale-replay axis, mirroring scanCancelCandidates /
@@ -485,7 +485,7 @@ tasks.register<Exec>("scanStaleReplayRead") {
     group = "verification"
     description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "tools/scan-stale-replay-candidates.sh")
+    commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh")
 }
 
 // Same discovery aid for the OTHER breadth axis: the oom_files positive list is
@@ -497,7 +497,7 @@ tasks.register<Exec>("scanOomCandidates") {
     group = "verification"
     description = "Lists non-whitelisted files whose Exception catches may belong in oom_files (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "tools/scan-oom-candidates.sh")
+    commandLine = listOf("bash", "../tools/scan-oom-candidates.sh")
 }
 
 // Discovery aid for the init-order-launch gate (initorder_files positive list),
@@ -511,7 +511,7 @@ tasks.register<Exec>("scanInitOrderLaunch") {
     group = "verification"
     description = "Lists files that launch a coroutine in an init block followed by a property initializer (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; the script derives the repo root itself)
-    commandLine = listOf("bash", "tools/scan-init-order-launch.sh")
+    commandLine = listOf("bash", "../tools/scan-init-order-launch.sh")
 }
 
 // Code coverage configuration via JaCoCo — AGGREGATES ALL THREE MODULES.

@@ -187,7 +187,7 @@ activities.
    coverage. Details: `app/src/test/CLAUDE.md`.
 
    **Enforced** by `./gradlew checkConventions`
-   (`tools/check-contract-triple.sh`): every `*Repository` interface in
+   (`../tools/check-contract-triple.sh`): every `*Repository` interface in
    `:domain` needs the full triple, or a marker in its contract file.
    Two markers, because the exemptions are not all the same size:
    `NO CONTRACT TEST (ADR)` exempts the whole triple, `NO IMPL CONTRACT
@@ -205,7 +205,7 @@ activities.
    Same lesson as `Exception sufficient`: a linter cannot judge prose
    quality, only the presence of a stable token — so the token has to be
    decided once and reused. Regression-tested via
-   `tools/check-contract-triple-test.sh` (manual rerun, not a CI gate);
+   `../tools/check-contract-triple-test.sh` (manual rerun, not a CI gate);
    because the check is filesystem-shaped rather than text-shaped, that
    test builds a synthetic repo skeleton instead of feeding a fixture to
    an awk core.
@@ -256,7 +256,7 @@ activities.
    key of its repo — a key left behind is a reset that silently lies
    (AUDIT-4 #1: `SettingsRepositoryImpl` declared `APP_DRAWER_MODE` but never
    removed it). `./gradlew checkConventions` enforces this per file
-   (`tools/check-purge-completeness.awk`): every constant-style
+   (`../tools/check-purge-completeness.awk`): every constant-style
    `val UPPER_SNAKE = <…>PreferencesKey(…)` must be referenced in a
    non-comment line of that file's `purgeRepository()` (a comment merely
    *naming* the key does not count — that adjacency is how the AUDIT-4 gap
@@ -264,7 +264,7 @@ activities.
    across a reset (only `ONBOARDING_COMPLETED` today). Dynamic per-entity
    keys (local `camelCase` vals built from a prefix, purged by iteration)
    are excluded; a wholesale `.clear()` exempts the file. Regression-tested
-   via `tools/check-purge-completeness-test.sh` (manual rerun, not a CI gate).
+   via `../tools/check-purge-completeness-test.sh` (manual rerun, not a CI gate).
 
    *Storage-cleanup keep-list (enforced).* The user-facing "clean up storage"
    feature (`DataStoreMaintenanceRepository.removeOrphanKeys`) is a
@@ -306,7 +306,7 @@ activities.
    owners from the override means "join the keep-list" (what silences the
    straggler) *is* implementing the interface, which subjects the file to the
    completeness gate. Regression-tested via
-   `tools/check-settings-keys-registered-test.sh` (manual rerun, not a CI gate).
+   `../tools/check-settings-keys-registered-test.sh` (manual rerun, not a CI gate).
 
 6. **Respect the version pins in `gradle/libs.versions.toml`.** Many
    dependencies carry `DO NOT CHANGE` / `DO NOT UPGRADE` / `DO NOT DOWNGRADE`
@@ -411,7 +411,7 @@ activities.
    live in `core/TimberWrapper.kt`.
 
    This rule is enforced by `./gradlew checkConventions`
-   (`tools/check-intent-gate.awk`): a bare `Timber.e(` is flagged everywhere
+   (`../tools/check-intent-gate.awk`): a bare `Timber.e(` is flagged everywhere
    unless it carries a `pre-wiring bare` marker within ±5 lines. The former
    crash-infra file whitelist is gone — those files use `reportToAcra`, which is
    not a bare `Timber.e`, so no whitelist entry is needed for new crash-infra.
@@ -510,8 +510,8 @@ activities.
     annotation, then append the path to the `rule11_files` array in
     `tools/check-conventions.sh`. Narrowed exception types are not
     flagged — narrowing IS following Rule 11. The detection logic
-    itself lives in `tools/check-rule11-annotation.awk`; regression-
-    test any regex change via `tools/check-conventions-test.sh` (not
+    itself lives in `../tools/check-rule11-annotation.awk`; regression-
+    test any regex change via `../tools/check-conventions-test.sh` (not
     wired into CI, manual rerun).
 
     **Cancellation-rethrow linter (positive list).** The coroutine form
@@ -580,11 +580,11 @@ activities.
     `cancel_files` array in
     `tools/check-conventions.sh` to add a file (adding one with
     unreviewed catches just turns the build red — that IS the review
-    prompt). Logic in `tools/check-cancellation-rethrow.awk`, whose
+    prompt). Logic in `../tools/check-cancellation-rethrow.awk`, whose
     case-(a) walk is indentation-based so a cancellation-first arm still
     satisfies an umbrella `catch (Throwable)` sitting behind typed arms
     (the stacked-catch shape in `BackupRepositoryImpl.saveBackupToFile`);
-    regression-tested via `tools/check-cancellation-rethrow-test.sh`
+    regression-tested via `../tools/check-cancellation-rethrow-test.sh`
     (manual rerun, not a CI gate).
 
     **The `Flow.catch { }` operator is the other cancellation swallower,
@@ -607,7 +607,7 @@ activities.
     `SettingsRepositoryImpl` form), or a narrowing rethrow that propagates
     everything non-recoverable (`if (e is IOException) { … } else throw e`, as in
     `DataStoreReadFlow` / `AppUsageRepositoryImpl`). Enforced by
-    `./gradlew checkConventions` via `tools/check-flow-catch-rethrow.awk` — a
+    `./gradlew checkConventions` via `../tools/check-flow-catch-rethrow.awk` — a
     GLOBAL scan, because the shape is precise: only an arm that BOTH logs AND
     lacks a guard flags; a `.catch { }` that merely emits a fallback without
     logging cannot mask a cancellation as an error and is left alone. (The AUDIT-12 follow-on
@@ -615,7 +615,7 @@ activities.
     family, `ObserveInstalledAppsUseCase`, and `InstalledAppsRepositoryImpl`
     — the last already guarded the `emit()` cancellation but still logged
     the incoming `e` unguarded.) Regression-tested via
-    `tools/check-flow-catch-rethrow-test.sh` (manual rerun, not a CI gate).
+    `../tools/check-flow-catch-rethrow-test.sh` (manual rerun, not a CI gate).
 
     **Discovery — when a refactor may need a NEW `cancel_files` entry.**
     Because the whitelist is a positive list, the linter is blind to a
@@ -628,7 +628,7 @@ activities.
     reason the check is a positive list, not a global sweep). So the
     trigger is manual and yours to run: **after such a refactor, run
     `./gradlew scanCancelCandidates`** (script
-    `tools/scan-cancel-candidates.sh`). It sweeps every non-whitelisted
+    `../tools/scan-cancel-candidates.sh`). It sweeps every non-whitelisted
     main source for the broad-catch shape the linter would flag and ranks
     files by coroutine density so likely suspend-frame swallowers surface
     first; it is report-only and never fails the build (deliberately not
@@ -689,7 +689,7 @@ activities.
     this rule.
 
     Enforced by `./gradlew checkRule13` — a git-diff-aware linter
-    (`tools/check-rule13-german-comments.{sh,awk}`) that flags `+`
+    (`../tools/check-rule13-german-comments.{sh,awk}`) that flags `+`
     lines containing umlauts or ≥2 high-precision German function
     words. Default base is `origin/main`, override with
     `CHECK_BASE=<ref>`. The historical post-Rule-13 sweep ran
@@ -711,7 +711,7 @@ unbuffered `MutableSharedFlow<PackageEvent>()` while its siblings
 were correctly buffered; fixed to `extraBufferCapacity = 1`.
 
 `./gradlew checkConventions` enforces this globally over main sources
-(`tools/check-unbuffered-sharedflow.awk`): any `MutableSharedFlow(...)`
+(`../tools/check-unbuffered-sharedflow.awk`): any `MutableSharedFlow(...)`
 **construction** with a provably-zero buffer flags — type annotations
 (`: MutableSharedFlow<Unit>`), imports and comment mentions never do. Give the
 flow a real buffer (`extraBufferCapacity`/`replay`), or, if a collector is
@@ -719,7 +719,7 @@ provably always active before any emit so a drop cannot happen, record that
 with a `rendezvous intended` marker within ±2 lines. Test buffering stays out
 of scope (unbuffered-with-immediate-collector is legitimate and fails fast —
 the test hangs; see `TESTING_CONVENTIONS.kt` §2). Regression-tested via
-`tools/check-unbuffered-sharedflow-test.sh` (manual rerun, not a CI gate).
+`../tools/check-unbuffered-sharedflow-test.sh` (manual rerun, not a CI gate).
 
 ### Fragment teardown discipline (enforced)
 
@@ -727,14 +727,14 @@ Two mechanical view-lifecycle gates, both currently green, both in
 `checkConventions`:
 
 - **`registerForActivityResult()` placement**
-  (`tools/check-activity-result-placement.awk`). The call must be a field
+  (`../tools/check-activity-result-placement.awk`). The call must be a field
   initializer or run in `onCreate`; from `onViewCreated` / `onResume` / etc.
   it throws *"LifecycleOwners must call register before they are STARTED"* on
   the next config change (AUDIT-5 #2). The check resolves each call's
   innermost enclosing function by brace depth and flags only the forbidden
   lifecycle methods — a field or a plain helper is fine.
 
-- **RecyclerView adapter null-out** (`tools/check-adapter-nulling.awk`). A
+- **RecyclerView adapter null-out** (`../tools/check-adapter-nulling.awk`). A
   Fragment that assigns a non-null `recyclerView.adapter` must clear it
   (`adapter = null`) in `onDestroyView`, or the view tree leaks across the
   view-recreation cycle (AUDIT-3 #13, AUDIT-4 #3); `AppDrawerFragment` is the
@@ -742,7 +742,7 @@ Two mechanical view-lifecycle gates, both currently green, both in
   scope. Escape hatch for an adapter provably owned elsewhere: an
   `adapter-nulling n/a` marker on the assignment line.
 
-Both are regression-tested via `tools/check-fragment-teardown-test.sh` (manual
+Both are regression-tested via `../tools/check-fragment-teardown-test.sh` (manual
 rerun, not a CI gate).
 
 ### Exception-vs-Throwable breadth (enforced — Rule 11 sibling)
@@ -760,7 +760,7 @@ NARROW (Exception missing `OutOfMemoryError`) — widen to Throwable and, in a
 suspend frame, the resulting broad catch is handed to the cancellation check.
 
 `./gradlew checkConventions` enforces it as a **positive list**
-(`tools/check-exception-breadth.awk`), same growth model as the Rule 11 /
+(`../tools/check-exception-breadth.awk`), same growth model as the Rule 11 /
 cancellation whitelists: a file joins only once every broad catch on its
 allocation boundaries is `Throwable`, a narrowed type, or — where `Exception`
 is genuinely right (a pure-I/O boundary, e.g. a `contentResolver.openInputStream`
@@ -790,10 +790,10 @@ view classes (`MainActivity`, `SettingsFragment`, `AppDrawerFragment`, …) were
 deliberately NOT added despite being clean today — half of `ui/` on the list would
 make "is listed" stop meaning anything. Append to
 the `oom_files` array in `tools/check-conventions.sh` to add a file. Regression-
-tested via `tools/check-exception-breadth-test.sh` (manual rerun, not a CI gate).
+tested via `../tools/check-exception-breadth-test.sh` (manual rerun, not a CI gate).
 
 **Discovery — `./gradlew scanOomCandidates`.** Sibling of `scanCancelCandidates`
-for this axis (`tools/scan-oom-candidates.sh`, report-only, never fails the
+for this axis (`../tools/scan-oom-candidates.sh`, report-only, never fails the
 build). Sweeps every non-whitelisted main source for a bare `catch (e: Exception)`
 and ranks by ALLOCATION density (bitmap / inflate / JSON / ZIP / bulk-read lines)
 rather than hit count — hit count is dominated by adapters full of legitimate race
@@ -838,7 +838,7 @@ the coroutine runs → NPE. The nyx `FolderIconRenderer` hit exactly this: its
 still null — an intermittent startup crash (surfaced first as a flaky
 `DrawerAppToHomeTaplTest`). Fix: declare the state ABOVE the launching init.
 
-Enforced by `./gradlew checkConventions` via `tools/check-init-order-launch.awk`
+Enforced by `./gradlew checkConventions` via `../tools/check-init-order-launch.awk`
 as a **positive list** (`initorder_files`), same growth model as the cancellation /
 breadth whitelists: a listed file is LOCKED against a regression that reorders a
 property initializer below a coroutine-launching init block. It is a positive list,
@@ -847,7 +847,7 @@ property after such an init without proving the launch touches it); the fix
 (reorder) is mechanical and safe, so a false positive costs little, but the
 opt-in keeps the gate honest. nyx locks `FolderIconRenderer.kt`; the kolibri list
 is empty today (no kolibri file has the shape). Regression-tested via
-`tools/check-init-order-launch-test.sh` (manual rerun, not a CI gate).
+`../tools/check-init-order-launch-test.sh` (manual rerun, not a CI gate).
 
 **Discovery — `./gradlew scanInitOrderLaunch`.** Sibling of `scanCancelCandidates` /
 `scanOomCandidates` (report-only, never fails the build). Unlike those, it sweeps
@@ -936,7 +936,7 @@ edited in one place, not three:
 Kotlin or XML.
 
 **Parity is enforced** by `./gradlew checkConventions`
-(`tools/check-strings-parity.awk`, covering `strings.xml` and `arrays.xml`).
+(`../tools/check-strings-parity.awk`, covering `strings.xml` and `arrays.xml`).
 Both drift directions flag, because they are different defects: a key only in
 `values/` ships English text to a German device without failing anything at
 compile time (`stringResource` falls back to the default locale), and a key only
@@ -957,7 +957,7 @@ a key is either in both files or it is not, and the `translatable` attribute
 already encodes every legitimate exception, so there is no judgement call for a
 whitelist to record. The tree was parity-clean when the check landed, so it
 locks that state rather than reporting debt. Regression-tested via
-`tools/check-strings-parity-test.sh` (manual rerun, not a CI gate).
+`../tools/check-strings-parity-test.sh` (manual rerun, not a CI gate).
 
 ---
 

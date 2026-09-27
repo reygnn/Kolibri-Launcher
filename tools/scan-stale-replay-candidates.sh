@@ -40,7 +40,9 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
+# stale-replay is a Kolibri-only check; sweep the kolibri modules explicitly even
+# though this detector now lives in the neutral tools/.
+repo_root="$(cd "$script_dir/../kolibri" && pwd)"
 gate="$script_dir/check-stale-replay-read.sh"
 awkf="$script_dir/check-stale-replay-read.awk"
 

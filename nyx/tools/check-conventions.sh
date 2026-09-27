@@ -44,7 +44,7 @@ set -u
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"                 # = <repo>/nyx
-kol_tools="$(cd "$repo_root/../kolibri/tools" && pwd)"    # canonical detectors
+det="$(cd "$repo_root/../tools" && pwd)"                  # shared detectors (neutral home)
 # Shared-module positive lists (neutral home): SHARED_CANCEL_FILES / SHARED_OOM_FILES /
 # SHARED_INITORDER_FILES — sourced by both apps so a shared file is enforced by both.
 shared_lint="$repo_root/../tools/shared-lint-files.sh"
@@ -69,8 +69,8 @@ for d in "${src_roots[@]}"; do
     exit 2
   fi
 done
-if [ ! -d "$kol_tools" ]; then
-  echo "ERROR: kolibri detectors not found: $kol_tools" >&2
+if [ ! -d "$det" ]; then
+  echo "ERROR: shared detectors not found: $det" >&2
   exit 2
 fi
 
@@ -121,7 +121,7 @@ run_awk_list() {
 }
 
 # ── Rule 9 — bare `Timber.e(` without an intent tag (GLOBAL) ──────────────────
-run_awk_global "$kol_tools/check-intent-gate.awk" \
+run_awk_global "$det/check-intent-gate.awk" \
   "Rule 9 — bare \`Timber.e(\` without an intent tag or a \`pre-wiring bare\` marker" \
   "${src_roots[@]}"
 
@@ -143,29 +143,29 @@ toast_hits=$(
   "Toast routing — bare \`Toast.makeText(\` outside \`ToastSafe.kt\` (use \`showToastSafe\`)" "$toast_hits"
 
 # ── Flow.catch cancellation-rethrow (GLOBAL) ──────────────────────────────────
-run_awk_global "$kol_tools/check-flow-catch-rethrow.awk" \
+run_awk_global "$det/check-flow-catch-rethrow.awk" \
   "Flow.catch — logging arm without a CancellationException rethrow (swallows upstream cancellation)" \
   "${src_roots[@]}"
 
 # ── Unbuffered MutableSharedFlow (GLOBAL) ─────────────────────────────────────
-run_awk_global "$kol_tools/check-unbuffered-sharedflow.awk" \
+run_awk_global "$det/check-unbuffered-sharedflow.awk" \
   "Unbuffered MutableSharedFlow — drops emissions with no subscriber (add \`extraBufferCapacity = 1\` / \`replay\`, or a \`rendezvous intended\` marker)" \
   "${src_roots[@]}"
 
 # ── registerForActivityResult() placement (app/ only) ─────────────────────────
-run_awk_global "$kol_tools/check-activity-result-placement.awk" \
+run_awk_global "$det/check-activity-result-placement.awk" \
   "registerForActivityResult() placement — called from a lifecycle method (move to a field initializer or onCreate)" \
   "$app_root"
 
 # ── RecyclerView adapter null-out (app/ only) ─────────────────────────────────
-run_awk_global "$kol_tools/check-adapter-nulling.awk" \
+run_awk_global "$det/check-adapter-nulling.awk" \
   "RecyclerView adapter null-out — Fragment assigns an adapter but never nulls it in onDestroyView (leak)" \
   "$app_root"
 
 # ── Rule 11 — broad-catch annotation discipline (positive list) ───────────────
 rule11_files=(
 )
-run_awk_list "$kol_tools/check-rule11-annotation.awk" \
+run_awk_list "$det/check-rule11-annotation.awk" \
   "Rule 11 — broad catch without four-category-frame annotation in whitelisted file" \
   "${rule11_files[@]}"
 
@@ -188,7 +188,7 @@ cancel_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/IconLoaderImpl.kt"
   "${SHARED_CANCEL_FILES[@]}"
 )
-run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
+run_awk_list "$det/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \
   "${cancel_files[@]}"
 
@@ -196,7 +196,7 @@ run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
 oom_files=(
   "${SHARED_OOM_FILES[@]}"
 )
-run_awk_list "$kol_tools/check-exception-breadth.awk" \
+run_awk_list "$det/check-exception-breadth.awk" \
   "Exception breadth — bare \`catch (e: Exception)\` at an allocation boundary (use \`Throwable\` for OOM, or an \`Exception sufficient\` marker)" \
   "${oom_files[@]}"
 
@@ -212,12 +212,12 @@ initorder_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/FolderIconRenderer.kt"
   "${SHARED_INITORDER_FILES[@]}"
 )
-run_awk_list "$kol_tools/check-init-order-launch.awk" \
+run_awk_list "$det/check-init-order-launch.awk" \
   "Init-order launch — property initializer declared after a coroutine-launching init block (move the state above init)" \
   "${initorder_files[@]}"
 
 # ── Localization parity — values/ vs values-de/ (GLOBAL) ──────────────────────
-parity_awk="$kol_tools/check-strings-parity.awk"
+parity_awk="$det/check-strings-parity.awk"
 require "$parity_awk"
 parity_hits=""
 for res in strings arrays; do
@@ -233,7 +233,7 @@ done
 # ── Rule 2 — contract-test triple completeness (nyx :domain) ──────────────────
 # Reuses kolibri's script with CONTRACT_REPO_ROOT pointed at nyx, so it scans
 # nyx/domain for *Repository interfaces and their triples / ADR markers.
-triple_sh="$kol_tools/check-contract-triple.sh"
+triple_sh="$det/check-contract-triple.sh"
 require "$triple_sh"
 triple_hits=$(CONTRACT_REPO_ROOT="$repo_root" bash "$triple_sh")
 [ -n "$triple_hits" ] && report \

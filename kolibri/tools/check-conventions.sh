@@ -38,6 +38,9 @@
 set -u
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
+# Shared detectors now live in the neutral repo-root tools/ (this orchestrator stays
+# in kolibri/tools as the kolibri-specific entry point).
+det="$(cd "$repo_root/../tools" && pwd)"
 
 # Shared-module positive lists (neutral home, used by both apps' orchestrators):
 # SHARED_CANCEL_FILES / SHARED_OOM_FILES / SHARED_INITORDER_FILES. See
@@ -90,7 +93,7 @@ report() {
 # Logic in tools/check-intent-gate.awk; regression-tested via
 # tools/check-intent-gate-test.sh (manual rerun, not a CI gate).
 # ─────────────────────────────────────────────────────────────────────────────
-intentgate_awk="$script_dir/check-intent-gate.awk"
+intentgate_awk="$det/check-intent-gate.awk"
 
 if [ ! -f "$intentgate_awk" ]; then
   echo "ERROR: Intent-gate awk script not found: $intentgate_awk" >&2
@@ -202,7 +205,7 @@ rule11_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/WallpaperEditController.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
 )
-rule11_awk="$script_dir/check-rule11-annotation.awk"
+rule11_awk="$det/check-rule11-annotation.awk"
 
 if [ ! -f "$rule11_awk" ]; then
   echo "ERROR: Rule 11 awk script not found: $rule11_awk" >&2
@@ -271,7 +274,7 @@ cancel_files=(
   "$repo_root/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetFavoriteAppsUseCase.kt"
   "${SHARED_CANCEL_FILES[@]}"
 )
-cancel_awk="$script_dir/check-cancellation-rethrow.awk"
+cancel_awk="$det/check-cancellation-rethrow.awk"
 
 if [ ! -f "$cancel_awk" ]; then
   echo "ERROR: Cancellation-rethrow awk script not found: $cancel_awk" >&2
@@ -310,7 +313,7 @@ fi
 initorder_files=(
   "${SHARED_INITORDER_FILES[@]}"
 )
-initorder_awk="$script_dir/check-init-order-launch.awk"
+initorder_awk="$det/check-init-order-launch.awk"
 if [ ! -f "$initorder_awk" ]; then
   echo "ERROR: Init-order awk script not found: $initorder_awk" >&2
   exit 2
@@ -344,7 +347,7 @@ fi
 # GLOBAL scan, not a positive list — the shape is precise (only logging arms
 # without a guard flag). Logic in tools/check-flow-catch-rethrow.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-flowcatch_awk="$script_dir/check-flow-catch-rethrow.awk"
+flowcatch_awk="$det/check-flow-catch-rethrow.awk"
 
 if [ ! -f "$flowcatch_awk" ]; then
   echo "ERROR: Flow.catch rethrow awk script not found: $flowcatch_awk" >&2
@@ -375,7 +378,7 @@ fi
 # scope (unbuffered-with-immediate-collector is legitimate and fails fast);
 # see TESTING_CONVENTIONS.kt §2. Logic in tools/check-unbuffered-sharedflow.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-sharedflow_awk="$script_dir/check-unbuffered-sharedflow.awk"
+sharedflow_awk="$det/check-unbuffered-sharedflow.awk"
 
 if [ ! -f "$sharedflow_awk" ]; then
   echo "ERROR: Unbuffered-SharedFlow awk script not found: $sharedflow_awk" >&2
@@ -406,7 +409,7 @@ fi
 # a wholesale `.clear()` exempts the file. Logic in
 # tools/check-purge-completeness.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-purge_awk="$script_dir/check-purge-completeness.awk"
+purge_awk="$det/check-purge-completeness.awk"
 
 if [ ! -f "$purge_awk" ]; then
   echo "ERROR: purge-completeness awk script not found: $purge_awk" >&2
@@ -434,7 +437,7 @@ fi
 # whose innermost enclosing function is a forbidden lifecycle method flags.
 # Logic in tools/check-activity-result-placement.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-arresult_awk="$script_dir/check-activity-result-placement.awk"
+arresult_awk="$det/check-activity-result-placement.awk"
 
 if [ ! -f "$arresult_awk" ]; then
   echo "ERROR: registerForActivityResult-placement awk script not found: $arresult_awk" >&2
@@ -462,7 +465,7 @@ fi
 # clear in onDestroy). Escape hatch: an `adapter-nulling n/a` marker on the
 # assignment. Logic in tools/check-adapter-nulling.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-adapter_awk="$script_dir/check-adapter-nulling.awk"
+adapter_awk="$det/check-adapter-nulling.awk"
 
 if [ ! -f "$adapter_awk" ]; then
   echo "ERROR: adapter-nulling awk script not found: $adapter_awk" >&2
@@ -506,7 +509,7 @@ oom_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
   "${SHARED_OOM_FILES[@]}"
 )
-oom_awk="$script_dir/check-exception-breadth.awk"
+oom_awk="$det/check-exception-breadth.awk"
 
 if [ ! -f "$oom_awk" ]; then
   echo "ERROR: exception-breadth awk script not found: $oom_awk" >&2
@@ -540,7 +543,7 @@ fi
 # the codebase is parity-clean today, so this locks that state.
 # Logic in tools/check-strings-parity.awk.
 # ─────────────────────────────────────────────────────────────────────────────
-parity_awk="$script_dir/check-strings-parity.awk"
+parity_awk="$det/check-strings-parity.awk"
 
 if [ ! -f "$parity_awk" ]; then
   echo "ERROR: strings-parity awk script not found: $parity_awk" >&2
@@ -573,14 +576,14 @@ fi
 # allowed justified gaps; what this adds is one greppable token for them.
 # Logic in tools/check-contract-triple.sh.
 # ─────────────────────────────────────────────────────────────────────────────
-triple_sh="$script_dir/check-contract-triple.sh"
+triple_sh="$det/check-contract-triple.sh"
 
 if [ ! -f "$triple_sh" ]; then
   echo "ERROR: contract-triple script not found: $triple_sh" >&2
   exit 2
 fi
 
-triple_hits=$(bash "$triple_sh")
+triple_hits=$(CONTRACT_REPO_ROOT="$repo_root" bash "$triple_sh")
 if [ -n "$triple_hits" ]; then
   report "Rule 2 — incomplete contract-test triple (add the missing test, or an ADR marker in the contract)" "$triple_hits"
 fi
@@ -608,7 +611,7 @@ fi
 # what silences the straggler) IS implementing the interface, which subjects the
 # file to (a). Regression-tested via tools/check-settings-keys-registered-test.sh.
 # ─────────────────────────────────────────────────────────────────────────────
-settings_keys_awk="$script_dir/check-settings-keys-registered.awk"
+settings_keys_awk="$det/check-settings-keys-registered.awk"
 
 if [ ! -f "$settings_keys_awk" ]; then
   echo "ERROR: settings-keys-registered awk script not found: $settings_keys_awk" >&2

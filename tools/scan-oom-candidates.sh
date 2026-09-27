@@ -54,8 +54,8 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/../.." && pwd)"            # kolibri/tools -> kolibri -> repo root
-conv="$script_dir/check-conventions.sh"                 # kolibri orchestrator (canonical lists)
+repo_root="$(cd "$script_dir/.." && pwd)"               # tools/ -> repo root
+conv="$repo_root/kolibri/tools/check-conventions.sh"    # kolibri orchestrator (canonical lists)
 nyx_conv="$repo_root/nyx/tools/check-conventions.sh"    # nyx orchestrator (its own lists)
 shared_lint="$repo_root/tools/shared-lint-files.sh"     # shared-module lists (neutral home)
 awkf="$script_dir/check-exception-breadth.awk"

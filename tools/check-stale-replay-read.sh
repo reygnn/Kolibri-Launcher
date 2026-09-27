@@ -32,7 +32,10 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
+# stale-replay is a Kolibri-only check (nyx skips it); its stale_files paths are
+# Kolibri sources, so repo_root targets the kolibri module explicitly even though
+# this detector now lives in the neutral tools/.
+repo_root="$(cd "$script_dir/../kolibri" && pwd)"
 awkf="$script_dir/check-stale-replay-read.awk"
 
 [ -f "$awkf" ] || { echo "ERROR: detector not found: $awkf" >&2; exit 2; }
