@@ -2,12 +2,16 @@ package com.github.reygnn.nyx_launcher.data.icon
 
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -83,6 +87,30 @@ class FolderIconRendererTest {
 
         renderer.render(members, 96) // complete composite is now cached
         assertThat(loader.calls).isEqualTo(afterIncomplete + 2) // no extra member loads
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun construction_hits_the_init_order_race_and_reports_to_acra() {
+        // REPRO of the FolderIconRenderer init-order race. The init block launches the
+        // currentStyle collector (onEach { clear() }) BEFORE `lock`/`cache` are declared, so
+        // their initialisers run AFTER init. With an eager (Unconfined) dispatcher the collector
+        // runs synchronously inside init and clear() touches a still-null `lock` -> NPE. In
+        // production the collector runs on Dispatchers.IO, making this a timing race (observed
+        // ~1/8 on device). The scope's CoroutineExceptionHandler must route that NPE to
+        // TimberWrapper.reportToAcra (ACRA_REPORT tag) instead of an uncaught crash.
+        val captured = mutableListOf<Pair<String, Throwable?>>()
+        val previous = KolibriLog.taggedErrorHandler
+        KolibriLog.taggedErrorHandler = { tag, t, _ -> captured += tag to t }
+        try {
+            FolderIconRenderer(CountingIconLoader(), UnconfinedTestDispatcher())
+        } finally {
+            KolibriLog.taggedErrorHandler = previous
+        }
+
+        val reported = captured.firstOrNull { it.first == TimberWrapper.ACRA_REPORT_TAG }
+        assertThat(reported).isNotNull()
+        assertThat(reported!!.second).isInstanceOf(NullPointerException::class.java)
     }
 
     @Test

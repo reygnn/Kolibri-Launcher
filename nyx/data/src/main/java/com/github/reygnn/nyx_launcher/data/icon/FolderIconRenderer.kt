@@ -6,8 +6,10 @@ import android.graphics.Paint
 import android.graphics.RectF
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
@@ -39,9 +41,15 @@ class FolderIconRenderer @Inject constructor(
         // source (SSOT). This is a memory optimisation, NOT the correctness mechanism:
         // render() keys by currentStyle, so a style switch always misses under the new key and
         // recomposes regardless of clear() timing — a mixed-style composite can never stick (F12).
+        // Fire-and-forget collector: an uncaught throwable here (its scope has no other
+        // handler) would escape to the process-wide uncaught handler. Route it to ACRA
+        // instead so a failure is reported, not silently crashing on style change / startup.
+        val handler = CoroutineExceptionHandler { _, e ->
+            TimberWrapper.reportToAcra(e, "FolderIconRenderer style-collector failed")
+        }
         iconLoader.currentStyle
             .onEach { clear() }
-            .launchIn(CoroutineScope(SupervisorJob() + dispatcher))
+            .launchIn(CoroutineScope(SupervisorJob() + dispatcher + handler))
     }
     private val lock = Any()
     private val cache = object : LinkedHashMap<CacheKey, Bitmap>(16, 0.75f, true) {
