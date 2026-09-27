@@ -115,29 +115,32 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 > wurde am 2026-09-18 doch umgesetzt — der Material-Blocker war überwindbar; siehe
 > „Kürzlich erledigt".)
 
-### NyxDrawer-TAPL härten — Drawer-Open verifizieren vor dem Drag-Arm (2026-09-25)
+### NyxDrawer-TAPL — dokumentierte Ursache gefixt (2026-09-27); Rest: Kaltstart-Flake
 
-Die Drawer-Instrumented-Tests (`DrawerAppToHomeTaplTest`, `DrawerAppToHomeDragTaplTest`)
-sind auf dem Pixel gesten-flaky: der **Swipe-up-Open** bzw. das **Long-Press-Arming**
-schlägt zeitweise fehl. Wenn der Swipe-up flaked, ist der Drawer nicht wirklich offen, aber
-`NyxDrawer.assertOnPage()` akzeptiert die ausgelegte (nur unsichtbare) `drawer_panel`, und
-`ArmedDrawerDragToHomeBar` findet trotzdem `drawer_panel.getChildAt(0)`. Der Long-Press geht
-dann auf die dahinterliegende **Home-Fläche** → `homeRoot.onLongPress` öffnet den
-`NyxCustomizationDialog`, der Drag armt nie → irreführende Fehler
-(`drawer long-press never armed a drag`) statt einer klaren „Drawer nicht offen"-Meldung.
+**Der ursprünglich hier vermutete „reine Test-Robustheit"-Befund war falsch — es war ein
+Produkt-Bug, gefixt in `6edf979`.** Die Drawer-Instrumented-Tests (`DrawerAppToHomeTaplTest`,
+`DrawerAppToHomeDragTaplTest`) waren auf dem Pixel gesten-flaky: ein Long-Press auf leere
+Drawer-Fläche leckte auf die dahinterliegende **Home-Fläche** → `homeRoot.onLongPress` öffnete
+den `NyxCustomizationDialog`, der Drag armte nie → irreführendes
+`drawer long-press never armed a drag`. Ursache: der `GestureDispatchCore` im Home-DragLayer
+blieb bei **offenem Drawer** scharf (`homeGesturesAllowed()` griff erst im Callback-Body, zu
+spät). `6edf979` nullt Swipe-up/Long-Press/Double-Tap-Callbacks, solange das Drawer-Overlay
+offen ist (`setHomeGestureDetectionActive`, getoggelt aus `DrawerOverlayController`
+onShown/onHidden) — das Leck ist damit strukturell zu. (Derselbe Fix behob auch das
+Scroll-Einfrieren bei schnellem Flick im offenen Drawer.)
 
-**Zu tun:** In `NyxDrawer` (androidTest, TAPL) nach dem Swipe-up verifizieren, dass der
-Drawer **tatsächlich offen/oben** ist (auf `drawerOverlay.isOpen` bzw. echte Sichtbarkeit +
-Endposition der `drawer_panel` warten, nicht nur „laid out"), bevor `ArmedDrawerDragToHomeBar`
-den Down-Event sendet. Dann scheitert ein Swipe-up-Flake sauber und leckt nicht in den
-Home-Long-Press.
+**A17-Verifikation (2026-09-27):** beide Drawer-Tests bestehen einzeln kalt
+(`DrawerAppToHomeTaplTest` 3×, `DrawerAppToHomeDragTaplTest` 1×). Die dokumentierte
+Long-Press-Leck-Failure trat nicht mehr auf.
 
-Kein Produkt-Bug: der Home-Long-Press reagiert korrekt auf einen Long-Press auf dem echten
-Home; `homeGesturesAllowed()` sperrt bewusst nicht auf den offenen Drawer (der Overlay
-verschluckt Touches selbst). Reine Test-Robustheit. Verwandt: als Sofort-Mitigation
-`numFlakyTestAttempts` für `:nyx:app` erwägen (kolibris Standard-Flake-Mitigation, die nyx
-noch nicht hat). Hinweis: ein gesperrtes Gerät ist ein *anderer* Rotfall (der Homescreen
-kommt nicht in den Vordergrund) — für androidTest muss das Gerät entsperrt/wach sein.
+**Rest (offen, klein):** ein seltener **Kaltstart-Flake** bleibt — `NyxHome.assertOnPage()`
+sah in 1 von 4 Läufen den `home_pager` nicht innerhalb des Budgets (37 s-Stall beim ersten
+Cold-Launch, *vor* jeder Drawer-Geste; im Lauf lief parallel das Play-Store-Aufräumen des
+gerade deinstallierten Builds). Das ist ein initialer Render-/Umgebungs-Flake, **nicht** die
+Drawer-Geste. Stehende Mitigation: `numFlakyTestAttempts` für `:nyx:app` (kolibris
+Standard-Flake-Mitigation, die nyx noch nicht hat). Hinweis: ein gesperrtes Gerät ist ein
+*anderer* Rotfall (der Homescreen kommt nicht in den Vordergrund) — für androidTest muss das
+Gerät entsperrt/wach sein.
 
 ### App-Start-Ausführung teilen (Option B — offener Refactor-Kandidat, 2026-09-18)
 
