@@ -36,4 +36,38 @@ class IconBindingPayloadTest {
         assertThat(payload.isDotOnlyPayload()).isTrue()
         assertThat(payload.hasIconStylePayload()).isFalse()
     }
+
+    // --- iconRepaintPackages (targeted per-package repaint, F1) ---
+
+    @Test fun icon_repaint_payload_names_its_package() {
+        val payload = listOf(IconRepaintPayload("com.a"))
+        assertThat(payload.iconRepaintPackages()).containsExactly("com.a")
+        // It is neither a dot-only nor an icon-style batch, so those branches don't claim it.
+        assertThat(payload.isDotOnlyPayload()).isFalse()
+        assertThat(payload.hasIconStylePayload()).isFalse()
+    }
+
+    @Test fun multiple_icon_repaint_payloads_dedupe_to_their_packages() {
+        val payload = listOf(
+            IconRepaintPayload("com.a"),
+            IconRepaintPayload("com.b"),
+            IconRepaintPayload("com.a"),
+        )
+        assertThat(payload.iconRepaintPackages()).containsExactly("com.a", "com.b")
+    }
+
+    @Test fun a_coalesced_dot_plus_icon_repaint_keeps_both_signals() {
+        // The pager repaints the matching tiles AND, because a dot payload rode along, refreshes
+        // the whole-page dots — so the coalesced dot update isn't dropped. Pin both halves.
+        val payload = listOf(NOTIFICATION_DOT_PAYLOAD, IconRepaintPayload("com.a"))
+        assertThat(payload.iconRepaintPackages()).containsExactly("com.a")
+        assertThat(payload.any { it === NOTIFICATION_DOT_PAYLOAD }).isTrue()
+        assertThat(payload.isDotOnlyPayload()).isFalse() // not "dot only" any more
+    }
+
+    @Test fun no_icon_repaint_payload_yields_empty() {
+        assertThat(listOf(NOTIFICATION_DOT_PAYLOAD).iconRepaintPackages()).isEmpty()
+        assertThat(listOf(ICON_STYLE_PAYLOAD).iconRepaintPackages()).isEmpty()
+        assertThat(emptyList<Any>().iconRepaintPackages()).isEmpty()
+    }
 }

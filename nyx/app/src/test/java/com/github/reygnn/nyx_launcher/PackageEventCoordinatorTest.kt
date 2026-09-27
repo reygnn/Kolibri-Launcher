@@ -205,7 +205,10 @@ class PackageEventCoordinatorTest {
             appUpdateSignal.send(PackageEvent.Changed("com.example.updated"))
             advanceUntilIdle()
 
-            // Marked for repaint, AFTER the eviction (so the UI re-decodes fresh).
+            // Both happen in the same handler, which runs to completion before the coroutine yields
+            // — so by the time a UI collector observes the mark, the evict has already run and a
+            // repaint re-decodes fresh (this test asserts both effects are present after the handler,
+            // not their intra-block source order, which mockk can't observe against the StateFlow).
             assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.example.updated")
             verify(exactly = 1) { iconLoader.evict("com.example.updated") }
 

@@ -35,11 +35,19 @@ class FolderMemberAdapterTest {
         installed = installed,
     )
 
-    /** Counts adapter rebinds (notifyDataSetChanged + notifyItemRangeChanged). */
+    /**
+     * Records adapter rebinds. [rebinds] counts dispatches (as before); [changed] records the
+     * exact positions of every onItemRangeChanged so a targeted repaint can be distinguished from
+     * a blanket range (a collapsing counter would pass for both).
+     */
     private class RebindCounter : RecyclerView.AdapterDataObserver() {
         var rebinds = 0
+        val changed = mutableListOf<Int>()
         override fun onChanged() { rebinds++ }
-        override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?) { rebinds++ }
+        override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?) {
+            rebinds++
+            for (i in positionStart until positionStart + itemCount) changed += i
+        }
     }
 
     @Test
@@ -69,17 +77,19 @@ class FolderMemberAdapterTest {
     }
 
     @Test
-    fun `refreshIconsFor rebinds only the matching member, not the rest`() {
-        // F1 targeted repaint: an in-place icon update for com.a must re-decode only a's tile,
-        // leaving b untouched (so the value-equal short-circuit's win is preserved).
+    fun `refreshIconsFor rebinds only the matching member position, not the whole range`() {
+        // F1 targeted repaint: an in-place icon update for com.a must re-decode ONLY a's tile
+        // (position 0), leaving b untouched — so the value-equal short-circuit's win is preserved.
+        // Asserting the exact changed position (not just a count) rules out a blanket-range
+        // regression: notifyItemRangeChanged(0, size) would also give rebinds == 1.
         val adapter = adapter(installed = emptySet())
         adapter.submit(listOf(a, b))
         val counter = RebindCounter().also { adapter.registerAdapterDataObserver(it) }
 
-        adapter.refreshIconsFor("com.a")   // one matching position → one item-change
-        assertThat(counter.rebinds).isEqualTo(1)
+        adapter.refreshIconsFor("com.a")            // members = [a, b] → only position 0
+        assertThat(counter.changed).containsExactly(0)
 
-        adapter.refreshIconsFor("com.z")   // no member matches → no rebind
-        assertThat(counter.rebinds).isEqualTo(1)
+        adapter.refreshIconsFor("com.z")            // no member matches → no change at all
+        assertThat(counter.changed).containsExactly(0) // unchanged from before
     }
 }
