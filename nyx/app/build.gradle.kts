@@ -204,7 +204,7 @@ tasks.configureEach {
 
 // --- Convention linters (reuse Kolibri's battle-tested detectors) ---
 // Nyx does not re-implement the checks: the detector logic lives once in
-// kolibri/tools/*.awk (+ the two generalized *.sh). This orchestrator runs those
+// tools/*.awk (+ the two generalized *.sh). This orchestrator runs those
 // detectors over Nyx's own sources, with Nyx's own scan roots / positive lists,
 // and only the checks that apply to Nyx. The per-check triage (what runs, what is
 // deliberately skipped and why) is documented at the top of the script.

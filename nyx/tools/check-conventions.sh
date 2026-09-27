@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # Nyx does NOT re-implement the checks: the battle-tested detector logic lives
-# once in kolibri/tools/*.awk (+ the two generalized *.sh). This orchestrator
+# once in tools/*.awk (+ the two generalized *.sh). This orchestrator
 # reuses those detectors against nyx's own source tree, with nyx's own scan
 # roots and positive lists, running only the checks that apply to nyx.
 #

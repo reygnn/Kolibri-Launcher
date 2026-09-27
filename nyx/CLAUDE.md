@@ -21,8 +21,8 @@ into Nyx — extend the shared source.
   rule question comes up.
 - **Enforcement**: `./gradlew :nyx:app:checkConventions` and
   `:nyx:app:checkRule13`. Nyx has its **own orchestrator**
-  (`nyx/tools/check-conventions.sh`) that runs Kolibri's detectors
-  (`kolibri/tools/*.awk` + the two generalized `*.sh`) against Nyx's sources,
+  (`nyx/tools/check-conventions.sh`) that runs the shared detectors
+  (`tools/*.awk` + the two generalized `*.sh`) against Nyx's sources,
   with Nyx's own scan roots / positive lists. When Kolibri adds or fixes a
   detector, Nyx inherits it automatically — only the roots and opt-in lists in
   Nyx's orchestrator are Nyx-owned.
