@@ -12,10 +12,13 @@
 # NON-listed file is invisible: neither the linter nor Rule 11 points at it.
 #
 # This script closes the DISCOVERY half of that gap. It is NOT a gate: it never
-# fails the build. It sweeps every :app/:data/:domain main source that is not
-# already whitelisted (and not deliberate crash-infra), runs the SAME awk the
-# linter uses, and ranks the hits by coroutine density so the files most likely
-# to hide a real suspend-frame swallower float to the top.
+# fails the build. It sweeps every module's main source REPO-WIDE — kolibri +
+# nyx + the shared modules (:core / :common-ui / :common-data / :common-android /
+# :feature-crashreporting), since the shared-code refactors move suspend/catch
+# code between modules — skips anything already whitelisted (in EITHER
+# orchestrator) or deliberate crash-infra, runs the SAME awk the linter uses, and
+# ranks the hits by coroutine density so the files most likely to hide a real
+# suspend-frame swallower float to the top.
 #
 # WHEN TO RUN (see CLAUDE.md Rule 11, "Discovery"): after a refactor/rewrite
 # that gives a file coroutine work it did not have before — a new
@@ -36,27 +39,32 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
-conv="$script_dir/check-conventions.sh"
+repo_root="$(cd "$script_dir/../.." && pwd)"            # kolibri/tools -> kolibri -> repo root
+conv="$script_dir/check-conventions.sh"                 # kolibri orchestrator (canonical lists)
+nyx_conv="$repo_root/nyx/tools/check-conventions.sh"    # nyx orchestrator (its own lists)
 awkf="$script_dir/check-cancellation-rethrow.awk"
 
-for f in "$conv" "$awkf"; do
+for f in "$conv" "$nyx_conv" "$awkf"; do
   if [ ! -f "$f" ]; then
     echo "ERROR: required file not found: $f" >&2
     exit 2
   fi
 done
 
-# Basenames already on the cancel_files whitelist — parsed live from the linter
-# so this tool can never drift from the enforced list.
+# Basenames already on the cancel_files whitelist — parsed live from BOTH
+# orchestrators (a shared-module file may be listed in either), so this tool can
+# never drift from the enforced lists. Basename match: the one realistic
+# cross-app collision (MainActivity.kt) is on both lists, so excluding both is
+# correct; any other same-name collision is rare and only costs a re-report.
 mapfile -t whitelisted < <(
-  sed -n '/^cancel_files=(/,/^)/p' "$conv" | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
+  { sed -n '/^cancel_files=(/,/^)/p' "$conv"
+    sed -n '/^cancel_files=(/,/^)/p' "$nyx_conv"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
 )
 
 # Crash-infra files keep deliberately broad catches (Rule 9 / Rule 7). They are
 # known-intentional, so excluding them keeps the signal high. A genuinely new
 # concern in one of these is a design decision, not a lint find.
-crashinfra_re='KolibriLauncherApp|CrashReportingBootstrap|PipelineBacklogProbe|RecoveryWatchdog|UncaughtCrashHandler|LoopGuard|TimberWrapper|AcraTree'
+crashinfra_re='KolibriLauncherApp|NyxApplication|CrashReportingBootstrap|PipelineBacklogProbe|RecoveryWatchdog|UncaughtCrashHandler|LoopGuard|TimberWrapper|AcraTree'
 
 is_excluded() {
   local base="$1"
@@ -83,8 +91,8 @@ while IFS= read -r file; do
 
   rel="${file#"$repo_root"/}"
   rows+=("${density}	${n_hits}	${rel}")
-done < <(find "$repo_root/app/src/main" "$repo_root/data/src/main" "$repo_root/domain/src/main" \
-            -name '*.kt' 2>/dev/null)
+done < <(find "$repo_root" -type d -name build -prune -o \
+              -path '*/src/main/*' -name '*.kt' -print 2>/dev/null)
 
 echo "════════════════════════════════════════════════════════════════════════"
 echo " cancel_files candidate scan (report-only — never fails the build)"

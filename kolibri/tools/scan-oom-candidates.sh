@@ -14,11 +14,14 @@
 #
 # This script closes the DISCOVERY half of that gap, mirroring
 # scan-cancel-candidates.sh for the other axis. It is NOT a gate: it never fails
-# the build. It sweeps every :app/:data/:domain main source that is not already
-# whitelisted, runs the SAME awk the linter uses, and ranks the hits by
-# ALLOCATION density — how many lines carry a bitmap / inflate / JSON / ZIP /
-# bulk-read operation — so the files where an `Exception` catch actually risks
-# missing an OutOfMemoryError float to the top.
+# the build. It sweeps every module's main source REPO-WIDE — kolibri + nyx + the
+# shared modules (:core / :common-ui / :common-data / :common-android /
+# :feature-crashreporting), since shared-code refactors move allocation code
+# between modules — skips anything already whitelisted (in EITHER orchestrator),
+# runs the SAME awk the linter uses, and ranks the hits by ALLOCATION density —
+# how many lines carry a bitmap / inflate / JSON / ZIP / bulk-read operation — so
+# the files where an `Exception` catch actually risks missing an OutOfMemoryError
+# float to the top.
 #
 # Why allocation density and not raw hit count: hit count is dominated by
 # adapters full of legitimate race guards. Density is the proxy for "this file
@@ -51,21 +54,24 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
-conv="$script_dir/check-conventions.sh"
+repo_root="$(cd "$script_dir/../.." && pwd)"            # kolibri/tools -> kolibri -> repo root
+conv="$script_dir/check-conventions.sh"                 # kolibri orchestrator (canonical lists)
+nyx_conv="$repo_root/nyx/tools/check-conventions.sh"    # nyx orchestrator (its own lists)
 awkf="$script_dir/check-exception-breadth.awk"
 
-for f in "$conv" "$awkf"; do
+for f in "$conv" "$nyx_conv" "$awkf"; do
   if [ ! -f "$f" ]; then
     echo "ERROR: required file not found: $f" >&2
     exit 2
   fi
 done
 
-# Basenames already on the oom_files whitelist — parsed live from the linter so
-# this tool can never drift from the enforced list.
+# Basenames already on the oom_files whitelist — parsed live from BOTH
+# orchestrators (a shared-module file may be listed in either), so this tool can
+# never drift from the enforced lists.
 mapfile -t whitelisted < <(
-  sed -n '/^oom_files=(/,/^)/p' "$conv" | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
+  { sed -n '/^oom_files=(/,/^)/p' "$conv"
+    sed -n '/^oom_files=(/,/^)/p' "$nyx_conv"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
 )
 
 is_excluded() {
@@ -93,8 +99,8 @@ while IFS= read -r file; do
 
   rel="${file#"$repo_root"/}"
   rows+=("${density}	${n_hits}	${rel}")
-done < <(find "$repo_root/app/src/main" "$repo_root/data/src/main" "$repo_root/domain/src/main" \
-            -name '*.kt' 2>/dev/null)
+done < <(find "$repo_root" -type d -name build -prune -o \
+              -path '*/src/main/*' -name '*.kt' -print 2>/dev/null)
 
 echo "════════════════════════════════════════════════════════════════════════"
 echo " oom_files candidate scan (report-only — never fails the build)"
