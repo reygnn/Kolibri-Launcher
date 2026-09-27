@@ -5,29 +5,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Opaque base for the wallpaper collage, owned by the Activity (NOT by
-         HomeFragment's view). Because it lives above the fragment lifecycle it
-         stays drawn during the drawer→home view teardown/rebuild, so the system
-         wallpaper can't flash through the transparent window in that gap
-         (WALLPAPER_DRAWER_HOME_REBUILD_SPEC). Colour is driven by
-         SettingsRepository.wallpaperBackdropFlow in MainActivity: TRANSPARENT
-         (system wallpaper shows via FLAG_SHOW_WALLPAPER) or BLACK. Default
-         transparent here preserves the historical look until the flow emits. -->
-    <View
-        android:id="@+id/wallpaper_backdrop"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@android:color/transparent" />
-
-    <!-- Activity-level wallpaper render surface (WALLPAPER_ACTIVITY_HOSTING_SPEC §25,
-         P1 scaffold). Above the backdrop, below the NavHost — the same Z-slot the
-         fragment's wallpaperContainer occupies today, so custom layers draw over the
-         opaque backdrop and under the home content. UNWIRED in P1: both children are
-         GONE and no MainActivity code binds them yet, so the fragment's own
-         wallpaperView (fragment_home.xml) remains the live surface and there is no
-         double-render. P2 relocates the render machine here and drops the fragment's
-         copy in the same commit. Snake_case ids avoid an id clash with the fragment's
-         camelCase ones during the transition. -->
+    <!-- Activity-level wallpaper render surface + backdrop (WALLPAPER_ACTIVITY_HOSTING_SPEC §25).
+         Lowest Z-child, below the NavHost, so the custom layers draw under the home content.
+         The container's own BACKGROUND is the backdrop (§25 P5, nyx-parity — the former separate
+         wallpaper_backdrop View is gone): driven by SettingsRepository.wallpaperBackdropFlow in
+         MainActivity — TRANSPARENT (system wallpaper shows via the window's FLAG_SHOW_WALLPAPER) or
+         BLACK. Seeded transparent in setupMainContent before the first frame (the historical
+         default), then the flow updates it. -->
     <FrameLayout
         android:id="@+id/wallpaper_container"
         android:layout_width="match_parent"

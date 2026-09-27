@@ -395,6 +395,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     // lifecycle. Views are bound in setupMainContent; the edit controller + render/scrim/edit
     // observers are wired in setupWallpaperRendering. Renders on lifecycleScope (Activity).
 
+    private lateinit var wallpaperContainer: View
     private lateinit var wallpaperView: ZoomableImageView
     private lateinit var wallpaperScrim: View
 
@@ -588,20 +589,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     }
 
     /**
-     * Drives the Activity-owned backdrop ([R.id.wallpaper_backdrop]) from the
-     * persisted [SettingsRepository.wallpaperBackdropFlow]. The backdrop sits
-     * behind the NavHost and outlives HomeFragment's view, so painting it opaque
-     * black here (rather than as a bottom collage layer) is what stops the system
-     * wallpaper from flashing on every drawer→home return
-     * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC). [WallpaperBackdrop.SYSTEM_WALLPAPER]
-     * keeps it transparent so the device wallpaper shows through the window's
-     * FLAG_SHOW_WALLPAPER (set in [setupWindow]); no window flag is toggled at
-     * runtime — opaque black simply makes the flag a visual no-op.
+     * Drives the wallpaper backdrop from the persisted
+     * [SettingsRepository.wallpaperBackdropFlow] by colouring the wallpaper
+     * container's own background (§25 P5, nyx-parity — the former separate
+     * [R.id.wallpaper_backdrop] View is gone). The container is the lowest Z-child,
+     * below the NavHost. [WallpaperBackdrop.SYSTEM_WALLPAPER] keeps it transparent so
+     * the device wallpaper shows through the window's FLAG_SHOW_WALLPAPER (set in
+     * [setupWindow]); [WallpaperBackdrop.BLACK] paints it opaque black. No window flag
+     * is toggled at runtime. The transparent first-frame default is seeded eagerly in
+     * [setupMainContent]; this collector updates it on STARTED.
      *
-     * Must be called after [setupMainContent] has inflated the content view.
+     * Must be called after [setupMainContent] has bound [wallpaperContainer].
      */
     private fun observeWallpaperBackdrop() {
-        val backdrop = findViewById<View>(R.id.wallpaper_backdrop)
         collectOnStarted(
             flow = settingsRepository.wallpaperBackdropFlow,
             errorTag = "wallpaper backdrop",
@@ -611,7 +611,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 WallpaperBackdrop.SYSTEM_WALLPAPER -> Color.TRANSPARENT
                 WallpaperBackdrop.BLACK -> Color.BLACK
             }
-            backdrop.setBackgroundColor(color)
+            wallpaperContainer.setBackgroundColor(color)
         }
     }
 
@@ -789,8 +789,14 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
             setContentView(R.layout.activity_main)
             // Activity-hosted wallpaper surface (§25 P3): bind the persistent render views now
             // that the content view exists; they outlive the fragment view lifecycle.
+            wallpaperContainer = findViewById(R.id.wallpaper_container)
             wallpaperView = findViewById(R.id.wallpaper_view)
             wallpaperScrim = findViewById(R.id.wallpaper_scrim)
+            // Eager backdrop seed before the first frame (§25 P5): historical default is transparent
+            // (system wallpaper via FLAG_SHOW_WALLPAPER); observeWallpaperBackdrop updates it to
+            // BLACK on STARTED if the user chose that. Same first-frame behaviour as the former
+            // wallpaper_backdrop View's transparent XML default.
+            wallpaperContainer.setBackgroundColor(Color.TRANSPARENT)
             // Build the overlay controller now that the container exists (before
             // onRestoreInstanceState, which may re-show the drawer).
             drawerContainer?.let { drawerOverlay = buildDrawerOverlay(it) }
