@@ -377,6 +377,38 @@ class WallpaperDelegateTest {
     }
 
     /**
+     * §25 review M1/T2: a multi->single-layer transition (an edit deletes a layer down to one and
+     * commits) must not strand the prior multi-layer composite. cacheKeyOrNull is null for a
+     * single-layer state (§25 P4), so [WallpaperDelegate.refillCache] now drops the resident
+     * ~10 MB composite AND its luminance on the null-key branch instead of early-returning — before
+     * the fix the composite stayed resident until clear / next multi-warm / process death, and the
+     * AUTO classifier kept the removed composite's luminance (M1 leak + T2 stale-signal). The branch
+     * fires for any null-key state, so a single-layer state models it; the multi->single transition
+     * is what produces a resident composite to drop in production.
+     */
+    @Test
+    fun `a single-layer state drops any resident composite and its luminance`() = runTest {
+        val single = WallpaperState(layers = listOf(WallpaperLayerState(imageUri = "file:///l1.jpg")))
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns flowOf(single)
+
+        val cache: WallpaperCompositeCache = mockk(relaxed = true)
+        val luminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
+
+        val delegate = createDelegate(
+            observeWallpaperStateUseCase = useCase,
+            compositeCache = cache,
+            compositeLuminanceSignal = luminanceSignal,
+        )
+
+        delegate.start()
+        advanceUntilIdle()
+
+        verify { cache.invalidate() } // the stale multi-layer composite is dropped, not stranded
+        verify { luminanceSignal.emit(null) } // AUTO classifier stops reading the removed composite's value
+    }
+
+    /**
      * AUDIT-20 F11: leaving edit mode is a single funnel ([WallpaperDelegate.leaveEditMode])
      * that refills the display cache for BOTH commit and cancel. A no-op cancel restores an
      * unchanged state and produces no DataStore emission, so this explicit warm is the only

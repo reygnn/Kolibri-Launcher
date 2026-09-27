@@ -765,7 +765,24 @@ class WallpaperDelegate(
     private fun refillCache(state: WallpaperState) {
         if (refillInProgress) return
         if (_isWallpaperEditMode.value) return
-        val key = cacheKeyOrNull(state) ?: return
+        val key = cacheKeyOrNull(state)
+        if (key == null) {
+            // Single-layer / no wallpaper: nothing is cached under a null key (§25 P4), so a
+            // resident composite here is necessarily a STALE entry from a prior multi-layer state
+            // — e.g. an edit deleted a layer down to one and committed. Drop it and its luminance,
+            // guarded on the CURRENT state so a newer multi-layer state (whose own refill will
+            // re-warm and re-emit) is never clobbered. Without this the multi->single transition
+            // early-returned before the cleanup below, stranding the ~10 MB HARDWARE bitmap until
+            // clear/next-warm/process-death and leaving the AUTO classifier on the removed
+            // composite's luminance (the composite signal is only ever read for multi-layer, so
+            // the stale value is inert while single-layer but wrong on a later single->multi
+            // re-entry until the new warm emits).
+            if (cacheKeyOrNull(_wallpaperState.value) == null) {
+                compositeCache.invalidate()
+                compositeLuminanceSignal.emit(null)
+            }
+            return
+        }
         // F12 (structural): drop any entry cached under a now-dead key BEFORE deciding to
         // warm, so "entry for a dead resolution" is never even a state — independent of
         // whether the warm below succeeds. A rotate/fold (or a content change) versions the
