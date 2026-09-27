@@ -174,6 +174,10 @@ cancel_files=(
   # Shared crash-net base adopted by nyx (highest blast radius): every broad
   # Throwable catch sits behind a CancellationException-first arm.
   "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseActivity.kt"
+  # loadFromDiskOrResolve (suspend) wraps the non-suspend writeDisk in runCatching —
+  # safe today (no suspension point marker), locked so a suspend-flip of writeDisk
+  # can't silently swallow cancellation. Surfaced by the repo-wide scanCancelCandidates.
+  "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/IconLoaderImpl.kt"
 )
 run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \

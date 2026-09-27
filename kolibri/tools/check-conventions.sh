@@ -261,6 +261,11 @@ cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/SettingsViewModel.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/service/ComponentLabelResolverImpl.kt"
   "$repo_root/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetFavoriteAppsUseCase.kt"
+  # Shared launch helper (:common-ui): runLaunchCatching's broad Throwable arm is a
+  # System-API boundary; `launch` is a non-suspend `() -> Unit`, so no CancellationException
+  # can reach it (no suspension point marker). Listed here (the shared-file convention) and
+  # used by both apps. Surfaced by the repo-wide scanCancelCandidates.
+  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/AppLaunchResult.kt"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 

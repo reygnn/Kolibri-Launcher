@@ -150,6 +150,9 @@ class IconLoaderImpl @Inject constructor(
             }
         }
         val bitmap = source.load(ref, sizePx, style)
+        // no suspension point — writeDisk is a blocking (non-suspend) file write, so this
+        // runCatching cannot swallow a CancellationException today. Locked (cancel_files) so a
+        // future suspend-flip of writeDisk is a review prompt, not a silent swallow.
         runCatching { writeDisk(file, bitmap) }.onSuccess { schedulePrune() } // best-effort
         return bitmap
     }

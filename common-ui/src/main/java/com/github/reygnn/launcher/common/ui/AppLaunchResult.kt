@@ -55,6 +55,8 @@ fun runLaunchCatching(launch: () -> Unit): AppLaunchResult =
         AppLaunchResult.ComponentGone
     } catch (e: SecurityException) {
         AppLaunchResult.PermissionDenied
+    // no suspension point — `launch` is a non-suspend `() -> Unit`, so no
+    // CancellationException can reach these arms (the type enforces it).
     } catch (e: Throwable) {
         AppLaunchResult.Failed(e)
     }
