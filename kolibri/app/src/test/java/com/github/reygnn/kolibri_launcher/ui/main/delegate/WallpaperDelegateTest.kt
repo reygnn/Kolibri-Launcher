@@ -245,38 +245,6 @@ class WallpaperDelegateTest {
     // JVM-testable is the warm TRIGGER GATE — that a flatten is (not) kicked — pinned here.
 
     @Test
-    fun `refills a single-layer wallpaper via decode, not flatten`() = runTest {
-        // AUDIT-20 F15: single-layer now gets a PROACTIVE refill through the decode branch
-        // (not the composite flatten), cached under its file:// key, with the debug toast.
-        val single = WallpaperState.single("file:///single.jpg")
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(single)
-
-        val flattener: WallpaperFlattener = mockk(relaxed = true)
-        val bitmap = DecodedWallpaperBitmap(mockk<Bitmap>(relaxed = true), 1, 100, 100)
-        coEvery { flattener.decodeSingle("file:///single.jpg") } returns bitmap
-        val cache: WallpaperCompositeCache = mockk(relaxed = true)
-        every { cache.get(any()) } returns null
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeCache = cache,
-        )
-
-        delegate.start()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
-        coVerify { flattener.decodeSingle("file:///single.jpg") }
-        verify { cache.put("file:///single.jpg", bitmap) }
-        assertTrue(
-            "a single-layer refill emits the debug toast",
-            sentEvents.any { it is UiEvent.ShowToastFromString && it.message.startsWith("Single-layer cache filled") }
-        )
-    }
-
-    @Test
     fun `refill does nothing when there is no wallpaper`() = runTest {
         val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
         every { useCase.invoke() } returns flowOf(WallpaperState.NONE)
@@ -289,33 +257,6 @@ class WallpaperDelegateTest {
 
         coVerify(exactly = 0) { flattener.decodeSingle(any()) }
         coVerify(exactly = 0) { flattener.flatten(any(), any(), any()) }
-    }
-
-    @Test
-    fun `refill skips decode and signals still-valid on a single-layer cache hit`() = runTest {
-        val single = WallpaperState.single("file:///single.jpg")
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns flowOf(single)
-
-        val flattener: WallpaperFlattener = mockk(relaxed = true)
-        val cache: WallpaperCompositeCache = mockk(relaxed = true)
-        every { cache.get("file:///single.jpg") } returns mockk(relaxed = true) // already cached
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeCache = cache,
-        )
-
-        delegate.start()
-        advanceUntilIdle()
-
-        // No re-decode — the raw bitmap is still valid; the TEMP debug toast makes the
-        // "already cached" case visible (a transform-only edit hits this path).
-        coVerify(exactly = 0) { flattener.decodeSingle(any()) }
-        assertTrue(
-            sentEvents.any { it is UiEvent.ShowToastFromString && it.message == "Single-layer cache still valid" }
-        )
     }
 
     @Test
@@ -377,6 +318,23 @@ class WallpaperDelegateTest {
         )
 
         delegate.start()
+        advanceUntilIdle()
+
+        verify { luminanceSignal.emit(null) }
+    }
+
+    @Test
+    fun `onClearWallpaper drops the composite luminance for the AUTO classifier`() = runTest {
+        // §25 P4 guard (finding 3): warmComposite is the SOLE producer of the composite-luminance
+        // signal the AUTO surface classifier consumes, and no test guarded that feed. This pins the
+        // CLEAR half — removing the wallpaper must drop the signal to null so the classifier stops
+        // using the removed wallpaper's value. The positive warm -> emit(value) half needs the
+        // Bitmap.copy(HARDWARE) path (Robolectric), so it is deferred; WAH-INV-6 (never delete
+        // warmComposite) is the standing tripwire.
+        val luminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true)
+        val delegate = createDelegate(compositeLuminanceSignal = luminanceSignal)
+
+        delegate.onClearWallpaper()
         advanceUntilIdle()
 
         verify { luminanceSignal.emit(null) }
@@ -502,49 +460,6 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         assertEquals("same-key failure must not loop -> exactly one warm", 1, flattenCalls.get())
-    }
-
-    /**
-     * warmSingleLayer key-gate (AUDIT-20 F9, single-layer twin of the composite gate): a decode
-     * that finishes AFTER the state was superseded must drop its bitmap, not cache it under the
-     * now-stale key. The first state's decode parks on a gate; a second emission supersedes it
-     * (the in-flight refill is single-flighted, so it just updates the state); on release the
-     * key-gate sees a different current imageUri and skips the put.
-     */
-    @Test
-    fun `a superseded single-layer decode does not cache under its stale key`() = runTest {
-        val gate = CompletableDeferred<Unit>()
-        val s1Bitmap = DecodedWallpaperBitmap(mockk<Bitmap>(relaxed = true), 1, 100, 100)
-        val flattener: WallpaperFlattener = mockk(relaxed = true)
-        coEvery { flattener.decodeSingle("file:///a.jpg") } coAnswers { gate.await(); s1Bitmap }
-        coEvery { flattener.decodeSingle("file:///b.jpg") } returns null // superseding state: no put either
-
-        val s1 = WallpaperState.single("file:///a.jpg")
-        val s2 = WallpaperState.single("file:///b.jpg")
-        val stateFlow = MutableStateFlow(s1)
-        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
-        every { useCase.invoke() } returns stateFlow
-
-        val cache: WallpaperCompositeCache = mockk(relaxed = true)
-        every { cache.get(any()) } returns null
-
-        val delegate = createDelegate(
-            observeWallpaperStateUseCase = useCase,
-            wallpaperFlattener = flattener,
-            compositeCache = cache,
-        )
-
-        delegate.start()
-        advanceUntilIdle() // s1 warm parks in decodeSingle, holding the regen lock
-
-        stateFlow.value = s2 // supersede; the in-flight refill is single-flighted -> just updates state
-        advanceUntilIdle()
-
-        gate.complete(Unit) // s1 decode finishes into a state that is now s2
-        advanceUntilIdle()
-
-        coVerify { flattener.decodeSingle("file:///a.jpg") } // the stale decode DID run
-        verify(exactly = 0) { cache.put("file:///a.jpg", any()) } // ...but its key-gate rejected the put
     }
 
     /**

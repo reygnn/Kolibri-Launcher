@@ -231,8 +231,14 @@ Fail/Supersede). → **Kein Re-Sourcing nötig.**
 > Zuhause (Flatten-nur-für-Luminanz-Produzent oder Sampling im `FullRebuild` des
 > Binders). Nicht Teil dieses Umbaus.
 
-**Auflage:** einen **Guard-Test** ergänzen, der den bisher ungetesteten Feed schließt —
-Composite-Warm → `CompositeLuminanceSignal` emittiert; Clear → `null`.
+**Auflage / Stand P4:** Guard-Test für den bisher ungetesteten Feed. Umgesetzt ist die
+**Clear → `null`**-Hälfte als schneller JVM-Test (`onClearWallpaper drops the composite
+luminance…`). Die **Composite-Warm → `emit(value)`**-Hälfte trifft die
+`Bitmap.copy(HARDWARE)`-Zeile in `warmComposite` und bräuchte deshalb **Robolectric**
+(kein bestehender `WallpaperDelegateTest` ist Robolectric; die Datei ist bewusst reines
+schnelles JVM) — daher **verschoben**; **WAH-INV-6** (nie `warmComposite` löschen) bleibt
+der stehende Tripwire. Der bestehende Negativ-Guard (`a failed warm drops the composite
+luminance…`, `emit(null)`) deckt den Fail-Pfad bereits ab.
 
 ### 2.7 Backdrop (Befund 4) — separate View droppen, Einstellung behalten
 

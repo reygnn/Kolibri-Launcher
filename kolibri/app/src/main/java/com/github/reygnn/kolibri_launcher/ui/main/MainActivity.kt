@@ -746,8 +746,9 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         if (key.startsWith(WallpaperCompositeKey.SCHEME)) {
             return compositeCache.get(key)
         }
-        // Single-layer / per-layer file:// image: reuse the cached decode.
-        compositeCache.get(key)?.let { return it }
+        // Single-layer / per-layer file:// image: decode live (bounded). Since §25 P4 single-layer
+        // wallpapers are no longer proactively cached (the Activity-hosted surface makes the
+        // drawer->home re-decode the cache once avoided impossible), so there is no file:// read here.
 
         return try {
             // Bounded decode: downsample below the Canvas ~100 MB per-bitmap draw limit so a huge

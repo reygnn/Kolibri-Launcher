@@ -748,14 +748,13 @@ class WallpaperDelegate(
      * backup restore, or a rotate/fold (new resolution) — gets one produced in the BACKGROUND so
      * the next drawer->home is a ~0 ms cache hit.
      *
-     * ONE entry point, branching by representation (AUDIT-20 F15 — single-layer used to have no
-     * proactive fill and only cached lazily on the render path):
-     *  - no wallpaper       -> nothing
-     *  - single-layer image -> HARDWARE decode, cached under the `file://` key. A lone image needs
-     *    no compositing: the render positions it via the ImageView matrix, so the cache holds the
-     *    raw (possibly small) bitmap and the system wallpaper shows through any uncovered area —
-     *    cheaper than pre-baking a full-screen composite.
-     *  - multi-layer        -> flatten N layers -> HARDWARE composite, cached under `composite://`.
+     * Only MULTI-layer wallpapers are warmed (§25 P4): the composite flatten is the per-frame-GPU
+     * win the device spike locked, and it must survive as a single texture. A single-layer
+     * wallpaper is NOT cached — since §25 P3 the render surface is Activity-hosted (never torn
+     * down), so the drawer->home re-decode the single-layer cache once avoided no longer happens; a
+     * lone image decodes live via the render's bounded loader.
+     *  - no wallpaper / single-layer -> nothing to warm
+     *  - multi-layer                 -> flatten N layers -> HARDWARE composite, cached under `composite://`.
      *
      * Deliberately NOT on the launch hot path. Single-flighted ([refillInProgress]) and skipped
      * during edit mode (the layers are mid-change; the commit path refills). Gated on a cache MISS
@@ -775,25 +774,14 @@ class WallpaperDelegate(
         // an empty cache, so the live current-key entry is never touched.
         compositeCache.invalidateIfNotKey(key)
         if (compositeCache.get(key) != null) {
-            // Cache-diagnostic toast (F10), gated by BuildConfig.SHOW_CACHE_TOASTS —
-            // debug + personal/daily-driver builds only, compiled out of a public
-            // release. A single-layer cache HIT means the raw bitmap is still valid
-            // (e.g. a transform-only edit changed scale/position but not the image,
-            // so nothing is re-decoded), signalling that "no fill toast" is NOT
-            // "not cached".
-            if (state.layerCount == 1 && BuildConfig.SHOW_CACHE_TOASTS) {
-                scope.launchSafe("Error signalling single-layer cache hit") {
-                    scope.sendEvent(
-                        UiEvent.ShowToastFromString("Single-layer cache still valid", Toast.LENGTH_SHORT)
-                    )
-                }
-            }
+            // Already warm (the composite is in memory) — nothing to do.
             return
         }
         refillInProgress = true
         scope.launchSafe("Error refilling wallpaper cache") {
             try {
-                if (state.layerCount >= 2) warmComposite(state, key) else warmSingleLayer(state, key)
+                // Only multi-layer reaches here — cacheKeyOrNull returns null for single-layer.
+                warmComposite(state, key)
             } finally {
                 refillInProgress = false
                 // Self-reschedule (S5): only if the current state is a DIFFERENT miss — never the
@@ -810,45 +798,14 @@ class WallpaperDelegate(
     }
 
     /**
-     * The display-cache key for [state], or null if it has no wallpaper. Multi-layer -> the
-     * resolution-keyed `composite://` key; single-layer -> the raw `file://` image URI. The
-     * single-layer key matches `HomeFragment.loadBitmapFromUri`'s `uri.toString()` because
-     * wallpaper URIs come from `WallpaperFileManager.copyToInternal` (canonical `file://`), so
-     * `imageUri == imageUri.toUri().toString()` — keeping this side Uri-free.
+     * The display-cache key for [state], or null if there is nothing to warm. Only MULTI-layer
+     * wallpapers get a key (the resolution-keyed `composite://` flatten). A single-layer wallpaper
+     * returns null and is never cached (§25 P4): the Activity-hosted render surface (§25 P3) is not
+     * torn down on drawer->home, so the re-decode the single-layer cache once avoided cannot happen;
+     * a lone image decodes live via the render's bounded loader.
      */
-    private fun cacheKeyOrNull(state: WallpaperState): String? = when {
-        !state.hasWallpaper -> null
-        state.layerCount >= 2 -> compositeKey(state)
-        else -> state.layers.firstOrNull()?.imageUri
-    }
-
-    /**
-     * Single-layer refill: HARDWARE-decode the lone image via the flattener (which owns the
-     * `Uri`/`contentResolver`), then key-gated cache it under its `file://` key. A decode that
-     * finishes after a clear (NONE) or a supersede drops its bitmap rather than stranding a stale
-     * entry (AUDIT-20 F9). No compositing — the render positions it live via the ImageView matrix.
-     */
-    private suspend fun warmSingleLayer(state: WallpaperState, key: String) = compositeRegenLock.withLock {
-        val uriString = state.layers.firstOrNull()?.imageUri ?: return@withLock
-        val decoded = wallpaperFlattener.decodeSingle(uriString) ?: return@withLock
-        val current = _wallpaperState.value
-        if (current.layerCount == 1 && current.layers[0].imageUri == key) {
-            compositeCache.put(key, decoded)
-            // Cache-diagnostic toast (F10), gated by BuildConfig.SHOW_CACHE_TOASTS —
-            // debug + personal/daily-driver builds only, compiled out of a public
-            // release. Visual signal on each single-layer cache fill; symmetric with
-            // the composite warm's toast below.
-            if (BuildConfig.SHOW_CACHE_TOASTS) {
-                val m = context.resources.displayMetrics
-                scope.sendEvent(
-                    UiEvent.ShowToastFromString(
-                        "Single-layer cache filled (${m.widthPixels}x${m.heightPixels})",
-                        Toast.LENGTH_SHORT,
-                    )
-                )
-            }
-        }
-    }
+    private fun cacheKeyOrNull(state: WallpaperState): String? =
+        if (state.hasWallpaper && state.layerCount >= 2) compositeKey(state) else null
 
     /**
      * The composite cache key for [state] at the CURRENT display metrics. The one pinned metric
@@ -937,8 +894,8 @@ class WallpaperDelegate(
             // release. Visual signal on each composite cache (re)fill, to gauge how
             // often a re-flatten is actually needed (cold start / edit-commit / rotate);
             // the resolution in the text distinguishes a rotate-triggered refill. Only a
-            // genuine composite (layerCount >= 2) reaches this path; a lone image fills
-            // via warmSingleLayer under its file:// key.
+            // genuine composite (layerCount >= 2) reaches this path; a lone image is not
+            // cached at all (§25 P4) and decodes live via the render's bounded loader.
             if (BuildConfig.SHOW_CACHE_TOASTS) {
                 scope.sendEvent(
                     UiEvent.ShowToastFromString(
