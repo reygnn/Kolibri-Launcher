@@ -4,9 +4,9 @@ import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
 import android.view.View
+import android.view.ViewStub
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.kolibri_launcher.databinding.FragmentHomeBinding
 import com.github.reygnn.kolibri_launcher.databinding.ViewWallpaperEditOverlayBinding
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -41,7 +41,16 @@ import timber.log.Timber
  * intentionally absent: a freely-draggable FAB makes both redundant.
  */
 internal class WallpaperEditController(
-    private val binding: FragmentHomeBinding,
+    // Explicit views instead of the whole FragmentHomeBinding
+    // (WALLPAPER_ACTIVITY_HOSTING_SPEC §25, P2 prep): the controller only ever
+    // touched three binding views — the render surface, the edit-overlay stub,
+    // and the dim target. Passing them explicitly makes the controller host-
+    // agnostic, so P3 can re-host it under MainActivity by handing it the
+    // Activity's views (dimTarget = the NavHost container) with no body change.
+    private val wallpaperView: ZoomableImageView,
+    private val editOverlayStub: ViewStub,
+    // View whose alpha dims the home content while editing (fragment: rootLayout).
+    private val dimTarget: View,
     private val viewModel: LauncherViewModel,
     private val launchLayerPicker: () -> Unit,
     private val rerenderWallpaper: () -> Unit,
@@ -76,7 +85,7 @@ internal class WallpaperEditController(
     private fun ensureOverlayInflated(): ViewWallpaperEditOverlayBinding {
         overlay?.let { return it }
 
-        val root = binding.wallpaperEditOverlayStub.inflate()
+        val root = editOverlayStub.inflate()
         val bound = ViewWallpaperEditOverlayBinding.bind(root)
         overlay = bound
 
@@ -110,7 +119,6 @@ internal class WallpaperEditController(
     // ============================================================================
 
     private fun applyEditState(state: WallpaperEditState) {
-        val wallpaperView = binding.wallpaperView
         wallpaperView.isEditMode = state.isEditMode
         wallpaperView.isSnapEnabled = state.snapEnabled
         wallpaperView.isHorizontalSnapEnabled = state.horizontalSnapEnabled
@@ -121,7 +129,7 @@ internal class WallpaperEditController(
         // correct no-op (the safe-call assignment does nothing).
         overlay?.root?.visibility =
             if (state.overlayVisible) View.VISIBLE else View.GONE
-        binding.rootLayout.alpha = state.rootLayoutAlpha
+        dimTarget.alpha = state.rootLayoutAlpha
     }
 
     /**
@@ -180,7 +188,7 @@ internal class WallpaperEditController(
                 ensureOverlayInflated()
                 applyEditState(targetState)
                 wireEditModeListeners()
-                Timber.d("Wallpaper edit mode: ON (stateLayers=${viewModel.wallpaperState.value.layerCount}, viewLayers=${binding.wallpaperView.layerCount})")
+                Timber.d("Wallpaper edit mode: ON (stateLayers=${viewModel.wallpaperState.value.layerCount}, viewLayers=${wallpaperView.layerCount})")
             } else {
                 applyEditState(targetState)
                 // If the overlay was never inflated (never entered edit mode),
@@ -203,7 +211,6 @@ internal class WallpaperEditController(
     }
 
     private fun wireEditModeListeners() {
-        val wallpaperView = binding.wallpaperView
 
         // ── TOUCH FORWARDING ──
         // wallpaperEditOverlay sits above wallpaperView with a full-
@@ -359,7 +366,7 @@ internal class WallpaperEditController(
         commandsPanel.setOnBackdropToggleClicked { /* no-op */ }
         commandsPanel.setOnCloseClicked { /* no-op */ }
 
-        binding.wallpaperView.onLayerTapped = null
+        wallpaperView.onLayerTapped = null
     }
 
     /**
@@ -377,7 +384,7 @@ internal class WallpaperEditController(
      */
     private fun showWallpaperMemoryDialog() {
         val ctx = commandsPanel.context
-        val rows = binding.wallpaperView.collectWallpaperMemoryRows()
+        val rows = wallpaperView.collectWallpaperMemoryRows()
         val message = if (rows.isEmpty()) {
             ctx.getString(R.string.wallpaper_memory_empty)
         } else {
@@ -422,7 +429,6 @@ internal class WallpaperEditController(
      * the layers.
      */
     fun saveCurrentViewTransforms() {
-        val wallpaperView = binding.wallpaperView
         val currentState = viewModel.wallpaperState.value
 
         // Race-guard: this runs before layer operations, in which the
@@ -498,7 +504,6 @@ internal class WallpaperEditController(
         // Only meaningful in edit mode (overlay inflated). Guard so a layer
         // change arriving off edit-mode can't touch a null overlay.
         overlay ?: return
-        val wallpaperView = binding.wallpaperView
         val count = wallpaperView.layerCount
         val active = wallpaperView.activeLayerIndex
 
@@ -512,7 +517,6 @@ internal class WallpaperEditController(
     fun applyLayerButtonsState() {
         // Only meaningful in edit mode (overlay inflated). Guard as above.
         overlay ?: return
-        val wallpaperView = binding.wallpaperView
         val state = LayerButtonsState.from(
             isMultiLayerMode = wallpaperView.isMultiLayerMode,
             layerCount = wallpaperView.layerCount,

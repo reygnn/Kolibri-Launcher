@@ -159,10 +159,16 @@ geteilt — §2.8). Der `registerForActivityResult`-Bild-Picker (`layerPickerLau
 oder in `onCreate`** (nyx: Feld-Initializer, `MainActivity.kt:173`) — Pflicht wegen des
 `registerForActivityResult`-Placement-Gates (`checkConventions`).
 
-### 2.4 Observer-Split (load-bearing)
+### 2.4 Observer-Split (load-bearing) + Render/Edit-Kopplung
 
-Die Home-**Gesten** (`HomeGestureLayout`, `applyWallpaperEditModeToGestures`) bleiben im
-Fragment. Nach dem Umzug:
+**Kopplungs-Befund (aus dem Code, treibt die P2/P3-Grenze):** Render- und Edit-Schicht
+zielen auf denselben `wallpaperView`, und `HomeFragment`s **Observer 8**
+(`isWallpaperEditMode`) macht in EINEM Block `wallpaperEditController.applyEditMode()` +
+`applyScrim()` + Toggle-`updateWallpaper()` + `applyWallpaperEditModeToGestures()`. Der
+`WallpaperEditController` wurde zudem mit dem ganzen `FragmentHomeBinding` konstruiert.
+Darum sind Render und Edit **nicht getrennt umziehbar** — sie wandern gemeinsam (P3),
+nachdem der Controller in P2 host-agnostisch gemacht wurde. Einzig die Gesten-Sperre bleibt
+im Fragment. Nach dem Umzug:
 - **MainActivity** observt `isWallpaperEditMode` → Edit-Controller + `applyScrim` +
   Toggle-Re-Render.
 - **HomeFragment** behält einen *separaten* Observer desselben `isWallpaperEditMode`-
@@ -282,22 +288,34 @@ in `activity_main.xml` (gone, **unverdrahtet**; Fragment rendert weiter). Zwei
 ZoomableImageViews existieren, aber nur die des Fragments ist gebunden → kein
 Doppel-Render. *Bricht evtl.:* Inflation, z-Order. *Device:* keine sichtbare Änderung.
 
-**P2 — Render-Surface + Binder/Scheduler → MainActivity** (`lifecycleScope`). Fragment +
-`fragment_home.xml` verlieren sie; Fragment-Wurzel wird `homeGestureRoot`. Reader-Teile
-(§2.5) mit. *Bricht evtl.:* Transparent-Window-Bleed, Scrim/Insets, Latest-wins-Race
-auf neuer Scope, Config-Change-Re-Render. **Rule-11-Marker mitnehmen:** `loadBitmapFromUri`
-trägt `Catch kept` / `no suspension point`; MainActivity ist bereits in
-`rule11_files`/`cancel_files`, also erzwingt `checkConventions` sie. `Throwable`-Breite
-auf dem `decodeBoundedWallpaperBitmap`-Catch halten. *Device:* Single- + Multi-Layer
-identisch; Scrim; Rotation; drawer→home.
+**P2 — Prep: `WallpaperEditController` auf explizite Views umparametrisieren** (IN-Fragment,
+kein Umzug). Statt des ganzen `FragmentHomeBinding` bekommt der Controller `wallpaperView`,
+`editOverlayStub`, `dimTarget` einzeln — die drei binding-Views, die er je nutzte. Reiner
+Refactor, kein Verhaltenswechsel: macht den Controller **host-agnostisch**, damit P3 ihn
+ohne Body-Änderung unter der Activity re-hosten kann (Activity-Views statt Fragment-Views).
+*Bricht evtl.:* nichts Funktionales (mechanisch; einzige Konstruktionsstelle
+`HomeFragment.onViewCreated`, keine Test-Referenzen). *Device:* nicht nötig (kein
+Verhaltenswechsel) — Build + checkConventions + Unit-Tests genügen.
 
-**P3 — Edit-Controller + Stub → MainActivity.** `WallpaperEditController` auf Activity-
-Views umparametrisieren (`dimTarget = nav_host_fragment`); Picker → `onCreate`/Feld.
-MainActivity observt `isWallpaperEditMode`/`fabPosition`/`wallpaperBackdrop` → Controller
-+ Toggle-Re-Render + `applyScrim`; HomeFragment behält nur den Gesten-Disable-Observer.
-*Bricht evtl.:* Edit-Re-Hosting (dimTarget, Touch-Forwarding an `wallpaperView.onTouchEvent`),
-Back-Press-Commit, ActivityResult-Placement-Gate. *Device:* volle Edit-Session — Enter,
-Pan/Zoom, Add-Layer, Delete, Swap, Backdrop-Toggle, Save, Cancel, Back-Press.
+**P3 — Render-Surface UND Edit-Controller GEMEINSAM → MainActivity** (`lifecycleScope`).
+Zusammengelegt (Re-Cut gegenüber der ersten Planung), **weil beide auf denselben
+`wallpaperView` zielen** und Observer 8 Render + Edit + Scrim in EINEM Block mischt — eine
+Trennung „nur Render zuerst" erzeugte einen kaputten Zwischenzustand (Kopplungs-Befund,
+§2.4). Verschoben: die View-Refs + `wallpaperViewBinder`/`wallpaperRenderScheduler` +
+`updateWallpaper`/`displayTargetFor`/`compositeCacheKeyIfHit`/`loadBitmapFromUri`/`applyScrim`
++ `@Inject compositeCache` + der (in P2 host-agnostische) `WallpaperEditController`
+(`dimTarget = nav_host_fragment`) + der Layer-Picker (→ `onCreate`/Feld) + der Wallpaper-Zweig
+von `onConfigurationChanged`. `fragment_home.xml` verliert die Views; Fragment-Wurzel wird
+`homeGestureRoot`. MainActivity observt `wallpaperState`/`scrimAlpha`/`isWallpaperEditMode`/
+`fabPosition`/`wallpaperBackdrop`; HomeFragment behält nur den Gesten-Disable-Observer
+(§2.4). **Rule-11-Marker mitnehmen:** `loadBitmapFromUri` trägt `Catch kept` /
+`no suspension point` (MainActivity ist schon in `rule11_files`/`cancel_files`),
+`decodeBoundedWallpaperBitmap` behält `Throwable`-Breite. *Bricht evtl.:*
+Transparent-Window-Bleed, Scrim/Insets, Latest-wins-Race, Config-Change-Re-Render,
+Edit-Re-Hosting (dimTarget, Touch-Forwarding an `wallpaperView.onTouchEvent`, Back-Press),
+ActivityResult-Placement-Gate. *Device:* Single-+Multi-Layer identisch; Scrim; Rotation;
+drawer→home; **volle Edit-Session** (Enter, Pan/Zoom, Add-Layer, Delete, Swap,
+Backdrop-Toggle, Save, Cancel, Back-Press).
 
 **P4 — Single-Layer-Cache-Pfad zurückbauen** (§2.5). `warmSingleLayer`, Single-Zweig
 von `refillCache` + Diagnose-Toasts, `file://`-Cache-Read raus. **`warmComposite` +
@@ -351,15 +369,15 @@ Reconciliation-/Cleanup-Pass.) Voller `./gradlew test` + `checkConventions` +
 
 | Risiko | Wo | Mitigation |
 |---|---|---|
-| **First-Frame-Flash** (System-Wallpaper sichtbar vor Custom-Paint, v.a. `BLACK`) | Cold-Start, P2/P5 | Container-Background (+ Scrim) in `onCreate` **eager** seeden; `SYSTEM_WALLPAPER` bleibt transparent. |
-| **Scrim / Insets-Regression** | P2 | Scrim ist Container-Kind auf Activity-Level; `applyScrim` GONE/VISIBLE + `ScrimRender`-Edit-Suppression auf Gerät prüfen; Statusbar/edge-to-edge unberührt. |
+| **First-Frame-Flash** (System-Wallpaper sichtbar vor Custom-Paint, v.a. `BLACK`) | Cold-Start, P3/P5 | Container-Background (+ Scrim) in `onCreate` **eager** seeden; `SYSTEM_WALLPAPER` bleibt transparent. |
+| **Scrim / Insets-Regression** | P3 | Scrim ist Container-Kind auf Activity-Level; `applyScrim` GONE/VISIBLE + `ScrimRender`-Edit-Suppression auf Gerät prüfen; Statusbar/edge-to-edge unberührt. |
 | **Edit-Re-Hosting** (dimTarget, Touch-Forwarding, Back-Press) | P3 | `dimTarget = nav_host_fragment`; Touch-Interceptor forwardet weiter an `wallpaperView.onTouchEvent`; volle Session + Back-Press-Commit auf Gerät. Stub-Inflation bleibt lazy. |
 | **Luminanz dunkel** (AUTO) | P4 | `warmComposite` als Produzent behalten (WAH-INV-6); Guard-Test auf den `CompositeLuminanceSignal`-Feed. |
-| **Latest-wins-Race** auf neuer Scope | P2 | `WallpaperRenderScheduler`-Semantik unverändert; jetzt `lifecycleScope`; `cancel()` → `onDestroy`. Schneller Wallpaper-Wechsel + Rotation testen. |
-| **Transparent-Window / FLAG_SHOW_WALLPAPER** | P2/P5 | Runtime-Flag + transparentes Fenster behalten (kein Theme-Wechsel). System-Wallpaper scheint durch transparente Collage-Regionen. |
-| **checkConventions an verschobenen Catches** | P2/P3 | Rule-11 (`Catch kept`) + Cancellation (`no suspension point`) Marker mit `loadBitmapFromUri`; MainActivity schon whitelisted. Picker in `onCreate`/Feld (ActivityResult-Gate). |
-| **Doppel-Render** im Übergang | P1→P2 | P1 fügt Activity-Views GONE/unverdrahtet ein; die Fragment-View wird im selben Commit entfernt, der die Activity-View verdrahtet (P2). Nie zwei gebundene `ZoomableImageView`. |
-| **Config-Change-Re-Flatten-Miss** (Rotation) | P2/P4 | MainActivity erhält `onConfigurationChanged`; `updateWallpaper(current)` + `onDisplayConfigChanged()` erhalten. Rotation → Single-Textur-Hit landet auf neuer Auflösung. |
+| **Latest-wins-Race** auf neuer Scope | P3 | `WallpaperRenderScheduler`-Semantik unverändert; jetzt `lifecycleScope`; `cancel()` → `onDestroy`. Schneller Wallpaper-Wechsel + Rotation testen. |
+| **Transparent-Window / FLAG_SHOW_WALLPAPER** | P3/P5 | Runtime-Flag + transparentes Fenster behalten (kein Theme-Wechsel). System-Wallpaper scheint durch transparente Collage-Regionen. |
+| **checkConventions an verschobenen Catches** | P3 | Rule-11 (`Catch kept`) + Cancellation (`no suspension point`) Marker mit `loadBitmapFromUri`; MainActivity schon whitelisted. Picker in `onCreate`/Feld (ActivityResult-Gate). |
+| **Doppel-Render** im Übergang | P1→P3 | P1 fügt Activity-Views GONE/unverdrahtet ein; die Fragment-View wird im selben Commit entfernt, der die Activity-View verdrahtet (P2). Nie zwei gebundene `ZoomableImageView`. |
+| **Config-Change-Re-Flatten-Miss** (Rotation) | P3/P4 | MainActivity erhält `onConfigurationChanged`; `updateWallpaper(current)` + `onDisplayConfigChanged()` erhalten. Rotation → Single-Textur-Hit landet auf neuer Auflösung. |
 
 ---
 

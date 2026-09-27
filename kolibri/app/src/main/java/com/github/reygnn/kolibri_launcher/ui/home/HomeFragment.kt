@@ -477,7 +477,13 @@ class HomeFragment : Fragment() {
         setupHomeWindowInsets()
 
         wallpaperEditController = WallpaperEditController(
-            binding = binding,
+            // Explicit views (WALLPAPER_ACTIVITY_HOSTING_SPEC §25, P2 prep): the
+            // controller no longer takes the whole binding. dimTarget = rootLayout
+            // (the home content the edit mode dims). P3 hands it the Activity's
+            // equivalents instead.
+            wallpaperView = binding.wallpaperView,
+            editOverlayStub = binding.wallpaperEditOverlayStub,
+            dimTarget = binding.rootLayout,
             viewModel = viewModel,
             launchLayerPicker = {
                 layerPickerLauncher?.let { WallpaperImagePicker.launch(it) }
