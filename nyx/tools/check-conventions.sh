@@ -45,6 +45,15 @@ set -u
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"                 # = <repo>/nyx
 kol_tools="$(cd "$repo_root/../kolibri/tools" && pwd)"    # canonical detectors
+# Shared-module positive lists (neutral home): SHARED_CANCEL_FILES / SHARED_OOM_FILES /
+# SHARED_INITORDER_FILES — sourced by both apps so a shared file is enforced by both.
+shared_lint="$repo_root/../tools/shared-lint-files.sh"
+if [ ! -f "$shared_lint" ]; then
+  echo "ERROR: shared lint list not found: $shared_lint" >&2
+  exit 2
+fi
+# shellcheck source=/dev/null
+source "$shared_lint"
 
 # Nyx production sources (app / domain / data), mirroring the module split.
 src_roots=(
@@ -170,14 +179,14 @@ run_awk_list "$kol_tools/check-rule11-annotation.awk" \
 #   are all synchronous and carry `no suspension point` markers. Locks them
 #   against an invisible suspend-flip.
 cancel_files=(
+  # Nyx-specific. Shared-module files (incl. the common-ui BaseActivity nyx adopted) live in
+  # tools/shared-lint-files.sh (SHARED_CANCEL_FILES) so both apps enforce them.
   "$app_root/com/github/reygnn/nyx_launcher/home/MainActivity.kt"
-  # Shared crash-net base adopted by nyx (highest blast radius): every broad
-  # Throwable catch sits behind a CancellationException-first arm.
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseActivity.kt"
   # loadFromDiskOrResolve (suspend) wraps the non-suspend writeDisk in runCatching —
   # safe today (no suspension point marker), locked so a suspend-flip of writeDisk
   # can't silently swallow cancellation. Surfaced by the repo-wide scanCancelCandidates.
   "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/IconLoaderImpl.kt"
+  "${SHARED_CANCEL_FILES[@]}"
 )
 run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \
@@ -185,6 +194,7 @@ run_awk_list "$kol_tools/check-cancellation-rethrow.awk" \
 
 # ── Exception-vs-Throwable breadth at allocation boundaries (positive list) ────
 oom_files=(
+  "${SHARED_OOM_FILES[@]}"
 )
 run_awk_list "$kol_tools/check-exception-breadth.awk" \
   "Exception breadth — bare \`catch (e: Exception)\` at an allocation boundary (use \`Throwable\` for OOM, or an \`Exception sufficient\` marker)" \
@@ -200,6 +210,7 @@ run_awk_list "$kol_tools/check-exception-breadth.awk" \
 # a NEW occurrence in any module is the report-only `./gradlew scanInitOrderLaunch`.
 initorder_files=(
   "$repo_root/data/src/main/java/com/github/reygnn/nyx_launcher/data/icon/FolderIconRenderer.kt"
+  "${SHARED_INITORDER_FILES[@]}"
 )
 run_awk_list "$kol_tools/check-init-order-launch.awk" \
   "Init-order launch — property initializer declared after a coroutine-launching init block (move the state above init)" \

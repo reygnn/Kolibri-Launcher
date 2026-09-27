@@ -57,21 +57,23 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"            # kolibri/tools -> kolibri -> repo root
 conv="$script_dir/check-conventions.sh"                 # kolibri orchestrator (canonical lists)
 nyx_conv="$repo_root/nyx/tools/check-conventions.sh"    # nyx orchestrator (its own lists)
+shared_lint="$repo_root/tools/shared-lint-files.sh"     # shared-module lists (neutral home)
 awkf="$script_dir/check-exception-breadth.awk"
 
-for f in "$conv" "$nyx_conv" "$awkf"; do
+for f in "$conv" "$nyx_conv" "$shared_lint" "$awkf"; do
   if [ ! -f "$f" ]; then
     echo "ERROR: required file not found: $f" >&2
     exit 2
   fi
 done
 
-# Basenames already on the oom_files whitelist — parsed live from BOTH
-# orchestrators (a shared-module file may be listed in either), so this tool can
-# never drift from the enforced lists.
+# Basenames already on an oom whitelist — parsed live from BOTH orchestrators AND
+# the shared-module list (SHARED_OOM_FILES), so this tool never drifts from the
+# enforced set.
 mapfile -t whitelisted < <(
   { sed -n '/^oom_files=(/,/^)/p' "$conv"
-    sed -n '/^oom_files=(/,/^)/p' "$nyx_conv"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
+    sed -n '/^oom_files=(/,/^)/p' "$nyx_conv"
+    sed -n '/^SHARED_OOM_FILES=(/,/^)/p' "$shared_lint"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
 )
 
 is_excluded() {

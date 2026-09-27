@@ -39,6 +39,17 @@ set -u
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 
+# Shared-module positive lists (neutral home, used by both apps' orchestrators):
+# SHARED_CANCEL_FILES / SHARED_OOM_FILES / SHARED_INITORDER_FILES. See
+# tools/shared-lint-files.sh — a shared file listed there is enforced by BOTH apps.
+shared_lint="$repo_root/../tools/shared-lint-files.sh"
+if [ ! -f "$shared_lint" ]; then
+  echo "ERROR: shared lint list not found: $shared_lint" >&2
+  exit 2
+fi
+# shellcheck source=/dev/null
+source "$shared_lint"
+
 # Production sources live in three Gradle modules after the §9.2 split.
 src_roots=(
   "$repo_root/app/src/main/java"
@@ -238,21 +249,18 @@ fi
 # `tools/check-cancellation-rethrow-test.sh` (manual rerun, not a CI gate).
 # ─────────────────────────────────────────────────────────────────────────────
 cancel_files=(
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/WallpaperViewBinder.kt"
+  # Kolibri-specific files. Shared-module files (WallpaperViewBinder, FlowCollection,
+  # BaseViewModel, ClockDelegate, AppLaunchResult, TimeBasedEventsRepositoryImpl,
+  # WallpaperRepositoryImpl, InstalledAppsRepositoryImpl, PackageUpdateReceiver) moved to
+  # tools/shared-lint-files.sh (SHARED_CANCEL_FILES) so both apps enforce them. Note
+  # BaseActivity below is Kolibri's OWN (ui/base) — distinct from the shared common-ui one.
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/home/HomeFragment.kt"
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/timeinfo/TimeBasedEventsRepositoryImpl.kt" # shared to :common-data (HIE Phase B)
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/FlowCollection.kt" # moved to :common-ui in the monorepo merge; still the highest-blast-radius collector
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/installedapps/InstalledAppsRepositoryImpl.kt" # shared to :common-data; broad catches around suspend emit() must keep their CancellationException-first arms (the invisible-flip shape)
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/installedapps/PackageUpdateReceiver.kt" # shared to :common-data; broad catch in suspend processPackageUpdate (withTimeout) must keep its CancellationException-first arm
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/DataStoreMaintenanceRepositoryImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/base/BaseActivity.kt"
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseViewModel.kt" # extracted to :common-ui (shared with nyx); broad catches keep their CancellationException-first arms + no-suspension-point marker
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/timeinfo/ClockDelegate.kt" # shared to :common-ui (HIE Phase B); two non-suspend battery catches keep their markers
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/delegate/WallpaperDelegate.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/backup/BackupFragment.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/backup/BackupViewModel.kt"
@@ -261,11 +269,7 @@ cancel_files=(
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/SettingsViewModel.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/service/ComponentLabelResolverImpl.kt"
   "$repo_root/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetFavoriteAppsUseCase.kt"
-  # Shared launch helper (:common-ui): runLaunchCatching's broad Throwable arm is a
-  # System-API boundary; `launch` is a non-suspend `() -> Unit`, so no CancellationException
-  # can reach it (no suspension point marker). Listed here (the shared-file convention) and
-  # used by both apps. Surfaced by the repo-wide scanCancelCandidates.
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/AppLaunchResult.kt"
+  "${SHARED_CANCEL_FILES[@]}"
 )
 cancel_awk="$script_dir/check-cancellation-rethrow.awk"
 
@@ -304,6 +308,7 @@ fi
 # tools/check-init-order-launch-test.sh (manual rerun, not a CI gate).
 # ─────────────────────────────────────────────────────────────────────────────
 initorder_files=(
+  "${SHARED_INITORDER_FILES[@]}"
 )
 initorder_awk="$script_dir/check-init-order-launch.awk"
 if [ ! -f "$initorder_awk" ]; then
@@ -492,14 +497,14 @@ fi
 # tools/check-exception-breadth.awk.
 # ─────────────────────────────────────────────────────────────────────────────
 oom_files=(
-  "$repo_root/../common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/ZoomableImageView.kt"
+  # Kolibri-specific. Shared-module allocation boundaries (ZoomableImageView,
+  # WallpaperFileManager, WallpaperRepositoryImpl, WallpaperBitmapLuminanceImpl) moved to
+  # tools/shared-lint-files.sh (SHARED_OOM_FILES) so both apps enforce them.
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt"
   "$repo_root/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt"
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt"
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
-  "$repo_root/../common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
   "$repo_root/app/src/main/java/com/github/reygnn/kolibri_launcher/crashreporting/ingestion/AnrReporter.kt"
+  "${SHARED_OOM_FILES[@]}"
 )
 oom_awk="$script_dir/check-exception-breadth.awk"
 
