@@ -237,11 +237,11 @@ class WallpaperDelegateTest {
     // COMPOSITE WARM (in-memory, v4)
     // ===========================================
     //
-    // The warm itself (flatten -> HARDWARE copy -> cache put) is not JVM-tested: the
-    // software->HARDWARE Bitmap.copy needs a real bitmap (a mock can't), so a JVM test would be
-    // mock theater (Rule 10). It is covered on-device; the flatten completeness and the content
-    // key are unit-tested in WallpaperFlattener/WallpaperCompositeKey tests. What IS honestly
-    // JVM-testable is the warm TRIGGER GATE — that a flatten is (not) kicked — pinned here.
+    // Only the warm's real software->HARDWARE Bitmap.copy SEMANTICS are on-device (a JVM mock can't
+    // reproduce the copy); that part is covered on-device, and flatten completeness + the content key
+    // are unit-tested in WallpaperFlattener/WallpaperCompositeKey tests. Everything around the copy IS
+    // JVM-pinned here with a relaxed Bitmap mock standing in for it: the warm TRIGGER GATE (that a
+    // flatten is (not) kicked) AND the luminance-emit path (success -> emit(value), fail/clear -> emit(null)).
 
     @Test
     fun `refill does nothing when there is no wallpaper`() = runTest {
