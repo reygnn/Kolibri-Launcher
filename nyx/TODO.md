@@ -207,11 +207,12 @@ Regressionsrisiko, die einen eigenen Task verdienen):
   geguarded auf `folderOverlayController.isVisible` — installed nur für Home-Folder (Drawer-Folder
   sind vor-reconciled). Robolectric-Test (`FolderMemberAdapterTest`) pinnt die Entry-Points.
 
-- **self-uninstall id-scoped vs. alle Platzierungen.** Uninstall von einer Home-Kachel entfernt
-  nur DIESE Platzierung; Duplikate derselben App auf anderen Kacheln / in Foldern bleiben grau
-  (im KDoc dokumentiert). Falls stattdessen „alle Platzierungen der deinstallierten App
-  entfernen" gewünscht ist, wäre das eine bewusste Produkt-Änderung (nach `packageName` statt
-  `id` reapen) — nicht rein technisch.
+- **self-uninstall id-scoped** — ✅ **entschieden (2026-09-27): bleibt id-scoped.** Uninstall von
+  einer Home-Kachel entfernt nur DIESE Platzierung; Duplikate derselben App auf anderen Kacheln /
+  in Foldern bleiben grau (im KDoc dokumentiert). Die Alternative „alle Platzierungen reapen"
+  (nach `packageName`) wurde bewusst verworfen: sie löst nur den seltenen Duplikat-Fall, bricht
+  aber das No-Prune-„jede Platzierung eigene Referenz"-Modell, ist asymmetrisch zum externen
+  Uninstall (der graue Kacheln behält) und bräuchte Folder-Dissolve-Handling (≥2-Member-Invariante).
 
 - ~~**Folder-Dot nutzt `members` statt `presentMembers`.**~~ ✅ **erledigt (2026-09-27):**
   `IconBinding.hasNotificationDot` keyt jetzt auf `presentMembers` (installed-only) — ein Folder
