@@ -1745,7 +1745,12 @@ im statischen Normalbetrieb kostet die Layer-Zahl nichts (View gecacht). Heißt:
 behalten (bzw. Edit-Mode: aktiver Layer live + Rest geflacht). Der Activity-Umzug
 selbst bleibt gefahrlos.
 
-Volle Analyse, Anker, Risiken, Trigger:
+**Implementierungs-Spec (2026-09-27): `docs/specs/WALLPAPER_ACTIVITY_HOSTING_SPEC.md`.**
+Voller §25 durchdesignt (Hybrid-Hosting, Flatten via Option 2A behalten, direct-wire
+statt `WallpaperHost`-Port, Backdrop-View droppen), 6-Phasen-Plan, Test-Impact +
+Risiko-Register. Fußt auf drei Recherche-Befunden (drawer→home reißt nichts mehr ab →
+Cache schon vestigial; Flatten steckt im Cache; `warmComposite` speist die
+AUTO-Luminanz). Entstehungs-Notiz + GPU-Spike-Daten:
 `docs/specs/WALLPAPER_ACTIVITY_HOSTING_EXPLORATION.md`.
 
 ---

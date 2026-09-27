@@ -5,6 +5,15 @@ Erkenntnis aus dem Monorepo-Merge mit `nyx`, die eine spätere
 Komplexitäts-Reduktion in Kolibri ermöglicht. Angelegt aus einer nyx-Session
 (2026-09-12); die Kolibri-Session entscheidet, ob/wann.
 
+> **→ Zur Implementierungs-Spec promotet: `WALLPAPER_ACTIVITY_HOSTING_SPEC.md`
+> (2026-09-27).** Der A17-GPU-Spike (unten) + drei Recherche-Befunde haben die
+> §25-Rechnung verschoben (der drawer→home-Teardown passiert längst nicht mehr →
+> der Cache-Apparat ist schon vestigial; der zu behaltende Flatten steckt genau
+> in diesem Cache). Die Spec trägt die volle Zielarchitektur (Hybrid-Hosting,
+> Flatten via Option 2A behalten, direct-wire statt `WallpaperHost`-Port,
+> Backdrop-View droppen), den 6-Phasen-Plan, Test-Impact + Risiko-Register.
+> Dieses Doc bleibt als Entstehungs-Notiz.
+
 ---
 
 ## Die Erkenntnis in einem Satz
