@@ -213,13 +213,16 @@ Regressionsrisiko, die einen eigenen Task verdienen):
   entfernen" gewünscht ist, wäre das eine bewusste Produkt-Änderung (nach `packageName` statt
   `id` reapen) — nicht rein technisch.
 
-- **Folder-Dot nutzt `members` statt `presentMembers`** (`IconBinding.hasNotificationDot`).
-  Ein Folder mit nur deinstalliertem dot-tragendem Member zeigt weiterhin einen Dot (auch auf
-  dem grauen Empty-Placeholder). Pre-existing, kosmetisch.
+- ~~**Folder-Dot nutzt `members` statt `presentMembers`.**~~ ✅ **erledigt (2026-09-27):**
+  `IconBinding.hasNotificationDot` keyt jetzt auf `presentMembers` (installed-only) — ein Folder
+  mit nur deinstalliertem dot-tragendem Member zeigt keinen Dot mehr (deckt sich mit dem
+  Composite-Renderer). `HomeCellDotTest` um den Fall erweitert.
 
-- **Kleinere SPEC-/Kosmetik-Punkte (low, kein Fix):** Cold-Start-COLOR-Flash bis die
-  iconStyle-Preference geladen ist (pre-existing Seed); `GetDrawerAppsUseCase.getCurrentApps()`
-  Doppel-Read im Warm-Path (Cold-Path liest bewusst erneut); kein Report-Dedup bei
-  wiederholtem `FailedNoCache` (kolibri-Parität); `InstalledAppsHolderPump.onEach`-Report ist
-  ungeguarded (nur relevant, falls `reportToAcra` — per Vertrag CANT_THROW — je wirft →
-  gedrosselte 1 Hz-Schleife). Alle als „nicht wert" eingestuft.
+- **Kleinere SPEC-/Kosmetik-Punkte:**
+  - ✅ **`GetDrawerAppsUseCase.getCurrentApps()` Doppel-Read** — warm-Path liest jetzt 1× (Cold-Path
+    re-readt bewusst nach dem Prime).
+  - **bewusst NICHT gefixt (jeweils begründet):** Cold-Start-COLOR-Flash bis die iconStyle-Preference
+    geladen ist (pre-existing Seed, Timing); kein Report-Dedup bei wiederholtem `FailedNoCache` —
+    **kolibri dedupt auch nicht**, ein Dedup nur in nyx bräche die Parität; `InstalledAppsHolderPump.onEach`-
+    Report ungeguarded — ein Guard wäre try/catch um `reportToAcra` (per Vertrag CANT_THROW) =
+    Rule-11-Verstoß.
