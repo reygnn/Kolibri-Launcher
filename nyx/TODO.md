@@ -151,19 +151,21 @@ kommt nicht in den Vordergrund) — für androidTest muss das Gerät entsperrt/w
 `numFlakyTestAttempts` für `:nyx:app` bleibt eine optionale allgemeine Flake-Mitigation
 (kolibri hat sie), ist aber für diese beiden Bugs nicht mehr nötig.
 
-### App-Start-Ausführung teilen (Option B — offener Refactor-Kandidat, 2026-09-18)
+### App-Start-Ausführung teilen (Option B) — erledigt (2026-09-27)
 
-Die **Launch-Taxonomie** (`AppLaunchResult` + `runLaunchCatching`) liegt seit
-2026-09-18 geteilt in `:common-ui` (Option A): nyx toastet jetzt bei Fehlschlag statt
-still zu schlucken (`ActivityNotFoundException`) bzw. bei `SecurityException` zu
-crashen — Pixel-/Kolibri-Parität. **Offen (Option B):** auch die *Ausführung* teilen —
-ein gemeinsames `AppLauncher` auf `LauncherApps.startMainActivity(ComponentName, user)`.
-nyx würde dann von seinem expliziten `startActivity(Intent(ACTION_MAIN/LAUNCHER,
-component))` auf die launcher-idiomatische API wechseln (work-profile-fähig, wie
-Launcher3/Kolibri; Kolibri nutzt sie bereits über `AppLauncherImpl`). Bewusst separat
-gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-Launch-
-Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
-Aufwand wert.
+Beide Optionen sind jetzt umgesetzt. Option A (seit 2026-09-18): die **Launch-Taxonomie**
+(`AppLaunchResult` + `runLaunchCatching`) liegt geteilt in `:common-ui` — nyx toastet bei
+Fehlschlag statt still zu schlucken/crashen (Pixel-/Kolibri-Parität).
+
+**Option B (erledigt 2026-09-27):** auch die *Ausführung* ist geteilt. `AppLauncher` +
+`AppLauncherImpl` (auf `LauncherApps.startMainActivity`) leben jetzt in `:common-ui`, gekeyed
+auf die kanonische `ComponentKey` (`:core`); beide Apps binden sie per eigenem
+`AppLauncherModule`. nyx' `launchApp` ruft `appLauncher.launch(this, key)` statt des expliziten
+`startActivity(Intent(ACTION_MAIN/LAUNCHER, component))` — launcher-idiomatisch,
+work-profile-fähig, Launcher3/Kolibri-Parität. Abgesichert durch den geteilten
+`AppLauncherImplTest` (`:common-ui`, Robolectric) und den instrumentierten
+`HomeAppLaunchTaplTest` (A17-verifiziert: ein echter Home-Tile-Tap läuft über den geteilten
+Launcher). Der Umbau wurde per 3-Agenten-Review geprüft (keine Korrektheits-Defekte).
 
 ### ~~Presence-Naht teilen (F7-Gate)~~ — obsolet (Branch `feature/lazy-slot-validation`)
 
