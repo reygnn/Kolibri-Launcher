@@ -102,6 +102,24 @@ internal class NyxHome : BasePage() {
     }
 
     /**
+     * Taps the app at grid cell [cellIndex] on the current page — a plain click,
+     * which routes through the grid adapter's onLaunch → MainActivity.launchApp →
+     * the shared AppLauncher. (Long-press would instead arm a drag.)
+     */
+    fun tapCell(cellIndex: Int) {
+        onView(withId(R.id.home_root)).perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
+            override fun getDescription() = "tap cell $cellIndex"
+            override fun perform(uiController: UiController, view: View) {
+                val pager = view.findViewById<ViewPager2>(R.id.home_pager)
+                val c = cellCenterOnScreen(pager, pager.currentItem, cellIndex)
+                    ?: error("No cell at index $cellIndex")
+                tap(uiController, c.first, c.second)
+            }
+        })
+    }
+
+    /**
      * Opens the app drawer via the production swipe-up gesture (home_root's
      * GestureDispatchCore -> onSwipeUp -> showDrawer) and waits for the drawer
      * list to render. Returns the drawer sub-page.

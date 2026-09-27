@@ -30,6 +30,9 @@ android {
         // DateFormat.is24HourFormat in ClockDelegateTest); return defaults instead
         // of throwing "not mocked".
         unitTests.isReturnDefaultValues = true
+        // Robolectric (AppLauncherImplTest) needs the merged manifest/resources to
+        // materialise real android.* types (e.g. ComponentName).
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -60,6 +63,10 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+    // robolectric: AppLauncherImplTest needs a real ComponentName (its captured
+    // package/class are asserted) — the un-mockable Android type the shared
+    // AppLauncher builds for startMainActivity.
+    testImplementation(libs.robolectric)
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
 }
 

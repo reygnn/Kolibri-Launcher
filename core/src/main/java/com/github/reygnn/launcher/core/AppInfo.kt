@@ -48,8 +48,10 @@ data class AppInfo(
      * `ComponentName` used to launch must carry the fully-qualified class — the
      * system resolves the activity by exact class-name match against the parsed
      * manifest (which stores long-form names), so a relative spelling would fail
-     * to resolve. This is the single source of truth for that normalization,
-     * shared by [key] (identity) and by each app's launcher.
+     * to resolve. This is the single source of truth for that normalization; it
+     * feeds [key] (identity), and the shared AppLauncher launches that [key]
+     * verbatim — so the launcher inherits the normalization through [key] rather
+     * than repeating it.
      *
      * A body `val` (declared before [key]), which — like [displayNameLower] and
      * [componentName] — keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
