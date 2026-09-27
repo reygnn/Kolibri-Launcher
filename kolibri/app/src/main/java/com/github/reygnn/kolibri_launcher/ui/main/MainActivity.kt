@@ -6,12 +6,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
+import android.view.ViewStub
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,7 +44,17 @@ import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
 import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomizationDialogFragment
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
+import com.github.reygnn.kolibri_launcher.ui.home.WallpaperEditController
 import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
+import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
+import com.github.reygnn.launcher.core.wallpaper.ScrimRender
+import com.github.reygnn.launcher.core.wallpaper.WallpaperCompositeKey
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
+import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.common.ui.AppLaunchResult
 import com.github.reygnn.launcher.common.ui.AppLauncher
 import com.github.reygnn.launcher.common.ui.DrawerOverlayController
@@ -372,6 +384,45 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     @Inject
     lateinit var crashReportingHealthNotifier: CrashReportingHealthNotifier
 
+    /** In-memory cache of the decoded display composite (Option D §9.4). Relocated from
+     *  HomeFragment (WALLPAPER_ACTIVITY_HOSTING_SPEC §25 P3) — its benefit is the per-frame
+     *  single-texture flatten (DISPLAY mode), independent of the fragment view lifecycle. */
+    @Inject
+    lateinit var compositeCache: WallpaperCompositeCache
+
+    // ---- Activity-hosted wallpaper render surface (WALLPAPER_ACTIVITY_HOSTING_SPEC §25 P3) ----
+    // Relocated from HomeFragment so the wallpaper surface persists across the (fragment) view
+    // lifecycle. Views are bound in setupMainContent; the edit controller + render/scrim/edit
+    // observers are wired in setupWallpaperRendering. Renders on lifecycleScope (Activity).
+
+    private lateinit var wallpaperView: ZoomableImageView
+    private lateinit var wallpaperScrim: View
+
+    private val wallpaperViewBinder = WallpaperViewBinder(
+        // suspend loader: the decode runs off the main thread. The binder only calls it for
+        // plans that actually load bitmaps (SwitchToSingleLayer / FullRebuild), so a
+        // property-only update never hits I/O.
+        bitmapLoader = { uri ->
+            withContext(Dispatchers.IO) {
+                LaunchTrace.section(LaunchTrace.Names.WALLPAPER_DECODE) {
+                    loadBitmapFromUri(uri)
+                }
+            }
+        }
+    )
+
+    /** Serializes wallpaper renders latest-wins (invariant unit-tested in WallpaperRenderScheduler). */
+    private val wallpaperRenderScheduler = WallpaperRenderScheduler()
+
+    /** Owns the wallpaper-edit-mode UI surface. Created in setupWallpaperRendering once the
+     *  content view exists; lives for the Activity lifetime (nulled in onDestroy). */
+    private var wallpaperEditController: WallpaperEditController? = null
+
+    /** Last edit-mode value the wallpaper was rendered for, so the edit-mode observer only
+     *  re-renders on an actual toggle — the initial STARTED emission is already covered by the
+     *  wallpaper-state observer. */
+    private var lastRenderedWallpaperEditMode: Boolean? = null
+
     /**
      * Latest wallpaper-surface classification emitted by
      * [resolveWallpaperSurfaceUseCase]. Cached so home-anchored dialogs
@@ -467,6 +518,21 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
+    // Layer-add image picker for wallpaper edit mode (separate from the base-wallpaper
+    // wallpaperPickerLauncher above). Registered as a field so it exists before STARTED,
+    // per the registerForActivityResult-placement rule.
+    private val layerPickerLauncher = registerForActivityResult(
+        WallpaperImagePicker.contract()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            // The delegate copies the image to internal storage immediately, so a persistable
+            // URI permission would be wasted here. onAddWallpaperLayer is fire-and-forget
+            // (VM launchSafe) and Timber.d cannot throw — no try/catch (Rule 11).
+            viewModel.onAddWallpaperLayer(uri)
+            Timber.d("Layer added from picker: $uri")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         setupWindow()
@@ -478,6 +544,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
 
         observeWallpaperBackdrop()
+        setupWallpaperRendering()
 
         // Keep the cached wallpaper-surface classification fresh across
         // wallpaper / surface-mode changes for the lifetime of the
@@ -548,9 +615,181 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
+    /**
+     * Wires the Activity-hosted wallpaper render + edit surface (§25 P3). Creates the edit
+     * controller against the Activity's views (dimTarget = the NavHost container, which hosts the
+     * home content the edit mode dims) and sets up the render / edit-mode / FAB / backdrop / scrim
+     * observers that formerly lived in HomeFragment. The home-gesture disable stays in HomeFragment
+     * (its own [LauncherViewModel.isWallpaperEditMode] observer). Must run after [setupMainContent].
+     */
+    private fun setupWallpaperRendering() {
+        val editController = WallpaperEditController(
+            wallpaperView = wallpaperView,
+            editOverlayStub = findViewById<ViewStub>(R.id.wallpaper_edit_overlay_stub),
+            dimTarget = findViewById(R.id.nav_host_fragment),
+            viewModel = viewModel,
+            launchLayerPicker = { WallpaperImagePicker.launch(layerPickerLauncher) },
+            rerenderWallpaper = { updateWallpaper(viewModel.wallpaperState.value) },
+        )
+        wallpaperEditController = editController
+
+        // Wallpaper state -> render.
+        collectOnStarted(
+            flow = viewModel.wallpaperState,
+            errorTag = "wallpaper state",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { updateWallpaper(it) }
+
+        // Wallpaper edit mode: drive the edit controller + re-evaluate the scrim + swap the
+        // representation ONLY on an actual toggle (EDIT = real layers, DISPLAY = flattened
+        // composite; the initial STARTED emission is already covered by the state observer). The
+        // home-gesture disable is HomeFragment's own observer, not here.
+        collectOnStarted(
+            flow = viewModel.isWallpaperEditMode,
+            errorTag = "wallpaper edit mode",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { isEditMode ->
+            editController.applyEditMode(isEditMode)
+            applyScrim()
+            if (lastRenderedWallpaperEditMode != null && lastRenderedWallpaperEditMode != isEditMode) {
+                updateWallpaper(viewModel.wallpaperState.value)
+            }
+            lastRenderedWallpaperEditMode = isEditMode
+        }
+
+        // Persisted FAB position -> reposition the edit cluster.
+        collectOnStarted(
+            flow = viewModel.fabPosition,
+            errorTag = "wallpaper-edit FAB position",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { editController.applyFabPosition(it) }
+
+        // Wallpaper backdrop -> keep the edit-panel toggle icon in sync (the on-screen backdrop
+        // is driven separately by observeWallpaperBackdrop).
+        collectOnStarted(
+            flow = viewModel.wallpaperBackdrop,
+            errorTag = "wallpaper-edit backdrop",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { editController.applyBackdrop(it) }
+
+        // User-controlled wallpaper scrim (edit-mode gating handled in applyScrim, re-triggered
+        // by the edit-mode observer above).
+        collectOnStarted(
+            flow = viewModel.wallpaperScrimAlphaState,
+            errorTag = "wallpaper scrim",
+            coroutineContext = mainActivityExceptionHandler,
+        ) { applyScrim() }
+    }
+
+    private fun updateWallpaper(state: WallpaperState) {
+        // Wallpaper removed / reset (AUDIT-20 F3): drop the cached ~10 MB composite bitmap.
+        // Nothing on screen queries the cache again, so it would otherwise stay resident.
+        if (!state.hasWallpaper) {
+            compositeCache.invalidate()
+        }
+
+        // Read-and-consume the one-shot focus hint (before the async render): a just-added layer
+        // sets it so the view auto-selects the new layer. Consuming here prevents it leaking into
+        // an unrelated next rebuild.
+        val focusHint = viewModel.pendingFocusLayerId.value
+        if (focusHint != null) {
+            viewModel.consumePendingFocusLayerId()
+        }
+
+        // Latest-wins render on the Activity lifecycleScope: a newer state cancels the in-flight
+        // render of the previous one (the scheduler owns that invariant). No try/catch per Rule
+        // 11: bind wraps its own throwy ops and the loader catches its own I/O; the decode runs
+        // off-main inside the suspend bitmapLoader, so a property-only update stays synchronous.
+        wallpaperRenderScheduler.render(lifecycleScope) {
+            wallpaperViewBinder.bind(
+                view = wallpaperView,
+                target = displayTargetFor(state),
+                preferredActiveLayerId = focusHint,
+                onRebuildComplete = {
+                    if (wallpaperView.isEditMode) {
+                        wallpaperEditController?.applyLayerButtonsState()
+                        wallpaperEditController?.updateLayerIndicator()
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * The state to actually render. In DISPLAY mode, if a flattened composite exists (Option D
+     * §9.4), render it as a single image — one decode, one texture. In EDIT mode (or with no
+     * composite) render the real multi-layer state so the editor operates on its layers.
+     */
+    private fun displayTargetFor(state: WallpaperState): WallpaperState {
+        val key = compositeCacheKeyIfHit(state) ?: return state
+        return WallpaperState.single(key)
+    }
+
+    /**
+     * The `composite://<key>` cache key for [state] IF a warmed composite is currently cached for
+     * it, else null. Display-mode multi-layer only. Uses [android.content.res.Resources.getDisplayMetrics]
+     * — the same pinned metric source the delegate's warm-write side reads (its context is this
+     * Activity), so the read key matches the write key exactly (WAH-INV-5).
+     */
+    private fun compositeCacheKeyIfHit(state: WallpaperState): String? {
+        if (viewModel.isWallpaperEditMode.value) return null
+        if (state.layerCount < 2) return null
+        val m = resources.displayMetrics
+        val key = WallpaperCompositeKey.of(state, m.widthPixels, m.heightPixels)
+        return if (compositeCache.get(key) != null) key else null
+    }
+
+    private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
+        val key = uri.toString()
+        // A composite:// key is SYNTHETIC (not a file) — resolve from the in-memory cache only,
+        // never openInputStream it. A miss means "not warm yet"; the caller is on the per-layer path.
+        if (key.startsWith(WallpaperCompositeKey.SCHEME)) {
+            return compositeCache.get(key)
+        }
+        // Single-layer / per-layer file:// image: reuse the cached decode.
+        compositeCache.get(key)?.let { return it }
+
+        return try {
+            // Bounded decode: downsample below the Canvas ~100 MB per-bitmap draw limit so a huge
+            // camera photo can't crash the wallpaper draw. Decode-to-DRAW only; caching is owned
+            // by the delegate's proactive refill, so this never writes the cache.
+            decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): bitmap I/O boundary —
+            // FileNotFoundException / SecurityException + OOM (Throwable umbrella); the caller
+            // treats null as "skip this layer".
+            // No suspension point in this block — synchronous body (AUDIT-12 whitelist review).
+            TimberWrapper.silentError(e, "Error loading bitmap from $uri")
+            null
+        }
+    }
+
+    /**
+     * Applies the user's wallpaper scrim to [R.id.wallpaper_scrim]. Pure decision delegated to
+     * [ScrimRender]: hidden in wallpaper edit mode or at a zero-rounding alpha, otherwise an
+     * opaque-black fill with the strength in the alpha byte (View alpha stays 1 → no offscreen
+     * saveLayer).
+     */
+    private fun applyScrim() {
+        val color = ScrimRender.colorOrNull(
+            alpha = viewModel.wallpaperScrimAlphaState.value,
+            isEditMode = viewModel.isWallpaperEditMode.value,
+        )
+        if (color == null) {
+            wallpaperScrim.visibility = View.GONE
+        } else {
+            wallpaperScrim.setBackgroundColor(color)
+            wallpaperScrim.visibility = View.VISIBLE
+        }
+    }
+
     private fun setupMainContent(): Boolean {
         return try {
             setContentView(R.layout.activity_main)
+            // Activity-hosted wallpaper surface (§25 P3): bind the persistent render views now
+            // that the content view exists; they outlive the fragment view lifecycle.
+            wallpaperView = findViewById(R.id.wallpaper_view)
+            wallpaperScrim = findViewById(R.id.wallpaper_scrim)
             // Build the overlay controller now that the container exists (before
             // onRestoreInstanceState, which may re-show the drawer).
             drawerContainer?.let { drawerOverlay = buildDrawerOverlay(it) }
@@ -793,6 +1032,18 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Display metrics changed -> the composite key changed, so any cached composite is now
+        // wrong-resolution and misses. Re-render the current state (a miss falls to the per-layer
+        // path) and request a warm at the new resolution; no DataStore emission fires on a config
+        // change, so this is the trigger (§25 P3, relocated from HomeFragment.onConfigurationChanged).
+        if (::wallpaperView.isInitialized) {
+            updateWallpaper(viewModel.wallpaperState.value)
+        }
+        viewModel.onDisplayConfigChanged()
+    }
+
     override fun onPause() {
         super.onPause()
         // No try/catch: the isReceiverRegistered guard structurally
@@ -880,6 +1131,19 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
             isReceiverRegistered = false
         }
         navController = null
+
+        // Wallpaper render teardown (§25 P3, relocated from HomeFragment.onDestroyView). The
+        // Activity-persistent surface is only torn down here (process death / finish): clear the
+        // view callbacks, cancel any in-flight render, release the edit controller. The lifecycle
+        // scope cancellation already stops the render coroutine; cancel() drops the stale handle.
+        if (::wallpaperView.isInitialized) {
+            wallpaperView.onTransformChanged = null
+            wallpaperView.onLayerTransformChanged = null
+            wallpaperView.onActiveLayerChanged = null
+            wallpaperView.onLayerTapped = null
+        }
+        wallpaperRenderScheduler.cancel()
+        wallpaperEditController = null
 
         super.onDestroy()
     }

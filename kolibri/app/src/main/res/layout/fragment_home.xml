@@ -1,41 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Home content only. The wallpaper render surface (ZoomableImageView) + scrim +
+  edit-overlay stub moved to activity_main.xml — the wallpaper is Activity-hosted
+  (WALLPAPER_ACTIVITY_HOSTING_SPEC §25 P3). HomeGestureLayout is now the fragment
+  root: home-screen gestures (directional swipes + long-press) are detected via
+  dispatchTouchEvent at this parent level, while the favoritesRecyclerView inside
+  still receives slow drags normally for scrolling (see homescroll.md + the
+  HomeGestureLayout class KDoc).
+-->
+<com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/wallpaperContainer"
+    android:id="@+id/homeGestureRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-
-    <!-- Layer 0: Custom Wallpaper (unterster Layer) -->
-    <com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
-        android:id="@+id/wallpaperView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="matrix"
-        android:visibility="gone" />
-
-    <!-- Layer 0.5: user-controlled home scrim. Above the wallpaper, below the
-         content. Alpha is baked into the background colour (View alpha stays 1 →
-         no offscreen saveLayer). GONE unless the user set a non-zero scrim and
-         not in wallpaper edit mode; driven by HomeFragment.applyScrim. -->
-    <View
-        android:id="@+id/wallpaperScrim"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
-
-    <!-- Layer 1: Bestehender Content -->
-    <!--
-      Wrapped in HomeGestureLayout (since 2026-05-07) so that the
-      home-screen gestures (directional swipes + long-press) are
-      detected via dispatchTouchEvent at the parent
-      level, while the favoritesRecyclerView inside still receives
-      slow drags normally for scrolling. See homescroll.md and the
-      class KDoc on HomeGestureLayout for the full rationale.
-    -->
-    <com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout
-        android:id="@+id/homeGestureRoot"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
 
     <LinearLayout
         android:id="@+id/rootLayout"
@@ -204,23 +182,4 @@
 
     </LinearLayout>
 
-    </com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
-
-    <!--
-      Layer 2: Edit-Mode Overlay — lazily inflated.
-
-      Behind a ViewStub so the CommandsPanel + SpeedDialFabCluster (~47ms
-      of layout inflation) are NOT built on every launcher cold start;
-      this UI is only ever shown in wallpaper-edit mode. WallpaperEditController
-      inflates the stub on first edit-mode entry and toggles VISIBLE/GONE
-      afterwards. Placed at the same (last) child index as the former
-      overlay so its z-order above Layer 1 is unchanged. See the
-      cold_start_* Perfetto measurement (feature/lazy-wallpaper-fab).
-    -->
-    <ViewStub
-        android:id="@+id/wallpaperEditOverlayStub"
-        android:layout="@layout/view_wallpaper_edit_overlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-</FrameLayout>
+</com.github.reygnn.kolibri_launcher.ui.home.HomeGestureLayout>
