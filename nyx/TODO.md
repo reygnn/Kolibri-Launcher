@@ -153,69 +153,16 @@ gehalten: der `startMainActivity`-Umstieg ist eine Verhaltensänderung der nyx-L
 Mechanik mit eigenem Test-/Regressionsaufwand — kein Blocker, nur (noch) nicht den
 Aufwand wert.
 
-### Presence-Naht teilen (F7-Gate) — Option B + C erledigt (2026-09-24)
+### ~~Presence-Naht teilen (F7-Gate)~~ — obsolet (Branch `feature/lazy-slot-validation`)
 
-> ⚠️ **Obsolet** (Branch `feature/lazy-slot-validation`): das gesamte F7-Gate ist mit dem
-> Auto-Prune gelöscht. `ReconcileHomeLayoutUseCase` prunt nicht mehr (nur noch Struktur-
-> Repair), `AppPresence`/`InstallSessionInspector`/`DeletionGatePass`/`PackageManager*`
-> existieren nicht mehr — ein fehlender Layout-Key wird schlicht als „missing"-Tile behalten
-> (Windows-Verknüpfungs-Modell, root TODO.md „✅ UMGESETZT"). Bleibt als Referenz.
-
-Der Partial-Snapshot-Schutz aus **AUDIT-1 F7** ist umgesetzt (RHL-INV-6, das nyx-Analog
-zu Kolibris R-INV-2). `ReconcileHomeLayoutUseCase` prunt einen fehlenden Layout-Key nicht
-mehr blind, sondern behält ihn, wenn *eine* von zwei unabhängigen Prüfungen anschlägt —
-beide fail-safe Richtung „behalten". Umgesetzte Schichten:
-
-- **fix 1 — fail-closed Read:** Kandidaten werden über `HomeLayoutRepository.snapshot()`
-  (fail-CLOSED, wie der interne `update`-Read) statt über den fail-open `layout()`-Flow
-  berechnet; ein transienter Read-Fehler bricht den Pass ab, statt zu einem leeren Layout
-  ohne Schutz zu degradieren.
-- **fix 2 — Cross-Surface-Presence:** `AppPresence`-Impl ist `PackageManagerPresence`
-  (PackageManager, `ACTION_MAIN`/`CATEGORY_LAUNCHER`, komponentengenau) — ein *anderes*
-  Subsystem als die LauncherApps-Enumeration, sodass ein LauncherApps-Transient den Check
-  nicht mitvergiftet. Technik von Kolibris `PackagePresenceImpl` übernommen.
-- **fix 3 — Session-Gate:** Port `InstallSessionInspector` + Impl
-  `PackageManagerInstallSessions` (`PackageInstaller.getAllSessions()`). Launcher3-Muster:
-  einen Key, dessen Paket eine aktive Install/Restore-Session hat, nie prunen (Promise).
-  Schließt den Mid-Restore-Vektor, den keine Presence-Prüfung schließen kann.
-- **fix 4 — einheitlicher Skip-Kanal (Follow-up-Review):** der store-seitige fail-closed
-  Read ist jetzt value-honest wie die Enumerations-Seite. Wirft `snapshot()` oder der
-  atomare `update()`-RMW eine transiente `IOException`, fängt der Use-Case sie ab und gibt
-  `ReconcileResult.Skipped(STORE_FAILED)` zurück, statt zu werfen (neuer `SkipReason`,
-  observability-only wie `LOAD_FAILED`). Damit ist `invoke()` total (nur
-  `CancellationException` entkommt), und beide Aufrufer (`PackageEventCoordinator`,
-  `NyxBackupManager` — restore path) sind ohne eigenen Guard korrekt — vorher hing der Import-Pfad am
-  weit entfernten `runCatching` im `SettingsFragment`. Der `try/catch` im Coordinator bleibt
-  als Defense-in-Depth für seinen langlebigen Collector.
-- **fix 5 — fail-safe-Logging via `reportToAcra` statt `silentError` (Medium-Review-Follow-up,
-  2026-09-24):** die drei fail-safe-to-keep-Catches der geteilten Seams
-  (`PackageManagerPresence` ×2 → `true`, `PackageManagerInstallSessions` → `null`) nutzten
-  `silentError`, das in DEBUG wirft und so den fail-safe-Vertrag in DEBUG-Builds brach; auf
-  `reportToAcra` umgestellt. **Betrifft beide Launcher gleich** (geteiltes `:common-data`-Impl) —
-  die Konvention dahinter (`silentError` ↔ `reportToAcra` an fail-safe-Grenzen) steht daher im
-  **root `TODO.md`**, nicht hier. Passt zu fix 4 (der nyx-eigene `STORE_FAILED`-Catch traf
-  dieselbe Wahl).
-
-Ein Rest-Fall bleibt bewusst offen (Restore ohne auffindbare Session) — dokumentiert in
-`ACCEPTED_LIMITATIONS.md` („… pruned during a restore that exposes no install session").
-
-**Erledigt (Option B):** die Presence-*Naht* ist geteilt, symmetrisch zum `AppEnumerator`.
-Ports `AppPresence` + `InstallSessionInspector` → `:core` (neben `AppEnumerator`), Impls
-`PackageManagerPresence` + `PackageManagerInstallSessions` → `:common-data` (neben
-`LauncherAppsEnumerator`), app-seitig via `@Binds` in nyx' `RepositoryModule` gebunden
-(`PackageManager` app-seitig provided). Das Use-Case-Gate blieb in nyx (hängt am
-`HomeLayout`). Reiner Modul-/Namespace-Umzug, keine Verhaltensänderung. (Kolibri bindet die
-geteilten Ports seit Option C ebenfalls — siehe unten.)
-
-**Erledigt (Option C):** Kolibris eigenes `PackagePresence` (Interface, `PackagePresenceImpl`,
-`FakePackagePresence`, dessen Robolectric-Test) ist entfernt; beide Apps nutzen jetzt die
-*eine* geteilte `AppPresence` aus `:core`. Die Naht trägt jetzt beide Grains:
-`isComponentPresent(ComponentKey)` + `isPackagePresent(String)`, implementiert vom geteilten
-`PackageManagerPresence`. Kolibris `ObserveInstalledAppsUseCase` überbrückt seine flachen
-`"pkg/class"`-Strings via `ComponentKey.parse` auf die Component-Grain-Methode (malformed →
-absent, wie zuvor); Custom-Names nutzen die Package-Grain-Methode direkt. Damit gibt es genau
-eine Presence-Abstraktion und eine Impl für nyx **und** kolibri — die F7-Konsolidierung ist
-abgeschlossen.
+Das gesamte F7-Gate ist mit dem Auto-Prune gelöscht: `ReconcileHomeLayoutUseCase` prunt nicht
+mehr (nur noch Struktur-Repair), `AppPresence`/`InstallSessionInspector`/`DeletionGatePass`/
+`PackageManager*` existieren nicht mehr. Ein fehlender Layout-Key bleibt schlicht als
+„missing"-Tile stehen (Windows-Verknüpfungs-Modell — siehe root `TODO.md`). Der AUDIT-1-F7-
+Apparat (fail-closed Read, Cross-Surface-Presence, Session-Gate, `STORE_FAILED`-Skip, die
+Option-B/C-Konsolidierung der geteilten Presence-Naht) ist damit gegenstandslos; die
+zugehörige `silentError`↔`reportToAcra`-Lesson steht als Kurz-Referenz im root `TODO.md`.
+Historie: git-Log auf `ReconcileHomeLayoutUseCase` + Branch `feature/lazy-slot-validation`.
 
 ### Custom Names — bewusst NICHT umgesetzt (won't build, 2026-09-18)
 

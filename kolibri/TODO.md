@@ -27,11 +27,12 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 13 | Brocken B — Test-Isolation pro Modul | erledigt 2026-05-03 — `:domain:test` 310 Tests in 45 Files (~5s), `:data:test` 32 Tests (~30s, AGP-Block via `enableTestFixturesKotlinSupport`-Flag entsperrt), `:app:test` für UI/Hilt separat | — |
 | 14 | `Invalid resource ID 0x00000000` Logcat-Noise | **erledigt 2026-08-20** — der Schwall reproduziert auf 0.99.188 nicht mehr (inzident behoben seit dem Mai-Befund); die eine verbliebene Warnung derselben Familie (AppCompat-Widget ohne AppCompat-Theme im `WallpaperFlattener`) via `ContextThemeWrapper(AppTheme)` gefixt, auf Gerät verifiziert. Detail-Sektion §14 unten. | — |
 | 15 | `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht | **erledigt 2026-08-20** — shared `core/ComponentKey.isValid` (pure-Kotlin, driftfrei über Fake+Impl); malformed Key → `silentError` + `false` statt silent-accept; Regressions-Anker im Contract. Detail-Sektion §15. | — |
-| 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | **won't-do (2026-08-14)** — der aktuelle `extraBufferCapacity = 1` ist korrekt (Event-Bus-Buffered-Regel). `replay = 1` würde einem späten Subscriber das letzte Paket-Event nachspielen (Stale-Replay → redundante Re-Enumeration); der einzige genannte Nutzen war Test-Bequemlichkeit. Produktions-Risiko > Test-Komfort → geschlossen. | — |
+| 16 | `AppUpdateSignal.events`: `replay = 1` erwägen | **verworfen 2026-08-29** — der aktuelle `extraBufferCapacity = 1` ist korrekt (Event-Bus-Buffered-Regel). `replay = 1` würde einem späten Subscriber das letzte Paket-Event nachspielen (Stale-Replay → redundante Re-Enumeration); der einzige genannte Nutzen war Test-Bequemlichkeit. Produktions-Risiko > Test-Komfort → geschlossen. | — |
 | 17 | `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent | **geschlossen 2026-08-20** — kein Code-Fix nötig: UI-Status (`SettingsFragment.updateDefaultLauncherStatus`) nutzt bereits ausschließlich `isRoleHeld(ROLE_HOME)`; `resolveActivity` nur als Permission-Vorfilter mit SecurityException-Netz. Limbo im Production-Pfad nicht erreichbar. Detail-Sektion §17. | — |
 | 20 | Gesture/Scroll Tuning UI mit Schiebereglern | **verschoben bis auf weiteres** (2026-05-07) — entstanden aus der HomeGesture-Wrapper-Migration; Defaults haben sich nach Real-Device-Validation als „perfekt" empfunden, kein User-Druck zur Customization | mittel |
 | 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | **erledigt** — Phase 1 (2026-05-08, commit `9828def`) + Phase 2 (Backup-Schema, 2026-05-08). Tabellen-Status hing hinterher; die Detail-Sektion §21 unten stand längst auf ✅, und der Code ist verdrahtet (BackupDataAssembler Export/Import + BackupSerializer). Verifiziert 2026-08-14. | — |
-| 22 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, Geräte-Verifikation im Monorepo steht noch aus. | klein-mittel |
+| 22 | Coverage-Threshold im Wallpaper-Classifier (`huggie.png`-Anker) | **offen (trigger-basiert zurückgestellt)** — `MIN_OPAQUE_COVERAGE = 0.5f`-Gate; `huggie.png` sitzt mit 48.7 % direkt auf dem Routing-Zaun, beide Pfade konvergieren aber zufällig. Erst angehen, wenn ein 40–60-%-Borderline-Bild AUTO falsch klassifiziert oder eine Asset-Pipeline-Änderung Coverage verschiebt. Detail-Sektion §22 unten. | klein-mittel, empirisch |
+| 26 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, Geräte-Verifikation im Monorepo steht noch aus. | klein-mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -72,9 +73,10 @@ Brocken aus dem Audit-Snapshot sind durch (A: HomeFragment 2026-05-03,
 B: §13 inkl. `:data:test`-Move, C: §11/§12). Der ehemalige
 „`androidTest/` leer"-Deckler ist seit Mai auch erledigt (16 Tests
 Stand 2026-05-06). Wenn der User trotzdem Arbeit will, gibt es keinen
-offensichtlichen Default mehr — frag was er will. Mögliche Anker: die
-verbleibenden kleinen Einträge in der Tabelle (§14-§17; §19 seit
-2026-08-21 obsolet — Code entfernt), der
+offensichtlichen Default mehr — frag was er will. Mögliche Anker: der
+einzige noch offene kleine Tabellen-Eintrag §22 (Wallpaper-Coverage-
+Threshold, trigger-basiert zurückgestellt) — §14–§17 sind seit 2026-08-20
+erledigt/geschlossen, §19 seit 2026-08-21 obsolet (Code entfernt); der
 Quartals-Recheck §10 (2026-Q3), oder ein neuer Audit-Pass für eine
 aktuelle Score-Bestandsaufnahme.
 
@@ -417,8 +419,18 @@ beschrieben oben unter „Folge-Schritt zu §11".
 ---
 
 > **Erledigte Sektionen ausgelagert.** Abgeschlossene §§ (1, 3, 5, 6, 8, 9,
-> 11, 12, 23, 24, 25) liegen im Archiv `docs/history/TODO-completed.md`. Diese
+> 11, 12) liegen im Archiv `docs/history/TODO-completed.md`. Diese
 > Datei führt nur noch offene / laufende Punkte.
+>
+> ⚠️ **Nummern-Wiederverwendung (§23–§25):** Das Archiv enthält außerdem ein
+> *älteres* §23/§24/§25 (tote ACRA-Consent-Keys / event-getriebener Swipe-
+> Cleanup / toter Swipe-`componentName`, alle 2026-07/08 erledigt). Die
+> §23/§24/§25 **weiter unten in dieser Datei** sind *andere* Themen
+> (report-by-intent / Event-Indikator-Verankerung / Wallpaper-Activity-
+> Hosting). Die Nummern wurden versehentlich doppelt vergeben; **beide**
+> Sätze sind im Code/Docs verankert (`report-by-intent §23`, `TODO §24/§25`,
+> ACCEPTED_LIMITATIONS `§22`), daher bewusst **nicht** umnummeriert — beim
+> Zitieren die Quelle (Archiv vs. Live) mitnennen.
 
 ## 2. Throwable-Catch-Religion — Trivial-Sweep abgeschlossen, Reststand
 
@@ -1117,7 +1129,7 @@ AGP-Bug an einer Stelle dokumentiert ist, und (c) der Endstand des
 
 ---
 
-## 14. (offen) `Invalid resource ID 0x00000000` Logcat-Noise
+## 14. (erledigt 2026-08-20) `Invalid resource ID 0x00000000` Logcat-Noise
 
 **Beobachtet 2026-05-04** beim Re-Test nach der ACRA-Consent-Fix-Episode
 (`bundleRelease` 17:06, AAB installiert, App geöffnet). Logcat zeigt
@@ -1181,7 +1193,7 @@ Composite bleibt pixelgleich (auf Gerät verifiziert). ThemeUtils-Warnung
 
 ---
 
-## 15. (offen) `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht
+## 15. (erledigt 2026-08-20) `FavoritesRepository.addFavoriteComponent` validiert ComponentName-Format nicht
 
 **Aufgedeckt 2026-05-04** beim Bring-up der instrumented Tests. Der Test
 `BackupRoundTripSafTest.saveAndLoad_throughRealContentResolver_…` hat
@@ -1286,7 +1298,7 @@ geschlossen ohne Code-Änderung. Falls je ein zweiter Collector oder ein echter
 
 ---
 
-## 17. (offen) `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent
+## 17. (geschlossen 2026-08-20) `resolveActivity(CATEGORY_HOME)` vs. `RoleManager.isRoleHeld(HOME)` strukturell nicht äquivalent
 
 **Aufgedeckt 2026-05-04** beim Bring-up von
 `DefaultLauncherRoleConsistencyTest`, **eingegrenzt 2026-05-05** beim
