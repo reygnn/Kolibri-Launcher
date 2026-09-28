@@ -459,39 +459,19 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun self_uninstall_removes_the_tile_once_the_app_leaves_the_installed_set() =
+    fun confirm_self_uninstall_removes_the_id_scoped_placement() =
         runTest(mainDispatcherRule.dispatcher) {
+            // Removal is now result-gated in MainActivity — this is called ONLY on a confirmed
+            // from-tile uninstall — so the ViewModel just drops the id-scoped placement. No
+            // installed-set polling, so an external uninstall / cancelled dialog can no longer
+            // mis-trigger it (§Audit-2 N3).
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
-            installedAppsStateRepository.updateApps(listOf(appInfo("pa"), appInfo("other")))
+
+            viewModel.confirmSelfUninstall(ITEM)
             advanceUntilIdle()
 
-            viewModel.requestSelfUninstall(ITEM, packageName = "pa")
-            // runCurrent (NOT advanceUntilIdle): let the wait-coroutine subscribe and suspend
-            // without advancing virtual time through its 300s timeout.
-            runCurrent()
-            coVerify(exactly = 0) { removeItem(ITEM) } // pa still installed → tile kept
-
-            // The system uninstall completed: pa leaves the (still non-empty) installed set.
-            installedAppsStateRepository.updateApps(listOf(appInfo("other")))
-            advanceUntilIdle()
             coVerify(exactly = 1) { removeItem(ITEM) }
-        }
-
-    @Test
-    fun self_uninstall_keeps_the_tile_if_the_app_stays_installed() =
-        runTest(mainDispatcherRule.dispatcher) {
-            coEvery { getDrawerApps() } returns emptyList()
-            val viewModel = createViewModel()
-            installedAppsStateRepository.updateApps(listOf(appInfo("pa")))
-            advanceUntilIdle()
-
-            // A cancelled system uninstall: pa never leaves the set → the bounded wait times
-            // out and the placement is NOT removed (the greyed tile stays).
-            viewModel.requestSelfUninstall(ITEM, packageName = "pa")
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { removeItem(ITEM) }
         }
 
     private companion object {

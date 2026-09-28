@@ -5,7 +5,6 @@ import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
-import com.github.reygnn.launcher.core.LazySlotMembership
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.home.model.DrawerDropTarget
@@ -46,7 +45,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -270,29 +268,18 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * The user chose "Uninstall" on the home TILE [id] (package [packageName]). Uninstalling
-     * from the tile is unambiguous intent to be rid of it, so once the app actually leaves the
-     * installed set (the user confirmed the system dialog) remove the now-dead placement instead
-     * of leaving a greyed "missing" orphan the user must remove a second time. A cancelled
-     * uninstall never satisfies the wait, so the tile stays; the wait is bounded so a coroutine
-     * can't linger indefinitely (on timeout the tile just remains, greyed — the old behaviour).
-     * This is scoped to a tile the user themselves uninstalled — an EXTERNAL uninstall still
-     * keeps its greyed tile (the no-prune Windows-shortcut model). It is also ID-scoped by
-     * design: only THIS placement [id] is removed. If the same app also sits on other home
-     * tiles or inside a folder, those independent placements stay as greyed "missing" tiles for
-     * the user to remove (each placement is its own reference — removing one does not imply the
-     * others were meant to go).
+     * The user CONFIRMED the system uninstall dialog for the home TILE [id] (the launch is
+     * result-gated in MainActivity, so this is only called when the uninstall actually
+     * completed). Remove the now-dead placement instead of leaving a greyed "missing" orphan the
+     * user must remove a second time. ID-scoped by design: only THIS placement [id] is removed —
+     * the same app on other tiles or inside a folder keeps its independent greyed placements. An
+     * EXTERNAL uninstall never reaches here (only a confirmed from-tile uninstall does), so it
+     * still keeps its greyed tile (the no-prune Windows-shortcut model). Result-gating this,
+     * rather than polling the global installed set, is what prevents an unrelated disappearance
+     * (a cancelled dialog followed by an external uninstall) from mis-removing the tile.
      */
-    fun requestSelfUninstall(id: ItemId, packageName: String) {
-        launchSafe {
-            val gone = withTimeoutOrNull(SELF_UNINSTALL_TIMEOUT_MS) {
-                // The one membership rule (package-grain) — carries the "empty = not loaded"
-                // guard, so this doesn't re-derive it (SSOT with the greying decision).
-                installedKeys.first { installed -> LazySlotMembership.isPackageMissing(packageName, installed) }
-                true
-            }
-            if (gone == true) removeItem(id)
-        }
+    fun confirmSelfUninstall(id: ItemId) {
+        launchSafe { removeItem(id) }
     }
 
     fun renameFolder(folder: ItemId, title: String) {
@@ -398,11 +385,5 @@ class HomeViewModel @Inject constructor(
      */
     fun applyDeviceGrid(columns: Int, rows: Int) {
         launchSafe { fitHomeGrid(GridSpec(columns, rows)) }
-    }
-
-    private companion object {
-        // Bounded wait for a self-initiated uninstall to complete before giving up (the tile
-        // then stays greyed). Generous enough to cover reading the system confirm dialog.
-        const val SELF_UNINSTALL_TIMEOUT_MS = 300_000L
     }
 }

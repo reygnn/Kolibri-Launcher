@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -179,6 +180,19 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private val layerPickerLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let { wallpaperEditCoordinator.onAddLayer(it) }
+        }
+
+    // The home placement awaiting a confirmed uninstall (null for a drawer app — no tile). The
+    // tile is removed ONLY when the system dialog returns RESULT_OK for THIS package, so a
+    // cancelled dialog — or a later external uninstall — leaves the greyed tile in place
+    // (§Audit-2 N3). Lost on process death mid-dialog, which just falls back to keeping the tile.
+    private var pendingUninstallId: ItemId? = null
+    private val uninstallResultLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                pendingUninstallId?.let { viewModel.confirmSelfUninstall(it) }
+            }
+            pendingUninstallId = null
         }
 
     private lateinit var homeRoot: DragLayer
@@ -1656,12 +1670,26 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // [id] is the home placement (null for a drawer app): a from-tile uninstall removes the tile
     // once the app actually leaves the installed set, so it doesn't linger as a greyed orphan.
     private fun uninstallApp(pkg: String, id: ItemId?) {
-        startActivitySafe(
-            Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            },
-        )
-        if (id != null) viewModel.requestSelfUninstall(id, pkg)
+        pendingUninstallId = id
+        // ACTION_UNINSTALL_PACKAGE + EXTRA_RETURN_RESULT is deprecated in favour of
+        // PackageInstaller, but PackageInstaller's status-receiver plumbing (an IntentSender +
+        // a BroadcastReceiver) is disproportionate for this low-value tile cleanup; the
+        // deprecated path still returns a clean RESULT_OK on Android 16 and degrades safely (a
+        // non-cooperating OEM just leaves the greyed tile). Gating removal on that result — not
+        // polling the global installed set — is what fixes the over-broad removal (§Audit-2 N3).
+        // No FLAG_ACTIVITY_NEW_TASK: a new task would detach us and the result would never return.
+        @Suppress("DEPRECATION")
+        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE, Uri.fromParts("package", pkg, null))
+            .putExtra(Intent.EXTRA_RETURN_RESULT, true)
+        try {
+            uninstallResultLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            // No uninstaller resolved (should not happen on a normal device). Clear the pending
+            // id so a later unrelated RESULT_OK can't remove the wrong tile, and toast.
+            pendingUninstallId = null
+            TimberWrapper.silentError(e, "No uninstaller for $pkg")
+            showToastSafe(R.string.app_launch_failed)
+        }
     }
 
     private fun isSystemApp(pkg: String): Boolean = try {
