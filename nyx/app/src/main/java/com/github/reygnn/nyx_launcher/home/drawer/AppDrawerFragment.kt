@@ -96,8 +96,9 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
 
     // Last icon style repainted into the drawer. Skips the repeatOnLifecycle re-subscription
     // replay (StateFlow) so merely reopening the drawer doesn't re-decode every icon; only a
-    // real style change repaints. Mirrors MainActivity's grid dedupe.
-    private var appliedIconStyle: IconStyle? = null
+    // real style change repaints. Mirrors MainActivity's grid dedupe. Seeded to the loader's
+    // default (COLOR) so the first emission for a COLOR user is a no-op (§Audit-2 N8).
+    private var appliedIconStyle: IconStyle? = IconStyle.COLOR
 
     // Tells a genuine keystroke apart from a StateFlow replay so only a real user
     // narrowing can auto-launch (shared :common-ui logic).

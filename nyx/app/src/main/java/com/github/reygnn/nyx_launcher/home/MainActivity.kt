@@ -273,7 +273,10 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // survives the STOPPED→STARTED re-subscription: iconLoader.currentStyle is a StateFlow and
     // replays its current value to each new collector, so without this a mere return-to-home
     // would re-decode every grid icon (see the currentStyle collector).
-    private var appliedIconStyle: IconStyle? = null
+    // Seeded to the loader's default (COLOR) so the first currentStyle emission for a COLOR
+    // user — whose surfaces were just bound under COLOR — is a no-op instead of a forced
+    // full-surface refresh; a genuine flip to another style still repaints (§Audit-2 N8).
+    private var appliedIconStyle: IconStyle? = IconStyle.COLOR
     private lateinit var dockAdapter: DockAdapter
 
     private var gridIconPx = 0

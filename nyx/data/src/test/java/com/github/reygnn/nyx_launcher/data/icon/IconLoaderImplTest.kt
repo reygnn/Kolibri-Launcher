@@ -148,6 +148,27 @@ class IconLoaderImplTest {
             assertThat(source.lastStyle).isEqualTo(IconStyle.GRAYSCALE)
         }
 
+    @Test
+    fun the_first_decode_waits_for_the_real_style_instead_of_the_color_seed() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // NOTE: no advanceUntilIdle before the request (unlike the two tests above). The
+            // icon-style preference has not landed yet, so without the styleReady gate the first
+            // decode would run under the COLOR seed. The gate makes bitmap() wait for the real
+            // (MONOCHROME) style first, so a non-COLOR user's cold-start icons are not decoded
+            // twice (§Audit-2 N4).
+            val source = FakeSource()
+            val loader = IconLoaderImpl(
+                context,
+                mainDispatcherRule.dispatcher,
+                source,
+                FakePreferencesRepository(iconStyle = IconStyle.MONOCHROME),
+            )
+
+            loader.bitmap(ref("com.first"), 64)
+
+            assertThat(source.lastStyle).isEqualTo(IconStyle.MONOCHROME) // real style, not the seed
+        }
+
     private companion object {
         // ComponentCallbacks2.TRIM_MEMORY_COMPLETE — the most aggressive level.
         const val TRIM_MEMORY_COMPLETE = 80

@@ -9,6 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -71,12 +72,22 @@ class IconLoaderImpl @Inject constructor(
     private val _currentStyle = MutableStateFlow(IconStyle.COLOR)
     override val currentStyle: StateFlow<IconStyle> = _currentStyle.asStateFlow()
 
+    // Completed once the real persisted style has arrived. The FIRST bitmap() awaits it so a
+    // cold-start decode uses the user's actual variant, not the COLOR seed — else a
+    // non-COLOR user's first visible icons decode (and disk-write) under COLOR, then re-decode
+    // when the style lands. iconStyle() is fail-open (always emits), so this always completes.
+    private val styleReady = CompletableDeferred<Unit>()
+
     init {
-        preferences.iconStyle().onEach { _currentStyle.value = it }.launchIn(scope)
+        preferences.iconStyle().onEach {
+            _currentStyle.value = it
+            styleReady.complete(Unit) // idempotent — only the first emission matters
+        }.launchIn(scope)
         schedulePrune() // cold-start sweep of files accumulated across runs
     }
 
     override suspend fun bitmap(ref: IconRef, sizePx: Int): Bitmap {
+        styleReady.await() // first call waits for the real style; later calls resume immediately
         val currentStyle = _currentStyle.value
         val variant = when (currentStyle) {
             IconStyle.COLOR -> IconVariant.ADAPTIVE
