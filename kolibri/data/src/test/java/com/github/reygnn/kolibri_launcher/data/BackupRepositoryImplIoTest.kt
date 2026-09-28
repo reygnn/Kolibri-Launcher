@@ -139,6 +139,51 @@ class BackupRepositoryImplIoTest {
         assertThat((result as ImportResult.Error).message).contains("too large")
     }
 
+    // §Audit-2 N5 mirror: the ZIP blob loop is bounded so a decompression bomb can't fill the disk.
+
+    /** A ZIP archive with the given wallpaper entries (name → decompressed bytes). */
+    private fun zipWith(vararg images: Pair<String, ByteArray>): ByteArray {
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { zip ->
+            images.forEach { (name, bytes) ->
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(bytes)
+                zip.closeEntry()
+            }
+        }
+        return bos.toByteArray()
+    }
+
+    @Test
+    fun `importFromZip - an over-sized wallpaper blob - returns Error`() = runTest {
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor // statSize 1024 → passes the file-size gate
+        // 11 MiB decompressed (compresses tiny, so the whole-archive cap is untouched) > the 10 MiB per-blob cap.
+        val zipBytes = zipWith("wallpapers/big.img" to ByteArray(11 * 1024 * 1024))
+        every { contentResolver.openInputStream(testUri) } answers { ByteArrayInputStream(zipBytes) } // fresh per call (isZipFile + import)
+        // The real copyFromInputStream drains the stream; make the mock do the same so the per-blob cap counts.
+        every { wallpaperFileManager.copyFromInputStream(any()) } answers {
+            firstArg<InputStream>().readBytes(); mockk<Uri>(relaxed = true)
+        }
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+        assertThat((result as ImportResult.Error).message).contains("too large")
+    }
+
+    @Test
+    fun `importFromZip - too many wallpaper blobs - returns Error`() = runTest {
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
+        val many = (0..64).map { "wallpapers/img_$it.img" to byteArrayOf(1) }.toTypedArray() // 65 > MAX_IMAGE_ENTRIES
+        val zipBytes = zipWith(*many)
+        every { contentResolver.openInputStream(testUri) } answers { ByteArrayInputStream(zipBytes) }
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+        assertThat((result as ImportResult.Error).message).contains("too many")
+    }
+
     @Test
     fun `loadBackupFromFile - Empty file (0 bytes) - returns InvalidFormat`() = runTest {
         every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor

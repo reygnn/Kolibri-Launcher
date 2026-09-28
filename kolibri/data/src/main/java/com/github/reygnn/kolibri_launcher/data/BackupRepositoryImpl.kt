@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.CappedInputStream
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupException
@@ -306,11 +307,20 @@ class BackupRepositoryImpl @Inject constructor(
     private suspend fun importFromZip(uri: Uri, options: ImportOptions): ImportResult {
         var jsonString: String? = null
         val extractedImages = mutableMapOf<String, String>() // zipEntryName → internal URI string
+        var imageEntryCount = 0
 
         // 1. Extract ZIP
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                ZipInputStream(BufferedInputStream(inputStream)).use { zipIn ->
+                // Bound the whole compressed archive: a streaming provider can report statSize == -1
+                // and slip past the size gate in loadBackupFromFile, so cap the bytes ZipInputStream
+                // may pull (extraction AND closeEntry skips) — a decompression bomb's work stays
+                // bounded. Shared CappedInputStream, mirroring nyx's backup import (§Audit-2 N5).
+                val boundedInput = CappedInputStream(
+                    BufferedInputStream(inputStream),
+                    AppConstants.MAX_BACKUP_SIZE_BYTES + 1,
+                )
+                ZipInputStream(boundedInput).use { zipIn ->
                     var entry = zipIn.nextEntry
                     while (entry != null) {
                         when {
@@ -318,7 +328,19 @@ class BackupRepositoryImpl @Inject constructor(
                                 jsonString = zipIn.readBytes().toString(Charsets.UTF_8)
                             }
                             entry.name.startsWith("wallpapers/") && !entry.isDirectory -> {
-                                val internalUri = wallpaperFileManager.copyFromInputStream(zipIn)
+                                // Reject an archive spamming the wallpaper dir before it can.
+                                if (++imageEntryCount > MAX_IMAGE_ENTRIES) {
+                                    return ImportResult.Error("Backup archive has too many images")
+                                }
+                                // Cap each blob's DECOMPRESSED size so a bomb entry can't fill the
+                                // disk: extract through a per-blob CappedInputStream and reject
+                                // (dropping the partial file) if it exceeds the limit.
+                                val cappedBlob = CappedInputStream(zipIn, AppConstants.MAX_BACKUP_SIZE_BYTES + 1)
+                                val internalUri = wallpaperFileManager.copyFromInputStream(cappedBlob)
+                                if (cappedBlob.limitReached) {
+                                    internalUri?.let { wallpaperFileManager.deleteFile(it) }
+                                    return ImportResult.Error("Backup image is too large")
+                                }
                                 if (internalUri != null) {
                                     extractedImages[entry.name] = internalUri.toString()
                                     Timber.d("Extracted ${entry.name} → $internalUri")
@@ -328,6 +350,7 @@ class BackupRepositoryImpl @Inject constructor(
                         zipIn.closeEntry()
                         entry = zipIn.nextEntry
                     }
+                    if (boundedInput.limitReached) return ImportResult.Error("Backup file is too large")
                 }
             }
         } catch (e: CancellationException) {
@@ -749,5 +772,11 @@ class BackupRepositoryImpl @Inject constructor(
             TimberWrapper.silentError(e, "Unexpected error while creating preview")
             null
         }
+    }
+
+    private companion object {
+        // A real backup carries one image per wallpaper layer; reject an archive with absurdly
+        // many image entries before it can spam internal storage (§Audit-2 N5 mirror).
+        const val MAX_IMAGE_ENTRIES = 64
     }
 }

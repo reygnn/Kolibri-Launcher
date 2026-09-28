@@ -1,4 +1,4 @@
-package com.github.reygnn.nyx_launcher.data.home
+package com.github.reygnn.launcher.core
 
 import java.io.FilterInputStream
 import java.io.InputStream
@@ -8,18 +8,19 @@ import java.io.InputStream
  * returned it reports EOF (`-1`) instead of reading further, and [limitReached]
  * flips true. A backup import wraps both the whole compressed archive and each
  * decompressed blob in one of these, so a zip / decompression bomb can neither
- * over-read the source stream nor fill the disk.
+ * over-read the source stream nor fill the disk. Shared by both launchers'
+ * backup engines (nyx + kolibri).
  *
  * Read `limit` as "one past the real budget" (like `readNBytes(budget + 1)`): the
  * caller sets it to `budget + 1` and treats [limitReached] as "the source held more
  * than `budget` bytes → reject", so a payload of exactly `budget` bytes is accepted.
  *
  * Does NOT override [close]; the default [FilterInputStream] behaviour (close the
- * source) is only ever reached by the whole-archive wrapper, whose `ZipInputStream`
- * should close the underlying stream exactly as before. The per-blob wrapper is
- * never closed (the shared `ZipInputStream` must stay open across entries).
+ * source) is only ever reached by a whole-archive wrapper, whose `ZipInputStream`
+ * should close the underlying stream exactly as before. A per-blob wrapper is never
+ * closed (the shared `ZipInputStream` must stay open across entries).
  */
-internal class CappedInputStream(
+class CappedInputStream(
     source: InputStream,
     private val limit: Long,
 ) : FilterInputStream(source) {

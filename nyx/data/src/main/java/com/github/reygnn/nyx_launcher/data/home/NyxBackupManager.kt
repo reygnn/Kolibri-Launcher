@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.data.home
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.CappedInputStream
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
