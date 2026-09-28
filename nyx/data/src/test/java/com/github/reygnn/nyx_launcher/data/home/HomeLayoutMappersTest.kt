@@ -98,4 +98,61 @@ class HomeLayoutMappersTest {
 
         assertThat(layout.toDto().toDomain()).isEqualTo(layout)
     }
+
+    // ------------------------------------------------- N15: drop invalid keys on decode
+    @Test
+    fun a_component_key_dto_decodes_only_when_both_parts_are_present() {
+        assertThat(ComponentKeyDto("com.a", "com.a.Main").toDomain()).isEqualTo(ComponentKey("com.a", "com.a.Main"))
+        assertThat(ComponentKeyDto("", "com.a.Main").toDomain()).isNull() // empty package
+        assertThat(ComponentKeyDto("com.a", "").toDomain()).isNull() // empty class
+    }
+
+    @Test
+    fun decode_drops_a_grid_item_with_an_invalid_key() {
+        // A crafted / cross-device blob with an empty-package key — not validated on the way in
+        // until now (§Audit-2 N15). The invalid item is dropped; the valid one survives.
+        val dto = HomeLayoutDto(
+            columns = 4, rows = 6, pages = 1,
+            items = listOf(
+                PlacedItemDto(HomeItemDto.AppDto("ok", ComponentKeyDto("com.a", "com.a.Main")), page = 0, x = 0, y = 0),
+                PlacedItemDto(HomeItemDto.AppDto("bad", ComponentKeyDto("", "com.b.Main")), page = 0, x = 1, y = 0),
+            ),
+            dock = emptyList(),
+        )
+
+        assertThat(dto.toDomain().items.map { it.item.id.raw }).containsExactly("ok")
+    }
+
+    @Test
+    fun decode_filters_invalid_folder_members() {
+        val dto = HomeLayoutDto(
+            columns = 4, rows = 6, pages = 1,
+            items = listOf(
+                PlacedItemDto(
+                    HomeItemDto.FolderDto(
+                        "f", "Games",
+                        listOf(
+                            ComponentKeyDto("com.a", "com.a.Main"),
+                            ComponentKeyDto("com.b", ""), // empty class → dropped
+                            ComponentKeyDto("com.c", "com.c.Main"),
+                        ),
+                    ),
+                    page = 0, x = 0, y = 0,
+                ),
+            ),
+            dock = emptyList(),
+        )
+
+        val folder = dto.toDomain().items.single().item as HomeItem.Folder
+        assertThat(folder.members.map { it.packageName }).containsExactly("com.a", "com.c").inOrder()
+    }
+
+    @Test
+    fun hidden_apps_decode_drops_invalid_keys() {
+        val dto = HiddenAppsDto(
+            schemaVersion = 1,
+            apps = listOf(ComponentKeyDto("com.a", "com.a.Main"), ComponentKeyDto("", "com.b.Main")),
+        )
+        assertThat(dto.toDomain()).containsExactly(ComponentKey("com.a", "com.a.Main"))
+    }
 }

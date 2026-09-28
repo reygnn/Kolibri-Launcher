@@ -23,4 +23,4 @@ internal fun Set<ComponentKey>.toHiddenDto(): HiddenAppsDto =
     HiddenAppsDto(schemaVersion = 1, apps = map { it.toDto() })
 
 internal fun HiddenAppsDto.toDomain(): Set<ComponentKey> =
-    apps.map { it.toDomain() }.toSet()
+    apps.mapNotNull { it.toDomain() }.toSet() // drop invalid-keyed entries on decode (§Audit-2 N15)

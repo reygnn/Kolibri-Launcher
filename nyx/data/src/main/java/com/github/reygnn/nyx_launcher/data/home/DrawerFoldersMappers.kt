@@ -27,5 +27,7 @@ internal fun DrawerFoldersDto.toDomain(): DrawerFolders = DrawerFolders(
 internal fun DrawerFolderDto.toDomain(): DrawerFolder = DrawerFolder(
     id = DrawerFolderId(id),
     title = title,
-    members = members.map { it.toDomain() },
+    // Drop invalid-keyed members on decode (§Audit-2 N15); a folder left with < 2 members is
+    // then dropped by DrawerFoldersTransition.sanitize on restore.
+    members = members.mapNotNull { it.toDomain() },
 )

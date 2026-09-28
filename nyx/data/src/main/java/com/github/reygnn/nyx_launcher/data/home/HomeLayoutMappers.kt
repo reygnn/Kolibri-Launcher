@@ -42,20 +42,24 @@ internal fun ComponentKey.toDto(): ComponentKeyDto =
 internal fun HomeLayoutDto.toDomain(): HomeLayout = HomeLayout(
     grid = GridSpec(columns, rows),
     pages = pages,
-    items = items.map { it.toDomain() },
-    dock = dock.map { it.toDomain() },
+    // Invalid-keyed items are dropped on decode (§Audit-2 N15); the resulting off-grid gaps /
+    // sub-two-member folders are then healed by the post-restore reconcile.
+    items = items.mapNotNull { it.toDomain() },
+    dock = dock.mapNotNull { it.toDomain() },
 )
 
-internal fun PlacedItemDto.toDomain(): PlacedItem = PlacedItem(
-    item = item.toDomain(),
-    pos = CellPos(page, x, y),
-    span = Span(spanW, spanH),
-)
+internal fun PlacedItemDto.toDomain(): PlacedItem? =
+    item.toDomain()?.let { PlacedItem(item = it, pos = CellPos(page, x, y), span = Span(spanW, spanH)) }
 
-internal fun HomeItemDto.toDomain(): HomeItem = when (this) {
-    is HomeItemDto.AppDto -> HomeItem.App(ItemId(id), key.toDomain())
-    is HomeItemDto.FolderDto -> HomeItem.Folder(ItemId(id), title, members.map { it.toDomain() })
+internal fun HomeItemDto.toDomain(): HomeItem? = when (this) {
+    is HomeItemDto.AppDto -> key.toDomain()?.let { HomeItem.App(ItemId(id), it) }
+    is HomeItemDto.FolderDto -> HomeItem.Folder(ItemId(id), title, members.mapNotNull { it.toDomain() })
 }
 
-internal fun ComponentKeyDto.toDomain(): ComponentKey =
-    ComponentKey(packageName, className)
+/**
+ * Decode a persisted/imported key, dropping it (`null`) when malformed — a crafted or
+ * cross-device backup is not otherwise validated on the way in, so an empty package/class
+ * would persist as a dead key (§Audit-2 N15). Uses the single shared validity authority.
+ */
+internal fun ComponentKeyDto.toDomain(): ComponentKey? =
+    ComponentKey(packageName, className).takeIf { ComponentKey.isValid(it.flat) }

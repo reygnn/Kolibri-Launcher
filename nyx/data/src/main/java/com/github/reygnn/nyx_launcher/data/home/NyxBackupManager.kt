@@ -201,7 +201,7 @@ class NyxBackupManager @Inject constructor(
                     // Hidden apps are drawer organisation too — restore under the layout toggle
                     // (replace; a null field from an older backup leaves the current set intact).
                     backup.hiddenApps?.let { dto ->
-                        hiddenAppsRepository.update { dto.map { it.toDomain() }.toSet() }
+                        hiddenAppsRepository.update { dto.mapNotNull { it.toDomain() }.toSet() } // drop invalid keys (§Audit-2 N15)
                     }
                     backup.layout?.toDomain()?.let {
                         homeLayoutRepository.save(it)
