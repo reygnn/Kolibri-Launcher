@@ -212,16 +212,17 @@ class PackageEventCoordinatorTest {
             assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.example.updated")
             verify(exactly = 1) { iconLoader.evict("com.example.updated") }
 
-            // The UI drains what it repainted; a later STARTED re-subscription must not repaint again.
-            coordinator.consumeIconRepaints(setOf("com.example.updated"))
+            // The UI drains what it repainted (take-and-clear); a later STARTED re-subscription
+            // must not repaint again.
+            assertThat(coordinator.drainIconRepaints()).containsExactly("com.example.updated")
             assertThat(coordinator.pendingIconRepaints.value).isEmpty()
         }
 
     @Test
-    fun multiple_package_events_accumulate_until_consumed() =
+    fun multiple_package_events_accumulate_and_a_drain_takes_them_all() =
         runTest(mainDispatcherRule.dispatcher) {
-            // The set accumulates across events (a storm / several updates while backgrounded),
-            // and a partial drain leaves the rest pending.
+            // The set accumulates across events (a storm / several updates while backgrounded);
+            // draining takes and clears the whole set atomically (take-and-clear, not subset removal).
             coEvery { reconcile() } returns ReconcileResult.Unchanged
             coordinator.start()
             advanceUntilIdle()
@@ -231,8 +232,27 @@ class PackageEventCoordinatorTest {
             advanceUntilIdle()
             assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.a", "com.b")
 
-            coordinator.consumeIconRepaints(setOf("com.a"))
-            assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.b")
+            assertThat(coordinator.drainIconRepaints()).containsExactly("com.a", "com.b")
+            assertThat(coordinator.pendingIconRepaints.value).isEmpty()
+        }
+
+    @Test
+    fun the_same_package_invalidated_after_a_drain_reappears_pending() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // §Audit-2 N7: because a drain takes-and-clears (rather than removing a subset after
+            // the fact), a fresh event for a just-drained package re-appears in the pending set
+            // instead of being swallowed by a value-equal no-op.
+            coEvery { reconcile() } returns ReconcileResult.Unchanged
+            coordinator.start()
+            advanceUntilIdle()
+
+            appUpdateSignal.send(PackageEvent.Changed("com.a"))
+            advanceUntilIdle()
+            assertThat(coordinator.drainIconRepaints()).containsExactly("com.a")
+
+            appUpdateSignal.send(PackageEvent.Changed("com.a")) // same package invalidated again
+            advanceUntilIdle()
+            assertThat(coordinator.pendingIconRepaints.value).containsExactly("com.a")
         }
 
     @Test

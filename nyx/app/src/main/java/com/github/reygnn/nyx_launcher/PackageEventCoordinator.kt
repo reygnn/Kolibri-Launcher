@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -97,8 +98,8 @@ class PackageEventCoordinator @Inject constructor(
     // collector never re-fires — commonly lands while home is BACKGROUNDED (a Play-Store update),
     // when no UI collector is active. A transient event would be dropped and the stale icon would
     // survive the return to home; the accumulating StateFlow replays the pending set on the UI's
-    // STARTED re-subscription instead. The UI ([MainActivity]) repaints only the matching tiles and
-    // then drains what it consumed via [consumeIconRepaints], so a normal render never re-decodes.
+    // STARTED re-subscription instead. The UI ([MainActivity]) atomically takes the set via
+    // [drainIconRepaints], repaints those tiles, so a normal render never re-decodes.
     private val _pendingIconRepaints = MutableStateFlow<Set<String>>(emptySet())
     val pendingIconRepaints: StateFlow<Set<String>> = _pendingIconRepaints.asStateFlow()
 
@@ -193,11 +194,11 @@ class PackageEventCoordinator @Inject constructor(
     }
 
     /**
-     * Drop [packages] from [pendingIconRepaints] once the UI has repainted their tiles, so a later
-     * STARTED re-subscription (return to home) does not repaint them again. Idempotent; a package
-     * re-invalidated after consumption is re-added by the next event.
+     * Atomically take and clear the pending repaint set: the UI calls this once per emission and
+     * repaints exactly what it returns, so a later STARTED re-subscription does not repaint again.
+     * Take-and-clear, NOT remove-a-subset — a package re-invalidated after this returns lands in a
+     * fresh empty set and re-emits, so a repaint requested mid-drain can't be lost to a value-equal
+     * no-op followed by a subset removal (§Audit-2 N7).
      */
-    fun consumeIconRepaints(packages: Set<String>) {
-        _pendingIconRepaints.update { it - packages }
-    }
+    fun drainIconRepaints(): Set<String> = _pendingIconRepaints.getAndUpdate { emptySet() }
 }

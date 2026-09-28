@@ -528,14 +528,17 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 // matching tiles on each live surface, then drain what we consumed so a normal render
                 // never re-decodes. Empty set (the steady state) is a no-op.
                 launchGuarded {
-                    packageEvents.pendingIconRepaints.collect { pending ->
+                    packageEvents.pendingIconRepaints.collect {
+                        // Atomically take-and-clear the pending set up front: a package
+                        // re-invalidated while we repaint lands in a fresh set and re-emits, so its
+                        // repaint isn't lost to a value-equal no-op + subset removal (§Audit-2 N7).
+                        val pending = packageEvents.drainIconRepaints()
                         if (pending.isEmpty()) return@collect
                         pending.forEach { pkg ->
                             dockAdapter.refreshIconsFor(pkg)
                             pagerAdapter?.refreshIconsFor(pkg)
                             if (folderOverlayController.isVisible) openFolderMemberAdapter?.refreshIconsFor(pkg)
                         }
-                        packageEvents.consumeIconRepaints(pending)
                     }
                 }
                 // Notification dots (gated by the toggle): push the package set into the
