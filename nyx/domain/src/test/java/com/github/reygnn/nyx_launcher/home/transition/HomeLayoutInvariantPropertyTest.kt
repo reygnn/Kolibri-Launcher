@@ -132,10 +132,18 @@ class HomeLayoutInvariantPropertyTest {
                         if (fs.isEmpty()) null else HomeLayoutTransition.renameFolder(cur, fs[rnd.nextInt(fs.size)].id, "t$step")
                     }
                 }
+                val before = cur
                 val next = res?.layout ?: continue
                 cur = next
                 val bad = cur.invariantViolations()
                 if (bad.isNotEmpty()) fail("run=$run step=$step $sc violations=$bad\nlayout=$cur")
+                // §Audit-2 N14: conservation — no app key silently disappears across an accepted
+                // edit. place() may ADD a key; move / removeFromFolder / renameFolder conserve
+                // exactly, so a superset always holds. A structurally-valid-but-app-losing result
+                // (which invariantViolations alone would not catch) fails here.
+                if (!cur.appKeys().containsAll(before.appKeys())) {
+                    fail("run=$run step=$step $sc lost app keys ${before.appKeys() - cur.appKeys()}\nlayout=$cur")
+                }
 
                 if (step % 20 == 19) {
                     // Structural reconcile only (no prune): idempotency + invariant-safety.
@@ -145,6 +153,9 @@ class HomeLayoutInvariantPropertyTest {
                     if (rbad.isNotEmpty()) fail("reconcile invalid run=$run step=$step $sc $rbad")
                     val r2 = HomeLayoutReconciler.reconcile(after1, newId)
                     assertTrue("reconcile not idempotent run=$run step=$step $sc", r2 is ReconcileOutcome.Unchanged)
+                    // §Audit-2 N14: reconcile is no-prune → the DISTINCT app-key set is conserved
+                    // exactly (dedup only removes duplicates that survive elsewhere in the set).
+                    assertEquals("reconcile changed the app-key set run=$run step=$step $sc", cur.appKeys(), after1.appKeys())
                     cur = after1
                 }
             }
@@ -154,6 +165,20 @@ class HomeLayoutInvariantPropertyTest {
     // ---------------------------------------------------------------- generators
     // Layout generators (Scenario / scenario / seed) live in the shared fixture
     // RandomHomeLayouts so :data can reuse them; `target` is transition-specific.
+
+    /** Every distinct app [ComponentKey] present anywhere in the layout (grid, dock, folders). */
+    private fun HomeLayout.appKeys(): Set<ComponentKey> {
+        val keys = HashSet<ComponentKey>()
+        fun collect(item: HomeItem) {
+            when (item) {
+                is HomeItem.App -> keys.add(item.key)
+                is HomeItem.Folder -> keys.addAll(item.members)
+            }
+        }
+        items.forEach { collect(it.item) }
+        dock.forEach { collect(it) }
+        return keys
+    }
 
     private fun target(l: HomeLayout, rnd: Random): DropTarget = when (rnd.nextInt(4)) {
         0 -> DropTarget.Cell(CellPos(rnd.nextInt(l.pages + 1), rnd.nextInt(l.grid.columns + 1), rnd.nextInt(l.grid.rows + 1)))

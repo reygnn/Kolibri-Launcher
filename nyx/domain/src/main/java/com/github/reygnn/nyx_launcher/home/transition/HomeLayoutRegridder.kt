@@ -56,7 +56,13 @@ object HomeLayoutRegridder {
         // guard trusts a layout as a no-op only when the relocation loop would have moved
         // nothing. Normal layouts satisfy all three terms, so this stays a no-op on every
         // routine layout pass (no persist storm).
+        // …and pages is already trimmed to the last occupied page. A matching grid with correct
+        // cells but a STALE trailing page (remove() / an emptying move never decrements pages)
+        // must not short-circuit, or the stale page lingers until a separate reconcile — only the
+        // relocation path below recomputes pages (§Audit-2 N12). expectedPages mirrors newPages.
+        val expectedPages = maxOf(1, layout.items.maxOfOrNull { it.pos.page + 1 } ?: 0)
         if (layout.grid == target &&
+            layout.pages == expectedPages &&
             layout.dock.size <= target.columns &&
             layout.items.none {
                 it.pos.page !in 0 until HomeLayout.MAX_PAGES ||

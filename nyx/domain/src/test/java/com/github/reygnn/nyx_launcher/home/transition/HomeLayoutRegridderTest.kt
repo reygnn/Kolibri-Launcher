@@ -27,6 +27,17 @@ class HomeLayoutRegridderTest {
         assertThat(HomeLayoutRegridder.fit(start, g)).isEqualTo(RegridOutcome.Unchanged)
     }
 
+    @Test fun matching_grid_with_stale_trailing_pages_is_trimmed() {
+        // §Audit-2 N12: grid + cells are fine but pages=3 while nothing sits past page 0 (a
+        // remove()/emptying-move never decrements pages). The no-op guard must NOT short-circuit;
+        // the refit trims pages to the last occupied page, leaving items untouched.
+        val g = GridSpec(4, 6)
+        val start = layout(g, items = listOf(placed(app("a", "pa"), 0, 1, 1)), pages = 3)
+        val out = HomeLayoutRegridder.fit(start, g) as RegridOutcome.Changed
+        assertThat(out.layout.pages).isEqualTo(1)
+        assertThat(out.layout.items).isEqualTo(start.items) // positions untouched
+    }
+
     @Test fun growing_keeps_positions_and_updates_grid() {
         val start = layout(GridSpec(4, 6), items = listOf(placed(app("a", "pa"), 0, 3, 5)))
         val out = HomeLayoutRegridder.fit(start, GridSpec(6, 8)) as RegridOutcome.Changed
