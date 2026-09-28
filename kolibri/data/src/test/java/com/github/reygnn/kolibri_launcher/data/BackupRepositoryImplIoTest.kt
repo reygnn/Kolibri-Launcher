@@ -185,6 +185,31 @@ class BackupRepositoryImplIoTest {
     }
 
     @Test
+    fun `importFromZip - archive exceeding the whole-archive cap - returns Error`() = runTest {
+        // §Audit-2 N5: the whole-archive cap bounds the total COMPRESSED bytes ZipInputStream may
+        // pull — including the closeEntry skip of a non-wallpaper padding entry — which also closes
+        // the statSize == -1 slip. A single incompressible > 10 MiB "pad.bin" (neither manifest nor
+        // wallpaper) trips only the whole-archive cap; WITHOUT it the padding is skipped and the
+        // manifest parses (a different, non-Error outcome).
+        every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor // statSize 1024 passes the size gate
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("backup.json"))
+            zip.write("{}".toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(java.util.zip.ZipEntry("pad.bin"))
+            zip.write(kotlin.random.Random(0).nextBytes(11 * 1024 * 1024)) // ~11 MiB compressed > 10 MiB budget
+            zip.closeEntry()
+        }
+        val zipBytes = bos.toByteArray()
+        every { contentResolver.openInputStream(testUri) } answers { ByteArrayInputStream(zipBytes) } // fresh per call
+
+        val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
+    }
+
+    @Test
     fun `loadBackupFromFile - Empty file (0 bytes) - returns InvalidFormat`() = runTest {
         every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
         every { contentResolver.openInputStream(testUri) } returns ByteArrayInputStream(ByteArray(0))

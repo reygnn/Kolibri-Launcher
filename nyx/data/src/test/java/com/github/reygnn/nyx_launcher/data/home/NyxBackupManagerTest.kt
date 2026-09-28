@@ -43,6 +43,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.random.Random
 
 /**
  * Round-trips a backup through the ZIP container (export → import) with mocked repos,
@@ -232,6 +233,26 @@ class NyxBackupManagerTest {
             zip.closeEntry()
             zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
             zip.write(ByteArray(11 * 1024 * 1024)) // 11 MiB decompressed > 10 MiB per-blob cap
+            zip.closeEntry()
+        }
+        val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+    }
+
+    @Test
+    fun import_rejects_an_archive_exceeding_the_whole_archive_cap() = runTest(mainDispatcherRule.dispatcher) {
+        // §Audit-2 N5: the whole-archive cap bounds the total COMPRESSED bytes ZipInputStream may
+        // pull — including the closeEntry skip of a non-wallpaper padding entry. WITHOUT the cap
+        // the padding is skipped and the (valid) manifest imports fine; WITH it the archive is
+        // rejected before it can decompress unbounded. A single incompressible > 10 MiB entry that
+        // is neither the manifest nor a wallpaper blob, so only the whole-archive cap can catch it.
+        val bos = ByteArrayOutputStream()
+        ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(ZipEntry("backup.json"))
+            zip.write(NyxBackupSerializer().serialize(NyxBackup()).toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("pad.bin"))
+            zip.write(Random(0).nextBytes(11 * 1024 * 1024)) // incompressible → ~11 MiB compressed > 10 MiB budget
             zip.closeEntry()
         }
         val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
