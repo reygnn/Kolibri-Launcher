@@ -222,8 +222,14 @@ Regressionsrisiko, die einen eigenen Task verdienen):
 - **Kleinere SPEC-/Kosmetik-Punkte:**
   - ✅ **`GetDrawerAppsUseCase.getCurrentApps()` Doppel-Read** — warm-Path liest jetzt 1× (Cold-Path
     re-readt bewusst nach dem Prime).
-  - **bewusst NICHT gefixt (jeweils begründet):** Cold-Start-COLOR-Flash bis die iconStyle-Preference
-    geladen ist (pre-existing Seed, Timing); kein Report-Dedup bei wiederholtem `FailedNoCache` —
+  - ✅ **Cold-Start-COLOR-Flash / Doppel-Decode** — erledigt (2026-09-28, Audit-2 N4): der erste
+    `bitmap()`-Decode wartet jetzt via `styleReady` auf die echte iconStyle-Emission, statt unter dem
+    COLOR-Seed zu dekodieren; kein Doppel-Decode / Flash mehr für Nicht-COLOR-Nutzer.
+  - **bewusst NICHT gefixt (jeweils begründet):** kein Report-Dedup bei wiederholtem `FailedNoCache` —
     **kolibri dedupt auch nicht**, ein Dedup nur in nyx bräche die Parität; `InstalledAppsHolderPump.onEach`-
     Report ungeguarded — ein Guard wäre try/catch um `reportToAcra` (per Vertrag CANT_THROW) =
-    Rule-11-Verstoß.
+    Rule-11-Verstoß; **Audit-2 N16: Scrim wird beim Startup 2× angewandt** (Vorab-Seed in `onCreate`
+    `currentScrimAlpha = wallpaperScrimAlpha.value; applyScrim()` + identischer erster Collector-Replay)
+    — `applyScrim()` ist idempotent (`setBackgroundColor` + Visibility-Toggle), nicht pro Frame, nicht
+    sichtbar; der Vorab-Seed ist die gewollte Paint-before-first-frame-Optimierung, ein Dedup wäre
+    mehr Code für null messbaren Gewinn.
