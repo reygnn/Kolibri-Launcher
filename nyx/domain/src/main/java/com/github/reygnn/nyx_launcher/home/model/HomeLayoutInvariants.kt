@@ -28,13 +28,11 @@ fun HomeLayout.invariantViolations(dockCapacity: Int = grid.columns): List<Strin
     for (p in items) {
         val (page, x, y) = p.pos
         if (page !in 0 until pages) v += "item '${p.item.id.raw}' on page $page but pages=$pages"
-        if (x < 0 || y < 0 || x + p.span.w > cols || y + p.span.h > rows) {
-            v += "item '${p.item.id.raw}' off-grid at ($page,$x,$y) span ${p.span.w}x${p.span.h} in ${cols}x$rows"
+        if (x < 0 || y < 0 || x >= cols || y >= rows) {
+            v += "item '${p.item.id.raw}' off-grid at ($page,$x,$y) in ${cols}x$rows"
         }
-        for (dx in 0 until p.span.w) for (dy in 0 until p.span.h) {
-            if (!occupied.add(Triple(page, x + dx, y + dy))) {
-                v += "cell collision at ($page,${x + dx},${y + dy}) (item '${p.item.id.raw}')"
-            }
+        if (!occupied.add(Triple(page, x, y))) {
+            v += "cell collision at ($page,$x,$y) (item '${p.item.id.raw}')"
         }
     }
 

@@ -8,7 +8,6 @@ import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.RegridOutcome
-import com.github.reygnn.nyx_launcher.home.model.Span
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -132,7 +131,6 @@ class HomeLayoutRegridderTest {
         assertThat(rehomed.item.id).isEqualTo(ItemId("fd"))
         assertThat((rehomed.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
         assertThat(rehomed.pos).isEqualTo(CellPos(0, 0, 0))
-        assertThat(rehomed.span).isEqualTo(Span())
     }
 
     @Test fun a_grid_change_recomputes_pages_and_drops_stale_trailing_pages() {
@@ -203,22 +201,6 @@ class HomeLayoutRegridderTest {
         assertThat(byId[ItemId("a")]).isEqualTo(CellPos(0, 0, 0)) // page-0 item placed first
         assertThat(byId[ItemId("b")]).isEqualTo(CellPos(0, 1, 0)) // page-1 item second
         assertThat(out.layout.pages).isEqualTo(1) // both landed on page 0
-    }
-
-    @Test fun a_relocated_off_grid_items_span_is_preserved() {
-        // The regridder promises "Span is preserved" for relocated off-grid grid items
-        // (HomeLayoutRegridder.kt:59). v1 never sets a span > 1×1, so this guards the v2
-        // widget lift: an off-grid item carrying a non-default span keeps it after the
-        // re-fit, while dock overflow gets the default span.
-        val wide = PlacedItem(app("wide", "pw"), CellPos(0, 5, 0), Span(2, 2)) // off-grid under 4×6
-        val start = layout(
-            GridSpec(6, 8),
-            items = listOf(wide),
-        )
-        val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
-        val relocated = out.layout.items.single { it.item.id == ItemId("wide") }
-        assertThat(relocated.pos).isEqualTo(CellPos(0, 0, 0)) // moved onto the new grid
-        assertThat(relocated.span).isEqualTo(Span(2, 2)) // span survives the relocation
     }
 
     @Test fun regrid_is_idempotent() {
@@ -342,17 +324,17 @@ class HomeLayoutRegridderTest {
         assertThat(out.layout.pages).isEqualTo(4)
     }
 
-    @Test fun an_off_grid_folder_is_relocated_with_members_and_span_preserved() {
+    @Test fun an_off_grid_folder_is_relocated_with_its_members() {
         // Counterpart to the dock-overflow folder case: a FOLDER sitting off-grid (not in
-        // the dock) is relocated onto the new grid keeping its members and its span.
-        val f = PlacedItem(folder("fg", ck("pa"), ck("pb")), CellPos(0, 5, 0), Span(2, 2))
+        // the dock) is relocated onto the new grid keeping its members. Off-grid comes from
+        // the shrink (x=5 is on-grid at 6×8 but off-grid at 4×6).
+        val f = PlacedItem(folder("fg", ck("pa"), ck("pb")), CellPos(0, 5, 0))
         val start = layout(GridSpec(6, 8), items = listOf(f))
         val out = HomeLayoutRegridder.fit(start, GridSpec(4, 6)) as RegridOutcome.Changed
         val relocated = out.layout.items.single()
         assertThat(relocated.item.id).isEqualTo(ItemId("fg"))
         assertThat((relocated.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
         assertThat(relocated.pos).isEqualTo(CellPos(0, 0, 0))
-        assertThat(relocated.span).isEqualTo(Span(2, 2))
     }
 
     @Test fun regrid_is_idempotent_after_a_multi_page_shrink() {
@@ -390,16 +372,15 @@ class HomeLayoutRegridderTest {
     }
 
     @Test fun collision_healing_preserves_a_folder_collider_with_its_members() {
-        // The relocated collider can be a FOLDER — it keeps its members and span, it is not
-        // dropped or flattened. Here the folder is the later (losing) item at the shared cell.
+        // The relocated collider can be a FOLDER — it keeps its members, it is not dropped or
+        // flattened. Here the folder is the later (losing) item at the shared cell.
         val g = GridSpec(4, 6)
         val keeper = placed(app("keep", "pk"), 0, 2, 3)
-        val f = PlacedItem(folder("fd", ck("pa"), ck("pb")), CellPos(0, 2, 3), Span(2, 2)) // same cell
+        val f = PlacedItem(folder("fd", ck("pa"), ck("pb")), CellPos(0, 2, 3)) // same cell
         val out = HomeLayoutRegridder.fit(layout(g, items = listOf(keeper, f)), g) as RegridOutcome.Changed
         assertThat(out.layout.items.first { it.item.id == ItemId("keep") }.pos).isEqualTo(CellPos(0, 2, 3))
         val rehomed = out.layout.items.first { it.item.id == ItemId("fd") }
         assertThat((rehomed.item as HomeItem.Folder).members).containsExactly(ck("pa"), ck("pb")).inOrder()
-        assertThat(rehomed.span).isEqualTo(Span(2, 2)) // span survives
         assertThat(rehomed.pos).isNotEqualTo(CellPos(0, 2, 3)) // moved off the shared cell
     }
 

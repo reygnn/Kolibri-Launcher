@@ -7,7 +7,6 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
-import com.github.reygnn.nyx_launcher.home.model.Span
 
 // Domain → DTO ---------------------------------------------------------------
 
@@ -25,8 +24,6 @@ internal fun PlacedItem.toDto(): PlacedItemDto = PlacedItemDto(
     page = pos.page,
     x = pos.x,
     y = pos.y,
-    spanW = span.w,
-    spanH = span.h,
 )
 
 internal fun HomeItem.toDto(): HomeItemDto = when (this) {
@@ -49,7 +46,7 @@ internal fun HomeLayoutDto.toDomain(): HomeLayout = HomeLayout(
 )
 
 internal fun PlacedItemDto.toDomain(): PlacedItem? =
-    item.toDomain()?.let { PlacedItem(item = it, pos = CellPos(page, x, y), span = Span(spanW, spanH)) }
+    item.toDomain()?.let { PlacedItem(item = it, pos = CellPos(page, x, y)) }
 
 internal fun HomeItemDto.toDomain(): HomeItem? = when (this) {
     is HomeItemDto.AppDto -> key.toDomain()?.let { HomeItem.App(ItemId(id), it) }

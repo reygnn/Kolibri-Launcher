@@ -17,9 +17,3 @@ data class GridSpec(val columns: Int, val rows: Int)
  * [CellPos] (see [HomeLayout.dock]).
  */
 data class CellPos(val page: Int, val x: Int, val y: Int)
-
-/**
- * How many cells an item spans. v1 is always (1, 1); spans > 1 are reserved for
- * widgets (v2), so the field exists now to keep that lift from breaking callers.
- */
-data class Span(val w: Int = 1, val h: Int = 1)

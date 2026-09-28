@@ -11,7 +11,6 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.LayoutEdit
 import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
-import com.github.reygnn.nyx_launcher.home.model.Span
 
 /**
  * Pure home-layout transitions. No repository, no dispatcher, no Android, no
@@ -37,33 +36,25 @@ object HomeLayoutTransition {
         newFolderId: () -> ItemId,
     ): MoveResult {
         val source: HomeItem = layout.itemById(moving) ?: return MoveResult.NoOp
-        // Preserve the moved grid item's span across the relocation (A1-17): dragging a
-        // widget (v2, span > 1×1) must not shrink it back to 1×1. A dock source has no
-        // span, so it falls back to the default. Mirrors the regridder, which likewise
-        // keeps a relocated item's span.
-        val sourceSpan = layout.items.firstOrNull { it.item.id == moving }?.span ?: Span()
-        return moveResolved(layout, source, sourceSpan, moving, target, newFolderId)
+        return moveResolved(layout, source, moving, target, newFolderId)
     }
 
     /**
-     * Shared core: place [source] (identified by [moving]) onto [target]. [sourceSpan]
-     * is the moved item's span, threaded through so a relocation preserves it (a new
-     * item passes the default 1×1). [moving] need NOT exist in [layout] — for a
-     * brand-new item (see [place]) the removing/self-drop/occupant steps are simply
-     * no-ops against it.
+     * Shared core: place [source] (identified by [moving]) onto [target]. [moving] need
+     * NOT exist in [layout] — for a brand-new item (see [place]) the removing/self-drop/
+     * occupant steps are simply no-ops against it.
      */
     private fun moveResolved(
         layout: HomeLayout,
         source: HomeItem,
-        sourceSpan: Span,
         moving: ItemId,
         target: DropTarget,
         newFolderId: () -> ItemId,
     ): MoveResult = when (target) {
-        is DropTarget.Cell -> moveToCell(layout, source, sourceSpan, moving, target.pos, newFolderId)
+        is DropTarget.Cell -> moveToCell(layout, source, moving, target.pos, newFolderId)
         is DropTarget.DockSlot -> moveToDock(layout, source, moving, target.index)
         is DropTarget.DockItem -> moveOntoDockItem(layout, source, moving, target.index, newFolderId)
-        is DropTarget.GridInsert -> insertOnGrid(layout, source, sourceSpan, moving, target.page, target.index)
+        is DropTarget.GridInsert -> insertOnGrid(layout, source, moving, target.page, target.index)
     }
 
     /**
@@ -81,7 +72,6 @@ object HomeLayoutTransition {
     private fun insertOnGrid(
         layout: HomeLayout,
         source: HomeItem,
-        sourceSpan: Span,
         moving: ItemId,
         page: Int,
         index: Int,
@@ -100,7 +90,7 @@ object HomeLayoutTransition {
             val pos = firstFreeCellFrom(base, page.coerceAtMost(base.pages))
             if (pos.page >= HomeLayout.MAX_PAGES) return MoveResult.Rejected(MoveResult.Reason.OFF_GRID)
             val pages = if (pos.page >= base.pages) pos.page + 1 else base.pages
-            return resultOf(layout, base.copy(pages = pages, items = base.items + PlacedItem(source, pos, sourceSpan)))
+            return resultOf(layout, base.copy(pages = pages, items = base.items + PlacedItem(source, pos)))
         }
 
         val pageItems = base.items.filter { it.pos.page == page }
@@ -108,7 +98,7 @@ object HomeLayoutTransition {
 
         // Empty target cell → straight place, no shift.
         if (occupied[index] == null) {
-            return resultOf(layout, base.copy(items = base.items + PlacedItem(source, cellOf(page, index, cols), sourceSpan)))
+            return resultOf(layout, base.copy(items = base.items + PlacedItem(source, cellOf(page, index, cols))))
         }
 
         // Nearest gap: prefer a forward gap (shift the block [index, fwdGap) one cell
@@ -133,7 +123,7 @@ object HomeLayoutTransition {
                 val li = p.pos.y * cols + p.pos.x
                 shifted.add(if (li in shiftRange) p.copy(pos = cellOf(page, li + delta, cols)) else p)
             }
-            shifted.add(PlacedItem(source, cellOf(page, index, cols), sourceSpan))
+            shifted.add(PlacedItem(source, cellOf(page, index, cols)))
             val items = base.items.filterNot { it.pos.page == page } + shifted
             return resultOf(layout, base.copy(items = items))
         }
@@ -152,7 +142,7 @@ object HomeLayoutTransition {
                 else overflow = p // last-cell occupant of a dense page spills over
             }
         }
-        newPageItems.add(PlacedItem(source, cellOf(page, index, cols), sourceSpan))
+        newPageItems.add(PlacedItem(source, cellOf(page, index, cols)))
 
         var items = base.items.filterNot { it.pos.page == page } + newPageItems
         var pages = base.pages
@@ -173,7 +163,6 @@ object HomeLayoutTransition {
     private fun moveToCell(
         layout: HomeLayout,
         source: HomeItem,
-        sourceSpan: Span,
         moving: ItemId,
         pos: CellPos,
         newFolderId: () -> ItemId,
@@ -190,7 +179,7 @@ object HomeLayoutTransition {
             null -> {
                 val base = layout.removing(moving)
                 val pages = if (pos.page == layout.pages) layout.pages + 1 else base.pages
-                MoveResult.Moved(base.copy(pages = pages, items = base.items + PlacedItem(source, pos, sourceSpan)))
+                MoveResult.Moved(base.copy(pages = pages, items = base.items + PlacedItem(source, pos)))
             }
 
             is HomeItem.App -> when (source) {
@@ -429,7 +418,7 @@ object HomeLayoutTransition {
         // The old `isFolderMember ⇒ NoOp` guard is therefore gone.
         layout.topLevelIdOf(app)?.let { return move(layout, it, target, newId) }
         val fresh = HomeItem.App(newId(), app)
-        return moveResolved(layout, fresh, Span(), fresh.id, target, newId)
+        return moveResolved(layout, fresh, fresh.id, target, newId)
     }
 
     fun remove(layout: HomeLayout, id: ItemId): LayoutEdit {

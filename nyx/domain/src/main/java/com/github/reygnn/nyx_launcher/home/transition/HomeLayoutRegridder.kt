@@ -6,7 +6,6 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.RegridOutcome
-import com.github.reygnn.nyx_launcher.home.model.Span
 
 /**
  * Pure transition that re-fits a [HomeLayout] onto a device-derived [GridSpec]
@@ -24,7 +23,7 @@ import com.github.reygnn.nyx_launcher.home.model.Span
  *    rather than dropped (never lose an app — cf. HEU-INV-2).
  *  - Relocated items (off-grid grid items in page/y/x order, then dock overflow)
  *    fill the first free cells in row-major order across pages, adding pages as
- *    needed. Their [Span] is preserved.
+ *    needed.
  *  - Placement is hard-capped at [HomeLayout.MAX_PAGES] (page indices
  *    `0 until MAX_PAGES`), mirroring the move transition's page cap. An item that
  *    would only fit past the cap is dropped from the home layout rather than
@@ -109,11 +108,11 @@ object HomeLayoutRegridder {
         }
         offGrid.sortWith(compareBy({ it.pos.page }, { it.pos.y }, { it.pos.x }))
 
-        // Relocation queue: off-grid grid items first (span preserved), then dock
-        // overflow (default span). Both are placed unless the page cap is hit below.
-        val queue = ArrayList<Pair<HomeItem, Span>>(offGrid.size + dockOverflow.size)
-        offGrid.forEach { queue.add(it.item to it.span) }
-        dockOverflow.forEach { queue.add(it to Span()) }
+        // Relocation queue: off-grid grid items first, then dock overflow. Both are
+        // placed unless the page cap is hit below.
+        val queue = ArrayList<HomeItem>(offGrid.size + dockOverflow.size)
+        offGrid.forEach { queue.add(it.item) }
+        dockOverflow.forEach { queue.add(it) }
 
         val occupied = claimed // already exactly the kept in-bounds cells
         val relocated = ArrayList<PlacedItem>(queue.size)
@@ -125,7 +124,7 @@ object HomeLayoutRegridder {
             if (x >= cols) { x = 0; y++ }
             if (y >= rows) { y = 0; page++ }
         }
-        for ((item, span) in queue) {
+        for (item in queue) {
             var cell = CellPos(page, x, y)
             while (page < HomeLayout.MAX_PAGES && cell in occupied) {
                 advance()
@@ -135,7 +134,7 @@ object HomeLayoutRegridder {
             // dropped from the home layout (still reachable via the drawer). Row-major
             // fill means once we spill past the cap, nothing after it can fit either.
             if (page >= HomeLayout.MAX_PAGES) break
-            relocated.add(PlacedItem(item, cell, span))
+            relocated.add(PlacedItem(item, cell))
             occupied.add(cell)
             advance()
         }

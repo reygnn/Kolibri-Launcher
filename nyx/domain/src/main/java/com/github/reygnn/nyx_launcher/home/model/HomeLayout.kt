@@ -41,18 +41,10 @@ sealed interface HomeItem {
     ) : HomeItem
 }
 
-/**
- * A [HomeItem] pinned to a grid cell.
- *
- * [span] is reserved forward-compat (A1-17): in v1 it is always the default
- * `Span(1, 1)` — no transition or mapper ever sets it larger — and it is threaded
- * through model/DTO/regridder only so the widget lift (v2) doesn't break the
- * persisted format or callers. See [Span].
- */
+/** A [HomeItem] pinned to a single grid cell. */
 data class PlacedItem(
     val item: HomeItem,
     val pos: CellPos,
-    val span: Span = Span(),
 )
 
 /**

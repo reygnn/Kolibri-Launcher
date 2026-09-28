@@ -28,8 +28,6 @@ data class PlacedItemDto(
     val page: Int,
     val x: Int,
     val y: Int,
-    val spanW: Int = 1,
-    val spanH: Int = 1,
 )
 
 @Serializable
