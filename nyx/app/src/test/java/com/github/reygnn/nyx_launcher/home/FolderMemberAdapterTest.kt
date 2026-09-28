@@ -67,6 +67,21 @@ class FolderMemberAdapterTest {
     }
 
     @Test
+    fun `submit skips the rebind when the members are unchanged`() {
+        // §Audit-2 N11: value-equal short-circuit mirroring DockAdapter.submit — re-submitting the
+        // same members must not re-decode every tile; a changed list still rebinds.
+        val adapter = adapter(installed = emptySet())
+        val counter = RebindCounter().also { adapter.registerAdapterDataObserver(it) }
+
+        adapter.submit(listOf(a, b))  // first content → rebind
+        assertThat(counter.rebinds).isEqualTo(1)
+        adapter.submit(listOf(a, b))  // identical → no rebind
+        assertThat(counter.rebinds).isEqualTo(1)
+        adapter.submit(listOf(a))     // changed → rebind
+        assertThat(counter.rebinds).isEqualTo(2)
+    }
+
+    @Test
     fun `refreshIcons rebinds the member range`() {
         val adapter = adapter(installed = emptySet())
         adapter.submit(listOf(a, b))

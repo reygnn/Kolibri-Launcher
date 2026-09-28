@@ -35,6 +35,11 @@ class FolderMemberAdapter(
     private var dotPackages: Set<String> = emptySet()
 
     fun submit(newMembers: List<ComponentKey>) {
+        // Value-equal short-circuit, mirroring DockAdapter.submit: skip the full rebind (which
+        // re-decodes every member icon) when the members are unchanged. Harmless today (a fresh
+        // adapter per folder-open), but keeps the invariant if submit is ever wired to a reactive
+        // members flow (§Audit-2 N11). Live greying / style go through updateInstalled / refreshIcons.
+        if (members == newMembers) return
         members = newMembers
         notifyDataSetChanged()
     }
