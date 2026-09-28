@@ -191,6 +191,37 @@ class NyxBackupManagerTest {
     }
 
     @Test
+    fun import_rejects_an_archive_with_too_many_wallpaper_blobs() = runTest(mainDispatcherRule.dispatcher) {
+        // Count cap (MAX_BLOB_ENTRIES = 64): a real backup has one blob per layer; an archive
+        // spamming the wallpaper dir with far more entries is rejected before it can.
+        every { fileManager.copyFromInputStream(any()) } returns null // extraction result irrelevant here
+        val bytes = zipOf(NyxBackup(), blobs = (0..64).map { "wallpapers/layer_$it.img" }) // 65 > 64
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+    }
+
+    @Test
+    fun import_rejects_a_blob_larger_than_the_per_blob_cap() = runTest(mainDispatcherRule.dispatcher) {
+        // Per-blob decompressed cap (MAX_BLOB_BYTES = 10 MiB): drain the stream like the real
+        // copyFromInputStream so the per-blob CappedInputStream counts the bytes; an 11 MiB blob
+        // (compresses tiny, so the whole-archive cap is untouched) trips the cap → InvalidData.
+        every { fileManager.copyFromInputStream(any()) } answers {
+            firstArg<java.io.InputStream>().readBytes(); null
+        }
+        val bos = ByteArrayOutputStream()
+        ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(ZipEntry("backup.json"))
+            zip.write(NyxBackupSerializer().serialize(NyxBackup()).toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
+            zip.write(ByteArray(11 * 1024 * 1024)) // 11 MiB decompressed > 10 MiB per-blob cap
+            zip.closeEntry()
+        }
+        val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+    }
+
+    @Test
     fun options_gate_selective_import() = runTest(mainDispatcherRule.dispatcher) {
         val out = ByteArrayOutputStream()
         manager.export(out, "v", 0L)

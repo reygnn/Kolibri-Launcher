@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -134,7 +135,13 @@ class NyxBackupManager @Inject constructor(
                 // the restored URIs are already internal file://).
                 var manifest: String? = null
                 val extracted = HashMap<String, String>() // entryName -> internal uri
-                ZipInputStream(inp).use { zip ->
+                var blobCount = 0
+                // Cap the whole compressed archive (kolibri parity, shared MAX_BACKUP_SIZE_BYTES):
+                // ZipInputStream can never pull more than this many compressed bytes in total —
+                // extraction AND the closeEntry skips of unread entries — so a decompression bomb's
+                // work stays bounded. copyFromInputStream / readNBytes read through this wrapper.
+                val boundedInput = CappedInputStream(inp, MAX_BACKUP_SIZE_BYTES + 1)
+                ZipInputStream(boundedInput).use { zip ->
                     var entry = zip.nextEntry
                     while (entry != null) {
                         if (entry.name == MANIFEST) {
@@ -145,14 +152,30 @@ class NyxBackupManager @Inject constructor(
                             if (bytes.size > MAX_MANIFEST_BYTES) return@withContext ImportResult.InvalidData
                             manifest = bytes.toString(Charsets.UTF_8)
                         } else if (options.importWallpaper && entry.name.startsWith(WALLPAPER_DIR)) {
+                            val entryName = entry.name
                             // Extract only when actually importing wallpaper — else the
                             // blobs would land in internal storage unreferenced (leak).
-                            // copyFromInputStream reads to entry-end without closing the zip stream.
-                            fileManager.copyFromInputStream(zip)?.let { extracted[entry!!.name] = it.toString() }
+                            // Reject an archive with an absurd number of blobs (a real Nyx backup
+                            // has one per wallpaper layer) before it can spam the wallpaper dir.
+                            if (++blobCount > MAX_BLOB_ENTRIES) return@withContext ImportResult.InvalidData
+                            // Cap each blob's DECOMPRESSED size so a bomb entry can't fill the disk:
+                            // extract through a per-blob CappedInputStream and reject (dropping the
+                            // partial file) if it exceeds the limit. copyFromInputStream reads to
+                            // entry-end without closing the (wrapped) zip stream.
+                            val cappedBlob = CappedInputStream(zip, MAX_BLOB_BYTES + 1)
+                            val uri = fileManager.copyFromInputStream(cappedBlob)
+                            if (cappedBlob.limitReached) {
+                                uri?.let { localFileOrNull(it.toString())?.delete() }
+                                return@withContext ImportResult.InvalidData
+                            }
+                            uri?.let { extracted[entryName] = it.toString() }
                         }
                         zip.closeEntry()
                         entry = zip.nextEntry
                     }
+                    // A bomb that inflated past the whole-archive cap leaves the stream truncated;
+                    // if ZipInputStream didn't already throw (caught below), flag it explicitly.
+                    if (boundedInput.limitReached) return@withContext ImportResult.InvalidData
                 }
                 val backup = manifest?.let { serializer.deserialize(it) } ?: return@withContext ImportResult.InvalidData
 
@@ -259,5 +282,11 @@ class NyxBackupManager @Inject constructor(
         // Defensive cap for the manifest JSON entry (a real one is a few KB); guards against a
         // crafted/oversized/zip-bomb manifest OOMing the import (input is user-chosen via SAF).
         const val MAX_MANIFEST_BYTES = 5 * 1024 * 1024 // 5 MiB
+        // Whole-archive compressed cap (shared with kolibri via AppConstants) + per-blob
+        // decompressed cap + a generous blob-count cap: together they bound both the total
+        // decompression work and the on-disk bytes an untrusted backup can write.
+        const val MAX_BACKUP_SIZE_BYTES = AppConstants.MAX_BACKUP_SIZE_BYTES // 10 MiB (compressed archive)
+        const val MAX_BLOB_BYTES = AppConstants.MAX_BACKUP_SIZE_BYTES // 10 MiB per decompressed blob
+        const val MAX_BLOB_ENTRIES = 64 // far above any real per-layer blob count
     }
 }
