@@ -243,4 +243,33 @@ class DrawerFoldersTransitionTest {
             folders(folder("f2", "d", "e"), DrawerFolder(DrawerFolderId("new"), "Maker", listOf(key("a"), key("c")))),
         )
     }
+
+    // ---- sanitize (restore-time structural repair, §Audit-2 N10) ----
+
+    @Test
+    fun `sanitize keeps a well-formed blob unchanged and is idempotent`() {
+        val clean = folders(folder("f1", "a", "b"), folder("f2", "c", "d"))
+        assertThat(DrawerFoldersTransition.sanitize(clean)).isEqualTo(clean)
+        assertThat(DrawerFoldersTransition.sanitize(DrawerFoldersTransition.sanitize(clean))).isEqualTo(clean)
+    }
+
+    @Test
+    fun `sanitize drops a folder with fewer than two members (INV-1)`() {
+        val before = folders(folder("f1", "a"), folder("f2", "b", "c"))
+        assertThat(DrawerFoldersTransition.sanitize(before)).isEqualTo(folders(folder("f2", "b", "c")))
+    }
+
+    @Test
+    fun `sanitize de-duplicates members within a folder`() {
+        // A crafted blob with a repeated member; the duplicate is dropped, order preserved.
+        val before = folders(DrawerFolder(DrawerFolderId("f1"), "", listOf(key("a"), key("b"), key("a"))))
+        assertThat(DrawerFoldersTransition.sanitize(before)).isEqualTo(folders(folder("f1", "a", "b")))
+    }
+
+    @Test
+    fun `sanitize keeps an app in the first folder and strips it from later ones (INV-3)`() {
+        // 'a' is in both; it stays in f1, leaves f2 → f2 drops to [c] (< 2) and is dissolved.
+        val before = folders(folder("f1", "a", "b"), folder("f2", "a", "c"))
+        assertThat(DrawerFoldersTransition.sanitize(before)).isEqualTo(folders(folder("f1", "a", "b")))
+    }
 }

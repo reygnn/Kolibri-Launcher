@@ -19,6 +19,7 @@ import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
+import com.github.reygnn.nyx_launcher.home.transition.DrawerFoldersTransition
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -189,8 +190,12 @@ class NyxBackupManager @Inject constructor(
                     // Drawer folders are structural organisation too — restore them under the
                     // layout toggle. A replace (return the restored value), mirroring the home
                     // layout's save; a null field (older backup) leaves current folders intact.
+                    // Sanitize first (like the home layout's reconcile): a crafted/cross-device
+                    // blob can carry 0-1-member or duplicate-member folders, so repair them at
+                    // rest instead of relying on the read-time projection (§Audit-2 N10).
                     backup.drawerFolders?.toDomain()?.let { restored ->
-                        drawerFoldersRepository.update { restored }
+                        val repaired = DrawerFoldersTransition.sanitize(restored)
+                        drawerFoldersRepository.update { repaired }
                     }
                     // Hidden apps are drawer organisation too — restore under the layout toggle
                     // (replace; a null field from an older backup leaves the current set intact).

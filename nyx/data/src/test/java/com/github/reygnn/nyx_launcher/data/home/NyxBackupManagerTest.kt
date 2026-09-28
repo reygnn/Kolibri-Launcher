@@ -152,6 +152,23 @@ class NyxBackupManagerTest {
     }
 
     @Test
+    fun import_sanitizes_malformed_drawer_folders_before_persisting() = runTest(mainDispatcherRule.dispatcher) {
+        // §Audit-2 N10: a crafted / cross-device backup can carry a sub-two-member folder; the
+        // restore must repair it (drop it here) rather than persist a malformed folder that only
+        // heals at read time. Mirrors the home layout's post-restore reconcile.
+        val malformed = DrawerFolders(
+            listOf(DrawerFolder(DrawerFolderId("solo"), "Solo", listOf(ComponentKey("com.a", "com.a.M")))),
+        )
+        val result = manager.import(
+            ByteArrayInputStream(zipOf(NyxBackup(drawerFolders = malformed.toDto()))),
+            NyxBackupOptions(),
+        )
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(drawerFoldersRepository.current.folders).isEmpty() // the 1-member folder was dropped
+    }
+
+    @Test
     fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.dispatcher) {
         hiddenAppsRepository.update { setOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")) }
         val out = ByteArrayOutputStream()

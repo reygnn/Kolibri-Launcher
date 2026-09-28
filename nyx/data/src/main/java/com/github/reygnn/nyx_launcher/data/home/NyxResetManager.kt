@@ -35,19 +35,30 @@ class NyxResetManager @Inject constructor(
     private val fileManager: WallpaperFileManager,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    /** Wipes all persisted state. Returns true on success, false on any failure. */
+    /**
+     * Wipes all persisted state. Returns true only if EVERY step succeeded.
+     *
+     * The three stores/files are independent (they share no transaction), so each step runs on
+     * its own: a failure in one no longer skips the rest — a factory reset should clear as much
+     * as it can rather than stop at the first error and leave more residue behind (§Audit-2 N9).
+     */
     suspend fun reset(): Boolean = withContext(ioDispatcher) {
+        val layoutOk = runResetStep("home_layout clear") { dataStore.edit { it.clear() } }
+        // Usage lives in its OWN DataStore, so the home_layout clear() above misses it.
+        val usageOk = runResetStep("usage purge") { appUsageRepository.purgeRepository() }
+        val filesOk = runResetStep("wallpaper files clear") { fileManager.clearAll() }
+        layoutOk && usageOk && filesOk
+    }
+
+    /** Runs one reset step in isolation; logs and reports failure without aborting the others. */
+    private suspend fun runResetStep(name: String, step: suspend () -> Unit): Boolean =
         try {
-            dataStore.edit { it.clear() }
-            // Usage lives in its OWN DataStore, so the home_layout clear() above misses it.
-            appUsageRepository.purgeRepository()
-            fileManager.clearAll()
+            step()
             true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error during Nyx factory reset")
+            TimberWrapper.silentError(e, "Nyx factory reset: $name failed")
             false
         }
-    }
 }

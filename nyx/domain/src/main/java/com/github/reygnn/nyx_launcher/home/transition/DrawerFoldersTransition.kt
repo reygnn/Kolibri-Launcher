@@ -23,6 +23,24 @@ import com.github.reygnn.nyx_launcher.home.model.FolderMembership
 object DrawerFoldersTransition {
 
     /**
+     * Structural repair of a persisted [DrawerFolders] blob (e.g. a restored backup, which is
+     * not validated on the way in). Enforces the membership invariants a hand-crafted or
+     * cross-device blob may violate: members are de-duplicated in order, an app ends up in at
+     * most ONE folder (first folder wins, DFOLD-INV-3), and any folder left with fewer than two
+     * members is dropped (DFOLD-INV-1). Idempotent. Mirrors the read-time projection so a
+     * restored blob is well-formed at rest, not only once `GetDrawerContentUseCase` reconciles
+     * it for display (§Audit-2 N10).
+     */
+    fun sanitize(folders: DrawerFolders): DrawerFolders {
+        val claimed = mutableSetOf<ComponentKey>() // an app belongs to the first folder that holds it
+        val cleaned = folders.folders.mapNotNull { folder ->
+            val members = folder.members.filter { claimed.add(it) } // dedup within + across folders
+            if (members.size < 2) null else folder.copy(members = members)
+        }
+        return DrawerFolders(cleaned)
+    }
+
+    /**
      * Apply a drawer [target] drop of the loose app [source]. Returns the new
      * membership, or `null` for a no-op.
      */
