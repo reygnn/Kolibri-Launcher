@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.File
@@ -79,10 +80,17 @@ class IconLoaderImpl @Inject constructor(
     private val styleReady = CompletableDeferred<Unit>()
 
     init {
-        preferences.iconStyle().onEach {
-            _currentStyle.value = it
-            styleReady.complete(Unit) // idempotent — only the first emission matters
-        }.launchIn(scope)
+        preferences.iconStyle()
+            .onEach {
+                _currentStyle.value = it
+                styleReady.complete(Unit) // idempotent — only the first emission matters
+            }
+            // Complete on ANY stream end too — including an error before the first emission. Without
+            // this a dead collector (a non-IOException from DataStore, which readFlowFailOpen does
+            // NOT catch) would leave styleReady incomplete and hang every bitmap() on await()
+            // forever; instead we degrade to the COLOR seed like pre-N4 (§Audit-3 A3-03). Idempotent.
+            .onCompletion { styleReady.complete(Unit) }
+            .launchIn(scope)
         schedulePrune() // cold-start sweep of files accumulated across runs
     }
 

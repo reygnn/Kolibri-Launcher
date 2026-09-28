@@ -7,9 +7,12 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
+import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -167,6 +170,24 @@ class IconLoaderImplTest {
             loader.bitmap(ref("com.first"), 64)
 
             assertThat(source.lastStyle).isEqualTo(IconStyle.MONOCHROME) // real style, not the seed
+        }
+
+    @Test
+    fun `an icon-style flow that ends without emitting does not hang bitmap loading`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // §Audit-3 A3-03: styleReady is completed via onCompletion, so even if iconStyle() ends
+            // before its first emission (here an empty flow; in the field, a non-IOException flow
+            // death that readFlowFailOpen doesn't catch), bitmap() resumes under the COLOR seed
+            // instead of hanging forever on await(). Without the onCompletion this test would time out.
+            val source = FakeSource()
+            val emptyStylePrefs = object : PreferencesRepository by FakePreferencesRepository() {
+                override fun iconStyle(): Flow<IconStyle> = emptyFlow()
+            }
+            val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, emptyStylePrefs)
+
+            loader.bitmap(ref("com.late"), 64) // must NOT hang
+
+            assertThat(source.lastStyle).isEqualTo(IconStyle.COLOR) // degraded-but-working on the seed
         }
 
     private companion object {
