@@ -8,6 +8,10 @@
 `:nyx:data` (DataStore persistence, backup/reset, icon render/cache, DI).
 ~11.7k LOC production.
 
+**Status:** ✅ **RESOLVED (2026-09-28)** — every finding is now fixed, structurally
+resolved, or a documented won't-fix, all merged to `main`. See the **Resolution log**
+right after the verdict summary.
+
 **Explicitly out of scope** (to avoid re-litigating settled ground):
 
 - The shared **installed-apps** motor in `:core` / `:common-data` — already
@@ -68,6 +72,34 @@ refactors in `MainActivity`.
 **Totals:** 2 CONFIRMED medium (both testability/seam, not bugs),
 3 PARTIALLY-CONFIRMED (all medium→low), 11 low/latent/info. Zero correctness
 defects.
+
+## Resolution log (2026-09-28)
+
+Every finding was addressed; all changes are merged to `main`. Commit hashes are
+the merged (post-rebase) `main` commits.
+
+| ID | Disposition | Commit(s) |
+|----|-------------|-----------|
+| N1 | **Fixed** — `dockDropAt` extracted + JVM-tested | `f387c34` |
+| N2 | **Fixed** — `selectAppShortcuts` policy extracted + tested | `b5bc887` |
+| N3 | **Fixed** — uninstall result-gated (`registerForActivityResult`); polling removed | `096749c` |
+| N4 | **Fixed** — first `bitmap()` gated on the real style (`styleReady`) | `aa6e486` |
+| N5 | **Fixed** — per-blob + entry-count + whole-archive caps; `CappedInputStream` shared to `:core`, mirrored into kolibri; whole-archive cap directly tested both launchers | `e6f330f`, `13d24f7`, `3047f12` |
+| N6 | **Fixed** — `startShortcut` catch narrowed + routed through toast/ACRA | `d41d3e9` |
+| N7 | **Fixed** — `drainIconRepaints` atomic take-and-clear | `df05bb3` |
+| N8 | **Fixed** — `appliedIconStyle` seeded to the loader default (COLOR) | `aa6e486` |
+| N9 | **Fixed** — reset runs each step independently (partial-failure clears the rest) | `eaf22a9` |
+| N10 | **Fixed** — `DrawerFoldersTransition.sanitize` on restore | `eaf22a9` |
+| N11 | **Fixed** — `FolderMemberAdapter.submit` value-equal short-circuit | `75e65b0` |
+| N12 | **Fixed** — regridder no-op guard gained the `pages` term | `1f1e7d0` |
+| N13 | **Resolved** — widgets are won't-implement, so the `span` scaffolding was removed; the oracle is now single-cell too, so the guard/oracle asymmetry is structurally gone | `dc6be52` |
+| N14 | **Fixed** — app-conservation net added to the property walk | `1f1e7d0` |
+| N15 | **Fixed** — `ComponentKey.isValid` wired into decode; invalid keys dropped | `b992600` |
+| N16 | **WON'T-FIX** — the double scrim-apply is idempotent, off-frame and invisible; the pre-seed is the intended paint-before-first-frame optimization. Recorded in `nyx/TODO.md`. | `22153a8` |
+
+> Note: N13's original text below reads "latent (v2 only)". It is retained for the
+> record, but the v2 widget lift was cancelled (memory `nyx-no-home-widgets`), so the
+> `span` plumbing it referenced no longer exists.
 
 ---
 
