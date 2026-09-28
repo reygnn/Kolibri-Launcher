@@ -174,4 +174,68 @@ class HomeGridGeometryTest {
         // Symmetry with the columns==0 guard: a non-positive row count also yields null.
         assertThat(gridDropAt(0, 50f, 50f, 400, 600, GridSpec(columns = 4, rows = 0), 1f)).isNull()
     }
+
+    // ---- dockDropAt: centre = DockItem (folder), edges = DockSlot (insert) ----
+
+    // Three visible dock icons, each 100 wide, laid out left-to-right at 0/100/200,
+    // adapter positions 0/1/2 (the common case: nothing dragged/hidden).
+    private val dock = listOf(
+        DockChild(left = 0, width = 100, adapterPos = 0),
+        DockChild(left = 100, width = 100, adapterPos = 1),
+        DockChild(left = 200, width = 100, adapterPos = 2),
+    )
+
+    @Test fun dock_centre_lands_on_the_icon() {
+        // fx = 0.5 over icon 0 → land ON it (DockItem carries the adapter position).
+        assertThat(dockDropAt(dock, 50f)).isEqualTo(DropTarget.DockItem(0))
+        assertThat(dockDropAt(dock, 250f)).isEqualTo(DropTarget.DockItem(2))
+    }
+
+    @Test fun dock_left_edge_inserts_before_the_first_icon() {
+        // fx = 0.1 (< 0.2) over icon 0 and its centre (50) is not left of x=10 → index 0.
+        assertThat(dockDropAt(dock, 10f)).isEqualTo(DropTarget.DockSlot(0))
+    }
+
+    @Test fun dock_between_two_icons_inserts_at_that_index() {
+        // x = 95: icon 0's right edge (fx 0.95 > 0.8) and its centre (50) is left of 95 → index 1;
+        // icons 1/2 are to the right, neither on-band nor centre-left → DockSlot(1).
+        assertThat(dockDropAt(dock, 95f)).isEqualTo(DropTarget.DockSlot(1))
+    }
+
+    @Test fun dock_past_the_last_icon_appends() {
+        // x = 290: icons 0 and 1 are centre-left (→ index 2), icon 2's right edge (fx 0.9)
+        // is not on-band and its centre (250) is left of 290 → index 3 == past the last icon.
+        assertThat(dockDropAt(dock, 290f)).isEqualTo(DropTarget.DockSlot(3))
+    }
+
+    @Test fun dock_edge_fraction_boundary_is_inclusive_of_the_centre_band() {
+        // fx == 0.2 is not strictly beyond the edge fraction, so it lands ON the icon —
+        // same inclusive-centre-band rule as gridDropAt.
+        assertThat(dockDropAt(dock, 20f)).isEqualTo(DropTarget.DockItem(0))
+    }
+
+    @Test fun dock_item_carries_the_adapter_position_not_the_loop_index() {
+        // A single icon whose adapter position is 5 (e.g. leading items exist) → DockItem(5),
+        // proving the classifier reports the child's adapterPos, not its index in the list.
+        assertThat(dockDropAt(listOf(DockChild(left = 0, width = 100, adapterPos = 5)), 50f))
+            .isEqualTo(DropTarget.DockItem(5))
+    }
+
+    @Test fun dock_skips_the_dragged_view_via_the_gap_in_adapter_positions() {
+        // The dragged icon (adapter pos 1) is hidden, so the caller omits it: the list holds
+        // only positions 0 and 2, laid out at 0 and 200. A drop on the second visible icon
+        // still resolves to its real adapter position (2), and the missing slot does not shift
+        // the insert count.
+        val dragging = listOf(
+            DockChild(left = 0, width = 100, adapterPos = 0),
+            DockChild(left = 200, width = 100, adapterPos = 2),
+        )
+        assertThat(dockDropAt(dragging, 250f)).isEqualTo(DropTarget.DockItem(2))
+        assertThat(dockDropAt(dragging, 290f)).isEqualTo(DropTarget.DockSlot(2)) // append after 2 visible
+    }
+
+    @Test fun dock_with_no_children_inserts_at_zero() {
+        // An empty dock (or one whose only child is the dragged, hidden view) → DockSlot(0).
+        assertThat(dockDropAt(emptyList(), 123f)).isEqualTo(DropTarget.DockSlot(0))
+    }
 }

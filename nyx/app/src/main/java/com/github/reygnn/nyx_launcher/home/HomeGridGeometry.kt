@@ -73,3 +73,35 @@ internal fun gridDropAt(
         else -> DropTarget.Cell(cell)
     }
 }
+
+/**
+ * One dock child's on-screen geometry, in the dock's own (scroll/padding-adjusted)
+ * coordinate space, for pure drop classification. [adapterPos] is the child's
+ * position in the dock adapter.
+ */
+internal data class DockChild(val left: Int, val width: Int, val adapterPos: Int)
+
+/**
+ * Classifies a dock drop into a [DropTarget], mirroring [gridDropAt] so dock and
+ * grid folders behave the same: the central ~60% of a dock icon lands ON it
+ * ([DropTarget.DockItem] → folder create / add-to-folder / move-between-folders),
+ * while the outer ~20% on each side inserts BETWEEN icons ([DropTarget.DockSlot]).
+ * The insert index is the number of icons whose centre is left of [localX], so a
+ * drop on an icon's left half inserts before it and past the last icon appends.
+ *
+ * [children] must already be in adapter order and exclude any non-visible /
+ * [RecyclerView.NO_POSITION] child — notably the dragged icon's hidden view, whose
+ * old slot must not shift the count during a reorder. Android-free and total, so it
+ * is JVM-testable; harvesting the live children stays in MainActivity.
+ */
+internal fun dockDropAt(children: List<DockChild>, localX: Float): DropTarget {
+    var index = 0
+    for (child in children) {
+        val fx = (localX - child.left) / child.width.toFloat()
+        if (fx in GRID_INSERT_EDGE_FRACTION..(1f - GRID_INSERT_EDGE_FRACTION)) {
+            return DropTarget.DockItem(child.adapterPos) // land ON this icon
+        }
+        if (child.left + child.width / 2f < localX) index++
+    }
+    return DropTarget.DockSlot(index) // insert between icons
+}

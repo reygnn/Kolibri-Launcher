@@ -932,25 +932,17 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             override fun onDrop(payload: DragPayload, x: Int, y: Int) {
                 val bounds = Rect().also { rectInDragLayer(dock, it) }
                 val localX = (x - bounds.left).toFloat()
-                // Centre-vs-edge, identical to the grid (gridDropAt): a drop over the
-                // central ~60% of a dock icon lands ON it (DockItem → folder create /
-                // add-to-folder / move-between-folders), the outer ~20% on each side
-                // inserts BETWEEN icons (DockSlot). Same GRID_INSERT_EDGE_FRACTION so
-                // dock and grid folders behave the same.
-                var index = 0
-                for (i in 0 until dock.childCount) {
+                // Harvest the live dock children (skipping the dragged icon's hidden view
+                // and any not-yet-positioned child), then let the pure dockDropAt classify
+                // centre-vs-edge — identical to the grid (gridDropAt).
+                val children = (0 until dock.childCount).mapNotNull { i ->
                     val child = dock.getChildAt(i)
-                    if (child.visibility != View.VISIBLE) continue // the icon being dragged
+                    if (child.visibility != View.VISIBLE) return@mapNotNull null // the icon being dragged
                     val adapterPos = dock.getChildAdapterPosition(child)
-                    if (adapterPos == RecyclerView.NO_POSITION) continue
-                    val fx = (localX - child.left) / child.width.toFloat()
-                    if (fx in GRID_INSERT_EDGE_FRACTION..(1f - GRID_INSERT_EDGE_FRACTION)) {
-                        viewModel.onDrop(payload, DropTarget.DockItem(adapterPos)) // land ON this icon
-                        return
-                    }
-                    if (child.left + child.width / 2f < localX) index++
+                    if (adapterPos == RecyclerView.NO_POSITION) return@mapNotNull null
+                    DockChild(child.left, child.width, adapterPos)
                 }
-                viewModel.onDrop(payload, DropTarget.DockSlot(index)) // insert between icons
+                viewModel.onDrop(payload, dockDropAt(children, localX))
             }
         })
 
