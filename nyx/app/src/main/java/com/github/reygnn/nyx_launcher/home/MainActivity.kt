@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Process
@@ -1597,7 +1598,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 }.getOrNull()?.apply { setBounds(0, 0, sizePx, sizePx) }
                 ContextMenuItem(label, icon) {
                     // no suspension point — the action runs on tap; startShortcut is synchronous.
-                    runCatching { launcherApps.startShortcut(sc, null, null) }
+                    startShortcutSafe(launcherApps, sc)
                 }
             }
         } catch (e: SecurityException) {
@@ -1680,6 +1681,31 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             // process down, and it would over-report a benign condition in RELEASE. Toast the
             // user (like runLaunchCatching's PermissionDenied handling).
             TimberWrapper.reportToAcra(e, "SecurityException starting $intent")
+            showToastSafe(R.string.app_launch_failed)
+        }
+    }
+
+    /**
+     * Fires a launcher shortcut, mirroring [startActivitySafe]'s failure handling so a
+     * failed tap toasts instead of silently doing nothing. Narrowed to the two documented
+     * throwers of [LauncherApps.startShortcut] — a programming error (e.g. NPE) is NOT
+     * swallowed and still surfaces. Runs on a plain main-thread click listener.
+     */
+    private fun startShortcutSafe(launcherApps: LauncherApps, shortcut: ShortcutInfo) {
+        try {
+            launcherApps.startShortcut(shortcut, null, null)
+        } catch (e: ActivityNotFoundException) {
+            // The shortcut's target activity is gone (uninstalled / disabled since the menu
+            // was built) — a real "shouldn't normally happen" miss, so silentError (like
+            // startActivitySafe's ANFE branch) plus a toast.
+            TimberWrapper.silentError(e, "No activity for shortcut ${shortcut.id} of ${shortcut.`package`}")
+            showToastSafe(R.string.app_launch_failed)
+        } catch (e: IllegalStateException) {
+            // EXPECTED: the user is locked, or nyx is no longer the default launcher (lost
+            // between building the menu and this tap). Benign, so reportToAcra (RELEASE
+            // breadcrumb, no DEBUG crash — this runs on a plain main-thread click listener),
+            // not silentError, plus a toast. Mirrors startActivitySafe's SecurityException branch.
+            TimberWrapper.reportToAcra(e, "IllegalState starting shortcut ${shortcut.id}")
             showToastSafe(R.string.app_launch_failed)
         }
     }
