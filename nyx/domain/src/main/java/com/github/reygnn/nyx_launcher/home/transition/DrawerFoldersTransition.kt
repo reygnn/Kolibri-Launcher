@@ -32,10 +32,20 @@ object DrawerFoldersTransition {
      * it for display (§Audit-2 N10).
      */
     fun sanitize(folders: DrawerFolders): DrawerFolders {
-        val claimed = mutableSetOf<ComponentKey>() // an app belongs to the first folder that holds it
+        val claimed = mutableSetOf<ComponentKey>() // an app belongs to the first SURVIVING folder that holds it
         val cleaned = folders.folders.mapNotNull { folder ->
-            val members = folder.members.filter { claimed.add(it) } // dedup within + across folders
-            if (members.size < 2) null else folder.copy(members = members)
+            // Dedup within the folder AND against earlier surviving folders (DFOLD-INV-3), but only
+            // COMMIT the claim once this folder is known to survive (>= 2 members). A dropped sub-2
+            // folder must claim nothing, or it would strip a shared member from a later valid folder
+            // and dissolve a folder the read projection keeps (§Audit-3 A3-01).
+            val seenHere = mutableSetOf<ComponentKey>()
+            val members = folder.members.filter { it !in claimed && seenHere.add(it) }
+            if (members.size < 2) {
+                null
+            } else {
+                claimed.addAll(members)
+                folder.copy(members = members)
+            }
         }
         return DrawerFolders(cleaned)
     }

@@ -272,4 +272,13 @@ class DrawerFoldersTransitionTest {
         val before = folders(folder("f1", "a", "b"), folder("f2", "a", "c"))
         assertThat(DrawerFoldersTransition.sanitize(before)).isEqualTo(folders(folder("f1", "a", "b")))
     }
+
+    @Test
+    fun `sanitize does not let a dropped sub-two folder strip a member from a later valid folder`() {
+        // §Audit-3 A3-01: f1 is invalid (1 member) and shares "a" with the valid f2. f1 is dropped
+        // and must claim NOTHING, so f2 survives intact — a dropped folder's claim must not
+        // dissolve a folder the read projection would keep. (Regression guard for the claim-order fix.)
+        val before = folders(folder("f1", "a"), folder("f2", "a", "b"))
+        assertThat(DrawerFoldersTransition.sanitize(before)).isEqualTo(folders(folder("f2", "a", "b")))
+    }
 }
