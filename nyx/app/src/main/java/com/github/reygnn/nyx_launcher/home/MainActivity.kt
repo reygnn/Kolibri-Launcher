@@ -1585,21 +1585,21 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                         LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED,
                 )
             val sizePx = (24 * resources.displayMetrics.density).toInt()
-            (launcherApps.getShortcuts(query, Process.myUserHandle()) ?: emptyList())
-                .filter { it.isEnabled }
-                .sortedBy { it.rank }
-                .take(4)
-                .mapNotNull { sc ->
-                    val label = (sc.shortLabel ?: sc.longLabel)?.toString() ?: return@mapNotNull null
-                    // no suspension point — getShortcutIconDrawable is a synchronous IPC.
-                    val icon = runCatching {
-                        launcherApps.getShortcutIconDrawable(sc, resources.displayMetrics.densityDpi)
-                    }.getOrNull()?.apply { setBounds(0, 0, sizePx, sizePx) }
-                    ContextMenuItem(label, icon) {
-                        // no suspension point — the action runs on tap; startShortcut is synchronous.
-                        runCatching { launcherApps.startShortcut(sc, null, null) }
-                    }
+            val shortcuts = launcherApps.getShortcuts(query, Process.myUserHandle()) ?: emptyList()
+            // Pure policy (enabled → rank order → cap → label resolve) lives in
+            // selectAppShortcuts; icon resolution and startShortcut stay here in the UI.
+            selectAppShortcuts(shortcuts) { sc ->
+                ShortcutCandidate(sc.isEnabled, sc.rank, sc.shortLabel?.toString(), sc.longLabel?.toString())
+            }.map { (sc, label) ->
+                // no suspension point — getShortcutIconDrawable is a synchronous IPC.
+                val icon = runCatching {
+                    launcherApps.getShortcutIconDrawable(sc, resources.displayMetrics.densityDpi)
+                }.getOrNull()?.apply { setBounds(0, 0, sizePx, sizePx) }
+                ContextMenuItem(label, icon) {
+                    // no suspension point — the action runs on tap; startShortcut is synchronous.
+                    runCatching { launcherApps.startShortcut(sc, null, null) }
                 }
+            }
         } catch (e: SecurityException) {
             emptyList() // not the default launcher
         } catch (e: IllegalStateException) {
