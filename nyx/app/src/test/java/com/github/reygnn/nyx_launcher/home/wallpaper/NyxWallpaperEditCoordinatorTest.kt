@@ -88,6 +88,26 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
+    fun `committing while an add copy is still in flight discards the add`() = runTest(mainDispatcherRule.dispatcher) {
+        // §Audit-3 A3-02: the copy coroutine only runs on advanceUntilIdle, so here the user
+        // commits BEFORE it resumes. The resuming add must discard (delete the copied file) rather
+        // than append + persist a layer that was never in the committed preview. WITHOUT the
+        // generation bump in onCommitEditMode this appended the layer (layerCount 1, no delete).
+        coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_late")
+        val c = coordinator()
+        advanceUntilIdle()
+
+        c.onEnterEditMode()
+        c.onAddLayer(uri("content://pick/late")) // schedules the suspending copy; NOT advanced yet
+        c.onCommitEditMode()                      // session ends before the copy resumes
+        advanceUntilIdle()                        // copy resumes → generation changed → discard
+
+        assertThat(c.isEditMode.value).isFalse()
+        assertThat(repoState.value.layerCount).isEqualTo(0) // the unpreviewed layer was NOT persisted
+        verify { fileManager.deleteFile("file:///internal/wp_late") } // its copied file is discarded
+    }
+
+    @Test
     fun `enter add cancel reverts state and deletes the added file`() = runTest(mainDispatcherRule.dispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_new")
         val c = coordinator()

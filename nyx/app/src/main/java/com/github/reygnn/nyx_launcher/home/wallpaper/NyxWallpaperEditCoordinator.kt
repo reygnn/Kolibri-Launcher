@@ -129,6 +129,10 @@ class NyxWallpaperEditCoordinator(
     }
 
     fun onCommitEditMode() {
+        // Bump the generation like onCancelEditMode: a layer-add whose copy is still in flight
+        // when the user commits must discard (it was never in the committed preview), not append
+        // and persist an unpreviewed layer after the session ends (§Audit-3 A3-02).
+        editRollbackGeneration++
         val filesToDelete = pendingRemovalsOnCommit.toSet()
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
@@ -164,8 +168,9 @@ class NyxWallpaperEditCoordinator(
     // ---- layer operations ----
 
     fun onAddLayer(imageUri: Uri) {
-        // Capture generation before the suspending copy; a synchronous Cancel can
-        // restore the snapshot mid-copy, so an add resuming across it must discard.
+        // Capture generation before the suspending copy; a synchronous Cancel OR Commit ends the
+        // session mid-copy (both bump the generation), so an add resuming across either must
+        // discard its copied file rather than append an unpreviewed layer (§Audit-3 A3-02).
         val rollbackGenAtStart = editRollbackGeneration
         launchSafe("Error adding wallpaper layer") {
             val internalUri = fileManager.copyToInternal(imageUri)
