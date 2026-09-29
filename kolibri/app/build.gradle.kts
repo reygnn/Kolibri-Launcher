@@ -62,7 +62,7 @@ android {
         )
 
         testInstrumentationRunner = "com.github.reygnn.kolibri_launcher.HiltTestRunner"
-        testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "3"
+        testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "1"
     }
 
     sourceSets {
