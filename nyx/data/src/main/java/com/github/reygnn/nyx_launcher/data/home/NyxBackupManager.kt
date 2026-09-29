@@ -132,11 +132,14 @@ class NyxBackupManager @Inject constructor(
     /** Reads a backup ZIP from [inp] and applies it per [options]. */
     suspend fun import(inp: InputStream, options: NyxBackupOptions): ImportResult =
         withContext(ioDispatcher) {
+            val extracted = HashMap<String, String>() // entryName -> internal uri
+            // Extracted blobs the restored wallpaper state now references (set only after its save
+            // succeeded). Every other extracted blob is deleted in `finally` (§Audit-3 A3-05).
+            var adopted: Set<String> = emptySet()
             try {
                 // Extract: manifest + each blob (copied to internal storage now, so
                 // the restored URIs are already internal file://).
                 var manifest: String? = null
-                val extracted = HashMap<String, String>() // entryName -> internal uri
                 var blobCount = 0
                 // Cap the whole compressed archive (kolibri parity, shared MAX_BACKUP_SIZE_BYTES):
                 // ZipInputStream can never pull more than this many compressed bytes in total —
@@ -186,7 +189,7 @@ class NyxBackupManager @Inject constructor(
                 // leaves the existing (most valuable) home layout intact rather than
                 // half-replaced — it is a single write and the least likely to fail.
                 if (options.importSettings) applyPrefs(backup.prefs)
-                if (options.importWallpaper) restoreWallpaper(backup.wallpaperLayers, extracted)
+                if (options.importWallpaper) adopted = restoreWallpaper(backup.wallpaperLayers, extracted)
                 if (options.importLayout) {
                     // Drawer folders are structural organisation too — restore them under the
                     // layout toggle. A replace (return the restored value), mirroring the home
@@ -220,6 +223,12 @@ class NyxBackupManager @Inject constructor(
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Nyx backup import failed")
                 ImportResult.InvalidData
+            } finally {
+                // Blobs are extracted before the manifest is validated, so an aborted import
+                // (invalid/missing manifest, a cap tripped, a failed write, cancellation) — or a
+                // blob no restored layer references — would otherwise sit orphaned in internal
+                // storage until the next startup orphan sweep. Drop them now (§Audit-3 A3-05).
+                (extracted.values - adopted).forEach { fileManager.deleteFile(it) }
             }
         }
 
@@ -242,11 +251,15 @@ class NyxBackupManager @Inject constructor(
         }
     }
 
-    private suspend fun restoreWallpaper(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>) {
+    /**
+     * Restores the wallpaper layers from [extracted] blobs and returns the extracted URIs the
+     * saved state now references (empty when nothing was saved) — the caller deletes the rest.
+     */
+    private suspend fun restoreWallpaper(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>): Set<String> {
         // Replace semantics: a backup with no wallpaper clears the current one.
         if (layers.isEmpty()) {
             wallpaperRepository.saveWallpaperState(WallpaperState.NONE)
-            return
+            return emptySet()
         }
         // Rebind each blob-backed layer to its freshly-extracted internal URI. A
         // blob-backed layer whose blob is missing/failed is DROPPED (its source
@@ -266,9 +279,9 @@ class NyxBackupManager @Inject constructor(
         }
         // Only overwrite when at least one layer survived; if every blob failed
         // (corrupt backup) keep the current wallpaper rather than wiping it.
-        if (restored.isNotEmpty()) {
-            wallpaperRepository.saveWallpaperState(WallpaperState.multiLayer(restored))
-        }
+        if (restored.isEmpty()) return emptySet()
+        wallpaperRepository.saveWallpaperState(WallpaperState.multiLayer(restored))
+        return restored.mapNotNullTo(HashSet()) { it.imageUri }
     }
 
     /** file:// internal image → its [File], or null (skip non-file / missing). */

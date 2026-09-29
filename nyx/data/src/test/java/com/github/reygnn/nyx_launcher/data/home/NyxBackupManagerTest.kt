@@ -375,6 +375,80 @@ class NyxBackupManagerTest {
         coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
     }
 
+    // ---- §Audit-3 A3-05: extracted blobs never outlive a failed / partial import ----
+
+    @Test
+    fun import_deletes_extracted_blobs_when_the_manifest_is_invalid() = runTest(mainDispatcherRule.dispatcher) {
+        // Blobs are extracted BEFORE the manifest is parsed; a garbage manifest aborts the import
+        // and must not leave the already-extracted blob orphaned in internal storage.
+        val uri = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns uri
+        val bos = ByteArrayOutputStream()
+        ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(ZipEntry("backup.json"))
+            zip.write("{ not json".toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
+            zip.write(byteArrayOf(1, 2, 3))
+            zip.closeEntry()
+        }
+
+        val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
+
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        val extractedUri = uri.toString()
+        verify { fileManager.deleteFile(extractedUri) }
+    }
+
+    @Test
+    fun import_deletes_a_blob_that_no_restored_layer_references() = runTest(mainDispatcherRule.dispatcher) {
+        // Two blobs extracted, but the manifest only references layer_0 → layer_1 is garbage.
+        val used = mockk<Uri>()
+        val stray = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns used andThen stray
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+
+        manager.import(
+            ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img", "wallpapers/layer_1.img"))),
+            NyxBackupOptions(),
+        )
+
+        // Resolve the strings OUTSIDE verify{}: a mock's toString() inside the block is recorded as a call.
+        val strayUri = stray.toString()
+        val usedUri = used.toString()
+        verify { fileManager.deleteFile(strayUri) }
+        verify(exactly = 0) { fileManager.deleteFile(usedUri) } // the restored layer's file stays
+    }
+
+    @Test
+    fun import_keeps_restored_blobs_when_a_later_step_fails() = runTest(mainDispatcherRule.dispatcher) {
+        // The wallpaper state is saved (and so references the blob) before the layout step; a
+        // failure AFTER that save must not delete a file the persisted wallpaper now points at.
+        val uri = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns uri
+        coEvery { homeLayoutRepository.save(any()) } throws java.io.IOException("disk full")
+        val backup = NyxBackup(layout = layout.toDto(), wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+
+        val result = manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        coVerify { wallpaperRepository.saveWallpaperState(any()) }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    @Test
+    fun import_deletes_extracted_blobs_when_the_wallpaper_save_fails() = runTest(mainDispatcherRule.dispatcher) {
+        val uri = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns uri
+        coEvery { wallpaperRepository.saveWallpaperState(any()) } throws java.io.IOException("disk full")
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+
+        manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+
+        val extractedUri = uri.toString()
+        verify { fileManager.deleteFile(extractedUri) } // never referenced by a persisted state
+    }
+
     @Test
     fun import_with_empty_wallpaper_layers_clears_the_current_wallpaper() = runTest(mainDispatcherRule.dispatcher) {
         manager.import(ByteArrayInputStream(zipOf(NyxBackup(wallpaperLayers = emptyList()))), NyxBackupOptions())
