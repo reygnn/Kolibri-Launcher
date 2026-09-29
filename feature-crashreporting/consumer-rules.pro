@@ -16,5 +16,8 @@
 -keepnames class org.acra.ACRA
 
 # Referenced by ACRA's annotation-processing artifacts, absent at runtime by design.
+# The Processor line also silences R8's "missing service class" warning for the
+# META-INF/services/javax.annotation.processing.Processor entry auto-service ships.
 -dontwarn javax.annotation.processing.AbstractProcessor
 -dontwarn javax.annotation.processing.SupportedOptions
+-dontwarn javax.annotation.processing.Processor
