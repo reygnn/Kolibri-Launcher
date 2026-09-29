@@ -8,14 +8,14 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -78,7 +78,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
         val result = manager.loadFromFile(testUriString, false)
 
-        assertIs<UsageImportResult.Error>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Error::class.java)
     }
 
     @Test
@@ -97,7 +97,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
         val result = manager.loadFromFile(testUriString, false)
 
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
     }
 
     @Test
@@ -114,7 +114,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
-        assertTrue(result.message.contains("too large", ignoreCase = true))
+        assertThat(result.message.contains("too large", ignoreCase = true)).isTrue()
     }
 
     @Test
@@ -130,7 +130,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
         val result = manager.loadFromFile(testUriString, false)
 
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -141,7 +141,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
-        assertTrue(result.message.contains("Cannot read", ignoreCase = true))
+        assertThat(result.message.contains("Cannot read", ignoreCase = true)).isTrue()
     }
 
     @Test
@@ -154,7 +154,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
-        assertTrue(result.message.contains("Permission denied", ignoreCase = true))
+        assertThat(result.message.contains("Permission denied", ignoreCase = true)).isTrue()
     }
 
     @Test
@@ -171,7 +171,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile(testUriString, false)
 
         assertIs<UsageImportResult.Error>(result)
-        assertTrue(result.message.contains("Disk sector corrupted"))
+        assertThat(result.message.contains("Disk sector corrupted")).isTrue()
     }
 
     @Test
@@ -179,12 +179,9 @@ class UsageExportRepositoryImplDoomsdaySpec {
         val result = manager.loadFromFile("://this-is-not-a-uri", false)
 
         assertIs<UsageImportResult.Error>(result)
-        assertTrue(
-            "Expected failure message, got: ${result.message}",
-            result.message.contains("Invalid file format") ||
+        assertWithMessage("Expected failure message, got: ${result.message}").that(result.message.contains("Invalid file format") ||
                     result.message.contains("Load failed") ||
-                    result.message.contains("Cannot read file")
-        )
+                    result.message.contains("Cannot read file")).isTrue()
     }
 
     // ============================================================================================
@@ -199,7 +196,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
         val success = manager.saveToFile(testUriString)
 
-        Assert.assertFalse("Save should fail on IOException", success)
+        assertWithMessage("Save should fail on IOException").that(success).isFalse()
     }
 
     @Test
@@ -208,7 +205,7 @@ class UsageExportRepositoryImplDoomsdaySpec {
 
         val success = manager.saveToFile(testUriString)
 
-        Assert.assertFalse("Save should fail if stream is null", success)
+        assertWithMessage("Save should fail if stream is null").that(success).isFalse()
     }
 
     /**

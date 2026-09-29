@@ -5,16 +5,16 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.favorites.FavoritesSortViewModel
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -71,13 +71,13 @@ class FavoritesSortViewModelTest {
 
     @Test
     fun `apps is empty before setInitialApps`() = runTest(mainDispatcherRule.testDispatcher) {
-        assertEquals(emptyList<AppInfo>(), viewModel.apps.value)
+        assertThat(viewModel.apps.value).isEqualTo(emptyList<AppInfo>())
     }
 
     @Test
     fun `setInitialApps populates the apps state`() = runTest(mainDispatcherRule.testDispatcher) {
         viewModel.setInitialApps(initialOrder)
-        assertEquals(initialOrder, viewModel.apps.value)
+        assertThat(viewModel.apps.value).isEqualTo(initialOrder)
     }
 
     @Test
@@ -90,7 +90,7 @@ class FavoritesSortViewModelTest {
             // A second setInitialApps (e.g. after rotation triggers another
             // onCreate while the VM survives) must not reset to the args.
             viewModel.setInitialApps(listOf(mail, browser, camera))
-            assertEquals(listOf(browser, camera, mail), viewModel.apps.value)
+            assertThat(viewModel.apps.value).isEqualTo(listOf(browser, camera, mail))
         }
 
     // ------------------------------------------------------------------
@@ -107,13 +107,10 @@ class FavoritesSortViewModelTest {
                 viewModel.onMoved(newOrder)
                 advanceUntilIdle()
 
-                assertEquals(newOrder, viewModel.apps.value)
-                assertEquals(
-                    listOf(browser.componentName, camera.componentName, mail.componentName),
-                    fakeRepository.savedOrder,
-                )
-                assertEquals(1, fakeRepository.saveOrderCallCount)
-                assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
+                assertThat(viewModel.apps.value).isEqualTo(newOrder)
+                assertThat(fakeRepository.savedOrder).isEqualTo(listOf(browser.componentName, camera.componentName, mail.componentName))
+                assertThat(fakeRepository.saveOrderCallCount).isEqualTo(1)
+                assertThat(awaitItem()).isEqualTo(UiEvent.FavoritesOrderChanged)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -130,7 +127,7 @@ class FavoritesSortViewModelTest {
             viewModel.event.test {
                 viewModel.onMoved(listOf(browser, camera, mail))
                 advanceUntilIdle()
-                assertEquals(UiEvent.ShowToast(R.string.error_saving_order), awaitItem())
+                assertThat(awaitItem()).isEqualTo(UiEvent.ShowToast(R.string.error_saving_order))
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -147,7 +144,7 @@ class FavoritesSortViewModelTest {
             viewModel.event.test {
                 viewModel.onMoved(listOf(browser, camera, mail))
                 advanceUntilIdle()
-                assertEquals(UiEvent.ShowToast(R.string.error_saving_order), awaitItem())
+                assertThat(awaitItem()).isEqualTo(UiEvent.ShowToast(R.string.error_saving_order))
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -165,17 +162,11 @@ class FavoritesSortViewModelTest {
                 viewModel.onSortAlphabetically()
                 advanceUntilIdle()
 
-                assertEquals(alphabeticalOrder, viewModel.apps.value)
-                assertEquals(
-                    alphabeticalOrder.map { it.componentName },
-                    fakeRepository.savedOrder,
-                )
-                assertEquals(1, fakeRepository.saveOrderCallCount)
-                assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
-                assertEquals(
-                    UiEvent.ShowToast(R.string.favorites_sorted_alphabetically),
-                    awaitItem(),
-                )
+                assertThat(viewModel.apps.value).isEqualTo(alphabeticalOrder)
+                assertThat(fakeRepository.savedOrder).isEqualTo(alphabeticalOrder.map { it.componentName })
+                assertThat(fakeRepository.saveOrderCallCount).isEqualTo(1)
+                assertThat(awaitItem()).isEqualTo(UiEvent.FavoritesOrderChanged)
+                assertThat(awaitItem()).isEqualTo(UiEvent.ShowToast(R.string.favorites_sorted_alphabetically))
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -195,8 +186,8 @@ class FavoritesSortViewModelTest {
                 // Apps state still reflects the (failed-to-persist) sort —
                 // matches pre-extraction behavior; the user sees the order
                 // change visually but a toast tells them the save failed.
-                assertEquals(alphabeticalOrder, viewModel.apps.value)
-                assertEquals(UiEvent.ShowToast(R.string.error_saving_order), awaitItem())
+                assertThat(viewModel.apps.value).isEqualTo(alphabeticalOrder)
+                assertThat(awaitItem()).isEqualTo(UiEvent.ShowToast(R.string.error_saving_order))
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -212,7 +203,7 @@ class FavoritesSortViewModelTest {
             viewModel.onSortAlphabetically()
             advanceUntilIdle()
 
-            assertEquals(listOf(a, b, c), viewModel.apps.value)
+            assertThat(viewModel.apps.value).isEqualTo(listOf(a, b, c))
         }
 
     // ------------------------------------------------------------------
@@ -230,18 +221,15 @@ class FavoritesSortViewModelTest {
                 // FavoritesOrderChanged is consumed here rather than dropped.
                 viewModel.onMoved(listOf(mail, browser, camera))
                 advanceUntilIdle()
-                assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
+                assertThat(awaitItem()).isEqualTo(UiEvent.FavoritesOrderChanged)
 
                 viewModel.onResetToOriginal()
                 advanceUntilIdle()
 
-                assertEquals(initialOrder, viewModel.apps.value)
-                assertEquals(
-                    initialOrder.map { it.componentName },
-                    fakeRepository.savedOrder,
-                )
-                assertEquals(UiEvent.FavoritesOrderChanged, awaitItem())
-                assertEquals(UiEvent.ShowToast(R.string.favorites_order_reset), awaitItem())
+                assertThat(viewModel.apps.value).isEqualTo(initialOrder)
+                assertThat(fakeRepository.savedOrder).isEqualTo(initialOrder.map { it.componentName })
+                assertThat(awaitItem()).isEqualTo(UiEvent.FavoritesOrderChanged)
+                assertThat(awaitItem()).isEqualTo(UiEvent.ShowToast(R.string.favorites_order_reset))
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -259,7 +247,7 @@ class FavoritesSortViewModelTest {
             viewModel.onSortAlphabetically()
             advanceUntilIdle()
 
-            assertEquals(0, fakeRepository.saveOrderCallCount)
+            assertThat(fakeRepository.saveOrderCallCount).isEqualTo(0)
         }
 
     @Test
@@ -270,6 +258,6 @@ class FavoritesSortViewModelTest {
             viewModel.onResetToOriginal()
             advanceUntilIdle()
 
-            assertEquals(0, fakeRepository.saveOrderCallCount)
+            assertThat(fakeRepository.saveOrderCallCount).isEqualTo(0)
         }
 }

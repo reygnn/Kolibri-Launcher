@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.ContentSpacingCalculator
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -20,7 +20,7 @@ class ContentSpacingCalculatorTest {
             chipsHeightPx = 50,
             areChipsVisible = false
         )
-        assertEquals(100, result)
+        assertThat(result).isEqualTo(100)
     }
 
     @Test
@@ -30,7 +30,7 @@ class ContentSpacingCalculatorTest {
             chipsHeightPx = 0,
             areChipsVisible = true
         )
-        assertEquals(100, result)
+        assertThat(result).isEqualTo(100)
     }
 
     @Test
@@ -40,7 +40,7 @@ class ContentSpacingCalculatorTest {
             chipsHeightPx = 30,
             areChipsVisible = true
         )
-        assertEquals(70, result)
+        assertThat(result).isEqualTo(70)
     }
 
     @Test
@@ -51,7 +51,7 @@ class ContentSpacingCalculatorTest {
             areChipsVisible = true,
             minGapPx = 10
         )
-        assertEquals(10, result)
+        assertThat(result).isEqualTo(10)
     }
 
     @Test
@@ -61,6 +61,6 @@ class ContentSpacingCalculatorTest {
             chipsHeightPx = 80,
             areChipsVisible = true
         )
-        assertEquals(0, result)
+        assertThat(result).isEqualTo(0)
     }
 }

@@ -1,9 +1,6 @@
 package com.github.reygnn.launcher.core
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -19,38 +16,38 @@ class ComponentKeyTest {
 
     @Test
     fun `a well-formed flattened component is valid`() {
-        assertTrue(ComponentKey.isValid("com.example.alpha/com.example.alpha.MainActivity"))
+        assertThat(ComponentKey.isValid("com.example.alpha/com.example.alpha.MainActivity")).isTrue()
         // Minimal shape: one non-empty char on each side of a single separator.
-        assertTrue(ComponentKey.isValid("a/b"))
+        assertThat(ComponentKey.isValid("a/b")).isTrue()
     }
 
     @Test
     fun `a bare package name with no class is rejected`() {
         // The garbage the guard exists to reject (KDoc / TODO 15): a package alone
         // is not a launchable component.
-        assertFalse(ComponentKey.isValid("com.example.alpha"))
+        assertThat(ComponentKey.isValid("com.example.alpha")).isFalse()
     }
 
     @Test
     fun `an empty string is rejected`() {
-        assertFalse(ComponentKey.isValid(""))
+        assertThat(ComponentKey.isValid("")).isFalse()
     }
 
     @Test
     fun `an empty package (leading slash) is rejected`() {
         // Deliberately stricter than ComponentName.unflattenFromString, which
         // tolerates an empty package — an empty-package component is never a real app.
-        assertFalse(ComponentKey.isValid("/com.example.Main"))
+        assertThat(ComponentKey.isValid("/com.example.Main")).isFalse()
     }
 
     @Test
     fun `an empty class (trailing slash) is rejected`() {
-        assertFalse(ComponentKey.isValid("com.example.alpha/"))
+        assertThat(ComponentKey.isValid("com.example.alpha/")).isFalse()
     }
 
     @Test
     fun `a lone separator is rejected`() {
-        assertFalse(ComponentKey.isValid("/"))
+        assertThat(ComponentKey.isValid("/")).isFalse()
     }
 
     /**
@@ -63,7 +60,7 @@ class ComponentKeyTest {
      */
     @Test
     fun `multi-slash is accepted, matching unflatten's first-separator rule`() {
-        assertTrue(ComponentKey.isValid("pkg/b/c"))
+        assertThat(ComponentKey.isValid("pkg/b/c")).isTrue()
     }
 
     // --- flat: the persistence/backup projection (must equal the historical string) ---
@@ -71,7 +68,7 @@ class ComponentKeyTest {
     @Test
     fun `flat is the package and class joined by a single separator`() {
         val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
-        assertEquals("com.example.alpha/com.example.alpha.MainActivity", key.flat)
+        assertThat(key.flat).isEqualTo("com.example.alpha/com.example.alpha.MainActivity")
     }
 
     // --- parse: the inverse of flat (former scattered substringBefore decomposition) ---
@@ -79,32 +76,32 @@ class ComponentKeyTest {
     @Test
     fun `parse splits a well-formed flat string into package and class`() {
         val key = ComponentKey.parse("com.example.alpha/com.example.alpha.MainActivity")
-        assertEquals(ComponentKey("com.example.alpha", "com.example.alpha.MainActivity"), key)
+        assertThat(key).isEqualTo(ComponentKey("com.example.alpha", "com.example.alpha.MainActivity"))
     }
 
     @Test
     fun `parse round-trips flat`() {
         val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
-        assertEquals(key, ComponentKey.parse(key.flat))
+        assertThat(ComponentKey.parse(key.flat)).isEqualTo(key)
     }
 
     @Test
     fun `parse rejects a bare package name`() {
         // The former TODO 15 hole: substringBefore('/') on "com.example" returned
         // the whole string; parse returns null so a malformed key can't masquerade.
-        assertNull(ComponentKey.parse("com.example"))
+        assertThat(ComponentKey.parse("com.example")).isNull()
     }
 
     @Test
     fun `parse rejects empty, leading-slash and trailing-slash forms`() {
-        assertNull(ComponentKey.parse(""))
-        assertNull(ComponentKey.parse("/com.example.Main"))
-        assertNull(ComponentKey.parse("com.example.alpha/"))
+        assertThat(ComponentKey.parse("")).isNull()
+        assertThat(ComponentKey.parse("/com.example.Main")).isNull()
+        assertThat(ComponentKey.parse("com.example.alpha/")).isNull()
     }
 
     @Test
     fun `parse keeps everything after the first separator as the class`() {
         // Mirrors isValid's first-separator rule (a real class cannot contain '/').
-        assertEquals(ComponentKey("pkg", "b/c"), ComponentKey.parse("pkg/b/c"))
+        assertThat(ComponentKey.parse("pkg/b/c")).isEqualTo(ComponentKey("pkg", "b/c"))
     }
 }

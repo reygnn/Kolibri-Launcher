@@ -3,8 +3,8 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.ui.appcontextmenu.ContextMenuResult
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 
@@ -40,11 +40,7 @@ class ContextMenuResultTest {
         )
 
         cases.forEach { (input, expected) ->
-            assertEquals(
-                "parse(\"$input\") should map to $expected",
-                expected,
-                ContextMenuResult.parse(input),
-            )
+            assertWithMessage("parse(\"$input\") should map to $expected").that(ContextMenuResult.parse(input)).isEqualTo(expected)
         }
     }
 
@@ -54,20 +50,17 @@ class ContextMenuResultTest {
 
     @Test
     fun `parse returns Unknown(null) for null action`() {
-        assertEquals(ContextMenuResult.Unknown(null), ContextMenuResult.parse(null))
+        assertThat(ContextMenuResult.parse(null)).isEqualTo(ContextMenuResult.Unknown(null))
     }
 
     @Test
     fun `parse returns Unknown for empty action`() {
-        assertEquals(ContextMenuResult.Unknown(""), ContextMenuResult.parse(""))
+        assertThat(ContextMenuResult.parse("")).isEqualTo(ContextMenuResult.Unknown(""))
     }
 
     @Test
     fun `parse returns Unknown for unrecognized action`() {
-        assertEquals(
-            ContextMenuResult.Unknown("not_a_real_action"),
-            ContextMenuResult.parse("not_a_real_action"),
-        )
+        assertThat(ContextMenuResult.parse("not_a_real_action")).isEqualTo(ContextMenuResult.Unknown("not_a_real_action"))
     }
 
     @Test
@@ -84,15 +77,8 @@ class ContextMenuResultTest {
 
         handledInsideDialog.forEach { action ->
             val result = ContextMenuResult.parse(action)
-            assertTrue(
-                "expected Unknown for action $action, got $result",
-                result is ContextMenuResult.Unknown,
-            )
-            assertEquals(
-                "Unknown should preserve the original action string",
-                action,
-                (result as ContextMenuResult.Unknown).action,
-            )
+            assertWithMessage("expected Unknown for action $action, got $result").that(result).isInstanceOf(ContextMenuResult.Unknown::class.java)
+            assertWithMessage("Unknown should preserve the original action string").that((result as ContextMenuResult.Unknown).action).isEqualTo(action)
         }
     }
 
@@ -101,7 +87,7 @@ class ContextMenuResultTest {
         // Demonstrates the smart-cast pattern the consuming Fragment uses:
         //   is ContextMenuResult.Unknown -> Timber.w("... ${result.action}")
         val result = ContextMenuResult.parse("some_future_action")
-        assertTrue(result is ContextMenuResult.Unknown)
-        assertEquals("some_future_action", (result as ContextMenuResult.Unknown).action)
+        assertThat(result).isInstanceOf(ContextMenuResult.Unknown::class.java)
+        assertThat((result as ContextMenuResult.Unknown).action).isEqualTo("some_future_action")
     }
 }

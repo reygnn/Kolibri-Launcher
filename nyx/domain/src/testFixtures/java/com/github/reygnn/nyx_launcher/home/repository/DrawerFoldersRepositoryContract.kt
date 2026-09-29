@@ -5,7 +5,7 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -29,7 +29,7 @@ abstract class DrawerFoldersRepositoryContract {
     abstract fun createRepository(initial: DrawerFolders): DrawerFoldersRepository
 
     @Test
-    fun folders_emits_the_initial_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun folders_emits_the_initial_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_FOLDER)
         repo.folders().test {
             assertThat(awaitItem()).isEqualTo(WITH_FOLDER)
@@ -38,7 +38,7 @@ abstract class DrawerFoldersRepositoryContract {
     }
 
     @Test
-    fun update_persists_the_transformed_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_persists_the_transformed_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(DrawerFolders.EMPTY)
         repo.folders().test {
             assertThat(awaitItem()).isEqualTo(DrawerFolders.EMPTY)
@@ -49,7 +49,7 @@ abstract class DrawerFoldersRepositoryContract {
     }
 
     @Test
-    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_FOLDER)
         repo.folders().test {
             assertThat(awaitItem()).isEqualTo(WITH_FOLDER)
@@ -60,7 +60,7 @@ abstract class DrawerFoldersRepositoryContract {
     }
 
     @Test
-    fun update_receives_the_current_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_receives_the_current_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_FOLDER)
         var seen: DrawerFolders? = null
         repo.update { current ->
@@ -80,7 +80,7 @@ abstract class DrawerFoldersRepositoryContract {
      * transform.
      */
     @Test
-    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.dispatcher) {
+    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(DrawerFolders.EMPTY)
         val append: suspend (DrawerFolders) -> DrawerFolders = { current ->
             yield()

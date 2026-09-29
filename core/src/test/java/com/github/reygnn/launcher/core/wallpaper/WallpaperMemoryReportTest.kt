@@ -1,8 +1,6 @@
 package com.github.reygnn.launcher.core.wallpaper
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import java.util.Locale
 
@@ -27,8 +25,8 @@ class WallpaperMemoryReportTest {
 
     @Test
     fun `config name is carried through verbatim`() {
-        assertEquals("ARGB_8888", row(config = "ARGB_8888").config)
-        assertEquals("HARDWARE", row(config = "HARDWARE").config)
+        assertThat(row(config = "ARGB_8888").config).isEqualTo("ARGB_8888")
+        assertThat(row(config = "HARDWARE").config).isEqualTo("HARDWARE")
     }
 
     @Test
@@ -36,14 +34,14 @@ class WallpaperMemoryReportTest {
         val report = WallpaperMemoryReport.of(
             listOf(row(bytes = 4_000_000L), row(bytes = 1_000_000L), row(bytes = 500_000L)),
         )
-        assertEquals(5_500_000L, report.totalBytes)
+        assertThat(report.totalBytes).isEqualTo(5_500_000L)
     }
 
     @Test
     fun `of on an empty list is zero total`() {
         val report = WallpaperMemoryReport.of(emptyList())
-        assertEquals(0L, report.totalBytes)
-        assertTrue(report.rows.isEmpty())
+        assertThat(report.totalBytes).isEqualTo(0L)
+        assertThat(report.rows.isEmpty()).isTrue()
     }
 
     @Test
@@ -52,12 +50,12 @@ class WallpaperMemoryReportTest {
             decodedWidth = 1500, decodedHeight = 2000, sampleSize = 2,
             originalWidth = 3000, originalHeight = 4000,
         )
-        assertTrue(r.isDownsampled)
+        assertThat(r.isDownsampled).isTrue()
     }
 
     @Test
     fun `isDownsampled false at full resolution`() {
-        assertFalse(row(sampleSize = 1).isDownsampled)
+        assertThat(row(sampleSize = 1).isDownsampled).isFalse()
     }
 
     @Test
@@ -68,15 +66,15 @@ class WallpaperMemoryReportTest {
             decodedWidth = 1500, decodedHeight = 2000, sampleSize = 2,
             originalWidth = 0, originalHeight = 0,
         )
-        assertFalse(r.isDownsampled)
+        assertThat(r.isDownsampled).isFalse()
     }
 
     @Test
     fun `formatMegabytes renders one decimal, locale-pinned`() {
         // 1_048_576 bytes = exactly 1 MB.
-        assertEquals("11.4 MB", formatMegabytes(11_950_000L, Locale.US))
-        assertEquals("1.0 MB", formatMegabytes(1_048_576L, Locale.US))
+        assertThat(formatMegabytes(11_950_000L, Locale.US)).isEqualTo("11.4 MB")
+        assertThat(formatMegabytes(1_048_576L, Locale.US)).isEqualTo("1.0 MB")
         // German locale uses a comma as the decimal separator.
-        assertEquals("11,4 MB", formatMegabytes(11_950_000L, Locale.GERMANY))
+        assertThat(formatMegabytes(11_950_000L, Locale.GERMANY)).isEqualTo("11,4 MB")
     }
 }

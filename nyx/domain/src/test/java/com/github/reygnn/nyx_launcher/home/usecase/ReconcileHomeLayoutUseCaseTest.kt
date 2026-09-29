@@ -11,7 +11,7 @@ import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.model.SkipReason
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import kotlinx.coroutines.test.runTest
@@ -55,10 +55,10 @@ class ReconcileHomeLayoutUseCaseTest {
     )
 
     private fun useCase(layoutRepo: FakeHomeLayoutRepository) =
-        ReconcileHomeLayoutUseCase(layoutRepo, ids, mainDispatcherRule.dispatcher)
+        ReconcileHomeLayoutUseCase(layoutRepo, ids, mainDispatcherRule.testDispatcher)
 
     @Test
-    fun structurally_clean_layout_is_unchanged_and_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun structurally_clean_layout_is_unchanged_and_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         val layoutRepo = FakeHomeLayoutRepository(layoutWith("pa", "pb"))
 
         val result = useCase(layoutRepo)()
@@ -68,7 +68,7 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     @Test
-    fun references_to_uninstalled_apps_are_never_pruned() = runTest(mainDispatcherRule.dispatcher) {
+    fun references_to_uninstalled_apps_are_never_pruned() = runTest(mainDispatcherRule.testDispatcher) {
         // No-prune contract: the use case consults no app enumeration, so a structurally-valid
         // layout is left completely intact regardless of whether its apps are still installed —
         // dead tiles are surfaced/removed lazily in the UI, never auto-dropped here.
@@ -83,7 +83,7 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     @Test
-    fun structural_repair_is_applied_and_saved_once() = runTest(mainDispatcherRule.dispatcher) {
+    fun structural_repair_is_applied_and_saved_once() = runTest(mainDispatcherRule.testDispatcher) {
         // A structurally-invalid layout (a 1-member folder, reachable via a malformed import)
         // is repaired: the folder dissolves into a plain tile. This is the one thing the pass
         // still does — pure structure, no enumeration.
@@ -99,7 +99,7 @@ class ReconcileHomeLayoutUseCaseTest {
     }
 
     @Test
-    fun store_write_failure_skips_reconcile_without_mutation() = runTest(mainDispatcherRule.dispatcher) {
+    fun store_write_failure_skips_reconcile_without_mutation() = runTest(mainDispatcherRule.testDispatcher) {
         // A transient DataStore error inside the atomic RMW aborts the pass as a value-honest
         // STORE_FAILED skip — never a throw, never a degrade to an empty layout.
         val layoutRepo = FakeHomeLayoutRepository(layoutWithFolder("pa")).apply {

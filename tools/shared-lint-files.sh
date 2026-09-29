@@ -5,7 +5,7 @@
 # Files in the SHARED modules (:core / :common-ui / :common-data / :common-android
 # / :feature-crashreporting) that are on a positive-list gate. They belong to
 # neither app, so they live here and are sourced by BOTH orchestrators
-# (kolibri/tools/check-conventions.sh AND nyx/tools/check-conventions.sh) — that
+# (tools/check-conventions.sh --app kolibri AND --app nyx) — that
 # way a shared file's broad-catch review is enforced by BOTH apps' checkConventions,
 # closing the ownership asymmetry (a shared file used to sit in one app's list and
 # was enforced by that app's CI alone).
@@ -21,7 +21,7 @@
 # Repo root = the parent of the directory holding this file (tools/ -> repo).
 _shared_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Cancellation-rethrow whitelist — shared-module files (see cancel_files in each
+# Cancellation-rethrow whitelist — shared-module files (see CANCEL_FILES in each
 # orchestrator for the app-specific ones).
 SHARED_CANCEL_FILES=(
   "$_shared_root/common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/WallpaperViewBinder.kt"

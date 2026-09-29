@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportBackupUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -12,7 +13,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class ExportBackupUseCaseTest {
@@ -41,7 +41,7 @@ class ExportBackupUseCaseTest {
         val result = useCase(uriString)
 
         // Assert
-        assertTrue(result)
+        assertThat(result).isTrue()
         coVerify { repository.saveBackupToFile(uriString) }
     }
 }

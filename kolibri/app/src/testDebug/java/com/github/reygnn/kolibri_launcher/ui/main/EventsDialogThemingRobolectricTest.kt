@@ -13,12 +13,11 @@ import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeEventFormatter
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,26 +82,18 @@ class EventsDialogThemingRobolectricTest {
             dialog.show()
 
             val listView = dialog.listView
-            assertNotNull("AlertDialog built with setAdapter must expose a ListView", listView)
+            assertWithMessage("AlertDialog built with setAdapter must expose a ListView").that(listView).isNotNull()
 
             // The colour the code USED to compute explicitly, and the colour the dialog's
             // ListView context now resolves — must match (parent.context ≡ the overlay).
             val expected = onSurfaceOf(ContextThemeWrapper(activity, styleRes))
-            assertEquals(
-                "dialog ListView context must resolve colorOnSurface against the wallpaper-aware overlay",
-                expected,
-                onSurfaceOf(listView.context),
-            )
+            assertWithMessage("dialog ListView context must resolve colorOnSurface against the wallpaper-aware overlay").that(onSurfaceOf(listView.context)).isEqualTo(expected)
 
             // Stronger: a real inflated row's label colour tracks that overlay too
             // (item_recent_app's textColor is ?attr/colorOnSurface).
             val row = adapter.getView(0, null, listView)
             val label = row.findViewById<TextView>(R.id.recent_app_name)
-            assertEquals(
-                "event row label colour must resolve against the overlay, not the Activity theme",
-                expected,
-                label.currentTextColor,
-            )
+            assertWithMessage("event row label colour must resolve against the overlay, not the Activity theme").that(label.currentTextColor).isEqualTo(expected)
 
             dialog.dismiss()
         }
@@ -126,10 +117,7 @@ class EventsDialogThemingRobolectricTest {
         launchHost().use { scenario ->
             lateinit var activity: HiltTestActivity
             scenario.onActivity { activity = it }
-            assertNotEquals(
-                onSurfaceOf(ContextThemeWrapper(activity, R.style.CustomAlertDialog_Light)),
-                onSurfaceOf(ContextThemeWrapper(activity, R.style.CustomAlertDialog_Dark)),
-            )
+            assertThat(onSurfaceOf(ContextThemeWrapper(activity, R.style.CustomAlertDialog_Dark))).isNotEqualTo(onSurfaceOf(ContextThemeWrapper(activity, R.style.CustomAlertDialog_Light)))
         }
     }
 }

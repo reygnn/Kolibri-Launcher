@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.hilt.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.truth) // A12: Truth is the one assertion library
+    testImplementation(libs.kotlin.test.junit) // assertFailsWith / assertIs (A12 exceptions)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     // robolectric: AppLauncherImplTest needs a real ComponentName (its captured

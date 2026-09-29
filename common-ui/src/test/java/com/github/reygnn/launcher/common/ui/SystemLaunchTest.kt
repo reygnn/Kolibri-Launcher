@@ -1,8 +1,7 @@
 package com.github.reygnn.launcher.common.ui
 
 import android.content.ActivityNotFoundException
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -15,31 +14,31 @@ class SystemLaunchTest {
     @Test
     fun `ActivityNotFoundException is an expected optional-app failure`() {
         // The primary case: no clock / calendar / battery app on this ROM.
-        assertTrue(isExpectedSystemLaunchFailure(ActivityNotFoundException("no handler")))
+        assertThat(isExpectedSystemLaunchFailure(ActivityNotFoundException("no handler"))).isTrue()
     }
 
     @Test
     fun `SecurityException is an expected optional-app failure`() {
-        assertTrue(isExpectedSystemLaunchFailure(SecurityException("guarded")))
+        assertThat(isExpectedSystemLaunchFailure(SecurityException("guarded"))).isTrue()
     }
 
     @Test
     fun `IllegalStateException is not expected — it must propagate`() {
-        assertFalse(isExpectedSystemLaunchFailure(IllegalStateException("bug")))
+        assertThat(isExpectedSystemLaunchFailure(IllegalStateException("bug"))).isFalse()
     }
 
     @Test
     fun `IllegalArgumentException is not expected`() {
-        assertFalse(isExpectedSystemLaunchFailure(IllegalArgumentException("bug")))
+        assertThat(isExpectedSystemLaunchFailure(IllegalArgumentException("bug"))).isFalse()
     }
 
     @Test
     fun `OutOfMemoryError is not expected — a Throwable catch must not swallow it`() {
-        assertFalse(isExpectedSystemLaunchFailure(OutOfMemoryError()))
+        assertThat(isExpectedSystemLaunchFailure(OutOfMemoryError())).isFalse()
     }
 
     @Test
     fun `a bare RuntimeException is not expected`() {
-        assertFalse(isExpectedSystemLaunchFailure(RuntimeException("bug")))
+        assertThat(isExpectedSystemLaunchFailure(RuntimeException("bug"))).isFalse()
     }
 }

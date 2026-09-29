@@ -10,23 +10,22 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * GOLDEN-MASTER characterization for the `AppInfo.isFavorite` removal
@@ -130,19 +129,14 @@ class FavoriteAppsMigrationCharacterizationTest {
     @Test
     fun `favorites are the chosen components sorted alphabetically`() = runTest {
         val results = mutableListOf<UiState<FavoriteAppsResult>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.favoriteApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.favoriteApps, into = results)
         try {
             favoritesFlow.value = setOf(appZ.componentName, appA.componentName)
             advanceUntilIdle()
 
             val result = (results.last() as UiState.Success).data
-            assertEquals(
-                listOf(appA.componentName, appZ.componentName),
-                result.apps.map { it.componentName },
-            )
-            assertTrue(!result.isFallback, "real favorites must not be a fallback")
+            assertThat(result.apps.map { it.componentName }).isEqualTo(listOf(appA.componentName, appZ.componentName))
+            assertWithMessage("real favorites must not be a fallback").that(!result.isFallback).isTrue()
         } finally {
             job.cancel()
         }
@@ -152,19 +146,14 @@ class FavoriteAppsMigrationCharacterizationTest {
     @Test
     fun `saved order is honored`() = runTest {
         val results = mutableListOf<UiState<FavoriteAppsResult>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.favoriteApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.favoriteApps, into = results)
         try {
             favoritesFlow.value = setOf(appA.componentName, appZ.componentName)
             orderFlow.value = listOf(appZ.componentName, appA.componentName) // Z before A
             advanceUntilIdle()
 
             val result = (results.last() as UiState.Success).data
-            assertEquals(
-                listOf(appZ.componentName, appA.componentName),
-                result.apps.map { it.componentName },
-            )
+            assertThat(result.apps.map { it.componentName }).isEqualTo(listOf(appZ.componentName, appA.componentName))
         } finally {
             job.cancel()
         }
@@ -177,19 +166,14 @@ class FavoriteAppsMigrationCharacterizationTest {
     @Test
     fun `no favorites yields alphabetical fallback`() = runTest {
         val results = mutableListOf<UiState<FavoriteAppsResult>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.favoriteApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.favoriteApps, into = results)
         try {
             favoritesFlow.value = emptySet()
             advanceUntilIdle()
 
             val result = (results.last() as UiState.Success).data
-            assertTrue(result.isFallback, "empty favorites must fall back")
-            assertEquals(
-                listOf(appA.componentName, appM.componentName, appZ.componentName),
-                result.apps.map { it.componentName },
-            )
+            assertWithMessage("empty favorites must fall back").that(result.isFallback).isTrue()
+            assertThat(result.apps.map { it.componentName }).isEqualTo(listOf(appA.componentName, appM.componentName, appZ.componentName))
         } finally {
             job.cancel()
         }

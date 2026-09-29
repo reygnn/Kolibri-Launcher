@@ -9,10 +9,11 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -42,8 +43,8 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch("com.test.app")
 
         // Assert
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+        assertThat(appUsageManager.hasUsageDataForPackage("com.test.app")).isTrue()
     }
 
     @Test
@@ -52,7 +53,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch(null)
 
         // Assert
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(0)
     }
 
     @Test
@@ -61,7 +62,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch("   ")
 
         // Assert
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(0)
     }
 
     // ========== SORTING TESTS ==========
@@ -92,10 +93,10 @@ class AppUsageRepositoryImplTest {
         val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert
-        Assert.assertEquals("App A", sortedApps[0].displayName) // sehr kürzlich
-        Assert.assertEquals("App B", sortedApps[1].displayName) // kürzlich
-        Assert.assertEquals("App C", sortedApps[2].displayName) // alt
-        Assert.assertEquals("App D", sortedApps[3].displayName) // ungenutzt
+        assertThat(sortedApps[0].displayName).isEqualTo("App A") // sehr kürzlich
+        assertThat(sortedApps[1].displayName).isEqualTo("App B") // kürzlich
+        assertThat(sortedApps[2].displayName).isEqualTo("App C") // alt
+        assertThat(sortedApps[3].displayName).isEqualTo("App D") // ungenutzt
     }
 
     @Test
@@ -119,9 +120,9 @@ class AppUsageRepositoryImplTest {
         val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert
-        Assert.assertEquals("App Used", sortedApps[0].displayName) // genutzte App zuerst
-        Assert.assertEquals("App A", sortedApps[1].displayName)    // dann alphabetisch
-        Assert.assertEquals("App Z", sortedApps[2].displayName)
+        assertThat(sortedApps[0].displayName).isEqualTo("App Used") // genutzte App zuerst
+        assertThat(sortedApps[1].displayName).isEqualTo("App A")    // dann alphabetisch
+        assertThat(sortedApps[2].displayName).isEqualTo("App Z")
     }
 
     @Test
@@ -150,8 +151,8 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - häufige Nutzung sollte gewinnen
-        Assert.assertEquals("Frequent", result[0].displayName)
-        Assert.assertEquals("Once", result[1].displayName)
+        assertThat(result[0].displayName).isEqualTo("Frequent")
+        assertThat(result[1].displayName).isEqualTo("Once")
     }
 
     @Test
@@ -160,7 +161,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.sortAppsByTimeWeightedUsage(emptyList(), emptyMap())
 
         // Assert
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     // ========== EDGE CASES & TIMESTAMP VALIDATION ==========
@@ -186,8 +187,8 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - alphabetisch sortiert, da Timestamps ungültig
-        Assert.assertEquals("Other", result[0].displayName)
-        Assert.assertEquals("Test", result[1].displayName)
+        assertThat(result[0].displayName).isEqualTo("Other")
+        assertThat(result[1].displayName).isEqualTo("Test")
     }
 
     @Test
@@ -213,8 +214,8 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - Valid sollte vor Future sein (Future wird ignoriert)
-        Assert.assertEquals("Valid", result[0].displayName)
-        Assert.assertEquals("Future", result[1].displayName)
+        assertThat(result[0].displayName).isEqualTo("Valid")
+        assertThat(result[1].displayName).isEqualTo("Future")
     }
 
     @Test
@@ -240,8 +241,8 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert - Recent sollte vor Ancient sein
-        Assert.assertEquals("Recent", result[0].displayName)
-        Assert.assertEquals("Ancient", result[1].displayName)
+        assertThat(result[0].displayName).isEqualTo("Recent")
+        assertThat(result[1].displayName).isEqualTo("Ancient")
     }
 
     // ========== ERROR HANDLING TESTS ==========
@@ -256,7 +257,7 @@ class AppUsageRepositoryImplTest {
             appUsageManager.recordPackageLaunch("com.test.app")
 
             // Assert - updateData wurde aufgerufen
-            Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+            assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
         }
 
     @Test
@@ -286,9 +287,9 @@ class AppUsageRepositoryImplTest {
             val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
             // Assert - alphabetisch sortiert als Fallback
-            Assert.assertEquals("A", result[0].displayName)
-            Assert.assertEquals("B", result[1].displayName)
-            Assert.assertEquals("C", result[2].displayName)
+            assertThat(result[0].displayName).isEqualTo("A")
+            assertThat(result[1].displayName).isEqualTo("B")
+            assertThat(result[2].displayName).isEqualTo("C")
         }
 
     @Test
@@ -314,8 +315,8 @@ class AppUsageRepositoryImplTest {
             val result = appUsageManager.sortAppsByTimeWeightedUsage(apps, snapshot)
 
             // Snapshot wins: com.b (its only recent entry) ranks first, not com.a.
-            Assert.assertEquals("B", result[0].displayName)
-            Assert.assertEquals("A", result[1].displayName)
+            assertThat(result[0].displayName).isEqualTo("B")
+            assertThat(result[1].displayName).isEqualTo("A")
         }
 
     // ========== HAS USAGE DATA TESTS ==========
@@ -332,7 +333,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.hasUsageDataForPackage("com.test.app")
 
         // Assert
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -341,7 +342,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.hasUsageDataForPackage("com.test.app")
 
         // Assert
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -350,7 +351,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.hasUsageDataForPackage(null)
 
         // Assert
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -359,7 +360,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.hasUsageDataForPackage("   ")
 
         // Assert
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -371,7 +372,7 @@ class AppUsageRepositoryImplTest {
         val result = appUsageManager.hasUsageDataForPackage("com.test.app")
 
         // Assert
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     // ========== REMOVE USAGE DATA TESTS ==========
@@ -380,13 +381,13 @@ class AppUsageRepositoryImplTest {
     fun `removeUsageDataForPackage - when successful - removes data`() = runTest {
         // Arrange - erst Daten hinzufügen
         appUsageManager.recordPackageLaunch("com.test.app")
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
+        assertThat(appUsageManager.hasUsageDataForPackage("com.test.app")).isTrue()
 
         // Act
         appUsageManager.removeUsageDataForPackage("com.test.app")
 
         // Assert
-        Assert.assertFalse(appUsageManager.hasUsageDataForPackage("com.test.app"))
+        assertThat(appUsageManager.hasUsageDataForPackage("com.test.app")).isFalse()
     }
 
     @Test
@@ -395,7 +396,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.removeUsageDataForPackage(null)
 
         // Assert
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(0)
     }
 
     @Test
@@ -404,7 +405,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.removeUsageDataForPackage("   ")
 
         // Assert
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(0)
     }
 
     @Test
@@ -416,7 +417,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.removeUsageDataForPackage("com.test.app")
 
         // Assert - updateData wurde aufgerufen
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
     }
 
     @Test
@@ -451,28 +452,25 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch("com.c")
 
         // 2. Prüfen dass Daten vorhanden sind
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.a"))
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.b"))
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.c"))
+        assertThat(appUsageManager.hasUsageDataForPackage("com.a")).isTrue()
+        assertThat(appUsageManager.hasUsageDataForPackage("com.b")).isTrue()
+        assertThat(appUsageManager.hasUsageDataForPackage("com.c")).isTrue()
 
         // 3. Sortierung sollte nach Recency sein (C, A, B)
         val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
-        Assert.assertEquals("App C", sorted[0].displayName) // zuletzt gestartet
-        Assert.assertEquals("App A", sorted[1].displayName)
-        Assert.assertEquals("App B", sorted[2].displayName)
+        assertThat(sorted[0].displayName).isEqualTo("App C") // zuletzt gestartet
+        assertThat(sorted[1].displayName).isEqualTo("App A")
+        assertThat(sorted[2].displayName).isEqualTo("App B")
 
         // 4. Eine App entfernen
         appUsageManager.removeUsageDataForPackage("com.a")
-        Assert.assertFalse(appUsageManager.hasUsageDataForPackage("com.a"))
+        assertThat(appUsageManager.hasUsageDataForPackage("com.a")).isFalse()
 
         // 5. Sortierung sollte sich ändern
         val sortedAfterRemoval = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
-        Assert.assertEquals("App C", sortedAfterRemoval[0].displayName)
-        Assert.assertEquals("App B", sortedAfterRemoval[1].displayName)
-        Assert.assertEquals(
-            "App A",
-            sortedAfterRemoval[2].displayName
-        ) // jetzt ungenutzt, alphabetisch
+        assertThat(sortedAfterRemoval[0].displayName).isEqualTo("App C")
+        assertThat(sortedAfterRemoval[1].displayName).isEqualTo("App B")
+        assertThat(sortedAfterRemoval[2].displayName).isEqualTo("App A") // jetzt ungenutzt, alphabetisch
     }
 
     @Test
@@ -484,7 +482,7 @@ class AppUsageRepositoryImplTest {
         }
 
         // Assert - App sollte Nutzungsdaten haben
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage("com.test.app"))
+        assertThat(appUsageManager.hasUsageDataForPackage("com.test.app")).isTrue()
 
         // Die genaue Anzahl der Timestamps können wir hier nicht direkt prüfen,
         // aber wir können verifizieren dass die App höher gerankt wird
@@ -496,7 +494,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch("com.other") // nur 1x
 
         val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
-        Assert.assertEquals("Test", sorted[0].displayName) // Mehr Starts = höherer Score
+        assertThat(sorted[0].displayName).isEqualTo("Test") // Mehr Starts = höherer Score
     }
 
     // ========== NEW TESTS: LIMITS & CLEANUP ==========
@@ -523,14 +521,14 @@ class AppUsageRepositoryImplTest {
         val prefs = fakeDataStore.data.first()
         val storedTimestamps = prefs[usageKey] ?: emptySet()
 
-        Assert.assertEquals(limit, storedTimestamps.size)
+        assertThat(storedTimestamps.size).isEqualTo(limit)
 
         // CHECK: Ist der Timestamp von 'jetzt' (bzw. sehr neu) dabei?
         // Da recordPackageLaunch intern System.currentTimeMillis() nutzt,
         // ist der exakte String schwer zu raten, aber wir können prüfen,
         // ob ein Wert existiert, der neuer ist als die alten.
         val newestStored = storedTimestamps.maxOfOrNull { it.toLong() } ?: 0L
-        Assert.assertTrue("Newest timestamp should be kept", newestStored > (currentTime - 10000))
+        assertWithMessage("Newest timestamp should be kept").that(newestStored > (currentTime - 10000)).isTrue()
     }
 
     @Test
@@ -548,20 +546,20 @@ class AppUsageRepositoryImplTest {
         )
         fakeDataStore.setInitialData(initialData)
 
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage(app1))
-        Assert.assertTrue(appUsageManager.hasUsageDataForPackage(app2))
+        assertThat(appUsageManager.hasUsageDataForPackage(app1)).isTrue()
+        assertThat(appUsageManager.hasUsageDataForPackage(app2)).isTrue()
 
         // Act
         appUsageManager.purgeRepository()
 
         // Assert
-        Assert.assertFalse(appUsageManager.hasUsageDataForPackage(app1))
-        Assert.assertFalse(appUsageManager.hasUsageDataForPackage(app2))
+        assertThat(appUsageManager.hasUsageDataForPackage(app1)).isFalse()
+        assertThat(appUsageManager.hasUsageDataForPackage(app2)).isFalse()
 
         // Prüfen, ob der andere Key noch da ist (optional, falls AppUsageRepositoryImpl selektiv löscht)
         // Laut deiner Implementierung filtert er nach KEY_USAGE_PREFIX, also sollte "some_other_setting" bleiben.
         val prefs = fakeDataStore.data.first()
-        Assert.assertTrue(prefs.contains(stringSetPreferencesKey("some_other_setting")))
+        assertThat(prefs.contains(stringSetPreferencesKey("some_other_setting"))).isTrue()
     }
 
     @Test
@@ -573,6 +571,6 @@ class AppUsageRepositoryImplTest {
         appUsageManager.purgeRepository()
 
         // Assert
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
     }
 }

@@ -5,13 +5,13 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -43,7 +43,7 @@ class ImportBackupUseCaseTest {
 
         val result = useCase(uriString, options)
 
-        assertEquals(expectedResult, result)
+        assertThat(result).isEqualTo(expectedResult)
         coVerify { repository.loadBackupFromFile(uriString, options) }
     }
 }

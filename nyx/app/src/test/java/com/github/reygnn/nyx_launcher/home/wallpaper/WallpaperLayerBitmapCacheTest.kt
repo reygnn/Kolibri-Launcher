@@ -2,13 +2,10 @@ package com.github.reygnn.nyx_launcher.home.wallpaper
 
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -34,21 +31,21 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache()
         val entry = decoded()
         cache.put("file:///a.png", entry)
-        assertSame(entry, cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isSameInstanceAs(entry)
     }
 
     @Test
     fun `get misses on an unknown key`() {
         val cache = WallpaperLayerBitmapCache()
         cache.put("file:///a.png", decoded())
-        assertNull(cache.get("file:///b.png"))
+        assertThat(cache.get("file:///b.png")).isNull()
     }
 
     @Test
     fun `get drops a recycled bitmap`() {
         val cache = WallpaperLayerBitmapCache()
         cache.put("file:///a.png", decoded(recycled = true))
-        assertNull(cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isNull()
     }
 
     @Test
@@ -57,7 +54,7 @@ class WallpaperLayerBitmapCacheTest {
         cache.put("file:///a.png", decoded())
         val replacement = decoded()
         cache.put("file:///a.png", replacement)
-        assertSame(replacement, cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isSameInstanceAs(replacement)
     }
 
     @Test
@@ -71,9 +68,9 @@ class WallpaperLayerBitmapCacheTest {
         cache.put("file:///b.png", b)
         cache.get("file:///a.png") // touch A → B is now the LRU entry
         cache.put("file:///c.png", c) // over budget → evict B
-        assertNull(cache.get("file:///b.png"))
-        assertSame(a, cache.get("file:///a.png"))
-        assertSame(c, cache.get("file:///c.png"))
+        assertThat(cache.get("file:///b.png")).isNull()
+        assertThat(cache.get("file:///a.png")).isSameInstanceAs(a)
+        assertThat(cache.get("file:///c.png")).isSameInstanceAs(c)
     }
 
     @Test
@@ -82,7 +79,7 @@ class WallpaperLayerBitmapCacheTest {
         val a = decoded(bytes = 10)
         cache.put("file:///a.png", a)
         cache.put("file:///b.png", decoded(bytes = 10)) // over budget → evict A
-        assertNull(cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isNull()
         verify(exactly = 0) { a.bitmap.recycle() }
     }
 
@@ -91,7 +88,7 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache(maxBytes = 5)
         val a = decoded(bytes = 10)
         cache.put("file:///a.png", a)
-        assertSame(a, cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isSameInstanceAs(a)
     }
 
     @Test
@@ -99,7 +96,7 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache()
         cache.put("file:///a.png", decoded())
         cache.clear()
-        assertNull(cache.get("file:///a.png"))
+        assertThat(cache.get("file:///a.png")).isNull()
     }
 
     @Test
@@ -113,7 +110,7 @@ class WallpaperLayerBitmapCacheTest {
         // Replace A repeatedly. If put() failed to subtract the replaced entry's bytes,
         // currentBytes would climb past the budget and evict the LRU sibling B.
         repeat(5) { cache.put("file:///a.png", decoded(bytes = 10)) }
-        assertSame(b, cache.get("file:///b.png"))
+        assertThat(cache.get("file:///b.png")).isSameInstanceAs(b)
     }
 
     @Test
@@ -121,8 +118,8 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache()
         val gen = cache.generation()
         val entry = decoded()
-        assertTrue(cache.putIfCurrent("file:///a.png", entry, gen))
-        assertSame(entry, cache.get("file:///a.png"))
+        assertThat(cache.putIfCurrent("file:///a.png", entry, gen)).isTrue()
+        assertThat(cache.get("file:///a.png")).isSameInstanceAs(entry)
     }
 
     @Test
@@ -130,7 +127,7 @@ class WallpaperLayerBitmapCacheTest {
         val cache = WallpaperLayerBitmapCache()
         val gen = cache.generation()
         cache.clear() // bumps generation — the wallpaper this decode was for is gone
-        assertFalse(cache.putIfCurrent("file:///a.png", decoded(), gen))
-        assertNull(cache.get("file:///a.png"))
+        assertThat(cache.putIfCurrent("file:///a.png", decoded(), gen)).isFalse()
+        assertThat(cache.get("file:///a.png")).isNull()
     }
 }

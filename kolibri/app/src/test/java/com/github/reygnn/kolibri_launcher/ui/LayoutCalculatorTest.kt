@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.LayoutCalculator
-import org.junit.Assert.*
+import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -31,7 +31,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(24f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(24f)
     }
 
     @Test
@@ -43,7 +43,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(36f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(36f)
     }
 
     @Test
@@ -56,7 +56,7 @@ class LayoutCalculatorTest {
             maxTextSizePx = 48f
         )
         // 24 + (24 * 0.25) = 30
-        assertEquals(30f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(30f)
     }
 
     // ========== PADDING TESTS ==========
@@ -70,7 +70,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(0, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(0)
     }
 
     @Test
@@ -82,7 +82,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(24, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(24)
     }
 
     @Test
@@ -94,7 +94,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(12, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(12)
     }
 
     @Test
@@ -107,7 +107,7 @@ class LayoutCalculatorTest {
             maxTextSizePx = 48f
         )
         // 24 * 0.33 = 7.92 → 7
-        assertEquals(7, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(7)
     }
 
     // ========== BOLD FLAG ==========
@@ -115,13 +115,13 @@ class LayoutCalculatorTest {
     @Test
     fun `bold true passed through`() {
         val result = calculator.calculate(0.5f, 0.5f, true, 24f, 48f)
-        assertTrue(result.isBold)
+        assertThat(result.isBold).isTrue()
     }
 
     @Test
     fun `bold false passed through`() {
         val result = calculator.calculate(0.5f, 0.5f, false, 24f, 48f)
-        assertFalse(result.isBold)
+        assertThat(result.isBold).isFalse()
     }
 
     // ========== DEFENSIVE: SCALE OUT OF BOUNDS ==========
@@ -135,7 +135,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(24f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(24f)
     }
 
     @Test
@@ -147,7 +147,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(24f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(24f)
     }
 
     // ========== DEFENSIVE: PADDING OUT OF BOUNDS ==========
@@ -161,7 +161,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(0, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(0)
     }
 
     // ========== DEFENSIVE: INVALID DIMENSIONS ==========
@@ -175,7 +175,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 0f,
             maxTextSizePx = 48f
         )
-        assertEquals(1f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(1f)
     }
 
     @Test
@@ -187,7 +187,7 @@ class LayoutCalculatorTest {
             minTextSizePx = -10f,
             maxTextSizePx = 48f
         )
-        assertEquals(1f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(1f)
     }
 
     @Test
@@ -199,7 +199,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 48f,
             maxTextSizePx = 24f
         )
-        assertEquals(48f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(48f)
     }
 
     @Test
@@ -207,8 +207,8 @@ class LayoutCalculatorTest {
         val result0 = calculator.calculate(0f, 0.5f, false, 36f, 36f)
         val result1 = calculator.calculate(1f, 0.5f, false, 36f, 36f)
 
-        assertEquals(36f, result0.textSizePx, 0.01f)
-        assertEquals(36f, result1.textSizePx, 0.01f)
+        assertThat(result0.textSizePx).isWithin(0.01f).of(36f)
+        assertThat(result1.textSizePx).isWithin(0.01f).of(36f)
     }
 
     @Test
@@ -221,7 +221,7 @@ class LayoutCalculatorTest {
             maxTextSizePx = -20f
         )
         // min → 1, max → coerceAtLeast(min) → 1
-        assertEquals(1f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(1f)
     }
 
     // ========== EDGE CASES ==========
@@ -235,7 +235,7 @@ class LayoutCalculatorTest {
             minTextSizePx = 24f,
             maxTextSizePx = 48f
         )
-        assertEquals(24.024f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(24.024f)
     }
 
     @Test
@@ -247,8 +247,8 @@ class LayoutCalculatorTest {
             minTextSizePx = 100f,
             maxTextSizePx = 200f
         )
-        assertEquals(150f, result.textSizePx, 0.01f)
-        assertEquals(75, result.verticalPaddingPx)
+        assertThat(result.textSizePx).isWithin(0.01f).of(150f)
+        assertThat(result.verticalPaddingPx).isEqualTo(75)
     }
 
     @Test
@@ -260,8 +260,8 @@ class LayoutCalculatorTest {
             minTextSizePx = 1f,
             maxTextSizePx = 3f
         )
-        assertEquals(2f, result.textSizePx, 0.01f)
-        assertEquals(1, result.verticalPaddingPx)
+        assertThat(result.textSizePx).isWithin(0.01f).of(2f)
+        assertThat(result.verticalPaddingPx).isEqualTo(1)
     }
 
     // ========== REAL-WORLD SCENARIOS ==========
@@ -276,8 +276,8 @@ class LayoutCalculatorTest {
             minTextSizePx = 14f,  // text_size_secondary_info
             maxTextSizePx = 64f   // text_size_time * MAX_SCALE
         )
-        assertEquals(39f, result.textSizePx, 0.01f)
-        assertEquals(19, result.verticalPaddingPx)
+        assertThat(result.textSizePx).isWithin(0.01f).of(39f)
+        assertThat(result.verticalPaddingPx).isEqualTo(19)
     }
 
     @Test
@@ -289,8 +289,8 @@ class LayoutCalculatorTest {
             minTextSizePx = 12f,
             maxTextSizePx = 48f
         )
-        assertEquals(12f, result.textSizePx, 0.01f)
-        assertEquals(0, result.verticalPaddingPx)
+        assertThat(result.textSizePx).isWithin(0.01f).of(12f)
+        assertThat(result.verticalPaddingPx).isEqualTo(0)
     }
 
     @Test
@@ -302,9 +302,9 @@ class LayoutCalculatorTest {
             minTextSizePx = 14f,
             maxTextSizePx = 64f
         )
-        assertEquals(64f, result.textSizePx, 0.01f)
-        assertEquals(64, result.verticalPaddingPx)
-        assertTrue(result.isBold)
+        assertThat(result.textSizePx).isWithin(0.01f).of(64f)
+        assertThat(result.verticalPaddingPx).isEqualTo(64)
+        assertThat(result.isBold).isTrue()
     }
 
     @Test
@@ -318,7 +318,7 @@ class LayoutCalculatorTest {
             maxTextSizePx = 48f
         )
         // 24 + (48 - 24) * 1.0 = 48
-        assertEquals(48f, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(48f)
     }
 
     @Test
@@ -339,7 +339,7 @@ class LayoutCalculatorTest {
         val expectedScale = AppConstants.LAYOUT_SCALE_MAX
         val expectedSize = 24f + (48f - 24f) * expectedScale
 
-        assertEquals(expectedSize, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(expectedSize)
     }
 
     @Test
@@ -357,7 +357,7 @@ class LayoutCalculatorTest {
 
         // Erwartung: Padding stoppt bei VERTICAL_PADDING_SCALE_MAX
         val expectedPadding = (24f * AppConstants.VERTICAL_PADDING_SCALE_MAX).toInt()
-        assertEquals(expectedPadding, result.verticalPaddingPx)
+        assertThat(result.verticalPaddingPx).isEqualTo(expectedPadding)
     }
 
     @Test
@@ -375,6 +375,6 @@ class LayoutCalculatorTest {
         val expectedScale = AppConstants.LAYOUT_SCALE_MIN
         val expectedSize = 24f + (48f - 24f) * expectedScale
 
-        assertEquals(expectedSize, result.textSizePx, 0.01f)
+        assertThat(result.textSizePx).isWithin(0.01f).of(expectedSize)
     }
 }

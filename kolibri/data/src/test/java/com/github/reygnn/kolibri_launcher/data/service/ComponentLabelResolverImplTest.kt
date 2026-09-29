@@ -3,13 +3,13 @@ package com.github.reygnn.kolibri_launcher.data.service
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,8 +29,11 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ComponentLabelResolverImplTest {
 
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     private val packageManager: PackageManager = mockk()
-    private val resolver = ComponentLabelResolverImpl(packageManager, UnconfinedTestDispatcher())
+    private val resolver = ComponentLabelResolverImpl(packageManager, mainDispatcherRule.testDispatcher)
 
     private fun launcherActivity(pkg: String, cls: String, label: String?): ResolveInfo =
         ResolveInfo().apply {
@@ -42,49 +45,49 @@ class ComponentLabelResolverImplTest {
         }
 
     @Test
-    fun `resolveLabel - matching launcher activity - returns its label`() = runTest {
+    fun `resolveLabel - matching launcher activity - returns its label`() = runTest(mainDispatcherRule.testDispatcher) {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns listOf(launcherActivity("com.app", "com.app.Main", "App One"))
 
-        assertEquals("App One", resolver.resolveLabel("com.app/com.app.Main"))
+        assertThat(resolver.resolveLabel("com.app/com.app.Main")).isEqualTo("App One")
     }
 
     @Test
-    fun `resolveLabel - blank label - falls back to package name`() = runTest {
+    fun `resolveLabel - blank label - falls back to package name`() = runTest(mainDispatcherRule.testDispatcher) {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns listOf(launcherActivity("com.app", "com.app.Main", ""))
 
-        assertEquals("com.app", resolver.resolveLabel("com.app/com.app.Main"))
+        assertThat(resolver.resolveLabel("com.app/com.app.Main")).isEqualTo("com.app")
     }
 
     @Test
-    fun `resolveLabel - package has other launcher activity but not this one - null`() = runTest {
+    fun `resolveLabel - package has other launcher activity but not this one - null`() = runTest(mainDispatcherRule.testDispatcher) {
         // The alias case: the package still has a (different) launcher entry, but the
         // exact component the favorite points at is gone → omit, no ghost.
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns listOf(launcherActivity("com.app", "com.app.OtherAlias", "Other"))
 
-        assertNull(resolver.resolveLabel("com.app/com.app.Main"))
+        assertThat(resolver.resolveLabel("com.app/com.app.Main")).isNull()
     }
 
     @Test
-    fun `resolveLabel - no launcher activities - null`() = runTest {
+    fun `resolveLabel - no launcher activities - null`() = runTest(mainDispatcherRule.testDispatcher) {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } returns emptyList()
 
-        assertNull(resolver.resolveLabel("com.app/com.app.Main"))
+        assertThat(resolver.resolveLabel("com.app/com.app.Main")).isNull()
     }
 
     @Test
-    fun `resolveLabel - PackageManager throws - null (fail-closed, no ghost)`() = runTest {
+    fun `resolveLabel - PackageManager throws - null (fail-closed, no ghost)`() = runTest(mainDispatcherRule.testDispatcher) {
         every {
             packageManager.queryIntentActivities(any(), any<PackageManager.ResolveInfoFlags>())
         } throws RuntimeException("PM dead")
 
-        assertNull(resolver.resolveLabel("com.app/com.app.Main"))
+        assertThat(resolver.resolveLabel("com.app/com.app.Main")).isNull()
     }
 }

@@ -6,13 +6,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
 import com.github.reygnn.launcher.core.ComponentKey
+import com.google.common.truth.Truth.assertThat
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,25 +40,25 @@ class AppLauncherImplTest {
 
     @Test
     fun `successful launch maps to Launched`() {
-        assertEquals(AppLaunchResult.Launched, runLaunchCatching { /* no throw */ })
+        assertThat(runLaunchCatching { /* no throw */ }).isEqualTo(AppLaunchResult.Launched)
     }
 
     @Test
     fun `ActivityNotFoundException maps to ComponentGone`() {
-        assertEquals(AppLaunchResult.ComponentGone, runLaunchCatching { throw ActivityNotFoundException("gone") })
+        assertThat(runLaunchCatching { throw ActivityNotFoundException("gone") }).isEqualTo(AppLaunchResult.ComponentGone)
     }
 
     @Test
     fun `SecurityException maps to PermissionDenied`() {
-        assertEquals(AppLaunchResult.PermissionDenied, runLaunchCatching { throw SecurityException("denied") })
+        assertThat(runLaunchCatching { throw SecurityException("denied") }).isEqualTo(AppLaunchResult.PermissionDenied)
     }
 
     @Test
     fun `any other Throwable maps to Failed and preserves the cause`() {
         val boom = IllegalStateException("boom")
         val result = runLaunchCatching { throw boom }
-        assertTrue(result is AppLaunchResult.Failed)
-        assertEquals(boom, (result as AppLaunchResult.Failed).cause)
+        assertThat(result).isInstanceOf(AppLaunchResult.Failed::class.java)
+        assertThat((result as AppLaunchResult.Failed).cause).isEqualTo(boom)
     }
 
     @Test
@@ -71,8 +70,8 @@ class AppLauncherImplTest {
         // that catch to `Exception` (which would miss OOM) turns it red instead of slipping through.
         val oom = OutOfMemoryError("boom")
         val result = runLaunchCatching { throw oom }
-        assertTrue(result is AppLaunchResult.Failed)
-        assertEquals(oom, (result as AppLaunchResult.Failed).cause)
+        assertThat(result).isInstanceOf(AppLaunchResult.Failed::class.java)
+        assertThat((result as AppLaunchResult.Failed).cause).isEqualTo(oom)
     }
 
     // --- AppLauncherImpl ---
@@ -84,8 +83,8 @@ class AppLauncherImplTest {
 
         val result = AppLauncherImpl().launch(activity, ComponentKey("com.example.x", "com.example.x.Main"))
 
-        assertTrue(result is AppLaunchResult.Failed)
-        assertTrue((result as AppLaunchResult.Failed).cause is IllegalStateException)
+        assertThat(result).isInstanceOf(AppLaunchResult.Failed::class.java)
+        assertThat((result as AppLaunchResult.Failed).cause is IllegalStateException).isTrue()
     }
 
     @Test
@@ -102,8 +101,8 @@ class AppLauncherImplTest {
 
         val result = AppLauncherImpl().launch(activity, ComponentKey("com.example.x", "com.example.x.Main"))
 
-        assertEquals(AppLaunchResult.Launched, result)
-        assertEquals("com.example.x", component.captured.packageName)
-        assertEquals("com.example.x.Main", component.captured.className)
+        assertThat(result).isEqualTo(AppLaunchResult.Launched)
+        assertThat(component.captured.packageName).isEqualTo("com.example.x")
+        assertThat(component.captured.className).isEqualTo("com.example.x.Main")
     }
 }

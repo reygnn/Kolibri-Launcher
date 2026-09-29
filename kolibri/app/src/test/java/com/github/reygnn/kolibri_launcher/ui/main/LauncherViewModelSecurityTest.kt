@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
+import com.github.reygnn.launcher.core.testing.recordEmissions
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
@@ -32,12 +33,13 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUse
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -47,12 +49,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -352,35 +350,35 @@ class LauncherViewModelSecurityTest {
     fun `attack - battery scale zero - no division by zero crash`() = runTest {
         viewModel.updateBatteryLevel(level = 50, scale = 0)
         advanceUntilIdle()
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
     fun `attack - battery negative scale - shows fallback`() = runTest {
         viewModel.updateBatteryLevel(level = 50, scale = -1)
         advanceUntilIdle()
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
     fun `attack - battery negative level - shows fallback`() = runTest {
         viewModel.updateBatteryLevel(level = -1, scale = 100)
         advanceUntilIdle()
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
     fun `attack - battery MAX_VALUE - no overflow`() = runTest {
         viewModel.updateBatteryLevel(level = Int.MAX_VALUE, scale = Int.MAX_VALUE)
         advanceUntilIdle()
-        assertEquals("100%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("100%")
     }
 
     @Test
     fun `attack - battery level greater than scale - shows over 100`() = runTest {
         viewModel.updateBatteryLevel(level = 150, scale = 100)
         advanceUntilIdle()
-        assertEquals("150%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("150%")
     }
 
     // ========================================================================
@@ -391,7 +389,7 @@ class LauncherViewModelSecurityTest {
     fun `attack - null intent - shows fallback battery`() = runTest {
         viewModel.updateBatteryLevelFromIntent(null)
         advanceUntilIdle()
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
@@ -406,7 +404,7 @@ class LauncherViewModelSecurityTest {
         }
         viewModel.updateBatteryLevelFromIntent(emptyIntent)
         advanceUntilIdle()
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
@@ -421,7 +419,7 @@ class LauncherViewModelSecurityTest {
         }
         viewModel.updateBatteryLevelFromIntent(maliciousIntent)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.batteryString.isNotEmpty())
+        assertThat(viewModel.uiState.value.batteryString.isNotEmpty()).isTrue()
     }
 
     // ========================================================================
@@ -432,27 +430,27 @@ class LauncherViewModelSecurityTest {
     fun `attack - extremely long search query - no crash`() = runTest {
         val longQuery = "A".repeat(1024 * 1024)
         viewModel.onAppDrawerSearchQueryChanged(longQuery)
-        assertEquals(longQuery, viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo(longQuery)
     }
 
     @Test
     fun `attack - search query with null bytes`() = runTest {
         val malicious = "search\u0000term"
         viewModel.onAppDrawerSearchQueryChanged(malicious)
-        assertEquals(malicious, viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo(malicious)
     }
 
     @Test
     fun `attack - search query with unicode exploits`() = runTest {
         val malicious = "\u202Eevil\u200B\u200Csearch"
         viewModel.onAppDrawerSearchQueryChanged(malicious)
-        assertEquals(malicious, viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo(malicious)
     }
 
     @Test
     fun `attack - empty search query`() = runTest {
         viewModel.onAppDrawerSearchQueryChanged("")
-        assertEquals("", viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     // ========================================================================
@@ -464,13 +462,13 @@ class LauncherViewModelSecurityTest {
         coEvery { toggleFavoriteUseCase(any(), any()) } throws RuntimeException("Crash")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.onToggleFavorite(createTestApp())
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -478,13 +476,13 @@ class LauncherViewModelSecurityTest {
         coEvery { hideAppUseCase(any()) } throws RuntimeException("Crash")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.onHideApp(createTestApp())
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -492,13 +490,13 @@ class LauncherViewModelSecurityTest {
         coEvery { recordAppLaunchUseCase(any()) } throws RuntimeException("Crash")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.onAppClicked(createTestApp())
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.ShowToast && it.messageResId == R.string.error_launching_app })
+        assertThat(events.any { it is UiEvent.ShowToast && it.messageResId == R.string.error_launching_app }).isTrue()
     }
 
     @Test
@@ -506,13 +504,13 @@ class LauncherViewModelSecurityTest {
         coEvery { toggleSortOrderUseCase() } throws RuntimeException("Crash")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.toggleSortOrder()
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -520,13 +518,13 @@ class LauncherViewModelSecurityTest {
         coEvery { setTextColorUseCase(any()) } throws RuntimeException("Crash")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.onSetTextColor(0xFF0000)
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -575,13 +573,13 @@ class LauncherViewModelSecurityTest {
         val malicious = createTestApp(packageName = "", displayName = "Malicious")
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { viewModel.event.collect { events.add(it) } }
+        val job = recordEmissions(viewModel.event, into = events)
 
         viewModel.onAppClicked(malicious)
         advanceUntilIdle()
         job.cancel()
 
-        assertTrue(events.any { it is UiEvent.LaunchApp })
+        assertThat(events.any { it is UiEvent.LaunchApp }).isTrue()
     }
 
     @Test
@@ -642,16 +640,16 @@ class LauncherViewModelSecurityTest {
     @Test
     fun `edge case - onAppDrawerClosed resets query`() = runTest {
         viewModel.onAppDrawerSearchQueryChanged("query")
-        assertEquals("query", viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo("query")
 
         viewModel.onAppDrawerClosed()
-        assertEquals("", viewModel.appDrawerSearchQuery.value)
+        assertThat(viewModel.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     @Test
     fun `edge case - updateTimeAndDate - no crash`() = runTest {
         viewModel.updateTimeAndDate()
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.timeString.isNotEmpty())
+        assertThat(viewModel.uiState.value.timeString.isNotEmpty()).isTrue()
     }
 }

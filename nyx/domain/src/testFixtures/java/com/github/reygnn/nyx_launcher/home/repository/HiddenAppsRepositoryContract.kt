@@ -2,7 +2,7 @@ package com.github.reygnn.nyx_launcher.home.repository
 
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.ComponentKey
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -26,7 +26,7 @@ abstract class HiddenAppsRepositoryContract {
     abstract fun createRepository(initial: Set<ComponentKey>): HiddenAppsRepository
 
     @Test
-    fun hidden_emits_the_initial_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun hidden_emits_the_initial_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(setOf(A, B))
         repo.hidden().test {
             assertThat(awaitItem()).isEqualTo(setOf(A, B))
@@ -35,7 +35,7 @@ abstract class HiddenAppsRepositoryContract {
     }
 
     @Test
-    fun update_persists_the_transformed_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_persists_the_transformed_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(emptySet())
         repo.hidden().test {
             assertThat(awaitItem()).isEmpty()
@@ -46,7 +46,7 @@ abstract class HiddenAppsRepositoryContract {
     }
 
     @Test
-    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(setOf(A))
         repo.hidden().test {
             assertThat(awaitItem()).isEqualTo(setOf(A))
@@ -57,7 +57,7 @@ abstract class HiddenAppsRepositoryContract {
     }
 
     @Test
-    fun update_receives_the_current_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_receives_the_current_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(setOf(A))
         var seen: Set<ComponentKey>? = null
         repo.update { current ->
@@ -75,7 +75,7 @@ abstract class HiddenAppsRepositoryContract {
      * serializing the whole transform under a lock makes it 2.
      */
     @Test
-    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.dispatcher) {
+    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(emptySet())
         val a = launch { repo.update { yield(); it + A } }
         val b = launch { repo.update { yield(); it + B } }

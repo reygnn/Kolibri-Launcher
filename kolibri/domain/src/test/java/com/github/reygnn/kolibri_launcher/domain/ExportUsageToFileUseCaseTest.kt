@@ -2,11 +2,11 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.repository.UsageExportRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,7 +38,7 @@ class ExportUsageToFileUseCaseTest {
         val result = useCase(uri)
 
         // Assert
-        assertTrue(result.isSuccess)
+        assertThat(result.isSuccess).isTrue()
     }
 
     @Test
@@ -51,9 +51,9 @@ class ExportUsageToFileUseCaseTest {
         val result = useCase(uri)
 
         // Assert
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is IOException)
-        assertTrue(result.exceptionOrNull()?.message == "Could not write file")
+        assertThat(result.isFailure).isTrue()
+        assertThat(result.exceptionOrNull()).isInstanceOf(IOException::class.java)
+        assertThat(result.exceptionOrNull()?.message == "Could not write file").isTrue()
     }
 
     @Test
@@ -67,7 +67,7 @@ class ExportUsageToFileUseCaseTest {
         val result = useCase(uri)
 
         // Assert
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() == exception)
+        assertThat(result.isFailure).isTrue()
+        assertThat(result.exceptionOrNull() == exception).isTrue()
     }
 }

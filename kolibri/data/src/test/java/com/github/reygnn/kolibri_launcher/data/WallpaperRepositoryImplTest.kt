@@ -13,8 +13,10 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -25,10 +27,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -90,7 +88,7 @@ class WallpaperRepositoryImplTest {
     @Test
     fun `parseWallpaperState with no keys yields NONE`() = runTest {
         val state = manager.wallpaperState.first()
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -105,7 +103,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -115,12 +113,12 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(1, state.layerCount)
+        assertThat(state.layerCount).isEqualTo(1)
         val layer = state.layers.single()
-        assertEquals("file:///data/x.jpg", layer.imageUri)
-        assertEquals(2.5f, layer.scale)
-        assertEquals(-100f, layer.translateX)
-        assertEquals(-50f, layer.translateY)
+        assertThat(layer.imageUri).isEqualTo("file:///data/x.jpg")
+        assertThat(layer.scale).isEqualTo(2.5f)
+        assertThat(layer.translateX).isEqualTo(-100f)
+        assertThat(layer.translateY).isEqualTo(-50f)
     }
 
     @Test
@@ -132,7 +130,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -148,7 +146,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -165,9 +163,9 @@ class WallpaperRepositoryImplTest {
         val state = manager.wallpaperState.first()
 
         // Bad URI layer dropped; good ones kept.
-        assertEquals(2, state.layerCount)
-        assertEquals("l_ok", state.getLayer(0)!!.id)
-        assertEquals("l_ok2", state.getLayer(1)!!.id)
+        assertThat(state.layerCount).isEqualTo(2)
+        assertThat(state.getLayer(0)!!.id).isEqualTo("l_ok")
+        assertThat(state.getLayer(1)!!.id).isEqualTo("l_ok2")
     }
 
     @Test
@@ -185,19 +183,19 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(2, state.layerCount)
+        assertThat(state.layerCount).isEqualTo(2)
 
         val l1 = state.getLayer(0)!!
-        assertEquals("layer_1", l1.id)
-        assertEquals(1.5f, l1.scale)
-        assertEquals(10f, l1.translateX)
-        assertEquals(20f, l1.translateY)
+        assertThat(l1.id).isEqualTo("layer_1")
+        assertThat(l1.scale).isEqualTo(1.5f)
+        assertThat(l1.translateX).isEqualTo(10f)
+        assertThat(l1.translateY).isEqualTo(20f)
 
         val l2 = state.getLayer(1)!!
-        assertEquals("layer_2", l2.id)
-        assertEquals(2.0f, l2.scale)
-        assertEquals(-5f, l2.translateX)
-        assertEquals(0f, l2.translateY)
+        assertThat(l2.id).isEqualTo("layer_2")
+        assertThat(l2.scale).isEqualTo(2.0f)
+        assertThat(l2.translateX).isEqualTo(-5f)
+        assertThat(l2.translateY).isEqualTo(0f)
     }
 
     @Test
@@ -218,8 +216,8 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(1, state.layerCount)
-        assertEquals("la", state.getLayer(0)!!.id)
+        assertThat(state.layerCount).isEqualTo(1)
+        assertThat(state.getLayer(0)!!.id).isEqualTo("la")
     }
 
     @Test
@@ -235,7 +233,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -250,7 +248,7 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.wallpaperState.first()
 
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
     // ===========================================
@@ -269,16 +267,16 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNotNull("single image must persist as JSON", prefs[KEY_LAYERS_JSON])
+        assertWithMessage("single image must persist as JSON").that(prefs[KEY_LAYERS_JSON]).isNotNull()
 
         // Round-trip: reads back as a one-layer state with the same values.
         val loaded = manager.wallpaperState.first()
-        assertEquals(1, loaded.layerCount)
+        assertThat(loaded.layerCount).isEqualTo(1)
         val layer = loaded.layers.single()
-        assertEquals("file:///data/x.jpg", layer.imageUri)
-        assertEquals(1.5f, layer.scale)
-        assertEquals(10f, layer.translateX)
-        assertEquals(20f, layer.translateY)
+        assertThat(layer.imageUri).isEqualTo("file:///data/x.jpg")
+        assertThat(layer.scale).isEqualTo(1.5f)
+        assertThat(layer.translateX).isEqualTo(10f)
+        assertThat(layer.translateY).isEqualTo(20f)
     }
 
     @Test
@@ -294,11 +292,11 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNotNull(prefs[KEY_LAYERS_JSON])
+        assertThat(prefs[KEY_LAYERS_JSON]).isNotNull()
 
         val loaded = manager.wallpaperState.first()
-        assertEquals(2, loaded.layerCount)
-        assertEquals("file:///data/a.jpg", loaded.getLayer(0)!!.imageUri)
+        assertThat(loaded.layerCount).isEqualTo(2)
+        assertThat(loaded.getLayer(0)!!.imageUri).isEqualTo("file:///data/a.jpg")
     }
 
     @Test
@@ -309,7 +307,7 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_LAYERS_JSON])
+        assertThat(prefs[KEY_LAYERS_JSON]).isNull()
     }
 
     @Test
@@ -320,7 +318,7 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_LAYERS_JSON])
+        assertThat(prefs[KEY_LAYERS_JSON]).isNull()
     }
 
     @Test
@@ -331,7 +329,7 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_LAYERS_JSON])
+        assertThat(prefs[KEY_LAYERS_JSON]).isNull()
     }
 
     @Test
@@ -360,12 +358,12 @@ class WallpaperRepositoryImplTest {
 
         val loaded = manager.wallpaperState.first()
 
-        assertEquals(1, loaded.layerCount)
+        assertThat(loaded.layerCount).isEqualTo(1)
         val layer = loaded.getLayer(0)!!
-        assertEquals("file:///data/a.jpg", layer.imageUri)
-        assertEquals(1.25f, layer.scale)
-        assertEquals(7f, layer.translateX)
-        assertEquals(-3f, layer.translateY)
+        assertThat(layer.imageUri).isEqualTo("file:///data/a.jpg")
+        assertThat(layer.scale).isEqualTo(1.25f)
+        assertThat(layer.translateX).isEqualTo(7f)
+        assertThat(layer.translateY).isEqualTo(-3f)
     }
 
     @Test
@@ -392,12 +390,12 @@ class WallpaperRepositoryImplTest {
 
         val loaded = manager.wallpaperState.first()
 
-        assertEquals(2, loaded.layerCount)
+        assertThat(loaded.layerCount).isEqualTo(2)
         val layer = loaded.getLayer(0)!!
-        assertEquals("abc_123", layer.id)
-        assertEquals(1.25f, layer.scale)
-        assertEquals(7f, layer.translateX)
-        assertEquals(-3f, layer.translateY)
+        assertThat(layer.id).isEqualTo("abc_123")
+        assertThat(layer.scale).isEqualTo(1.25f)
+        assertThat(layer.translateX).isEqualTo(7f)
+        assertThat(layer.translateY).isEqualTo(-3f)
     }
 
     @Test
@@ -408,9 +406,9 @@ class WallpaperRepositoryImplTest {
 
         val state = manager.getWallpaperStateSync()
 
-        assertEquals(1, state.layerCount)
-        assertEquals("file:///data/a.jpg", state.layers.single().imageUri)
-        assertEquals(2.0f, state.layers.single().scale)
+        assertThat(state.layerCount).isEqualTo(1)
+        assertThat(state.layers.single().imageUri).isEqualTo("file:///data/a.jpg")
+        assertThat(state.layers.single().scale).isEqualTo(2.0f)
     }
 
     // ===========================================
@@ -430,10 +428,10 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val state = manager.wallpaperState.first()
-        assertEquals(WallpaperState.NONE, state)
+        assertThat(state).isEqualTo(WallpaperState.NONE)
 
         val prefs = dataStore.data.first()
-        assertNull(prefs[KEY_LAYERS_JSON])
+        assertThat(prefs[KEY_LAYERS_JSON]).isNull()
     }
 
     @Test
@@ -454,7 +452,7 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
         val afterClear = dataStore.data.first().asMap()
 
-        assertEquals(afterClear, afterPurge)
+        assertThat(afterPurge).isEqualTo(afterClear)
     }
 
     @Test
@@ -464,11 +462,11 @@ class WallpaperRepositoryImplTest {
         // precision noise in the round-trip via Double in the JSON path.
         manager.saveWallpaperState(WallpaperState.single("file:///data/x.jpg", scale = 0.25f))
         advanceUntilIdle()
-        assertEquals(0.25f, manager.wallpaperState.first().layers.single().scale)
+        assertThat(manager.wallpaperState.first().layers.single().scale).isEqualTo(0.25f)
 
         manager.saveWallpaperState(WallpaperState.single("file:///data/x.jpg", scale = 8.0f))
         advanceUntilIdle()
-        assertEquals(8.0f, manager.wallpaperState.first().layers.single().scale)
+        assertThat(manager.wallpaperState.first().layers.single().scale).isEqualTo(8.0f)
     }
 
     @Test
@@ -485,8 +483,8 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         val layer = manager.wallpaperState.first().layers.single()
-        assertEquals(-999f, layer.translateX)
-        assertEquals(-1500f, layer.translateY)
+        assertThat(layer.translateX).isEqualTo(-999f)
+        assertThat(layer.translateY).isEqualTo(-1500f)
     }
 
     // ===========================================
@@ -506,7 +504,7 @@ class WallpaperRepositoryImplTest {
         advanceUntilIdle()
 
         // Baseline: parsed once (one fileExists stat for the single layer).
-        assertEquals(1, emissions.size)
+        assertThat(emissions.size).isEqualTo(1)
         verify(exactly = 1) { fileManager.fileExists(any<Uri>()) }
 
         // Merge in an UNRELATED key (edit() keeps the wallpaper key intact).
@@ -515,7 +513,7 @@ class WallpaperRepositoryImplTest {
 
         job.cancel()
 
-        assertEquals("unrelated change must not re-emit wallpaper state", 1, emissions.size)
+        assertWithMessage("unrelated change must not re-emit wallpaper state").that(emissions.size).isEqualTo(1)
         // No re-parse → no second disk stat.
         verify(exactly = 1) { fileManager.fileExists(any<Uri>()) }
     }
@@ -538,8 +536,8 @@ class WallpaperRepositoryImplTest {
 
         job.cancel()
 
-        assertEquals("a real wallpaper change must re-emit", 2, emissions.size)
-        assertEquals(2.0f, emissions.last().layers.single().scale)
+        assertWithMessage("a real wallpaper change must re-emit").that(emissions.size).isEqualTo(2)
+        assertThat(emissions.last().layers.single().scale).isEqualTo(2.0f)
     }
 }
 

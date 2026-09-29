@@ -20,12 +20,12 @@ into Nyx — extend the shared source.
   so they are the *reference* for Nyx, not auto-loaded here — read them when a
   rule question comes up.
 - **Enforcement**: `./gradlew :nyx:app:checkConventions` and
-  `:nyx:app:checkRule13`. Nyx has its **own orchestrator**
-  (`nyx/tools/check-conventions.sh`) that runs the shared detectors
-  (`tools/*.awk` + the two generalized `*.sh`) against Nyx's sources,
-  with Nyx's own scan roots / positive lists. When Kolibri adds or fixes a
-  detector, Nyx inherits it automatically — only the roots and opt-in lists in
-  Nyx's orchestrator are Nyx-owned.
+  `:nyx:app:checkRule13`. There is **one orchestrator for both apps**,
+  `tools/check-conventions.sh --app nyx` (SPEC_NYX_REWRITE A3); `nyx/tools/check-conventions.sh`
+  is a one-line wrapper. Nyx owns only DATA in `tools/conventions/nyx.conf`: scan roots,
+  positive lists, and one decision per registered check (RUN / TASK / "SKIP: reason").
+  A parity gate fails the build (exit 2) when a detector is added without a decision
+  for both apps, or a SKIP carries no reason.
 
 ### Checks Nyx runs (and the ones it deliberately skips)
 

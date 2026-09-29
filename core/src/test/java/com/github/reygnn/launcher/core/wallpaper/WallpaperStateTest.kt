@@ -1,10 +1,6 @@
 package com.github.reygnn.launcher.core.wallpaper
 
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -34,13 +30,13 @@ class WallpaperStateTest {
             captureSampleSize = 2,
         )
 
-        assertEquals(1, state.layerCount)
+        assertThat(state.layerCount).isEqualTo(1)
         val layer = state.layers.single()
-        assertEquals("file:///wallpapers/a.png", layer.imageUri)
-        assertEquals(2.0f, layer.scale)
-        assertEquals(10f, layer.translateX)
-        assertEquals(-20f, layer.translateY)
-        assertEquals(2, layer.captureSampleSize)
+        assertThat(layer.imageUri).isEqualTo("file:///wallpapers/a.png")
+        assertThat(layer.scale).isEqualTo(2.0f)
+        assertThat(layer.translateX).isEqualTo(10f)
+        assertThat(layer.translateY).isEqualTo(-20f)
+        assertThat(layer.captureSampleSize).isEqualTo(2)
     }
 
     @Test
@@ -48,10 +44,10 @@ class WallpaperStateTest {
         val state = WallpaperState.single("file:///a.png")
 
         val layer = state.layers.single()
-        assertEquals(WallpaperState.DEFAULT_SCALE, layer.scale)
-        assertEquals(0f, layer.translateX)
-        assertEquals(0f, layer.translateY)
-        assertFalse(layer.isTransformed)
+        assertThat(layer.scale).isEqualTo(WallpaperState.DEFAULT_SCALE)
+        assertThat(layer.translateX).isEqualTo(0f)
+        assertThat(layer.translateY).isEqualTo(0f)
+        assertThat(layer.isTransformed).isFalse()
     }
 
     // ---------------------------------------------------------------
@@ -60,18 +56,15 @@ class WallpaperStateTest {
 
     @Test
     fun `layerCount is zero for NONE, one for single, N for multi`() {
-        assertEquals(0, WallpaperState.NONE.layerCount)
-        assertEquals(1, WallpaperState.single("file:///a.png").layerCount)
-        assertEquals(
-            3,
-            WallpaperState.multiLayer(
+        assertThat(WallpaperState.NONE.layerCount).isEqualTo(0)
+        assertThat(WallpaperState.single("file:///a.png").layerCount).isEqualTo(1)
+        assertThat(WallpaperState.multiLayer(
                 listOf(
                     WallpaperLayerState(imageUri = "file:///a.png"),
                     WallpaperLayerState(imageUri = "file:///b.png"),
                     WallpaperLayerState(imageUri = "file:///c.png"),
                 )
-            ).layerCount,
-        )
+            ).layerCount).isEqualTo(3)
     }
 
     // ---------------------------------------------------------------
@@ -80,12 +73,12 @@ class WallpaperStateTest {
 
     @Test
     fun `hasWallpaper is false for the empty state`() {
-        assertFalse(WallpaperState.NONE.hasWallpaper)
+        assertThat(WallpaperState.NONE.hasWallpaper).isFalse()
     }
 
     @Test
     fun `hasWallpaper is true for a single image`() {
-        assertTrue(WallpaperState.single("file:///a.png").hasWallpaper)
+        assertThat(WallpaperState.single("file:///a.png").hasWallpaper).isTrue()
     }
 
     @Test
@@ -96,7 +89,7 @@ class WallpaperStateTest {
                 WallpaperLayerState(imageUri = "file:///b.png"),
             )
         )
-        assertTrue(state.hasWallpaper)
+        assertThat(state.hasWallpaper).isTrue()
     }
 
     @Test
@@ -107,7 +100,7 @@ class WallpaperStateTest {
                 WallpaperLayerState(imageUri = null),
             )
         )
-        assertFalse(state.hasWallpaper)
+        assertThat(state.hasWallpaper).isFalse()
     }
 
     // ---------------------------------------------------------------
@@ -116,14 +109,14 @@ class WallpaperStateTest {
 
     @Test
     fun `isTransformed is false for the empty state`() {
-        assertFalse(WallpaperState.NONE.isTransformed)
+        assertThat(WallpaperState.NONE.isTransformed).isFalse()
     }
 
     @Test
     fun `isTransformed follows the single layer transform`() {
-        assertFalse(WallpaperState.single("file:///a.png").isTransformed)
-        assertTrue(WallpaperState.single("file:///a.png", scale = 2f).isTransformed)
-        assertTrue(WallpaperState.single("file:///a.png", translateX = 5f).isTransformed)
+        assertThat(WallpaperState.single("file:///a.png").isTransformed).isFalse()
+        assertThat(WallpaperState.single("file:///a.png", scale = 2f).isTransformed).isTrue()
+        assertThat(WallpaperState.single("file:///a.png", translateX = 5f).isTransformed).isTrue()
     }
 
     @Test
@@ -134,7 +127,7 @@ class WallpaperStateTest {
                 WallpaperLayerState(imageUri = "file:///b.png", scale = 3f),
             )
         )
-        assertTrue(state.isTransformed)
+        assertThat(state.isTransformed).isTrue()
     }
 
     // ---------------------------------------------------------------
@@ -143,15 +136,12 @@ class WallpaperStateTest {
 
     @Test
     fun `referencedUris is empty for the empty state`() {
-        assertTrue(WallpaperState.NONE.referencedUris.isEmpty())
+        assertThat(WallpaperState.NONE.referencedUris.isEmpty()).isTrue()
     }
 
     @Test
     fun `referencedUris exposes the single image`() {
-        assertEquals(
-            setOf("file:///a.png"),
-            WallpaperState.single("file:///a.png").referencedUris,
-        )
+        assertThat(WallpaperState.single("file:///a.png").referencedUris).isEqualTo(setOf("file:///a.png"))
     }
 
     @Test
@@ -163,7 +153,7 @@ class WallpaperStateTest {
                 WallpaperLayerState(imageUri = "file:///b.png"),
             )
         )
-        assertEquals(setOf("file:///a.png", "file:///b.png"), state.referencedUris)
+        assertThat(state.referencedUris).isEqualTo(setOf("file:///a.png", "file:///b.png"))
     }
 
     // ---------------------------------------------------------------
@@ -172,8 +162,8 @@ class WallpaperStateTest {
 
     @Test
     fun `NONE is an empty layer list`() {
-        assertTrue(WallpaperState.NONE.layers.isEmpty())
-        assertSame(WallpaperState.NONE, WallpaperState.NONE)
+        assertThat(WallpaperState.NONE.layers.isEmpty()).isTrue()
+        assertThat(WallpaperState.NONE).isSameInstanceAs(WallpaperState.NONE)
     }
 
     // ---------------------------------------------------------------
@@ -195,30 +185,30 @@ class WallpaperStateTest {
     @Test
     fun `getLayer returns null for out-of-range and empty states`() {
         val state = twoLayerState()
-        assertEquals("file:///a.png", state.getLayer(0)?.imageUri)
-        assertNull(state.getLayer(99))
-        assertNull(state.getLayer(-1))
-        assertNull(WallpaperState.NONE.getLayer(0))
+        assertThat(state.getLayer(0)?.imageUri).isEqualTo("file:///a.png")
+        assertThat(state.getLayer(99)).isNull()
+        assertThat(state.getLayer(-1)).isNull()
+        assertThat(WallpaperState.NONE.getLayer(0)).isNull()
     }
 
     @Test
     fun `withRemovedLayer returns the same instance for an out-of-range index`() {
         val state = twoLayerState()
-        assertSame(state, state.withRemovedLayer(-1))
-        assertSame(state, state.withRemovedLayer(99))
+        assertThat(state.withRemovedLayer(-1)).isSameInstanceAs(state)
+        assertThat(state.withRemovedLayer(99)).isSameInstanceAs(state)
     }
 
     @Test
     fun `withUpdatedLayer returns the same instance for an out-of-range index`() {
         val state = twoLayerState()
-        assertSame(state, state.withUpdatedLayer(99) { it.copy(scale = 5f) })
+        assertThat(state.withUpdatedLayer(99) { it.copy(scale = 5f) }).isSameInstanceAs(state)
     }
 
     @Test
     fun `withSwappedLayers returns the same instance when either index is out of range`() {
         val state = twoLayerState()
-        assertSame(state, state.withSwappedLayers(0, 99))
-        assertSame(state, state.withSwappedLayers(-1, 1))
+        assertThat(state.withSwappedLayers(0, 99)).isSameInstanceAs(state)
+        assertThat(state.withSwappedLayers(-1, 1)).isSameInstanceAs(state)
     }
 
     @Test
@@ -227,8 +217,8 @@ class WallpaperStateTest {
         val result = state.withSwappedLayers(1, 1)
         // Both indices are valid, so the guard is not taken; swapping an index with
         // itself must leave the order intact.
-        assertEquals(state.layers, result.layers)
-        assertEquals("file:///a.png", result.getLayer(0)?.imageUri)
-        assertEquals("file:///b.png", result.getLayer(1)?.imageUri)
+        assertThat(result.layers).isEqualTo(state.layers)
+        assertThat(result.getLayer(0)?.imageUri).isEqualTo("file:///a.png")
+        assertThat(result.getLayer(1)?.imageUri).isEqualTo("file:///b.png")
     }
 }

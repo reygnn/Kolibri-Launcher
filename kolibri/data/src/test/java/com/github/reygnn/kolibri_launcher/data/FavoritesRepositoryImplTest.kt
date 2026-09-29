@@ -9,12 +9,13 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertFailsWith
@@ -39,7 +40,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("com.favorite.app/ComponentA")
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -48,7 +49,7 @@ class FavoritesRepositoryImplTest {
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.another.app/ComponentB")))
         val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
-        Assert.assertFalse(favoritesRepositoryImpl.isFavoriteComponent("com.not.favorite/ComponentC"))
+        assertThat(favoritesRepositoryImpl.isFavoriteComponent("com.not.favorite/ComponentC")).isFalse()
     }
 
     @Test
@@ -58,9 +59,9 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.new.favorite/ComponentD")
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertTrue(savedFavorites?.contains("com.new.favorite/ComponentD") == true)
+        assertThat(savedFavorites?.contains("com.new.favorite/ComponentD") == true).isTrue()
     }
 
     @Test
@@ -75,9 +76,9 @@ class FavoritesRepositoryImplTest {
 
             val result = favoritesRepositoryImpl.addFavoriteComponent("com.over.limit/ComponentE")
 
-            Assert.assertFalse(result)
+            assertThat(result).isFalse()
             val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-            Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, savedFavorites?.size)
+            assertThat(savedFavorites?.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
         }
 
     @Test
@@ -90,8 +91,8 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.removeFavoriteComponent("com.to.remove/ComponentG")
 
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertFalse(savedFavorites?.contains("com.to.remove/ComponentG") == true)
-        Assert.assertEquals(1, savedFavorites?.size)
+        assertThat(savedFavorites?.contains("com.to.remove/ComponentG") == true).isFalse()
+        assertThat(savedFavorites?.size).isEqualTo(1)
     }
 
     @Test
@@ -106,12 +107,9 @@ class FavoritesRepositoryImplTest {
 
             val result = favoritesRepositoryImpl.addFavoriteComponent("com.app1/AnotherComponent")
 
-            Assert.assertTrue(result)
+            assertThat(result).isTrue()
             val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-            Assert.assertEquals(
-                AppConstants.MAX_FAVORITES_ON_HOME + 1,
-                savedFavorites?.size
-            )
+            assertThat(savedFavorites?.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME + 1)
         }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -124,7 +122,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.test/Component")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -145,7 +143,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
 
@@ -157,8 +155,8 @@ class FavoritesRepositoryImplTest {
         val resultEmpty = favoritesRepositoryImpl.addFavoriteComponent("")
         val resultBlank = favoritesRepositoryImpl.addFavoriteComponent("   ")
 
-        Assert.assertFalse(resultEmpty)
-        Assert.assertFalse(resultBlank)
+        assertThat(resultEmpty).isFalse()
+        assertThat(resultBlank).isFalse()
     }
 
     @Test
@@ -170,7 +168,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("com.test/Component")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -193,7 +191,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -203,7 +201,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -214,7 +212,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -224,7 +222,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.isFavoriteComponent(null)
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -234,7 +232,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.isFavoriteComponent("  ")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -247,7 +245,7 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.saveFavoriteComponents(emptyList())
 
         val savedFavorites = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertTrue(savedFavorites.isNullOrEmpty())
+        assertThat(savedFavorites.isNullOrEmpty()).isTrue()
     }
 
     @Test
@@ -260,7 +258,7 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.saveFavoriteComponents(listOf("com.test/Component"))
 
         // Verify it attempted but failed
-        Assert.assertNotNull(favoritesRepositoryImpl)
+        assertThat(favoritesRepositoryImpl).isNotNull()
     }
 
     @Test
@@ -277,10 +275,7 @@ class FavoritesRepositoryImplTest {
 
         favoritesRepositoryImpl.saveFavoriteComponents(listOf("com.new/Component"))
 
-        Assert.assertEquals(
-            setOf("com.new/Component"),
-            favoritesRepositoryImpl.getFavoriteComponentsSnapshot()
-        )
+        assertThat(favoritesRepositoryImpl.getFavoriteComponentsSnapshot()).isEqualTo(setOf("com.new/Component"))
     }
 
     @Test
@@ -294,10 +289,7 @@ class FavoritesRepositoryImplTest {
         val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
         fakeDataStore.makeReadFail()
 
-        Assert.assertEquals(
-            emptySet<String>(),
-            favoritesRepositoryImpl.getFavoriteComponentsSnapshot()
-        )
+        assertThat(favoritesRepositoryImpl.getFavoriteComponentsSnapshot()).isEqualTo(emptySet<String>())
     }
 
     @Test
@@ -313,10 +305,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.readFavoritesForEdit()
 
-        Assert.assertTrue(
-            "read failure must be Unavailable, not an empty Loaded",
-            result is FavoritesEditRead.Unavailable
-        )
+        assertWithMessage("read failure must be Unavailable, not an empty Loaded").that(result).isInstanceOf(FavoritesEditRead.Unavailable::class.java)
     }
 
     @Test
@@ -327,7 +316,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.addFavoriteComponent("com.test/Component")
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -337,7 +326,7 @@ class FavoritesRepositoryImplTest {
 
         val result = favoritesRepositoryImpl.removeFavoriteComponent("com.not.favorite/Component")
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     // ========== TOGGLE TESTS ==========
@@ -348,14 +337,14 @@ class FavoritesRepositoryImplTest {
         val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Initial leer
-        Assert.assertFalse(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
+        assertThat(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")).isFalse()
 
         // Act
         val result = favoritesRepositoryImpl.toggleFavoriteComponent("com.test/Component")
 
         // Assert
-        Assert.assertTrue("Should return true (added)", result)
-        Assert.assertTrue(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
+        assertWithMessage("Should return true (added)").that(result).isTrue()
+        assertThat(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")).isTrue()
     }
 
     @Test
@@ -366,14 +355,14 @@ class FavoritesRepositoryImplTest {
         val favoritesRepositoryImpl = FavoritesRepositoryImpl(fakeDataStore)
 
         // Verify initial state
-        Assert.assertTrue(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
+        assertThat(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")).isTrue()
 
         // Act
         val result = favoritesRepositoryImpl.toggleFavoriteComponent("com.test/Component")
 
         // Assert
-        Assert.assertFalse("Should return false (removed)", result)
-        Assert.assertFalse(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component"))
+        assertWithMessage("Should return false (removed)").that(result).isFalse()
+        assertThat(favoritesRepositoryImpl.isFavoriteComponent("com.test/Component")).isFalse()
     }
 
     // ========== SAVE & PURGE TESTS ==========
@@ -393,10 +382,10 @@ class FavoritesRepositoryImplTest {
 
         // Assert
         val saved = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertEquals(2, saved?.size)
-        Assert.assertTrue(saved?.contains("com.new/AppB") == true)
-        Assert.assertTrue(saved?.contains("com.new/AppC") == true)
-        Assert.assertFalse(saved?.contains("com.old/AppA") == true) // Alt überschrieben
+        assertThat(saved?.size).isEqualTo(2)
+        assertThat(saved?.contains("com.new/AppB") == true).isTrue()
+        assertThat(saved?.contains("com.new/AppC") == true).isTrue()
+        assertThat(saved?.contains("com.old/AppA") == true).isFalse() // Alt überschrieben
     }
 
     @Test
@@ -410,7 +399,7 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.saveFavoriteComponents(overLimit)
 
         val saved = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, saved?.size)
+        assertThat(saved?.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
     }
 
     @Test
@@ -426,8 +415,8 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.saveFavoriteComponents(components)
 
         val saved = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertEquals(AppConstants.MAX_FAVORITES_ON_HOME + 1, saved?.size)
-        Assert.assertTrue(saved?.contains("com.app1/AnotherComponent") == true)
+        assertThat(saved?.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME + 1)
+        assertThat(saved?.contains("com.app1/AnotherComponent") == true).isTrue()
     }
 
     @Test
@@ -442,7 +431,7 @@ class FavoritesRepositoryImplTest {
 
         // Assert
         val saved = fakeDataStore.data.first()[favoritesKey]
-        Assert.assertTrue(saved.isNullOrEmpty())
+        assertThat(saved.isNullOrEmpty()).isTrue()
     }
 
     @Test
@@ -456,7 +445,7 @@ class FavoritesRepositoryImplTest {
         favoritesRepositoryImpl.purgeRepository()
 
         // Assert
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
     }
 
     // ========== AUDIT-14 F1c/F2: distinctUntilChanged regression ==========
@@ -474,7 +463,7 @@ class FavoritesRepositoryImplTest {
             val repo = FavoritesRepositoryImpl(fakeDataStore)
 
             repo.favoriteComponentsFlow.test {
-                Assert.assertEquals(setOf("com.test/Component"), awaitItem())
+                assertThat(awaitItem()).isEqualTo(setOf("com.test/Component"))
 
                 // Simulate the per-launch usage tick: write an UNRELATED key.
                 val usageKey = longPreferencesKey("usage_count_com.other/App")
@@ -501,7 +490,7 @@ class FavoritesRepositoryImplTest {
             val repo = FavoritesRepositoryImpl(fakeDataStore)
 
             repo.favoriteComponentsFlow.test {
-                Assert.assertEquals(setOf("com.test/Component"), awaitItem())
+                assertThat(awaitItem()).isEqualTo(setOf("com.test/Component"))
 
                 fakeDataStore.updateData { prefs ->
                     prefs.toMutablePreferences().apply {
@@ -509,10 +498,7 @@ class FavoritesRepositoryImplTest {
                     }
                 }
 
-                Assert.assertEquals(
-                    setOf("com.test/Component", "com.test/Other"),
-                    awaitItem(),
-                )
+                assertThat(awaitItem()).isEqualTo(setOf("com.test/Component", "com.test/Other"))
             }
         }
 }

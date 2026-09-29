@@ -2,7 +2,7 @@ package com.github.reygnn.nyx_launcher.home.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,32 +47,32 @@ class GetDrawerAppsUseCaseTest {
     )
 
     @Test
-    fun sorts_by_display_name_case_insensitively() = runTest(mainDispatcherRule.dispatcher) {
+    fun sorts_by_display_name_case_insensitively() = runTest(mainDispatcherRule.testDispatcher) {
         val holder = FakeHolder().apply {
             updateApps(listOf(appInfo("banana"), appInfo("Apple"), appInfo("cherry")))
         }
-        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()
+        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.testDispatcher)()
         assertThat(result.map { it.label }).containsExactly("Apple", "banana", "cherry").inOrder()
         assertThat(result.all { it.customName == null }).isTrue()
     }
 
     @Test
-    fun empty_holder_times_out_to_empty_drawer() = runTest(mainDispatcherRule.dispatcher) {
+    fun empty_holder_times_out_to_empty_drawer() = runTest(mainDispatcherRule.testDispatcher) {
         // Holder never fed (cold start before the pump lands anything): the non-empty
         // prime never satisfies, times out, getCurrentApps() is empty → empty drawer.
         val holder = FakeHolder()
-        assertThat(GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()).isEmpty()
+        assertThat(GetDrawerAppsUseCase(holder, mainDispatcherRule.testDispatcher)()).isEmpty()
     }
 
     @Test
-    fun transient_empty_after_a_real_load_still_shows_last_good() = runTest(mainDispatcherRule.dispatcher) {
+    fun transient_empty_after_a_real_load_still_shows_last_good() = runTest(mainDispatcherRule.testDispatcher) {
         // The Option A win: a load lands, then a transient empty snapshot arrives; the
         // drawer must still show the last-good list, not blank.
         val holder = FakeHolder().apply {
             updateApps(listOf(appInfo("Apple"), appInfo("banana")))
             updateApps(emptyList())
         }
-        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.dispatcher)()
+        val result = GetDrawerAppsUseCase(holder, mainDispatcherRule.testDispatcher)()
         assertThat(result.map { it.label }).containsExactly("Apple", "banana").inOrder()
     }
 }

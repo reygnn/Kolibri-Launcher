@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import io.mockk.mockk
 
 import android.content.Context
@@ -17,7 +18,6 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -35,6 +35,9 @@ class BackupRepositoryImplMalformedTest {
     @get:Rule
     val timberRule = TimberRule()
 
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     // Fakes (Minimal setup, da wir erwarten, dass das Parsing fehlschlägt bevor Repos angefasst werden)
     private lateinit var favoritesRepo: FakeFavoritesRepository
     private lateinit var favoritesOrderRepo: FakeFavoritesOrderRepository
@@ -49,7 +52,6 @@ class BackupRepositoryImplMalformedTest {
     private val context: Context = mockk(relaxed = true)
 
     private lateinit var backupManager: BackupRepositoryImpl
-    private val testDispatcher = StandardTestDispatcher()
 
     // Import Options: Alles an, um maximalen Parsing-Druck zu erzeugen
     private val aggressiveOptions = ImportOptions(
@@ -94,7 +96,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles truncated JSON gracefully`() = runTest(testDispatcher) {
+    fun `importFromJson handles truncated JSON gracefully`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: JSON endet mitten im Stream (z.B. Download abgebrochen)
         val truncatedJson = """
             {
@@ -110,7 +112,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles wrong delimiters (semicolons instead of commas)`() = runTest(testDispatcher) {
+    fun `importFromJson handles wrong delimiters (semicolons instead of commas)`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: User hat JSON manuell editiert und Programmier-Syntax (;) benutzt
         val semicolonJson = """
             {
@@ -135,7 +137,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles unexpected characters and garbage`() = runTest(testDispatcher) {
+    fun `importFromJson handles unexpected characters and garbage`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: Datei ist korrupt oder Binärsalat
         val garbageJson = """
             {
@@ -153,7 +155,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles completely non-JSON text`() = runTest(testDispatcher) {
+    fun `importFromJson handles completely non-JSON text`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: User wählt eine .txt Datei mit Gedichten aus
         val plainText = "Dies ist keine Backup Datei. Dies ist ein Gedicht."
 
@@ -163,7 +165,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles JSON with missing closing braces`() = runTest(testDispatcher) {
+    fun `importFromJson handles JSON with missing closing braces`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: Klammern nicht geschlossen
         val openJson = """
             {
@@ -179,7 +181,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles JSON with trailing garbage`() = runTest(testDispatcher) {
+    fun `importFromJson handles JSON with trailing garbage`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: Valides JSON, aber danach kommt Müll (z.B. Copy-Paste Fehler)
         // Kotlinx ist standardmäßig strikt und erlaubt keinen Trailing Content.
         // JSONObject ignoriert oft Trailing Content.
@@ -205,7 +207,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson fails when required 'settings' object is missing`() = runTest(testDispatcher) {
+    fun `importFromJson fails when required 'settings' object is missing`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: JSON ist valide, aber inhaltlich falsch (kein settings block)
         val missingSettings = """
             {
@@ -223,7 +225,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles empty string`() = runTest(testDispatcher) {
+    fun `importFromJson handles empty string`() = runTest(mainDispatcherRule.testDispatcher) {
         // SCENARIO: Datei ist 0 Bytes
         val emptyString = ""
 
@@ -236,7 +238,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles JSON array instead of object`() = runTest(testDispatcher) {
+    fun `importFromJson handles JSON array instead of object`() = runTest(mainDispatcherRule.testDispatcher) {
         // Root ist Array statt Object
         val arrayJson = """["version", "1.0.0"]"""
 
@@ -246,7 +248,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles wrong type for settings (array instead of object)`() = runTest(testDispatcher) {
+    fun `importFromJson handles wrong type for settings (array instead of object)`() = runTest(mainDispatcherRule.testDispatcher) {
         val wrongTypeJson = """
         {
           "version": "1.0.0",
@@ -260,7 +262,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles wrong type for value (string instead of int)`() = runTest(testDispatcher) {
+    fun `importFromJson handles wrong type for value (string instead of int)`() = runTest(mainDispatcherRule.testDispatcher) {
         val wrongValueType = """
         {
           "version": "1.0.0",
@@ -282,7 +284,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles null values`() = runTest(testDispatcher) {
+    fun `importFromJson handles null values`() = runTest(mainDispatcherRule.testDispatcher) {
         val nullValues = """
         {
           "version": "1.0.0",
@@ -296,7 +298,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles only whitespace`() = runTest(testDispatcher) {
+    fun `importFromJson handles only whitespace`() = runTest(mainDispatcherRule.testDispatcher) {
         val whitespace = "   \n\t\r\n   "
 
         val result = backupManager.importFromJson(whitespace, aggressiveOptions)
@@ -305,7 +307,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles deeply nested structure`() = runTest(testDispatcher) {
+    fun `importFromJson handles deeply nested structure`() = runTest(mainDispatcherRule.testDispatcher) {
         // Potentieller Stack Overflow
         val deep = "{".repeat(1000) + "}".repeat(1000)
 
@@ -315,7 +317,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles missing version field gracefully`() = runTest(testDispatcher) {
+    fun `importFromJson handles missing version field gracefully`() = runTest(mainDispatcherRule.testDispatcher) {
         // Version ist optional für Backward-Compatibility
         val noVersion = """
         {
@@ -334,7 +336,7 @@ class BackupRepositoryImplMalformedTest {
     }
 
     @Test
-    fun `importFromJson handles BOM prefix`() = runTest(testDispatcher) {
+    fun `importFromJson handles BOM prefix`() = runTest(mainDispatcherRule.testDispatcher) {
         // UTF-8 BOM (Windows Notepad fügt das gerne ein)
         val bomJson = "\uFEFF" + """
         {

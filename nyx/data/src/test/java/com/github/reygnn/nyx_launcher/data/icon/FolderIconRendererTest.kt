@@ -3,9 +3,9 @@ package com.github.reygnn.nyx_launcher.data.icon
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.KolibriLog
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,9 +46,9 @@ class FolderIconRendererTest {
     private val members = listOf(ck("pa"), ck("pb"))
 
     @Test
-    fun second_render_of_same_folder_is_cached() = runTest(mainDispatcherRule.dispatcher) {
+    fun second_render_of_same_folder_is_cached() = runTest(mainDispatcherRule.testDispatcher) {
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.testDispatcher)
 
         renderer.render(members, 96)
         val afterFirst = loader.calls // two members composed
@@ -59,9 +59,9 @@ class FolderIconRendererTest {
     }
 
     @Test
-    fun clear_forces_a_recompose() = runTest(mainDispatcherRule.dispatcher) {
+    fun clear_forces_a_recompose() = runTest(mainDispatcherRule.testDispatcher) {
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.testDispatcher)
 
         renderer.render(members, 96)
         renderer.clear()
@@ -71,11 +71,11 @@ class FolderIconRendererTest {
     }
 
     @Test
-    fun an_incomplete_composite_is_not_cached_and_the_next_bind_retries() = runTest(mainDispatcherRule.dispatcher) {
+    fun an_incomplete_composite_is_not_cached_and_the_next_bind_retries() = runTest(mainDispatcherRule.testDispatcher) {
         // F11: one member fails to load transiently → the composite is incomplete and must NOT
         // be cached (else a blank quadrant sticks until an unrelated invalidation).
         val loader = CountingIconLoader().apply { failFor = setOf(ck("pb")) }
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.testDispatcher)
 
         renderer.render(members, 96)
         val afterIncomplete = loader.calls // pa ok + pb failed = 2
@@ -102,7 +102,11 @@ class FolderIconRendererTest {
         val previous = KolibriLog.taggedErrorHandler
         KolibriLog.taggedErrorHandler = { tag, t, _ -> captured += tag to t }
         try {
-            FolderIconRenderer(CountingIconLoader(), UnconfinedTestDispatcher())
+            FolderIconRenderer(
+                CountingIconLoader(),
+                // TESTING_CONVENTIONS exception 3: eager view on the rule's scheduler.
+                UnconfinedTestDispatcher(mainDispatcherRule.testDispatcher.scheduler),
+            )
         } finally {
             KolibriLog.taggedErrorHandler = previous
         }
@@ -111,11 +115,11 @@ class FolderIconRendererTest {
     }
 
     @Test
-    fun a_style_change_recomposes_under_the_new_key() = runTest(mainDispatcherRule.dispatcher) {
+    fun a_style_change_recomposes_under_the_new_key() = runTest(mainDispatcherRule.testDispatcher) {
         // F12: the composite cache is keyed by IconLoader.currentStyle, so flipping the style
         // authority is a cache miss (a mixed-style composite can't be served).
         val loader = CountingIconLoader()
-        val renderer = FolderIconRenderer(loader, mainDispatcherRule.dispatcher)
+        val renderer = FolderIconRenderer(loader, mainDispatcherRule.testDispatcher)
 
         renderer.render(members, 96)
         val afterFirst = loader.calls // 2

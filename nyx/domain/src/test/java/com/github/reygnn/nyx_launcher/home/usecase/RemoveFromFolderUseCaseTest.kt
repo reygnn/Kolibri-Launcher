@@ -11,7 +11,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -27,12 +27,12 @@ class RemoveFromFolderUseCaseTest {
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
 
     @Test
-    fun extract_persists_and_returns_extracted() = runTest(mainDispatcherRule.dispatcher) {
+    fun extract_persists_and_returns_extracted() = runTest(mainDispatcherRule.testDispatcher) {
         val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"), ck("pc")))
         val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 0, 0))), emptyList())
         val repo = FakeHomeLayoutRepository(start)
 
-        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.testDispatcher)(
             ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(0, 1, 1)),
         )
 
@@ -43,12 +43,12 @@ class RemoveFromFolderUseCaseTest {
     }
 
     @Test
-    fun member_not_in_folder_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun member_not_in_folder_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb")))
         val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 0, 0))), emptyList())
         val repo = FakeHomeLayoutRepository(start)
 
-        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.testDispatcher)(
             ItemId("f"), ck("zz"), DropTarget.Cell(CellPos(0, 1, 1)),
         )
 
@@ -57,14 +57,14 @@ class RemoveFromFolderUseCaseTest {
     }
 
     @Test
-    fun dissolve_persists_and_returns_folder_dissolved() = runTest(mainDispatcherRule.dispatcher) {
+    fun dissolve_persists_and_returns_folder_dissolved() = runTest(mainDispatcherRule.testDispatcher) {
         // B5: a two-member folder dissolves on extract — a save-triggering result. Only the
         // Extracted-save path was pinned; this pins the dissolve one.
         val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb")))
         val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 2, 3))), emptyList())
         val repo = FakeHomeLayoutRepository(start)
 
-        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.testDispatcher)(
             ItemId("f"), ck("pa"), DropTarget.Cell(CellPos(0, 0, 0)),
         )
 
@@ -73,14 +73,14 @@ class RemoveFromFolderUseCaseTest {
     }
 
     @Test
-    fun rejected_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun rejected_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         // B5: an off-grid target is Rejected → no write. Complements member_not_in_folder
         // (a NoOp no-save) by pinning the Rejected no-save at the use-case edge.
         val folder = HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"), ck("pc")))
         val start = HomeLayout(grid, 1, listOf(PlacedItem(folder, CellPos(0, 0, 0))), emptyList())
         val repo = FakeHomeLayoutRepository(start)
 
-        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.dispatcher)(
+        val result = RemoveFromFolderUseCase(repo, ids, mainDispatcherRule.testDispatcher)(
             ItemId("f"), ck("pb"), DropTarget.Cell(CellPos(0, 9, 9)), // off-grid
         )
 

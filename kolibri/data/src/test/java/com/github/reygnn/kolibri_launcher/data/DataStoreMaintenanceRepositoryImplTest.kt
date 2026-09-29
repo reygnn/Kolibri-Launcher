@@ -9,7 +9,8 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,8 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
@@ -79,18 +78,18 @@ class DataStoreMaintenanceRepositoryImplTest {
             it[orphanObsolete] = "stale"
         }
 
-        assertEquals(DataStoreMaintenanceRepository.Result.Removed(3), repo(dataStore).removeOrphanKeys())
+        assertThat(repo(dataStore).removeOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.Result.Removed(3))
 
         val prefs = dataStore.data.first()
         // Claimed keys untouched (exact + prefix).
-        assertEquals("file:///a.jpg", prefs[liveUri])
-        assertEquals("[]", prefs[liveLayers])
-        assertEquals("x", prefs[liveSetting])
-        assertEquals("My App", prefs[liveName])
+        assertThat(prefs[liveUri]).isEqualTo("file:///a.jpg")
+        assertThat(prefs[liveLayers]).isEqualTo("[]")
+        assertThat(prefs[liveSetting]).isEqualTo("x")
+        assertThat(prefs[liveName]).isEqualTo("My App")
         // Un-owned keys gone.
-        assertNull(prefs[orphanFlattened])
-        assertNull(prefs[orphanUsage])
-        assertNull(prefs[orphanObsolete])
+        assertThat(prefs[orphanFlattened]).isNull()
+        assertThat(prefs[orphanUsage]).isNull()
+        assertThat(prefs[orphanObsolete]).isNull()
     }
 
     @Test
@@ -98,8 +97,8 @@ class DataStoreMaintenanceRepositoryImplTest {
         val dataStore = FakeSettingsDataStore()
         dataStore.seed { it[liveUri] = "file:///a.jpg" }
 
-        assertEquals(DataStoreMaintenanceRepository.Result.Removed(0), repo(dataStore).removeOrphanKeys())
-        assertEquals("file:///a.jpg", dataStore.data.first()[liveUri])
+        assertThat(repo(dataStore).removeOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.Result.Removed(0))
+        assertThat(dataStore.data.first()[liveUri]).isEqualTo("file:///a.jpg")
     }
 
     @Test
@@ -112,22 +111,19 @@ class DataStoreMaintenanceRepositoryImplTest {
             it[orphanObsolete] = "stale"
         }
 
-        assertEquals(
-            DataStoreMaintenanceRepository.Result.Failed,
-            repo(dataStore, keyOwners = emptySet()).removeOrphanKeys(),
-        )
+        assertThat(repo(dataStore, keyOwners = emptySet()).removeOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.Result.Failed)
 
         // Nothing deleted — not even the genuine orphan — because the guard aborts before editing.
         val prefs = dataStore.data.first()
-        assertEquals("file:///a.jpg", prefs[liveUri])
-        assertEquals("stale", prefs[orphanObsolete])
+        assertThat(prefs[liveUri]).isEqualTo("file:///a.jpg")
+        assertThat(prefs[orphanObsolete]).isEqualTo("stale")
     }
 
     @Test
     fun `removeOrphanKeys reports Failed when the store edit throws - never masquerades as clean`() =
         runTest {
             val failing = FakeSettingsDataStore(updateError = IOException("disk full"))
-            assertEquals(DataStoreMaintenanceRepository.Result.Failed, repo(failing).removeOrphanKeys())
+            assertThat(repo(failing).removeOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.Result.Failed)
         }
 
     @Test
@@ -151,19 +147,16 @@ class DataStoreMaintenanceRepositoryImplTest {
 
         val result = repo(dataStore).previewOrphanKeys()
 
-        assertEquals(
-            DataStoreMaintenanceRepository.PreviewResult.Loaded(
+        assertThat(result).isEqualTo(DataStoreMaintenanceRepository.PreviewResult.Loaded(
                 listOf("obsolete_widget_key", "usage_com.foo", "wallpaper_flattened_path"),
-            ),
-            result,
-        )
+            ))
         // Dry run: the store is unchanged — every key (live AND orphan) still present.
         val prefs = dataStore.data.first()
-        assertEquals("file:///a.jpg", prefs[liveUri])
-        assertEquals("My App", prefs[liveName])
-        assertEquals("file:///c.webp", prefs[orphanFlattened])
-        assertEquals(setOf("1"), prefs[orphanUsage])
-        assertEquals("stale", prefs[orphanObsolete])
+        assertThat(prefs[liveUri]).isEqualTo("file:///a.jpg")
+        assertThat(prefs[liveName]).isEqualTo("My App")
+        assertThat(prefs[orphanFlattened]).isEqualTo("file:///c.webp")
+        assertThat(prefs[orphanUsage]).isEqualTo(setOf("1"))
+        assertThat(prefs[orphanObsolete]).isEqualTo("stale")
     }
 
     @Test
@@ -171,19 +164,13 @@ class DataStoreMaintenanceRepositoryImplTest {
         val dataStore = FakeSettingsDataStore()
         dataStore.seed { it[orphanObsolete] = "stale" }
 
-        assertEquals(
-            DataStoreMaintenanceRepository.PreviewResult.Failed,
-            repo(dataStore, keyOwners = emptySet()).previewOrphanKeys(),
-        )
+        assertThat(repo(dataStore, keyOwners = emptySet()).previewOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.PreviewResult.Failed)
     }
 
     @Test
     fun `previewOrphanKeys reports Failed when the read throws - never an empty list`() = runTest {
         val failing = FakeSettingsDataStore(readError = IOException("cannot read"))
-        assertEquals(
-            DataStoreMaintenanceRepository.PreviewResult.Failed,
-            repo(failing).previewOrphanKeys(),
-        )
+        assertThat(repo(failing).previewOrphanKeys()).isEqualTo(DataStoreMaintenanceRepository.PreviewResult.Failed)
     }
 
     @Test

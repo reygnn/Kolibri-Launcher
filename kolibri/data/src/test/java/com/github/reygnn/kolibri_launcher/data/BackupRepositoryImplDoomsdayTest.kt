@@ -6,7 +6,7 @@ import io.mockk.mockk
 import android.content.Context
 import android.graphics.Color
 import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions

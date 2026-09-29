@@ -4,6 +4,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -14,7 +15,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 class ObserveWallpaperBackdropUseCaseTest {
@@ -40,9 +40,6 @@ class ObserveWallpaperBackdropUseCaseTest {
 
         val emissions = useCase().toList()
 
-        assertEquals(
-            listOf(WallpaperBackdrop.SYSTEM_WALLPAPER, WallpaperBackdrop.BLACK),
-            emissions,
-        )
+        assertThat(emissions).isEqualTo(listOf(WallpaperBackdrop.SYSTEM_WALLPAPER, WallpaperBackdrop.BLACK))
     }
 }

@@ -1,7 +1,6 @@
 package com.github.reygnn.launcher.common.ui.wallpaperfab
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class LayerButtonsStateTest {
@@ -15,7 +14,7 @@ class LayerButtonsStateTest {
             layerCount = 0,
             activeLayerIndex = -1,
         )
-        assertTrue(state.addVisible)
+        assertThat(state.addVisible).isTrue()
     }
 
     @Test
@@ -25,9 +24,9 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = 1,
         )
-        assertFalse(state.deleteVisible)
-        assertFalse(state.upVisible)
-        assertFalse(state.downVisible)
+        assertThat(state.deleteVisible).isFalse()
+        assertThat(state.upVisible).isFalse()
+        assertThat(state.downVisible).isFalse()
     }
 
     @Test
@@ -37,9 +36,9 @@ class LayerButtonsStateTest {
             layerCount = 0,
             activeLayerIndex = -1,
         )
-        assertFalse(state.deleteVisible)
-        assertFalse(state.upVisible)
-        assertFalse(state.downVisible)
+        assertThat(state.deleteVisible).isFalse()
+        assertThat(state.upVisible).isFalse()
+        assertThat(state.downVisible).isFalse()
     }
 
     @Test
@@ -49,9 +48,9 @@ class LayerButtonsStateTest {
             layerCount = 2,
             activeLayerIndex = 0,
         )
-        assertTrue(state.deleteVisible)
-        assertTrue(state.upVisible)
-        assertTrue(state.downVisible)
+        assertThat(state.deleteVisible).isTrue()
+        assertThat(state.upVisible).isTrue()
+        assertThat(state.downVisible).isTrue()
     }
 
     // ========== ENABLED STATE - UP ==========
@@ -64,7 +63,7 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = 2,
         )
-        assertFalse(state.upEnabled)
+        assertThat(state.upEnabled).isFalse()
     }
 
     @Test
@@ -74,7 +73,7 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = 1,
         )
-        assertTrue(state.upEnabled)
+        assertThat(state.upEnabled).isTrue()
     }
 
     // ========== ENABLED STATE - DOWN ==========
@@ -86,7 +85,7 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = 0,
         )
-        assertFalse(state.downEnabled)
+        assertThat(state.downEnabled).isFalse()
     }
 
     @Test
@@ -96,7 +95,7 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = 1,
         )
-        assertTrue(state.downEnabled)
+        assertThat(state.downEnabled).isTrue()
     }
 
     // ========== ENABLED STATE - DELETE ==========
@@ -108,7 +107,7 @@ class LayerButtonsStateTest {
             layerCount = 3,
             activeLayerIndex = -1,
         )
-        assertFalse(state.deleteEnabled)
+        assertThat(state.deleteEnabled).isFalse()
     }
 
     @Test
@@ -118,7 +117,7 @@ class LayerButtonsStateTest {
             layerCount = 0,
             activeLayerIndex = 0,
         )
-        assertFalse(state.deleteEnabled)
+        assertThat(state.deleteEnabled).isFalse()
     }
 
     @Test
@@ -128,7 +127,7 @@ class LayerButtonsStateTest {
             layerCount = 2,
             activeLayerIndex = 0,
         )
-        assertTrue(state.deleteEnabled)
+        assertThat(state.deleteEnabled).isTrue()
     }
 
     // ========== EDGE CASE: SINGLE LAYER ==========
@@ -141,8 +140,8 @@ class LayerButtonsStateTest {
             layerCount = 1,
             activeLayerIndex = 0,
         )
-        assertTrue(state.deleteEnabled)
-        assertFalse(state.upEnabled)
-        assertFalse(state.downEnabled)
+        assertThat(state.deleteEnabled).isTrue()
+        assertThat(state.upEnabled).isFalse()
+        assertThat(state.downEnabled).isFalse()
     }
 }

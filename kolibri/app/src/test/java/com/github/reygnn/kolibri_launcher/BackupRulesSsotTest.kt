@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher
 
 import com.github.reygnn.launcher.core.AppConstants
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
@@ -43,15 +43,12 @@ class BackupRulesSsotTest {
 
     private fun sections(relPath: String, sectionTags: List<String>): Map<String, List<Rule>> {
         val file = File(relPath)
-        assertTrue(
-            "Backup-rules XML not found at ${file.absolutePath} — the test working " +
-                "directory must be the :app module root.",
-            file.exists()
-        )
+        assertWithMessage("Backup-rules XML not found at ${file.absolutePath} — the test working " +
+                "directory must be the :app module root.").that(file.exists()).isTrue()
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
         return sectionTags.associateWith { tag ->
             val nodes = doc.getElementsByTagName(tag)
-            assertTrue("$relPath is missing the <$tag> section.", nodes.length == 1)
+            assertWithMessage("$relPath is missing the <$tag> section.").that(nodes.length == 1).isTrue()
             fileRulesOf(nodes.item(0) as Element)
         }
     }
@@ -73,11 +70,8 @@ class BackupRulesSsotTest {
     fun `every backup section includes the whole datastore directory`() {
         ruleFiles.forEach { (path, sectionTags) ->
             sections(path, sectionTags).forEach { (section, rules) ->
-                assertTrue(
-                    "$path <$section> must <include domain=\"file\" path=\"$datastoreDir\"> " +
-                        "so the settings DataStore (and future stores) are backed up.",
-                    rules.any { it.tag == "include" && it.path == datastoreDir }
-                )
+                assertWithMessage("$path <$section> must <include domain=\"file\" path=\"$datastoreDir\"> " +
+                        "so the settings DataStore (and future stores) are backed up.").that(rules.any { it.tag == "include" && it.path == datastoreDir }).isTrue()
             }
         }
     }
@@ -86,12 +80,9 @@ class BackupRulesSsotTest {
     fun `every backup section excludes the consent store by its constant name`() {
         ruleFiles.forEach { (path, sectionTags) ->
             sections(path, sectionTags).forEach { (section, rules) ->
-                assertTrue(
-                    "$path <$section> must <exclude domain=\"file\" path=\"$consentFilePath\"> " +
+                assertWithMessage("$path <$section> must <exclude domain=\"file\" path=\"$consentFilePath\"> " +
                         "so ACRA consent never travels (must match " +
-                        "AppConstants.CONSENT_DATASTORE_NAME).",
-                    rules.any { it.tag == "exclude" && it.path == consentFilePath }
-                )
+                        "AppConstants.CONSENT_DATASTORE_NAME).").that(rules.any { it.tag == "exclude" && it.path == consentFilePath }).isTrue()
             }
         }
     }
@@ -100,10 +91,7 @@ class BackupRulesSsotTest {
     fun `no backup section re-includes the consent store`() {
         ruleFiles.forEach { (path, sectionTags) ->
             sections(path, sectionTags).forEach { (section, rules) ->
-                assertTrue(
-                    "$path <$section> must not <include> the consent file $consentFilePath.",
-                    rules.none { it.tag == "include" && it.path == consentFilePath }
-                )
+                assertWithMessage("$path <$section> must not <include> the consent file $consentFilePath.").that(rules.none { it.tag == "include" && it.path == consentFilePath }).isTrue()
             }
         }
     }

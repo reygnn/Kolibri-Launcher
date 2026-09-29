@@ -8,21 +8,21 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 /**
  * GOLDEN-MASTER characterization for the shared-installed-apps migration
@@ -109,9 +109,7 @@ class AppListSortMigrationCharacterizationTest {
     @Test
     fun `drawer output is alphabetical no matter the raw order`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.drawerApps, into = results)
         try {
             advanceUntilIdle()
 
@@ -119,10 +117,7 @@ class AppListSortMigrationCharacterizationTest {
             rawAppsFlow.value = listOf(appZ, appM, appA)
             advanceUntilIdle()
 
-            assertEquals(
-                listOf("Apple", "Mango", "Zebra"),
-                results.last().map { it.displayName },
-            )
+            assertThat(results.last().map { it.displayName }).isEqualTo(listOf("Apple", "Mango", "Zebra"))
         } finally {
             job.cancel()
         }
@@ -138,9 +133,7 @@ class AppListSortMigrationCharacterizationTest {
     @Test
     fun `reordering the same raw set emits no new drawer list`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.drawerApps, into = results)
         try {
             advanceUntilIdle()
 
@@ -152,15 +145,8 @@ class AppListSortMigrationCharacterizationTest {
             rawAppsFlow.value = listOf(appZ, appA, appM)
             advanceUntilIdle()
 
-            assertEquals(
-                countAfterFirst,
-                results.size,
-                "a pure reorder of the same set must not produce a new emission",
-            )
-            assertEquals(
-                listOf("Apple", "Mango", "Zebra"),
-                results.last().map { it.displayName },
-            )
+            assertWithMessage("a pure reorder of the same set must not produce a new emission").that(results.size).isEqualTo(countAfterFirst)
+            assertThat(results.last().map { it.displayName }).isEqualTo(listOf("Apple", "Mango", "Zebra"))
         } finally {
             job.cancel()
         }
@@ -174,9 +160,7 @@ class AppListSortMigrationCharacterizationTest {
     @Test
     fun `custom name is applied then sorted at the consumer`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val job = recordEmissions(useCase.drawerApps, into = results)
         try {
             advanceUntilIdle()
 
@@ -185,10 +169,7 @@ class AppListSortMigrationCharacterizationTest {
             customNamesFlow.value = mapOf(appZ.packageName to "Aardvark")
             advanceUntilIdle()
 
-            assertEquals(
-                listOf("Aardvark", "Apple", "Mango"),
-                results.last().map { it.displayName },
-            )
+            assertThat(results.last().map { it.displayName }).isEqualTo(listOf("Aardvark", "Apple", "Mango"))
         } finally {
             job.cancel()
         }

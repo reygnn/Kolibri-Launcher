@@ -2,9 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.ComponentKey
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertSame
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -23,8 +21,8 @@ class AppInfoTest {
     @Test
     fun `displayNameLower equals the locale-invariant lowercase of displayName`() {
         val app = appInfo("Camera ABC")
-        assertEquals("camera abc", app.displayNameLower)
-        assertEquals(app.displayName.lowercase(), app.displayNameLower)
+        assertThat(app.displayNameLower).isEqualTo("camera abc")
+        assertThat(app.displayNameLower).isEqualTo(app.displayName.lowercase())
     }
 
     @Test
@@ -32,7 +30,7 @@ class AppInfoTest {
         val renamed = appInfo("Original").copy(displayName = "Renamed VALUE")
         // If the key were a constructor default instead of a body val, copy would
         // carry the stale "original" key — this pins the recompute.
-        assertEquals("renamed value", renamed.displayNameLower)
+        assertThat(renamed.displayNameLower).isEqualTo("renamed value")
     }
 
     @Test
@@ -40,11 +38,11 @@ class AppInfoTest {
         // Same constructor args -> equal, even though the derived key also matches.
         val a = appInfo("App")
         val b = appInfo("App")
-        assertEquals(a, b)
-        assertEquals(a.hashCode(), b.hashCode())
+        assertThat(b).isEqualTo(a)
+        assertThat(b.hashCode()).isEqualTo(a.hashCode())
 
         // Different displayName -> not equal (sanity that equals still keys on it).
-        assertNotEquals(a, appInfo("Other"))
+        assertThat(appInfo("Other")).isNotEqualTo(a)
     }
 
     @Test
@@ -52,7 +50,7 @@ class AppInfoTest {
         val app = appInfo("Camera")
         // Body val, not a getter: the former getter allocated a new String per
         // read; the cache returns one instance (AUDIT-14 Nit §212).
-        assertSame(app.componentName, app.componentName)
+        assertThat(app.componentName).isSameInstanceAs(app.componentName)
     }
 
     @Test
@@ -63,7 +61,7 @@ class AppInfoTest {
             packageName = "com.example",
             className = ".MainActivity",
         )
-        assertEquals("com.example/com.example.MainActivity", shortForm.componentName)
+        assertThat(shortForm.componentName).isEqualTo("com.example/com.example.MainActivity")
     }
 
     @Test
@@ -74,7 +72,7 @@ class AppInfoTest {
             packageName = "com.example",
             className = "com.other.Activity",
         )
-        assertEquals("com.example/com.other.Activity", longForm.componentName)
+        assertThat(longForm.componentName).isEqualTo("com.example/com.other.Activity")
     }
 
     @Test
@@ -83,8 +81,8 @@ class AppInfoTest {
         // componentName is not a constructor param, so it never affects equals.
         val a = appInfo("App")
         val b = appInfo("App")
-        assertEquals(a, b)
-        assertEquals(a.componentName, b.componentName)
+        assertThat(b).isEqualTo(a)
+        assertThat(b.componentName).isEqualTo(a.componentName)
     }
 
     @Test
@@ -97,7 +95,7 @@ class AppInfoTest {
         )
         // The launcher builds its ComponentName from this — a relative spelling
         // must be expanded, or the launch would not resolve against the manifest.
-        assertEquals("com.example.MainActivity", shortForm.normalizedClassName)
+        assertThat(shortForm.normalizedClassName).isEqualTo("com.example.MainActivity")
     }
 
     @Test
@@ -108,7 +106,7 @@ class AppInfoTest {
             packageName = "com.example",
             className = "com.other.Activity",
         )
-        assertEquals("com.other.Activity", longForm.normalizedClassName)
+        assertThat(longForm.normalizedClassName).isEqualTo("com.other.Activity")
     }
 
     @Test
@@ -123,17 +121,14 @@ class AppInfoTest {
             packageName = "com.example",
             className = ".MainActivity",
         )
-        assertEquals(
-            "com.example/${shortForm.normalizedClassName}",
-            shortForm.componentName,
-        )
-        assertEquals("com.example/com.example.MainActivity", shortForm.componentName)
+        assertThat(shortForm.componentName).isEqualTo("com.example/${shortForm.normalizedClassName}")
+        assertThat(shortForm.componentName).isEqualTo("com.example/com.example.MainActivity")
     }
 
     @Test
     fun `normalizedClassName is cached - repeated reads return the same instance`() {
         val app = appInfo("Camera")
-        assertSame(app.normalizedClassName, app.normalizedClassName)
+        assertThat(app.normalizedClassName).isSameInstanceAs(app.normalizedClassName)
     }
 
     @Test
@@ -142,8 +137,8 @@ class AppInfoTest {
         // guarantee as displayNameLower / componentName.
         val a = appInfo("App")
         val b = appInfo("App")
-        assertEquals(a, b)
-        assertEquals(a.normalizedClassName, b.normalizedClassName)
+        assertThat(b).isEqualTo(a)
+        assertThat(b.normalizedClassName).isEqualTo(a.normalizedClassName)
     }
 
     // --- structured key (ComponentKey) + the projection drift anchor ---
@@ -154,8 +149,8 @@ class AppInfoTest {
         // structured-identity refactor cannot shift the string that every
         // component-keyed store and DiffUtil identity relies on.
         val app = appInfo("Camera")
-        assertEquals(app.key.flat, app.componentName)
-        assertEquals("com.example/MainActivity", app.componentName)
+        assertThat(app.componentName).isEqualTo(app.key.flat)
+        assertThat(app.componentName).isEqualTo("com.example/MainActivity")
     }
 
     @Test
@@ -168,17 +163,14 @@ class AppInfoTest {
         )
         // Identity uses the same normalization source as the launcher, so key,
         // componentName and normalizedClassName never disagree.
-        assertEquals(
-            ComponentKey("com.example", "com.example.MainActivity"),
-            shortForm.key,
-        )
-        assertEquals("com.example/com.example.MainActivity", shortForm.key.flat)
+        assertThat(shortForm.key).isEqualTo(ComponentKey("com.example", "com.example.MainActivity"))
+        assertThat(shortForm.key.flat).isEqualTo("com.example/com.example.MainActivity")
     }
 
     @Test
     fun `key is cached - repeated reads return the same instance`() {
         val app = appInfo("Camera")
-        assertSame(app.key, app.key)
+        assertThat(app.key).isSameInstanceAs(app.key)
     }
 
     @Test
@@ -187,7 +179,7 @@ class AppInfoTest {
         // it must never affect equals, or Flow distinctUntilChanged would change.
         val a = appInfo("App")
         val b = appInfo("App")
-        assertEquals(a, b)
-        assertEquals(a.key, b.key)
+        assertThat(b).isEqualTo(a)
+        assertThat(b.key).isEqualTo(a.key)
     }
 }

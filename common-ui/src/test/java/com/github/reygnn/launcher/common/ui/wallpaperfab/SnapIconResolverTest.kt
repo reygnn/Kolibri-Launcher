@@ -1,7 +1,7 @@
 package com.github.reygnn.launcher.common.ui.wallpaperfab
 
 import com.github.reygnn.launcher.common.ui.R
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class SnapIconResolverTest {
@@ -10,92 +10,68 @@ class SnapIconResolverTest {
 
     @Test
     fun `resolveMagnet returns on-icon when enabled`() {
-        assertEquals(R.drawable.ic_magnet_on, SnapIconResolver.resolveMagnet(true))
+        assertThat(SnapIconResolver.resolveMagnet(true)).isEqualTo(R.drawable.ic_magnet_on)
     }
 
     @Test
     fun `resolveMagnet returns off-icon when disabled`() {
-        assertEquals(R.drawable.ic_magnet_off, SnapIconResolver.resolveMagnet(false))
+        assertThat(SnapIconResolver.resolveMagnet(false)).isEqualTo(R.drawable.ic_magnet_off)
     }
 
     // ========== SNAP MODE (toggle icon) ==========
 
     @Test
     fun `resolveSnapMode returns rectangle icon for EDGE mode`() {
-        assertEquals(R.drawable.ic_rectangle_on, SnapIconResolver.resolveSnapMode(SnapMode.EDGE))
+        assertThat(SnapIconResolver.resolveSnapMode(SnapMode.EDGE)).isEqualTo(R.drawable.ic_rectangle_on)
     }
 
     @Test
     fun `resolveSnapMode returns center icon for CENTER mode`() {
-        assertEquals(R.drawable.ic_center_on, SnapIconResolver.resolveSnapMode(SnapMode.CENTER))
+        assertThat(SnapIconResolver.resolveSnapMode(SnapMode.CENTER)).isEqualTo(R.drawable.ic_center_on)
     }
 
     // ========== HORIZONTAL ==========
 
     @Test
     fun `resolveHorizontal EDGE enabled`() {
-        assertEquals(
-            R.drawable.ic_horizontal_edge_on,
-            SnapIconResolver.resolveHorizontal(enabled = true, mode = SnapMode.EDGE),
-        )
+        assertThat(SnapIconResolver.resolveHorizontal(enabled = true, mode = SnapMode.EDGE)).isEqualTo(R.drawable.ic_horizontal_edge_on)
     }
 
     @Test
     fun `resolveHorizontal EDGE disabled`() {
-        assertEquals(
-            R.drawable.ic_horizontal_edge_off,
-            SnapIconResolver.resolveHorizontal(enabled = false, mode = SnapMode.EDGE),
-        )
+        assertThat(SnapIconResolver.resolveHorizontal(enabled = false, mode = SnapMode.EDGE)).isEqualTo(R.drawable.ic_horizontal_edge_off)
     }
 
     @Test
     fun `resolveHorizontal CENTER enabled`() {
-        assertEquals(
-            R.drawable.ic_horizontal_center_on,
-            SnapIconResolver.resolveHorizontal(enabled = true, mode = SnapMode.CENTER),
-        )
+        assertThat(SnapIconResolver.resolveHorizontal(enabled = true, mode = SnapMode.CENTER)).isEqualTo(R.drawable.ic_horizontal_center_on)
     }
 
     @Test
     fun `resolveHorizontal CENTER disabled`() {
-        assertEquals(
-            R.drawable.ic_horizontal_center_off,
-            SnapIconResolver.resolveHorizontal(enabled = false, mode = SnapMode.CENTER),
-        )
+        assertThat(SnapIconResolver.resolveHorizontal(enabled = false, mode = SnapMode.CENTER)).isEqualTo(R.drawable.ic_horizontal_center_off)
     }
 
     // ========== VERTICAL ==========
 
     @Test
     fun `resolveVertical EDGE enabled`() {
-        assertEquals(
-            R.drawable.ic_vertical_edge_on,
-            SnapIconResolver.resolveVertical(enabled = true, mode = SnapMode.EDGE),
-        )
+        assertThat(SnapIconResolver.resolveVertical(enabled = true, mode = SnapMode.EDGE)).isEqualTo(R.drawable.ic_vertical_edge_on)
     }
 
     @Test
     fun `resolveVertical EDGE disabled`() {
-        assertEquals(
-            R.drawable.ic_vertical_edge_off,
-            SnapIconResolver.resolveVertical(enabled = false, mode = SnapMode.EDGE),
-        )
+        assertThat(SnapIconResolver.resolveVertical(enabled = false, mode = SnapMode.EDGE)).isEqualTo(R.drawable.ic_vertical_edge_off)
     }
 
     @Test
     fun `resolveVertical CENTER enabled`() {
-        assertEquals(
-            R.drawable.ic_vertical_center_on,
-            SnapIconResolver.resolveVertical(enabled = true, mode = SnapMode.CENTER),
-        )
+        assertThat(SnapIconResolver.resolveVertical(enabled = true, mode = SnapMode.CENTER)).isEqualTo(R.drawable.ic_vertical_center_on)
     }
 
     @Test
     fun `resolveVertical CENTER disabled`() {
-        assertEquals(
-            R.drawable.ic_vertical_center_off,
-            SnapIconResolver.resolveVertical(enabled = false, mode = SnapMode.CENTER),
-        )
+        assertThat(SnapIconResolver.resolveVertical(enabled = false, mode = SnapMode.CENTER)).isEqualTo(R.drawable.ic_vertical_center_off)
     }
 
     // ========== EXHAUSTIVENESS GUARD ==========

@@ -9,12 +9,11 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -89,15 +88,8 @@ class WallpaperViewBinderCancellationTest {
         val thrown = runCatching { binder.bind(view(), twoLayerState()) }.exceptionOrNull()
 
         // The two guarantees that actually matter, both under the parallel decode:
-        assertTrue(
-            "cancellation must reach the caller, not the silentError branch — got $thrown",
-            thrown is CancellationException
-        )
-        assertEquals(
-            "a cancelled render is not a crash — nothing may be reported",
-            emptyList<String>(),
-            loggedErrors
-        )
+        assertWithMessage("cancellation must reach the caller, not the silentError branch — got $thrown").that(thrown).isInstanceOf(CancellationException::class.java)
+        assertWithMessage("a cancelled render is not a crash — nothing may be reported").that(loggedErrors).isEqualTo(emptyList<String>())
         // NOTE: the old `loadedUris.size == 1` assertion was intentionally dropped.
         // The decode is now parallel: all layers' `async` bodies are pre-launched
         // before awaitAll suspends, and a spontaneously-thrown CancellationException
@@ -126,11 +118,8 @@ class WallpaperViewBinderCancellationTest {
 
             binder.bind(view, twoLayerState())
 
-            assertEquals("the surviving layer must still be added", 1, view.layerCount)
-            assertEquals("the failed layer must be reported once", 1, loggedErrors.size)
-            assertTrue(
-                "the report must name the failed layer — got ${loggedErrors.first()}",
-                loggedErrors.first().contains("L0")
-            )
+            assertWithMessage("the surviving layer must still be added").that(view.layerCount).isEqualTo(1)
+            assertWithMessage("the failed layer must be reported once").that(loggedErrors.size).isEqualTo(1)
+            assertWithMessage("the report must name the failed layer — got ${loggedErrors.first()}").that(loggedErrors.first().contains("L0")).isTrue()
         }
 }

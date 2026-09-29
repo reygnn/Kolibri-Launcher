@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
@@ -19,6 +19,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.onboarding.LaunchMode
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingEvent
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingViewModel
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -33,10 +34,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 @ExperimentalCoroutinesApi
 class OnboardingViewModelTest {
@@ -92,9 +90,9 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(3, uiState.selectableApps.size)
-        assertEquals("App 1", uiState.selectableApps[0].appInfo.displayName)
-        assertFalse(uiState.selectableApps[0].isSelected)
+        assertThat(uiState.selectableApps.size).isEqualTo(3)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App 1")
+        assertThat(uiState.selectableApps[0].isSelected).isFalse()
     }
 
     @Test
@@ -115,13 +113,10 @@ class OnboardingViewModelTest {
 
             val uiState = viewModel.uiState.value
             // The two resolved defaults are pre-selected; the third app is not.
-            assertEquals(
-                setOf("pkg1", "pkg3"),
-                uiState.selectedApps.map { it.packageName }.toSet(),
-            )
-            assertTrue(uiState.selectableApps.first { it.appInfo.packageName == "pkg1" }.isSelected)
-            assertFalse(uiState.selectableApps.first { it.appInfo.packageName == "pkg2" }.isSelected)
-            assertTrue(uiState.selectableApps.first { it.appInfo.packageName == "pkg3" }.isSelected)
+            assertThat(uiState.selectedApps.map { it.packageName }.toSet()).isEqualTo(setOf("pkg1", "pkg3"))
+            assertThat(uiState.selectableApps.first { it.appInfo.packageName == "pkg1" }.isSelected).isTrue()
+            assertThat(uiState.selectableApps.first { it.appInfo.packageName == "pkg2" }.isSelected).isFalse()
+            assertThat(uiState.selectableApps.first { it.appInfo.packageName == "pkg3" }.isSelected).isTrue()
         }
 
     @Test
@@ -133,7 +128,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -147,7 +142,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isFalse()
     }
 
     @Test
@@ -214,8 +209,8 @@ class OnboardingViewModelTest {
             viewModel.onDoneClicked()
 
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals(R.string.onboarding_error_save_failed, (event as OnboardingEvent.ShowError).messageResId)
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
+            assertThat((event as OnboardingEvent.ShowError).messageResId).isEqualTo(R.string.onboarding_error_save_failed)
         }
     }
 
@@ -239,11 +234,11 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowLimitReachedToast)
-            assertEquals(limit, event.limit)
+            assertIs<OnboardingEvent.ShowLimitReachedToast>(event)
+            assertThat(event.limit).isEqualTo(limit)
 
             val currentState = viewModel.uiState.value
-            assertEquals(limit, currentState.selectedApps.size)
+            assertThat(currentState.selectedApps.size).isEqualTo(limit)
         }
     }
 
@@ -255,7 +250,7 @@ class OnboardingViewModelTest {
         viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
         advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.showSetupExtras)
+        assertThat(viewModel.uiState.value.showSetupExtras).isTrue()
     }
 
     @Test
@@ -264,7 +259,7 @@ class OnboardingViewModelTest {
         viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
         advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.showSetupExtras)
+        assertThat(viewModel.uiState.value.showSetupExtras).isFalse()
     }
 
     // ========== RESTORE-BACKUP PATH ==========
@@ -286,7 +281,7 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
 
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -312,11 +307,8 @@ class OnboardingViewModelTest {
             viewModel.restoreBackupAndFinish("content://backup.zip")
 
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals(
-                R.string.onboarding_restore_limit_exceeded,
-                (event as OnboardingEvent.ShowError).messageResId
-            )
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
+            assertThat((event as OnboardingEvent.ShowError).messageResId).isEqualTo(R.string.onboarding_restore_limit_exceeded)
         }
         advanceUntilIdle()
 
@@ -334,11 +326,8 @@ class OnboardingViewModelTest {
             viewModel.restoreBackupAndFinish("content://backup.zip")
 
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals(
-                R.string.onboarding_restore_failed,
-                (event as OnboardingEvent.ShowError).messageResId
-            )
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
+            assertThat((event as OnboardingEvent.ShowError).messageResId).isEqualTo(R.string.onboarding_restore_failed)
         }
         advanceUntilIdle()
 
@@ -355,16 +344,13 @@ class OnboardingViewModelTest {
         viewModel.event.test {
             viewModel.restoreBackupAndFinish("content://backup.zip")
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals(
-                R.string.onboarding_restore_unsupported_version,
-                (event as OnboardingEvent.ShowError).messageResId
-            )
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
+            assertThat((event as OnboardingEvent.ShowError).messageResId).isEqualTo(R.string.onboarding_restore_unsupported_version)
         }
         advanceUntilIdle()
 
         coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
-        assertFalse(viewModel.uiState.value.isRestoring)
+        assertThat(viewModel.uiState.value.isRestoring).isFalse()
     }
 
     @Test
@@ -377,16 +363,13 @@ class OnboardingViewModelTest {
         viewModel.event.test {
             viewModel.restoreBackupAndFinish("content://backup.zip")
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
-            assertEquals(
-                R.string.onboarding_restore_invalid_format,
-                (event as OnboardingEvent.ShowError).messageResId
-            )
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
+            assertThat((event as OnboardingEvent.ShowError).messageResId).isEqualTo(R.string.onboarding_restore_invalid_format)
         }
         advanceUntilIdle()
 
         coVerify(exactly = 0) { markOnboardingCompletedUseCase() }
-        assertFalse(viewModel.uiState.value.isRestoring)
+        assertThat(viewModel.uiState.value.isRestoring).isFalse()
     }
 
     @Test
@@ -401,7 +384,7 @@ class OnboardingViewModelTest {
 
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -424,13 +407,13 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
                 // mark threw: UI re-enabled + error shown (not silent, not stuck).
-                assertTrue(awaitItem() is OnboardingEvent.ShowError)
-                assertFalse(viewModel.uiState.value.isRestoring)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.ShowError::class.java)
+                assertThat(viewModel.uiState.value.isRestoring).isFalse()
 
                 // A later Done must NOT wipe: the restored favorites were mirrored into
                 // the selection, so completeOnboardingUseCase saves THEM, not emptyList.
                 viewModel.onDoneClicked()
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -454,10 +437,10 @@ class OnboardingViewModelTest {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
 
                 val toast = awaitItem()
-                assertTrue(toast is OnboardingEvent.ShowMissingAppsToast)
-                assertEquals(3, (toast as OnboardingEvent.ShowMissingAppsToast).count)
+                assertThat(toast).isInstanceOf(OnboardingEvent.ShowMissingAppsToast::class.java)
+                assertThat((toast as OnboardingEvent.ShowMissingAppsToast).count).isEqualTo(3)
 
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -481,9 +464,9 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
                 val toast = awaitItem()
-                assertTrue(toast is OnboardingEvent.ShowDroppedLayersToast)
-                assertEquals(2, (toast as OnboardingEvent.ShowDroppedLayersToast).count)
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(toast).isInstanceOf(OnboardingEvent.ShowDroppedLayersToast::class.java)
+                assertThat((toast as OnboardingEvent.ShowDroppedLayersToast).count).isEqualTo(2)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -505,7 +488,7 @@ class OnboardingViewModelTest {
 
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -525,9 +508,9 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.restoreBackupAndFinish("content://backup.zip")
                 val toast = awaitItem()
-                assertTrue(toast is OnboardingEvent.ShowMissingAppsToast)
-                assertEquals(1, (toast as OnboardingEvent.ShowMissingAppsToast).count)
-                assertTrue(awaitItem() is OnboardingEvent.NavigateToMain)
+                assertThat(toast).isInstanceOf(OnboardingEvent.ShowMissingAppsToast::class.java)
+                assertThat((toast as OnboardingEvent.ShowMissingAppsToast).count).isEqualTo(1)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
             }
             advanceUntilIdle()
 
@@ -550,7 +533,7 @@ class OnboardingViewModelTest {
 
         viewModel.restoreBackupAndFinish("content://backup.zip")
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isRestoring)
+        assertThat(viewModel.uiState.value.isRestoring).isTrue()
 
         // A Done that fires while isRestoring is latched must be dropped by the
         // guard — it must NOT run completeOnboardingUseCase (which would save the
@@ -602,11 +585,11 @@ class OnboardingViewModelTest {
 
             // 6. Das Event wurde aufgefangen!
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.ShowError)
+            assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
 
             val uiState = viewModel.uiState.value
-            assertNotNull(uiState)
-            assertTrue(uiState.selectableApps.isEmpty())
+            assertThat(uiState).isNotNull()
+            assertThat(uiState.selectableApps.isEmpty()).isTrue()
         }
     }
 
@@ -629,10 +612,10 @@ class OnboardingViewModelTest {
                 advanceUntilIdle()
 
                 val event = awaitItem()
-                assertTrue(event is OnboardingEvent.ShowError)
+                assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
 
                 val uiState = viewModel.uiState.value
-                assertNotNull(uiState)
+                assertThat(uiState).isNotNull()
             }
         }
 
@@ -652,7 +635,7 @@ class OnboardingViewModelTest {
                 viewModel.onDoneClicked()
                 advanceUntilIdle()
                 val event = awaitItem()
-                assertTrue(event is OnboardingEvent.ShowError)
+                assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
             }
         }
 
@@ -677,7 +660,7 @@ class OnboardingViewModelTest {
                 coVerify { completeOnboardingUseCase(listOf(app1.componentName), true) }
 
                 val event = awaitItem()
-                assertTrue(event is OnboardingEvent.ShowError)
+                assertThat(event).isInstanceOf(OnboardingEvent.ShowError::class.java)
             }
         }
 
@@ -711,9 +694,9 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isFalse()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -753,8 +736,8 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size)
-        assertEquals("App 2", uiState.selectableApps[0].appInfo.displayName)
+        assertThat(uiState.selectableApps.size).isEqualTo(1)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App 2")
     }
 
     @Test
@@ -769,7 +752,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(3, uiState.selectableApps.size)
+        assertThat(uiState.selectableApps.size).isEqualTo(3)
     }
 
     @Test
@@ -781,8 +764,8 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size)
-        assertEquals("App 3", uiState.selectableApps[0].appInfo.displayName)
+        assertThat(uiState.selectableApps.size).isEqualTo(1)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App 3")
     }
 
     @Test
@@ -794,7 +777,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.isEmpty())
+        assertThat(uiState.selectableApps.isEmpty()).isTrue()
     }
 
     @Test
@@ -815,7 +798,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -826,8 +809,8 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(R.string.onboarding_title_welcome, uiState.titleResId)
-        assertEquals(R.string.onboarding_subtitle_welcome, uiState.subtitleResId)
+        assertThat(uiState.titleResId).isEqualTo(R.string.onboarding_title_welcome)
+        assertThat(uiState.subtitleResId).isEqualTo(R.string.onboarding_subtitle_welcome)
     }
 
     @Test
@@ -838,8 +821,8 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(R.string.onboarding_title_edit_favorites, uiState.titleResId)
-        assertEquals(R.string.onboarding_subtitle_edit_favorites, uiState.subtitleResId)
+        assertThat(uiState.titleResId).isEqualTo(R.string.onboarding_title_edit_favorites)
+        assertThat(uiState.subtitleResId).isEqualTo(R.string.onboarding_subtitle_edit_favorites)
     }
 
     @Test
@@ -848,11 +831,11 @@ class OnboardingViewModelTest {
 
         viewModel.setLaunchMode(LaunchMode.INITIAL_SETUP)
         advanceUntilIdle()
-        assertEquals(R.string.onboarding_title_welcome, viewModel.uiState.value.titleResId)
+        assertThat(viewModel.uiState.value.titleResId).isEqualTo(R.string.onboarding_title_welcome)
 
         viewModel.setLaunchMode(LaunchMode.EDIT_FAVORITES)
         advanceUntilIdle()
-        assertEquals(R.string.onboarding_title_edit_favorites, viewModel.uiState.value.titleResId)
+        assertThat(viewModel.uiState.value.titleResId).isEqualTo(R.string.onboarding_title_edit_favorites)
     }
 
     @Test
@@ -883,7 +866,7 @@ class OnboardingViewModelTest {
 
         val uiState = viewModel.uiState.value
         // Should be unselected (even number of toggles)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isFalse()
     }
 
     @Test
@@ -897,9 +880,9 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -944,7 +927,7 @@ class OnboardingViewModelTest {
             expectNoEvents() // No limit toast!
 
             val uiState = viewModel.uiState.value
-            assertEquals(limit, uiState.selectedApps.size)
+            assertThat(uiState.selectedApps.size).isEqualTo(limit)
         }
     }
 
@@ -960,9 +943,9 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals("App 1", uiState.selectedApps[0].displayName)
-        assertEquals("App 2", uiState.selectedApps[1].displayName)
-        assertEquals("App 3", uiState.selectedApps[2].displayName)
+        assertThat(uiState.selectedApps[0].displayName).isEqualTo("App 1")
+        assertThat(uiState.selectedApps[1].displayName).isEqualTo("App 2")
+        assertThat(uiState.selectedApps[2].displayName).isEqualTo("App 3")
     }
 
     @Test
@@ -978,7 +961,7 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is OnboardingEvent.NavigateToMain)
+            assertThat(event).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
         }
     }
 
@@ -994,9 +977,9 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size) // Filtered
-        assertEquals(1, uiState.selectedApps.size)    // Selected
-        assertTrue(uiState.selectableApps[0].isSelected)
+        assertThat(uiState.selectableApps.size).isEqualTo(1) // Filtered
+        assertThat(uiState.selectedApps.size).isEqualTo(1)    // Selected
+        assertThat(uiState.selectableApps[0].isSelected).isTrue()
     }
 
     @Test
@@ -1013,9 +996,9 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             val uiState = viewModel.uiState.value
-            assertEquals(1, uiState.selectableApps.size) // Only App 2 visible
-            assertEquals(1, uiState.selectedApps.size)    // But App 1 still selected!
-            assertEquals("App 1", uiState.selectedApps[0].displayName)
+            assertThat(uiState.selectableApps.size).isEqualTo(1) // Only App 2 visible
+            assertThat(uiState.selectedApps.size).isEqualTo(1)    // But App 1 still selected!
+            assertThat(uiState.selectedApps[0].displayName).isEqualTo("App 1")
         }
 
     @Test
@@ -1036,7 +1019,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(limit, uiState.selectedApps.size)
+        assertThat(uiState.selectedApps.size).isEqualTo(limit)
     }
 
     @Test
@@ -1048,7 +1031,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(3, uiState.selectableApps.size) // All apps shown
+        assertThat(uiState.selectableApps.size).isEqualTo(3) // All apps shown
     }
 
     @Test
@@ -1063,12 +1046,12 @@ class OnboardingViewModelTest {
         val uiState = viewModel.uiState.value
 
         // Check selectedApps
-        assertEquals(2, uiState.selectedApps.size)
+        assertThat(uiState.selectedApps.size).isEqualTo(2)
 
         // Check that selectableApps matches
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isFalse()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -1080,8 +1063,8 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectedApps.isEmpty())
-        assertTrue(uiState.selectableApps.all { !it.isSelected })
+        assertThat(uiState.selectedApps.isEmpty()).isTrue()
+        assertThat(uiState.selectableApps.all { !it.isSelected }).isTrue()
     }
 
     @Test
@@ -1097,10 +1080,10 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(2, uiState.selectedApps.size)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        assertThat(uiState.selectedApps.size).isEqualTo(2)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isFalse()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected).isTrue()
         // Resolution is fed the installed-apps list.
         coVerify { getDefaultFavoriteComponentsUseCase(testApps) }
     }
@@ -1123,13 +1106,13 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             val errorEvent = awaitItem()
-            assertTrue(errorEvent is OnboardingEvent.ShowError)
+            assertThat(errorEvent).isInstanceOf(OnboardingEvent.ShowError::class.java)
 
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
             val successEvent = awaitItem()
-            assertTrue(successEvent is OnboardingEvent.NavigateToMain)
+            assertThat(successEvent).isInstanceOf(OnboardingEvent.NavigateToMain::class.java)
 
             coVerify(exactly = 2) { completeOnboardingUseCase(any(), any()) }
         }
@@ -1151,11 +1134,11 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.loadInitialData()
                 advanceUntilIdle()
-                assertTrue(awaitItem() is OnboardingEvent.ShowError) // load-time failure
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.ShowError::class.java) // load-time failure
 
                 viewModel.onDoneClicked()
                 advanceUntilIdle()
-                assertTrue(awaitItem() is OnboardingEvent.ShowError) // save-gate blocked
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.ShowError::class.java) // save-gate blocked
             }
 
             coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }
@@ -1176,11 +1159,11 @@ class OnboardingViewModelTest {
             viewModel.event.test {
                 viewModel.loadInitialData()
                 advanceUntilIdle()
-                assertTrue(awaitItem() is OnboardingEvent.ShowError) // load-time (catch branch)
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.ShowError::class.java) // load-time (catch branch)
 
                 viewModel.onDoneClicked()
                 advanceUntilIdle()
-                assertTrue(awaitItem() is OnboardingEvent.ShowError) // save-gate blocked
+                assertThat(awaitItem()).isInstanceOf(OnboardingEvent.ShowError::class.java) // save-gate blocked
             }
 
             coVerify(exactly = 0) { completeOnboardingUseCase(any(), any()) }

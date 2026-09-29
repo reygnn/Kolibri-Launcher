@@ -1,8 +1,8 @@
 package com.github.reygnn.launcher.feature.crashreporting.resilience
 
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.acra.ReportField
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -16,8 +16,7 @@ class ReportContentTest {
 
     @Test
     fun `reportContent is exactly the seven minimal fields, in order`() {
-        assertEquals(
-            listOf(
+        assertThat(CrashReportingBootstrap.REPORT_CONTENT).isEqualTo(listOf(
                 ReportField.PACKAGE_NAME,
                 ReportField.ANDROID_VERSION,
                 ReportField.APP_VERSION_CODE,
@@ -25,21 +24,13 @@ class ReportContentTest {
                 ReportField.BRAND,
                 ReportField.PHONE_MODEL,
                 ReportField.STACK_TRACE,
-            ),
-            CrashReportingBootstrap.REPORT_CONTENT,
-        )
+            ))
     }
 
     @Test
     fun `reportContent excludes CUSTOM_DATA and LOGCAT`() {
-        assertEquals(7, CrashReportingBootstrap.REPORT_CONTENT.size)
-        assertFalse(
-            "CUSTOM_DATA must never be collected — it is the AUDIT-6 #4 race / PII surface (B4/B5)",
-            CrashReportingBootstrap.REPORT_CONTENT.contains(ReportField.CUSTOM_DATA),
-        )
-        assertFalse(
-            "LOGCAT must never be collected (B5)",
-            CrashReportingBootstrap.REPORT_CONTENT.contains(ReportField.LOGCAT),
-        )
+        assertThat(CrashReportingBootstrap.REPORT_CONTENT.size).isEqualTo(7)
+        assertWithMessage("CUSTOM_DATA must never be collected — it is the AUDIT-6 #4 race / PII surface (B4/B5)").that(CrashReportingBootstrap.REPORT_CONTENT.contains(ReportField.CUSTOM_DATA)).isFalse()
+        assertWithMessage("LOGCAT must never be collected (B5)").that(CrashReportingBootstrap.REPORT_CONTENT.contains(ReportField.LOGCAT)).isFalse()
     }
 }

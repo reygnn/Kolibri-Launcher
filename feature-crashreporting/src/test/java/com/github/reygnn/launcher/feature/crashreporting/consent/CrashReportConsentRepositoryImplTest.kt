@@ -8,15 +8,14 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentWriteResult
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -58,7 +57,7 @@ class CrashReportConsentRepositoryImplTest {
     fun `readState - when read fails - reports Unavailable`() = runTest {
         fakeDataStore.makeReadFail()
 
-        assertIs<ConsentReadResult.Unavailable>(repository.readState())
+        assertThat(repository.readState()).isInstanceOf(ConsentReadResult.Unavailable::class.java)
     }
 
     @Test
@@ -68,7 +67,7 @@ class CrashReportConsentRepositoryImplTest {
         // re-read the same garbage as "never asked" and re-prompt.
         fakeDataStore.setInitialData(preferencesOf(ConsentBootstrap.CONSENT_DECISION_KEY to "BOGUS"))
 
-        assertIs<ConsentReadResult.Unavailable>(repository.readState())
+        assertThat(repository.readState()).isInstanceOf(ConsentReadResult.Unavailable::class.java)
     }
 
     @Test
@@ -90,9 +89,9 @@ class CrashReportConsentRepositoryImplTest {
 
         val result = repository.setConsent(true)
 
-        assertIs<ConsentWriteResult.Failed>(result)
+        assertThat(result).isInstanceOf(ConsentWriteResult.Failed::class.java)
         // Read path is unaffected by the edit-fail flag; nothing was stored.
-        assertEquals(ConsentReadResult.Loaded(ConsentDecision.NeverAsked), repository.readState())
+        assertThat(repository.readState()).isEqualTo(ConsentReadResult.Loaded(ConsentDecision.NeverAsked))
     }
 
     @Test

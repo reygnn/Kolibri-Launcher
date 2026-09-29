@@ -29,7 +29,7 @@ import com.github.reygnn.nyx_launcher.home.usecase.DeleteFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveFromFolderUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RemoveItemUseCase
 import com.github.reygnn.nyx_launcher.home.usecase.RenameFolderUseCase
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -115,12 +115,12 @@ class HomeViewModelTest {
             RecordAppLaunchUseCase(appUsage),
             wallpaperDisplaySettings,
             notificationPresenceStore,
-            mainDispatcherRule.dispatcher,
+            mainDispatcherRule.testDispatcher,
         )
     }
 
     @Test
-    fun `notificationDots is gated by the toggle`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `notificationDots is gated by the toggle`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { getDrawerApps() } returns emptyList()
         notificationPresenceStore.update(setOf("com.a", "com.b"))
         val vm = createViewModel()
@@ -136,7 +136,7 @@ class HomeViewModelTest {
 
     @Test
     fun init_populates_drawerApps_from_a_non_empty_result() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(APP_A)
             val viewModel = createViewModel()
 
@@ -147,7 +147,7 @@ class HomeViewModelTest {
 
     @Test
     fun hideApp_then_unhideApp_updates_the_hidden_set() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(APP_A)
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -164,7 +164,7 @@ class HomeViewModelTest {
 
     @Test
     fun hide_already_hidden_or_unhide_not_hidden_is_a_no_op_write() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(APP_A)
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -187,7 +187,7 @@ class HomeViewModelTest {
 
     @Test
     fun refresh_returning_empty_after_populated_keeps_previous_list() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(APP_A)
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -203,7 +203,7 @@ class HomeViewModelTest {
 
     @Test
     fun refresh_returning_empty_while_empty_stays_empty() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -214,7 +214,7 @@ class HomeViewModelTest {
 
     @Test
     fun rapid_refresh_cancels_in_flight_query_and_newest_result_wins() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // First query is slow (SLOW), the second returns immediately (APP_B).
             var call = 0
             coEvery { getDrawerApps() } coAnswers {
@@ -238,7 +238,7 @@ class HomeViewModelTest {
 
     @Test
     fun move_forwards_to_move_item_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -250,7 +250,7 @@ class HomeViewModelTest {
 
     @Test
     fun place_forwards_to_place_item_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -262,7 +262,7 @@ class HomeViewModelTest {
 
     @Test
     fun onDrop_existing_routes_to_move_item_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -274,7 +274,7 @@ class HomeViewModelTest {
 
     @Test
     fun onDrop_new_app_routes_to_place_item_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -286,7 +286,7 @@ class HomeViewModelTest {
 
     @Test
     fun onDrop_folder_member_routes_to_remove_from_folder_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -299,7 +299,7 @@ class HomeViewModelTest {
 
     @Test
     fun remove_forwards_to_remove_item_use_case() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -311,7 +311,7 @@ class HomeViewModelTest {
 
     @Test
     fun apply_device_grid_forwards_the_measured_spec() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -323,7 +323,7 @@ class HomeViewModelTest {
 
     @Test
     fun create_drawer_folder_forwards_creating_a_folder_from_target_then_source() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -337,7 +337,7 @@ class HomeViewModelTest {
 
     @Test
     fun add_to_drawer_folder_forwards_adding_the_source_as_a_member() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
             drawerFolders.update {
@@ -353,7 +353,7 @@ class HomeViewModelTest {
 
     @Test
     fun extract_from_drawer_folder_forwards_shrinking_the_folder() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
             drawerFolders.update {
@@ -369,7 +369,7 @@ class HomeViewModelTest {
 
     @Test
     fun rename_drawer_folder_forwards_setting_the_new_title() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
             drawerFolders.update {
@@ -384,7 +384,7 @@ class HomeViewModelTest {
 
     @Test
     fun add_all_to_drawer_folder_forwards_bulk_membership() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
             drawerFolders.update {
@@ -400,7 +400,7 @@ class HomeViewModelTest {
 
     @Test
     fun drawer_vendor_groups_group_the_flat_app_list_by_maker() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(
                 LauncherApp(ComponentKey("com.google.a", "com.google.a.M"), "GA"),
                 LauncherApp(ComponentKey("com.google.b", "com.google.b.M"), "GB"),
@@ -414,7 +414,7 @@ class HomeViewModelTest {
 
     @Test
     fun addable_vendor_groups_exclude_current_members_and_drop_emptied_groups() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val g1 = ComponentKey("com.google.a", "com.google.a.M")
             val g2 = ComponentKey("com.google.b", "com.google.b.M")
             coEvery { getDrawerApps() } returns listOf(LauncherApp(g1, "GA"), LauncherApp(g2, "GB"))
@@ -432,7 +432,7 @@ class HomeViewModelTest {
 
     @Test
     fun installedKeys_maps_rawAppsFlow_to_the_component_key_set() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
             viewModel.installedKeys.test {
@@ -448,7 +448,7 @@ class HomeViewModelTest {
 
     @Test
     fun remove_missing_folder_member_forwards_to_delete_from_folder() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns emptyList()
             val viewModel = createViewModel()
 
@@ -460,7 +460,7 @@ class HomeViewModelTest {
 
     @Test
     fun confirm_self_uninstall_removes_the_id_scoped_placement() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // Removal is now result-gated in MainActivity — this is called ONLY on a confirmed
             // from-tile uninstall — so the ViewModel just drops the id-scoped placement. No
             // installed-set polling, so an external uninstall / cancelled dialog can no longer

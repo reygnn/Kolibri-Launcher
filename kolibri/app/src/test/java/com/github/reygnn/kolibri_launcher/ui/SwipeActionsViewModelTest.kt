@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetSwipeActionComponentUseCase
@@ -10,6 +10,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.swipeactions.SwipeActionsViewModel
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -19,9 +20,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -79,13 +77,13 @@ class SwipeActionsViewModelTest {
 
         // Assert
         val state = viewModel.uiState.value
-        assertEquals(3, state.selectableApps.size)
-        assertEquals(appA, state.appForLeft)
-        assertNull(state.appForRight)
+        assertThat(state.selectableApps.size).isEqualTo(3)
+        assertThat(state.appForLeft).isEqualTo(appA)
+        assertThat(state.appForRight).isNull()
 
         // App A should be marked as assigned to LEFT in the list
-        assertEquals(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, state.selectableApps.find { it.appInfo == appA }?.assignedSlot)
-        assertEquals(SwipeSlot.NONE, state.selectableApps.find { it.appInfo == appB }?.assignedSlot)
+        assertThat(state.selectableApps.find { it.appInfo == appA }?.assignedSlot).isEqualTo(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
+        assertThat(state.selectableApps.find { it.appInfo == appB }?.assignedSlot).isEqualTo(SwipeSlot.NONE)
     }
 
     @Test
@@ -98,7 +96,7 @@ class SwipeActionsViewModelTest {
         // persistence happens in onDoneClicked, which is never called here.
         viewModel.onAppSelected(appA)
         advanceUntilIdle()
-        assertEquals(appA, viewModel.uiState.value.appForLeft)
+        assertThat(viewModel.uiState.value.appForLeft).isEqualTo(appA)
 
         // Config change (rotation): the Activity re-creates and calls initialize()
         // again on the RETAINED ViewModel. Without the isInitialized guard this
@@ -106,7 +104,7 @@ class SwipeActionsViewModelTest {
         viewModel.initialize()
         advanceUntilIdle()
 
-        assertEquals(appA, viewModel.uiState.value.appForLeft)
+        assertThat(viewModel.uiState.value.appForLeft).isEqualTo(appA)
     }
 
     @Test
@@ -119,7 +117,7 @@ class SwipeActionsViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -131,17 +129,17 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Default is LEFT
-        assertEquals(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertThat(viewModel.uiState.value.currentSlotBeingAssigned).isEqualTo(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
 
         // Select RIGHT
         viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
         advanceUntilIdle()
-        assertEquals(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertThat(viewModel.uiState.value.currentSlotBeingAssigned).isEqualTo(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)
 
         // Select LEFT back
         viewModel.onSlotSelected(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
         advanceUntilIdle()
-        assertEquals(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, viewModel.uiState.value.currentSlotBeingAssigned)
+        assertThat(viewModel.uiState.value.currentSlotBeingAssigned).isEqualTo(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)
     }
 
     // ========== APP ASSIGNMENT LOGIC ==========
@@ -156,8 +154,8 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(appA, state.appForLeft)
-        assertNull(state.appForRight)
+        assertThat(state.appForLeft).isEqualTo(appA)
+        assertThat(state.appForRight).isNull()
     }
 
     @Test
@@ -168,12 +166,12 @@ class SwipeActionsViewModelTest {
         // Assign App A to LEFT
         viewModel.onAppSelected(appA)
         advanceUntilIdle()
-        assertEquals(appA, viewModel.uiState.value.appForLeft)
+        assertThat(viewModel.uiState.value.appForLeft).isEqualTo(appA)
 
         // Select App A again (toggle off)
         viewModel.onAppSelected(appA)
         advanceUntilIdle()
-        assertNull(viewModel.uiState.value.appForLeft)
+        assertThat(viewModel.uiState.value.appForLeft).isNull()
     }
 
     @Test
@@ -183,7 +181,7 @@ class SwipeActionsViewModelTest {
         viewModel.initialize()
         advanceUntilIdle()
 
-        assertEquals(appB, viewModel.uiState.value.appForRight)
+        assertThat(viewModel.uiState.value.appForRight).isEqualTo(appB)
 
         // Act: Active slot is LEFT. Select App B.
         viewModel.onAppSelected(appB)
@@ -191,8 +189,8 @@ class SwipeActionsViewModelTest {
 
         // Assert: App B moves to LEFT, RIGHT becomes empty
         val state = viewModel.uiState.value
-        assertEquals(appB, state.appForLeft)
-        assertNull(state.appForRight)
+        assertThat(state.appForLeft).isEqualTo(appB)
+        assertThat(state.appForRight).isNull()
     }
 
     @Test
@@ -212,8 +210,8 @@ class SwipeActionsViewModelTest {
 
         // Assert: App A moves to RIGHT, LEFT becomes empty
         val state = viewModel.uiState.value
-        assertEquals(appA, state.appForRight)
-        assertNull(state.appForLeft)
+        assertThat(state.appForRight).isEqualTo(appA)
+        assertThat(state.appForLeft).isNull()
     }
 
     @Test
@@ -229,8 +227,8 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         // Assert
-        assertNull(viewModel.uiState.value.appForLeft)
-        assertEquals(appB, viewModel.uiState.value.appForRight)
+        assertThat(viewModel.uiState.value.appForLeft).isNull()
+        assertThat(viewModel.uiState.value.appForRight).isEqualTo(appB)
     }
 
     // ========== SEARCH & FILTER TESTS ==========
@@ -244,8 +242,8 @@ class SwipeActionsViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.selectableApps.size)
-        assertEquals(appB, state.selectableApps[0].appInfo)
+        assertThat(state.selectableApps.size).isEqualTo(1)
+        assertThat(state.selectableApps[0].appInfo).isEqualTo(appB)
     }
 
     // ========== SAVING TESTS ==========
@@ -280,7 +278,7 @@ class SwipeActionsViewModelTest {
         viewModel.event.test {
             viewModel.onDoneClicked()
             val event = awaitItem()
-            assertEquals(UiEvent.NavigateUp, event)
+            assertThat(event).isEqualTo(UiEvent.NavigateUp)
         }
     }
 
@@ -296,10 +294,10 @@ class SwipeActionsViewModelTest {
 
             // Should show toast AND navigate up (fail-safe)
             val event1 = awaitItem()
-            assertTrue(event1 is UiEvent.ShowToast)
+            assertThat(event1).isInstanceOf(UiEvent.ShowToast::class.java)
 
             val event2 = awaitItem()
-            assertEquals(UiEvent.NavigateUp, event2)
+            assertThat(event2).isEqualTo(UiEvent.NavigateUp)
         }
     }
 
@@ -316,7 +314,7 @@ class SwipeActionsViewModelTest {
             // No write happened...
             coVerify(exactly = 0) { setSwipeActionUseCase(any<SwipeSlot>(), any()) }
             // ...but the tap is still not a dead end.
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.NavigateUp)
         }
     }
 }

@@ -49,13 +49,27 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  *    not testScope.backgroundScope. This ensures advanceUntilIdle() reaches
  *    all child coroutines.
  *
- * 5. Event collectors need UnconfinedTestDispatcher:
- *    `launch(UnconfinedTestDispatcher()) { vm.event.collect { ... } }`
- *    Otherwise the collector starts too late and misses events.
+ * 5. Observing flows — two tools, one per purpose:
+ *    a) The test asserts on the WHOLE set of emissions (`events.any { … }`,
+ *       `results.size`, `results.last()`): record them —
+ *         val events = mutableListOf<UiEvent>()
+ *         val job = recordEmissions(vm.event, into = events)
+ *         vm.doSomething(); advanceUntilIdle()
+ *         assertThat(events.none { it is UiEvent.ShowToast }).isTrue()
+ *         job.cancel()
+ *       recordEmissions (core testFixtures, com.github.reygnn.launcher.core.testing)
+ *       subscribes eagerly on the test's own scheduler, so event flows without
+ *       replay do not drop emissions and WhileSubscribed upstreams start.
+ *    b) The test expects emissions ONE BY ONE, in order: Turbine —
+ *         vm.state.test { assertThat(awaitItem()).isEqualTo(Loading); … }
  *
- * 6. WhileSubscribed flows need active subscribers:
- *    `launch(UnconfinedTestDispatcher()) { vm.someState.collect {} }`
- *    Without a subscriber, the upstream never starts and values stay at default.
+ * 6. WhileSubscribed flows need an active subscriber: recordEmissions (a) or
+ *    Turbine (b) provide one. Without a subscriber, the upstream never starts.
+ *
+ *    Never hand-roll a collector: no `launch(UnconfinedTestDispatcher()) { … }`,
+ *    no `backgroundScope.launch(...)` (see 4). UnconfinedTestDispatcher appears in
+ *    test code only inside recordEmissions and as exception 3 below. Detector A7
+ *    enforces this (tools/check-test-dispatcher.awk).
  *
  * ANTI-PATTERNS (will break tests silently):
  * ✗ private val testDispatcher = StandardTestDispatcher()  // second dispatcher!
@@ -63,10 +77,11 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  * ✗ @Before fun setUp() { Dispatchers.setMain(testDispatcher) }  // conflicts with rule!
  * ✗ testScope.runTest { }  // wrong scope, advanceUntilIdle won't work!
  *
- * EXCEPTIONS — when StandardTestDispatcher(testScheduler) IS needed:
+ * EXCEPTIONS — when a second dispatcher VIEW on the same scheduler IS needed:
  *
- * Both exceptions below construct a SECOND dispatcher but share the same
- * `testScheduler` from runTest. That keeps virtual time unified — it's not
+ * All three exceptions below construct a SECOND dispatcher but share the same
+ * scheduler (`testScheduler` inside runTest, `mainDispatcherRule.testDispatcher.scheduler`
+ * outside). That keeps virtual time unified — it's not
  * "two schedulers", it's one scheduler with two dispatcher views.
  *
  * 1. DelegateScopeTest
@@ -105,6 +120,15 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  *        construction) — by then the subscriber is already attached.
  *      - the flow is a StateFlow or SharedFlow with replay >= 1 — the
  *        late subscriber gets the cached value.
+ *
+ * 3. Eager-construction regression guards (UnconfinedTestDispatcher)
+ *    A test whose PURPOSE is to prove that something stays safe when it runs
+ *    eagerly — e.g. an init block that launches a collector which then runs
+ *    synchronously inside the constructor — needs an eager dispatcher. Use
+ *    UnconfinedTestDispatcher(mainDispatcherRule.testDispatcher.scheduler):
+ *    same scheduler, eager view. Never the parameterless form.
+ *    Reference: FolderIconRendererTest
+ *      .construction_is_init_order_safe_even_on_an_eager_dispatcher
  *
  * See: MainDispatcherRule.kt, AppManagementDelegateTest.kt (reference impl
  *      for delegate scope), OnboardingViewModelTest.kt (reference impl
@@ -150,7 +174,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  * IMPORTS
  * -------
  * Rule:    import com.github.reygnn.kolibri_launcher.rule.TimberRule       ✅
- *          import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule ✅
+ *          import com.github.reygnn.launcher.core.testing.MainDispatcherRule ✅
  * Not:     import com.github.reygnn.kolibri_launcher.rules.TimberRule       ❌ (falsches Package)
  *
  *

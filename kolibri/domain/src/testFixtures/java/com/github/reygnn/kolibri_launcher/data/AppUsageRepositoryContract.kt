@@ -3,13 +3,11 @@ package com.github.reygnn.kolibri_launcher.data
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -80,7 +78,7 @@ abstract class AppUsageRepositoryContract {
     @Test
     fun `fresh repository reports no usage data for any package`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 
     // ---------- recordPackageLaunch + hasUsageDataForPackage ----------
@@ -89,14 +87,14 @@ abstract class AppUsageRepositoryContract {
     fun `recordPackageLaunch makes hasUsageDataForPackage return true`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
-        assertTrue(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isTrue()
     }
 
     @Test
     fun `recordPackageLaunch on one package does not affect another`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(pkgB))
+        assertThat(repo.hasUsageDataForPackage(pkgB)).isFalse()
     }
 
     @Test
@@ -105,7 +103,7 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgA)
-        assertTrue(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isTrue()
     }
 
     // ---------- blank/null handling ----------
@@ -114,7 +112,7 @@ abstract class AppUsageRepositoryContract {
     fun `recordPackageLaunch with null is a no-op`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(null)
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 
     @Test
@@ -124,22 +122,22 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch("   ")
         // Wir können nicht direkt nach "" / "   " fragen (Repos lehnen die ja
         // auch beim has-Aufruf ab). Indirekt: nichts anderes wurde recorded.
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 
     @Test
     fun `hasUsageDataForPackage with null returns false`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(null))
+        assertThat(repo.hasUsageDataForPackage(null)).isFalse()
     }
 
     @Test
     fun `hasUsageDataForPackage with blank returns false`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(""))
-        assertFalse(repo.hasUsageDataForPackage("   "))
+        assertThat(repo.hasUsageDataForPackage("")).isFalse()
+        assertThat(repo.hasUsageDataForPackage("   ")).isFalse()
     }
 
     @Test
@@ -147,7 +145,7 @@ abstract class AppUsageRepositoryContract {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
         repo.removeUsageDataForPackage(null)
-        assertTrue(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isTrue()
     }
 
     @Test
@@ -156,7 +154,7 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.removeUsageDataForPackage("")
         repo.removeUsageDataForPackage("   ")
-        assertTrue(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isTrue()
     }
 
     // ---------- removeUsageDataForPackage ----------
@@ -166,7 +164,7 @@ abstract class AppUsageRepositoryContract {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
         repo.removeUsageDataForPackage(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 
     @Test
@@ -175,15 +173,15 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         repo.removeUsageDataForPackage(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
-        assertTrue(repo.hasUsageDataForPackage(pkgB))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
+        assertThat(repo.hasUsageDataForPackage(pkgB)).isTrue()
     }
 
     @Test
     fun `removeUsageDataForPackage on never-recorded package is safe`() = runTest {
         val repo = createRepository()
         repo.removeUsageDataForPackage(pkgA)
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 
     // ---------- sortAppsByTimeWeightedUsage: nur Multiset-Properties ----------
@@ -191,14 +189,14 @@ abstract class AppUsageRepositoryContract {
     @Test
     fun `sortAppsByTimeWeightedUsage with empty input returns empty`() = runTest {
         val repo = createRepository()
-        assertEquals(emptyList<AppInfo>(), repo.sortAppsByTimeWeightedUsage(emptyList(), emptyMap()))
+        assertThat(repo.sortAppsByTimeWeightedUsage(emptyList(), emptyMap())).isEqualTo(emptyList<AppInfo>())
     }
 
     @Test
     fun `sortAppsByTimeWeightedUsage with single app returns same single app`() = runTest {
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA))
-        assertEquals(input, repo.sortAppsByTimeWeightedUsage(input, emptyMap()))
+        assertThat(repo.sortAppsByTimeWeightedUsage(input, emptyMap())).isEqualTo(input)
     }
 
     /**
@@ -212,8 +210,8 @@ abstract class AppUsageRepositoryContract {
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB), appInfo("Gamma", pkgC))
         val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
-        assertEquals(input.size, output.size)
-        assertEquals(input.toSet(), output.toSet())
+        assertThat(output.size).isEqualTo(input.size)
+        assertThat(output.toSet()).isEqualTo(input.toSet())
     }
 
     @Test
@@ -223,7 +221,7 @@ abstract class AppUsageRepositoryContract {
         val repo = createRepository()
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB))
         val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
-        assertEquals(input.toSet(), output.toSet())
+        assertThat(output.toSet()).isEqualTo(input.toSet())
     }
 
     @Test
@@ -233,7 +231,7 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgB)
         val input = listOf(appInfo("Alpha", pkgA), appInfo("Beta", pkgB), appInfo("Gamma", pkgC))
         val output = repo.sortAppsByTimeWeightedUsage(input, emptyMap())
-        assertEquals(input.toSet(), output.toSet())
+        assertThat(output.toSet()).isEqualTo(input.toSet())
     }
 
     // ---------- getRecentlyLaunchedPackages ----------
@@ -249,7 +247,7 @@ abstract class AppUsageRepositoryContract {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
-        assertEquals(setOf(pkgA, pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
+        assertThat(repo.getRecentlyLaunchedPackages(10).toSet()).isEqualTo(setOf(pkgA, pkgB))
     }
 
     @Test
@@ -259,8 +257,8 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         val recent = repo.getRecentlyLaunchedPackages(10)
-        assertEquals(2, recent.size)
-        assertEquals(setOf(pkgA, pkgB), recent.toSet())
+        assertThat(recent.size).isEqualTo(2)
+        assertThat(recent.toSet()).isEqualTo(setOf(pkgA, pkgB))
     }
 
     @Test
@@ -269,21 +267,21 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         repo.recordPackageLaunch(pkgC)
-        assertEquals(2, repo.getRecentlyLaunchedPackages(2).size)
+        assertThat(repo.getRecentlyLaunchedPackages(2).size).isEqualTo(2)
     }
 
     @Test
     fun `getRecentlyLaunchedPackages with non-positive limit returns empty`() = runTest {
         val repo = createRepository()
         repo.recordPackageLaunch(pkgA)
-        assertTrue(repo.getRecentlyLaunchedPackages(0).isEmpty())
-        assertTrue(repo.getRecentlyLaunchedPackages(-1).isEmpty())
+        assertThat(repo.getRecentlyLaunchedPackages(0).isEmpty()).isTrue()
+        assertThat(repo.getRecentlyLaunchedPackages(-1).isEmpty()).isTrue()
     }
 
     @Test
     fun `getRecentlyLaunchedPackages on fresh repository is empty`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.getRecentlyLaunchedPackages(10).isEmpty())
+        assertThat(repo.getRecentlyLaunchedPackages(10).isEmpty()).isTrue()
     }
 
     @Test
@@ -292,7 +290,7 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         repo.removeUsageDataForPackage(pkgA)
-        assertEquals(setOf(pkgB), repo.getRecentlyLaunchedPackages(10).toSet())
+        assertThat(repo.getRecentlyLaunchedPackages(10).toSet()).isEqualTo(setOf(pkgB))
     }
 
     // ---------- usageSnapshotFlow ----------
@@ -324,14 +322,14 @@ abstract class AppUsageRepositoryContract {
         repo.recordPackageLaunch(pkgA)
         repo.recordPackageLaunch(pkgB)
         repo.purgeRepository()
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
-        assertFalse(repo.hasUsageDataForPackage(pkgB))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
+        assertThat(repo.hasUsageDataForPackage(pkgB)).isFalse()
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertFalse(repo.hasUsageDataForPackage(pkgA))
+        assertThat(repo.hasUsageDataForPackage(pkgA)).isFalse()
     }
 }

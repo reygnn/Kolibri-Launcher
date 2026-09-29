@@ -1,8 +1,7 @@
 package com.github.reygnn.launcher.core.timeinfo
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
@@ -28,9 +27,9 @@ class TimeEventFormatterTest {
         val time = createTime(14, 30, 0, 0)
 
         // 24h
-        assertEquals("14:30", formatter.formatAlarmTime(time, true, testLocale))
+        assertThat(formatter.formatAlarmTime(time, true, testLocale)).isEqualTo("14:30")
         // 12h
-        assertEquals("2:30 PM", formatter.formatAlarmTime(time, false, testLocale))
+        assertThat(formatter.formatAlarmTime(time, false, testLocale)).isEqualTo("2:30 PM")
     }
 
     @Test
@@ -40,7 +39,7 @@ class TimeEventFormatterTest {
         val time = createTime(14, 30, 1, 0)
 
         // Erwartung: 14:31
-        assertEquals("14:31", formatter.formatAlarmTime(time, true, testLocale))
+        assertThat(formatter.formatAlarmTime(time, true, testLocale)).isEqualTo("14:31")
     }
 
     @Test
@@ -49,7 +48,7 @@ class TimeEventFormatterTest {
         val time = createTime(14, 30, 0, 5)
 
         // Erwartung: 14:31
-        assertEquals("14:31", formatter.formatAlarmTime(time, true, testLocale))
+        assertThat(formatter.formatAlarmTime(time, true, testLocale)).isEqualTo("14:31")
     }
 
     @Test
@@ -57,7 +56,7 @@ class TimeEventFormatterTest {
         // 14:59:30 -> Sollte 15:00 werden
         val time = createTime(14, 59, 30, 0)
 
-        assertEquals("15:00", formatter.formatAlarmTime(time, true, testLocale))
+        assertThat(formatter.formatAlarmTime(time, true, testLocale)).isEqualTo("15:00")
     }
 
     @Test
@@ -65,7 +64,7 @@ class TimeEventFormatterTest {
         // 23:59:30 -> Sollte 00:00 (am nächsten Tag) werden
         val time = createTime(23, 59, 30, 0)
 
-        assertEquals("00:00", formatter.formatAlarmTime(time, true, testLocale))
+        assertThat(formatter.formatAlarmTime(time, true, testLocale)).isEqualTo("00:00")
     }
 
     @Test
@@ -74,7 +73,7 @@ class TimeEventFormatterTest {
         // Anders als dein Alarm-Logic, addieren wir hier NICHTS manuell.
         val time = createTime(14, 30, 30, 0)
 
-        assertEquals("14:30", formatter.formatCalendarTime(time, true, testLocale))
+        assertThat(formatter.formatCalendarTime(time, true, testLocale)).isEqualTo("14:30")
     }
 
     @Test
@@ -82,8 +81,8 @@ class TimeEventFormatterTest {
         val morning = createTime(9, 0, 0, 0)
         val evening = createTime(21, 0, 0, 0)
 
-        assertEquals("9:00 AM", formatter.formatCalendarTime(morning, false, testLocale))
-        assertEquals("9:00 PM", formatter.formatCalendarTime(evening, false, testLocale))
+        assertThat(formatter.formatCalendarTime(morning, false, testLocale)).isEqualTo("9:00 AM")
+        assertThat(formatter.formatCalendarTime(evening, false, testLocale)).isEqualTo("9:00 PM")
     }
 
     @Test
@@ -96,9 +95,9 @@ class TimeEventFormatterTest {
 
         // The type is now conveyed by a leading vector icon in the dialog adapter,
         // not by an inline glyph — the row text must start with the time.
-        assertTrue("expected no leading glyph, was: $row", row.startsWith("07:01"))
-        assertFalse("expected no bell glyph, was: $row", row.contains("⏰"))
-        assertTrue("expected title, was: $row", row.contains("Alarm"))
+        assertWithMessage("expected no leading glyph, was: $row").that(row.startsWith("07:01")).isTrue()
+        assertWithMessage("expected no bell glyph, was: $row").that(row.contains("⏰")).isFalse()
+        assertWithMessage("expected title, was: $row").that(row.contains("Alarm")).isTrue()
     }
 
     @Test
@@ -109,9 +108,9 @@ class TimeEventFormatterTest {
 
         val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
 
-        assertTrue("expected no leading glyph, was: $row", row.startsWith("14:30"))
-        assertFalse("expected no calendar glyph, was: $row", row.contains("📅"))
-        assertTrue("expected title, was: $row", row.contains("Standup"))
+        assertWithMessage("expected no leading glyph, was: $row").that(row.startsWith("14:30")).isTrue()
+        assertWithMessage("expected no calendar glyph, was: $row").that(row.contains("📅")).isFalse()
+        assertWithMessage("expected title, was: $row").that(row.contains("Standup")).isTrue()
     }
 
     @Test
@@ -123,9 +122,9 @@ class TimeEventFormatterTest {
 
         val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
 
-        assertTrue("expected all-day label, was: $row", row.startsWith(ALL_DAY))
-        assertFalse("expected no midnight time, was: $row", row.contains("00:00"))
-        assertTrue("expected title, was: $row", row.contains("Birthday"))
+        assertWithMessage("expected all-day label, was: $row").that(row.startsWith(ALL_DAY)).isTrue()
+        assertWithMessage("expected no midnight time, was: $row").that(row.contains("00:00")).isFalse()
+        assertWithMessage("expected title, was: $row").that(row.contains("Birthday")).isTrue()
     }
 
     @Test
@@ -136,8 +135,8 @@ class TimeEventFormatterTest {
 
         val row = formatter.formatEventRow(event, is24Hour = true, allDayLabel = ALL_DAY, locale = testLocale)
 
-        assertTrue("expected the alarm time, was: $row", row.startsWith("06:30"))
-        assertFalse("expected no all-day label, was: $row", row.contains(ALL_DAY))
+        assertWithMessage("expected the alarm time, was: $row").that(row.startsWith("06:30")).isTrue()
+        assertWithMessage("expected no all-day label, was: $row").that(row.contains(ALL_DAY)).isFalse()
     }
 
     // =========================================================================
@@ -169,7 +168,7 @@ class TimeEventFormatterTest {
 
     @Test
     fun `buildEventRows - empty input yields no rows`() {
-        assertTrue(formatter.buildEventRows(emptyList(), today, zone).isEmpty())
+        assertThat(formatter.buildEventRows(emptyList(), today, zone).isEmpty()).isTrue()
     }
 
     @Test
@@ -177,8 +176,8 @@ class TimeEventFormatterTest {
         val events = listOf(timedOn(today, 9, "A"), timedOn(today, 14, "B"))
         val rows = formatter.buildEventRows(events, today, zone)
 
-        assertEquals(2, rows.size)
-        assertTrue(rows.none { it is TimeEventFormatter.EventRow.TomorrowSeparator })
+        assertThat(rows.size).isEqualTo(2)
+        assertThat(rows.none { it is TimeEventFormatter.EventRow.TomorrowSeparator }).isTrue()
     }
 
     @Test
@@ -187,10 +186,10 @@ class TimeEventFormatterTest {
         val rows = formatter.buildEventRows(events, today, zone)
 
         // <separator>, A, B — the divider leads the list as a "tomorrow" marker.
-        assertEquals(3, rows.size)
-        assertTrue(rows[0] is TimeEventFormatter.EventRow.TomorrowSeparator)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.Item)
-        assertTrue(rows[2] is TimeEventFormatter.EventRow.Item)
+        assertThat(rows.size).isEqualTo(3)
+        assertThat(rows[0]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.Item::class.java)
+        assertThat(rows[2]).isInstanceOf(TimeEventFormatter.EventRow.Item::class.java)
     }
 
     @Test
@@ -203,15 +202,12 @@ class TimeEventFormatterTest {
         val rows = formatter.buildEventRows(events, today, zone)
 
         // T1, T2, <separator>, M1
-        assertEquals(4, rows.size)
-        assertTrue(rows[0] is TimeEventFormatter.EventRow.Item)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.Item)
-        assertTrue(rows[2] is TimeEventFormatter.EventRow.TomorrowSeparator)
-        assertTrue(rows[3] is TimeEventFormatter.EventRow.Item)
-        assertEquals(
-            "M1",
-            (rows[3] as TimeEventFormatter.EventRow.Item).event.title
-        )
+        assertThat(rows.size).isEqualTo(4)
+        assertThat(rows[0]).isInstanceOf(TimeEventFormatter.EventRow.Item::class.java)
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.Item::class.java)
+        assertThat(rows[2]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
+        assertThat(rows[3]).isInstanceOf(TimeEventFormatter.EventRow.Item::class.java)
+        assertThat((rows[3] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("M1")
     }
 
     @Test
@@ -220,10 +216,10 @@ class TimeEventFormatterTest {
         val events = listOf(allDayOn(today, "AllToday"), allDayOn(tomorrow, "AllTomorrow"))
         val rows = formatter.buildEventRows(events, today, zone)
 
-        assertEquals(3, rows.size)
-        assertEquals("AllToday", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
-        assertEquals("AllTomorrow", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+        assertThat(rows.size).isEqualTo(3)
+        assertThat((rows[0] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("AllToday")
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
+        assertThat((rows[2] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("AllTomorrow")
     }
 
     @Test
@@ -234,11 +230,11 @@ class TimeEventFormatterTest {
         )
         val rows = formatter.buildEventRows(events, today, zone)
 
-        assertEquals(3, rows.size)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
+        assertThat(rows.size).isEqualTo(3)
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
         val last = rows[2] as TimeEventFormatter.EventRow.Item
-        assertEquals("Wakeup", last.event.title)
-        assertEquals(TimeBasedEventType.ALARM, last.event.type)
+        assertThat(last.event.title).isEqualTo("Wakeup")
+        assertThat(last.event.type).isEqualTo(TimeBasedEventType.ALARM)
     }
 
     @Test
@@ -267,10 +263,10 @@ class TimeEventFormatterTest {
         val rows = formatter.buildEventRows(listOf(fallBackEvent, nextDayEvent), fallBackDay, dstZone)
 
         // FallBack (today), <separator>, NextDay — the 02:30 event stays in today.
-        assertEquals(3, rows.size)
-        assertEquals("FallBack", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
-        assertEquals("NextDay", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+        assertThat(rows.size).isEqualTo(3)
+        assertThat((rows[0] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("FallBack")
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
+        assertThat((rows[2] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("NextDay")
     }
 
     @Test
@@ -298,10 +294,10 @@ class TimeEventFormatterTest {
         val rows = formatter.buildEventRows(listOf(gapEvent, nextDayEvent), springForwardDay, dstZone)
 
         // SpringForward (today), <separator>, NextDay — the gap event stays in today.
-        assertEquals(3, rows.size)
-        assertEquals("SpringForward", (rows[0] as TimeEventFormatter.EventRow.Item).event.title)
-        assertTrue(rows[1] is TimeEventFormatter.EventRow.TomorrowSeparator)
-        assertEquals("NextDay", (rows[2] as TimeEventFormatter.EventRow.Item).event.title)
+        assertThat(rows.size).isEqualTo(3)
+        assertThat((rows[0] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("SpringForward")
+        assertThat(rows[1]).isInstanceOf(TimeEventFormatter.EventRow.TomorrowSeparator::class.java)
+        assertThat((rows[2] as TimeEventFormatter.EventRow.Item).event.title).isEqualTo("NextDay")
     }
 
     // =========================================================================
@@ -347,7 +343,7 @@ class TimeEventFormatterTest {
         // arithmetic in the device-default zone, so the default is pinned to Berlin.
         withDefaultZone("Europe/Berlin") {
             val gap = berlinInstant(2026, 3, 29, 1, 59, 30)
-            assertEquals("03:00", formatter.formatAlarmTime(gap, true, testLocale))
+            assertThat(formatter.formatAlarmTime(gap, true, testLocale)).isEqualTo("03:00")
         }
     }
 
@@ -359,7 +355,7 @@ class TimeEventFormatterTest {
         // limitation names ("an alarm set to a normal HH:00 has no sub-minute part").
         withDefaultZone("Europe/Berlin") {
             val onMinute = berlinInstant(2026, 3, 29, 1, 59, 0)
-            assertEquals("01:59", formatter.formatAlarmTime(onMinute, true, testLocale))
+            assertThat(formatter.formatAlarmTime(onMinute, true, testLocale)).isEqualTo("01:59")
         }
     }
 
@@ -372,7 +368,7 @@ class TimeEventFormatterTest {
         // does not.
         withDefaultZone("Europe/Berlin") {
             val fallBack = berlinInstant(2026, 10, 25, 1, 59, 30)
-            assertEquals("02:00", formatter.formatAlarmTime(fallBack, true, testLocale))
+            assertThat(formatter.formatAlarmTime(fallBack, true, testLocale)).isEqualTo("02:00")
         }
     }
 
@@ -389,7 +385,7 @@ class TimeEventFormatterTest {
             rows, is24Hour = true, allDayLabel = "All day",
             alarmFallbackLabel = "Alarm", calendarFallbackLabel = "Event", locale = testLocale,
         )
-        assertTrue(labels[0]!!.endsWith("Alarm"))
+        assertThat(labels[0]!!.endsWith("Alarm")).isTrue()
     }
 
     @Test
@@ -400,7 +396,7 @@ class TimeEventFormatterTest {
             ),
         )
         val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
-        assertTrue(labels[0]!!.endsWith("Event"))
+        assertThat(labels[0]!!.endsWith("Event")).isTrue()
     }
 
     @Test
@@ -411,14 +407,14 @@ class TimeEventFormatterTest {
             ),
         )
         val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
-        assertTrue(labels[0]!!.endsWith("Dentist"))
+        assertThat(labels[0]!!.endsWith("Dentist")).isTrue()
     }
 
     @Test
     fun `buildRowLabels - the tomorrow separator maps to null`() {
         val rows = listOf<TimeEventFormatter.EventRow>(TimeEventFormatter.EventRow.TomorrowSeparator)
         val labels = formatter.buildRowLabels(rows, true, "All day", "Alarm", "Event", testLocale)
-        assertEquals(null, labels[0])
+        assertThat(labels[0]).isEqualTo(null)
     }
 
     // --- Helper ---

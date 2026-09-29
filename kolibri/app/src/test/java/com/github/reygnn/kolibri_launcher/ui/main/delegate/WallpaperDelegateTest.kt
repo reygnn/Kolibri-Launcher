@@ -22,9 +22,11 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -44,11 +46,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -182,13 +179,13 @@ class WallpaperDelegateTest {
     @Test
     fun `initial wallpaperState is NONE`() {
         val delegate = createDelegate()
-        assertEquals(WallpaperState.NONE, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
     fun `initial isWallpaperEditMode is false`() {
         val delegate = createDelegate()
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
     // ===========================================
@@ -208,7 +205,7 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertEquals(testState, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(testState)
     }
 
     @Test
@@ -226,11 +223,11 @@ class WallpaperDelegateTest {
 
         delegate.start()
         advanceUntilIdle()
-        assertEquals(state1, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(state1)
 
         stateFlow.value = state2
         advanceUntilIdle()
-        assertEquals(state2, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(state2)
     }
 
     // ===========================================
@@ -486,13 +483,13 @@ class WallpaperDelegateTest {
 
         delegate.start()
         advanceUntilIdle()
-        assertEquals("start warms once via the collect loop", 1, flattenCalls.get())
+        assertWithMessage("start warms once via the collect loop").that(flattenCalls.get()).isEqualTo(1)
 
         delegate.onEnterWallpaperEditMode()
         delegate.onCancelWallpaperEditMode() // unchanged snapshot -> no emission; the funnel must warm
         advanceUntilIdle()
 
-        assertEquals("cancel must trigger a second warm through leaveEditMode", 2, flattenCalls.get())
+        assertWithMessage("cancel must trigger a second warm through leaveEditMode").that(flattenCalls.get()).isEqualTo(2)
     }
 
     /**
@@ -531,7 +528,7 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertEquals("same-key failure must not loop -> exactly one warm", 1, flattenCalls.get())
+        assertWithMessage("same-key failure must not loop -> exactly one warm").that(flattenCalls.get()).isEqualTo(1)
     }
 
     /**
@@ -570,15 +567,15 @@ class WallpaperDelegateTest {
 
         delegate.start()
         advanceUntilIdle() // warm #1 parks on the gate, refillInProgress == true
-        assertEquals(1, flattenCalls.get())
+        assertThat(flattenCalls.get()).isEqualTo(1)
 
         delegate.onDisplayConfigChanged() // refillCache -> single-flight guard -> early return
         advanceUntilIdle()
-        assertEquals("second trigger while in-flight must be dropped", 1, flattenCalls.get())
+        assertWithMessage("second trigger while in-flight must be dropped").that(flattenCalls.get()).isEqualTo(1)
 
         gate.complete(Unit)
         advanceUntilIdle()
-        assertEquals("same key -> no self-reschedule after completion", 1, flattenCalls.get())
+        assertWithMessage("same key -> no self-reschedule after completion").that(flattenCalls.get()).isEqualTo(1)
     }
 
     /**
@@ -615,13 +612,13 @@ class WallpaperDelegateTest {
 
         delegate.start()
         advanceUntilIdle()
-        assertEquals("start warms once via the collect loop", 1, flattenCalls.get())
+        assertWithMessage("start warms once via the collect loop").that(flattenCalls.get()).isEqualTo(1)
 
         delegate.onEnterWallpaperEditMode()
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
 
-        assertEquals("commit must trigger a second warm through leaveEditMode", 2, flattenCalls.get())
+        assertWithMessage("commit must trigger a second warm through leaveEditMode").that(flattenCalls.get()).isEqualTo(2)
     }
 
     /**
@@ -658,12 +655,12 @@ class WallpaperDelegateTest {
 
         delegate.start()
         advanceUntilIdle()
-        assertEquals(1, flattenCalls.get())
+        assertThat(flattenCalls.get()).isEqualTo(1)
 
         delegate.onDisplayConfigChanged()
         advanceUntilIdle()
 
-        assertEquals("config change must drive a re-warm", 2, flattenCalls.get())
+        assertWithMessage("config change must drive a re-warm").that(flattenCalls.get()).isEqualTo(2)
     }
 
     // ===========================================
@@ -696,7 +693,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -709,7 +706,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { setWallpaperImageUseCase.invoke(any()) }
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -721,7 +718,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -747,9 +744,9 @@ class WallpaperDelegateTest {
         // Synchronous — asserted BEFORE advanceUntilIdle (no persist round-trip yet). A
         // single-image wallpaper is the one-element layer list, so the transform lands
         // in layer 0.
-        assertEquals(2.0f, delegate.wallpaperState.value.layers.first().scale)
-        assertEquals(10f, delegate.wallpaperState.value.layers.first().translateX)
-        assertEquals(20f, delegate.wallpaperState.value.layers.first().translateY)
+        assertThat(delegate.wallpaperState.value.layers.first().scale).isEqualTo(2.0f)
+        assertThat(delegate.wallpaperState.value.layers.first().translateX).isEqualTo(10f)
+        assertThat(delegate.wallpaperState.value.layers.first().translateY).isEqualTo(20f)
 
         advanceUntilIdle()
         coVerify {
@@ -770,7 +767,7 @@ class WallpaperDelegateTest {
         delegate.onSaveWallpaperTransform(2.0f, 10f, 20f)
         advanceUntilIdle()
 
-        assertEquals(WallpaperState.NONE, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(WallpaperState.NONE)
         coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(any()) }
     }
 
@@ -796,7 +793,7 @@ class WallpaperDelegateTest {
         delegate.onClearWallpaper()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -808,7 +805,7 @@ class WallpaperDelegateTest {
         delegate.onClearWallpaper()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     /**
@@ -824,10 +821,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.clearAll() }
-        assertTrue(
-            "clearAll must run on the injected io dispatcher, not the main thread",
-            io.count > 0
-        )
+        assertWithMessage("clearAll must run on the injected io dispatcher, not the main thread").that(io.count > 0).isTrue()
     }
 
     /**
@@ -867,7 +861,7 @@ class WallpaperDelegateTest {
 
         delegate.start() // warm flatten parks on the gate, holding the regen lock
         advanceUntilIdle()
-        assertEquals(1, flattenCalls.get())
+        assertThat(flattenCalls.get()).isEqualTo(1)
 
         delegate.onClearWallpaper() // blocks on the held regen lock
         advanceUntilIdle()
@@ -877,7 +871,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         coVerify { clearWallpaperUseCase.invoke() }
-        assertEquals(WallpaperState.NONE, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(WallpaperState.NONE)
     }
 
     // ===========================================
@@ -890,7 +884,7 @@ class WallpaperDelegateTest {
 
         delegate.onSetWallpaperEditMode(true)
 
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
     }
 
     @Test
@@ -900,16 +894,16 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperEditMode(true)
         delegate.onSetWallpaperEditMode(false)
 
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
     fun `onToggleWallpaperEditMode toggles from false to true`() {
         val delegate = createDelegate()
 
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
         delegate.onToggleWallpaperEditMode()
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
     }
 
     @Test
@@ -919,7 +913,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperEditMode(true)
         delegate.onToggleWallpaperEditMode()
 
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
@@ -927,13 +921,13 @@ class WallpaperDelegateTest {
         val delegate = createDelegate()
 
         delegate.onToggleWallpaperEditMode() // false -> true
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
 
         delegate.onToggleWallpaperEditMode() // true -> false
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
 
         delegate.onToggleWallpaperEditMode() // false -> true
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
     }
 
     // ===========================================
@@ -989,20 +983,17 @@ class WallpaperDelegateTest {
 
         // Add is dispatched but not yet run (lazy dispatcher).
         delegate.onAddWallpaperLayer(testUri)
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
 
         // User cancels before the add's work runs — synchronous session teardown.
         delegate.onCancelWallpaperEditMode()
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
 
         // The add now runs across the closed session boundary.
         advanceUntilIdle()
 
         // The cancelled layer must not be persisted…
-        assertFalse(
-            "add from a closed session must not persist a layer",
-            delegate.wallpaperState.value.hasWallpaper
-        )
+        assertWithMessage("add from a closed session must not persist a layer").that(delegate.wallpaperState.value.hasWallpaper).isFalse()
         coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         // …and its orphaned file is cleaned up.
         verify { wallpaperFileManager.deleteFile(internalUriString) }
@@ -1020,17 +1011,14 @@ class WallpaperDelegateTest {
         delegate.onAddWallpaperLayer(testUri)
         // User commits before the add's work runs — keeps changes, no restore.
         delegate.onCommitWallpaperEditMode()
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
 
         // The add now runs after the commit and must persist its layer.
         advanceUntilIdle()
 
-        assertTrue(
-            "add resuming after commit must persist its layer",
-            delegate.wallpaperState.value.hasWallpaper
-        )
+        assertWithMessage("add resuming after commit must persist its layer").that(delegate.wallpaperState.value.hasWallpaper).isTrue()
         // Adding a layer to NONE yields the one-element layer list (a lone image).
-        assertEquals(1, delegate.wallpaperState.value.layerCount)
+        assertThat(delegate.wallpaperState.value.layerCount).isEqualTo(1)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
@@ -1046,9 +1034,9 @@ class WallpaperDelegateTest {
         // No session boundary crosses before the add runs.
         advanceUntilIdle()
 
-        assertTrue(delegate.wallpaperState.value.hasWallpaper)
+        assertThat(delegate.wallpaperState.value.hasWallpaper).isTrue()
         // Adding a layer to NONE yields the one-element layer list (a lone image).
-        assertEquals(1, delegate.wallpaperState.value.layerCount)
+        assertThat(delegate.wallpaperState.value.layerCount).isEqualTo(1)
         coVerify { saveWallpaperStateUseCase.invoke(match { it.hasWallpaper }) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(internalUriString) }
     }
@@ -1114,8 +1102,8 @@ class WallpaperDelegateTest {
         delegate.onRemoveWallpaperLayer(0)
 
         // No advanceUntilIdle: the removal must already be reflected in state.
-        assertEquals(1, delegate.wallpaperState.value.layerCount)
-        assertEquals("file:///b.jpg", delegate.wallpaperState.value.layers[0].imageUri)
+        assertThat(delegate.wallpaperState.value.layerCount).isEqualTo(1)
+        assertThat(delegate.wallpaperState.value.layers[0].imageUri).isEqualTo("file:///b.jpg")
     }
 
     @Test
@@ -1259,7 +1247,7 @@ class WallpaperDelegateTest {
 
         delegate.onEnterWallpaperEditMode()
 
-        assertTrue(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isTrue()
     }
 
     @Test
@@ -1269,7 +1257,7 @@ class WallpaperDelegateTest {
         delegate.onEnterWallpaperEditMode()
         delegate.onCommitWallpaperEditMode()
 
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
@@ -1279,7 +1267,7 @@ class WallpaperDelegateTest {
         delegate.onEnterWallpaperEditMode()
         delegate.onCancelWallpaperEditMode()
 
-        assertFalse(delegate.isWallpaperEditMode.value)
+        assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
@@ -1380,10 +1368,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         verify { wallpaperFileManager.deleteFile(layerUri) }
-        assertTrue(
-            "deleteFile must run on the injected io dispatcher, not the main thread",
-            io.count > countAfterStart
-        )
+        assertWithMessage("deleteFile must run on the injected io dispatcher, not the main thread").that(io.count > countAfterStart).isTrue()
     }
 
     @Test
@@ -1484,13 +1469,13 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         // Sanity: state has diverged from the snapshot
-        assertEquals(newState, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(newState)
 
         // Key guarantee: in-memory state is reverted BEFORE any further
         // coroutine work — the caller (HomeFragment) relies on this so
         // it can immediately feed the restored value into updateWallpaper().
         delegate.onCancelWallpaperEditMode()
-        assertEquals(snapshotState, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(snapshotState)
     }
 
     @Test
@@ -1668,7 +1653,7 @@ class WallpaperDelegateTest {
 
         delegate.onCancelWallpaperEditMode()
         // Snapshot restored synchronously, before the async cleanup runs.
-        assertEquals(baseState, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(baseState)
 
         advanceUntilIdle()
         verify(exactly = 1) { wallpaperFileManager.deleteFile(internalUriString) }
@@ -1690,7 +1675,7 @@ class WallpaperDelegateTest {
         delegate.onClearWallpaper()
         advanceUntilIdle()
 
-        assertEquals(1, events.size)
+        assertThat(events.size).isEqualTo(1)
         job.cancel()
     }
 
@@ -1705,7 +1690,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperImage(testUri)          // picker path, no session
         advanceUntilIdle()
 
-        assertEquals(1, events.size)
+        assertThat(events.size).isEqualTo(1)
         job.cancel()
     }
 
@@ -1720,11 +1705,11 @@ class WallpaperDelegateTest {
         delegate.onEnterWallpaperEditMode()
         delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
-        assertEquals("deferred while editing (scrim is hidden there)", 0, events.size)
+        assertWithMessage("deferred while editing (scrim is hidden there)").that(events.size).isEqualTo(0)
 
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
-        assertEquals("surfaces on commit", 1, events.size)
+        assertWithMessage("surfaces on commit").that(events.size).isEqualTo(1)
         job.cancel()
     }
 
@@ -1746,7 +1731,7 @@ class WallpaperDelegateTest {
         delegate.onCommitWallpaperEditMode()           // pan/zoom only -> no emit
         advanceUntilIdle()
 
-        assertEquals(0, events.size)
+        assertThat(events.size).isEqualTo(0)
         job.cancel()
     }
 
@@ -1774,7 +1759,7 @@ class WallpaperDelegateTest {
         delegate.onCommitWallpaperEditMode()
         advanceUntilIdle()
 
-        assertEquals(0, events.size)
+        assertThat(events.size).isEqualTo(0)
         job.cancel()
     }
 
@@ -1790,7 +1775,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperImage(testUri)          // copy fails -> early return, no emit
         advanceUntilIdle()
 
-        assertEquals(0, events.size)
+        assertThat(events.size).isEqualTo(0)
         job.cancel()
     }
 
@@ -1808,7 +1793,7 @@ class WallpaperDelegateTest {
         delegate.onCancelWallpaperEditMode()           // rollback -> no emit
         advanceUntilIdle()
 
-        assertEquals(0, events.size)
+        assertThat(events.size).isEqualTo(0)
         job.cancel()
     }
 
@@ -1840,7 +1825,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
         delegate.onCancelWallpaperEditMode()
 
-        assertEquals(snapshotState, delegate.wallpaperState.value)
+        assertThat(delegate.wallpaperState.value).isEqualTo(snapshotState)
     }
 
     // ===========================================
@@ -1888,10 +1873,7 @@ class WallpaperDelegateTest {
         advanceUntilIdle()
 
         verify(exactly = 1) { wallpaperFileManager.gcOrphans(any<Set<String>>()) }
-        assertTrue(
-            "gcOrphans must run on the injected io dispatcher, not the main thread",
-            io.count > 0
-        )
+        assertWithMessage("gcOrphans must run on the injected io dispatcher, not the main thread").that(io.count > 0).isTrue()
     }
 
     @Test
@@ -1941,15 +1923,12 @@ class WallpaperDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertNull("initial pending-focus must be null", delegate.pendingFocusLayerId.value)
+        assertWithMessage("initial pending-focus must be null").that(delegate.pendingFocusLayerId.value).isNull()
 
         delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
 
-        assertNotNull(
-            "after add, pending-focus must carry the new layer's id",
-            delegate.pendingFocusLayerId.value
-        )
+        assertWithMessage("after add, pending-focus must carry the new layer's id").that(delegate.pendingFocusLayerId.value).isNotNull()
     }
 
     @Test
@@ -1973,11 +1952,11 @@ class WallpaperDelegateTest {
         delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
 
-        assertNotNull(delegate.pendingFocusLayerId.value)
+        assertThat(delegate.pendingFocusLayerId.value).isNotNull()
 
         delegate.consumePendingFocusLayerId()
 
-        assertNull("consume must clear the signal", delegate.pendingFocusLayerId.value)
+        assertWithMessage("consume must clear the signal").that(delegate.pendingFocusLayerId.value).isNull()
     }
 
     @Test
@@ -2006,15 +1985,12 @@ class WallpaperDelegateTest {
         delegate.onAddWallpaperLayer(testUri)
         advanceUntilIdle()
 
-        assertNotNull(delegate.pendingFocusLayerId.value)
+        assertThat(delegate.pendingFocusLayerId.value).isNotNull()
 
         delegate.onCancelWallpaperEditMode()
         advanceUntilIdle()
 
-        assertNull(
-            "cancel must drop the pending-focus hint — the added layer no longer exists",
-            delegate.pendingFocusLayerId.value
-        )
+        assertWithMessage("cancel must drop the pending-focus hint — the added layer no longer exists").that(delegate.pendingFocusLayerId.value).isNull()
     }
 
     // ===========================================
@@ -2025,7 +2001,7 @@ class WallpaperDelegateTest {
     fun `fabPosition starts at DEFAULT when the use case has not emitted`() {
         val delegate = createDelegate()
         // initialValue of stateIn — the empty flow never emits.
-        assertEquals(com.github.reygnn.launcher.core.wallpaper.FabPosition.DEFAULT, delegate.fabPosition.value)
+        assertThat(delegate.fabPosition.value).isEqualTo(com.github.reygnn.launcher.core.wallpaper.FabPosition.DEFAULT)
     }
 
     @Test
@@ -2038,13 +2014,13 @@ class WallpaperDelegateTest {
         // on the test's backgroundScope so the test body owns no cancel.
         backgroundScope.launch { delegate.fabPosition.collect { } }
         advanceUntilIdle()
-        assertEquals(0.2f, delegate.fabPosition.value.xFraction)
-        assertEquals(0.3f, delegate.fabPosition.value.yFraction)
+        assertThat(delegate.fabPosition.value.xFraction).isEqualTo(0.2f)
+        assertThat(delegate.fabPosition.value.yFraction).isEqualTo(0.3f)
 
         flow.value = com.github.reygnn.launcher.core.wallpaper.FabPosition(xFraction = 0.7f, yFraction = 0.8f)
         advanceUntilIdle()
-        assertEquals(0.7f, delegate.fabPosition.value.xFraction)
-        assertEquals(0.8f, delegate.fabPosition.value.yFraction)
+        assertThat(delegate.fabPosition.value.xFraction).isEqualTo(0.7f)
+        assertThat(delegate.fabPosition.value.yFraction).isEqualTo(0.8f)
     }
 
     @Test
@@ -2067,7 +2043,7 @@ class WallpaperDelegateTest {
     fun `wallpaperBackdrop starts at DEFAULT when the use case has not emitted`() {
         // observe returns emptyFlow() (setUp) — stateIn holds its initialValue.
         val delegate = createDelegate()
-        assertEquals(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP, delegate.wallpaperBackdrop.value)
+        assertThat(delegate.wallpaperBackdrop.value).isEqualTo(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
     }
 
     @Test
@@ -2079,11 +2055,11 @@ class WallpaperDelegateTest {
         // StateIn(WhileSubscribed) needs a collector before it leaves initialValue.
         backgroundScope.launch { delegate.wallpaperBackdrop.collect { } }
         advanceUntilIdle()
-        assertEquals(WallpaperBackdrop.BLACK, delegate.wallpaperBackdrop.value)
+        assertThat(delegate.wallpaperBackdrop.value).isEqualTo(WallpaperBackdrop.BLACK)
 
         flow.value = WallpaperBackdrop.SYSTEM_WALLPAPER
         advanceUntilIdle()
-        assertEquals(WallpaperBackdrop.SYSTEM_WALLPAPER, delegate.wallpaperBackdrop.value)
+        assertThat(delegate.wallpaperBackdrop.value).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -15,7 +16,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -54,30 +54,30 @@ class CustomNamesRepositoryImplTest {
 
         val displayName = customNamesManager.getDisplayNameForPackage(packageName, "Original Name")
 
-        Assert.assertEquals(customName, displayName)
+        assertThat(displayName).isEqualTo(customName)
     }
 
     @Test
     fun `getDisplayNameForPackage returns original name if no custom name exists`() = runTest {
         val displayName = customNamesManager.getDisplayNameForPackage("com.test.app", "Original Name")
 
-        Assert.assertEquals("Original Name", displayName)
+        assertThat(displayName).isEqualTo("Original Name")
     }
 
     @Test
     fun `setCustomNameForPackage calls edit to save the new name`() = runTest {
         val result = customNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
-        Assert.assertTrue(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(result).isTrue()
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
     fun `setCustomNameForPackage with blank string calls remove logic`() = runTest {
         val result = customNamesManager.setCustomNameForPackage("com.test.app", "  ")
 
-        Assert.assertTrue(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(result).isTrue()
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
@@ -86,12 +86,12 @@ class CustomNamesRepositoryImplTest {
         val nameKey = stringPreferencesKey(AppConstants.KEY_NAME_PREFIX + packageName)
         fakeDataStore.setInitialData(preferencesOf(nameKey to "Some Name"))
 
-        Assert.assertTrue(customNamesManager.hasCustomNameForPackage(packageName))
+        assertThat(customNamesManager.hasCustomNameForPackage(packageName)).isTrue()
     }
 
     @Test
     fun `hasCustomNameForPackage returns false when name does not exist`() = runTest {
-        Assert.assertFalse(customNamesManager.hasCustomNameForPackage("com.test.app"))
+        assertThat(customNamesManager.hasCustomNameForPackage("com.test.app")).isFalse()
     }
 
     @Test
@@ -100,7 +100,7 @@ class CustomNamesRepositoryImplTest {
 
         val result = customNamesManager.setCustomNameForPackage("com.test.app", "New Name")
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -120,7 +120,7 @@ class CustomNamesRepositoryImplTest {
 
         val result = customNamesManager.getDisplayNameForPackage("com.test.app", "Original")
 
-        Assert.assertEquals("Original", result)
+        assertThat(result).isEqualTo("Original")
     }
 
     @Test
@@ -132,21 +132,21 @@ class CustomNamesRepositoryImplTest {
 
         val result = manager.getDisplayNameForPackage("com.test.app", "Original")
 
-        Assert.assertEquals("Original", result)
+        assertThat(result).isEqualTo("Original")
     }
 
     @Test
     fun `hasCustomNameForPackage - when DataStore corrupted - returns false`() = runTest {
         fakeDataStore.makeReadFail()
 
-        Assert.assertFalse(customNamesManager.hasCustomNameForPackage("com.test.app"))
+        assertThat(customNamesManager.hasCustomNameForPackage("com.test.app")).isFalse()
     }
 
     @Test
     fun `removeCustomNameForPackage - when DataStore fails - returns false`() = runTest {
         fakeDataStore.makeEditFail()
 
-        Assert.assertFalse(customNamesManager.removeCustomNameForPackage("com.test.app"))
+        assertThat(customNamesManager.removeCustomNameForPackage("com.test.app")).isFalse()
     }
 
     @Test
@@ -184,9 +184,9 @@ class CustomNamesRepositoryImplTest {
 
         val result = customNamesManager.getAllCustomNames()
 
-        Assert.assertEquals(2, result.size)
-        Assert.assertEquals("Name 1", result["com.app1"])
-        Assert.assertEquals("Name 2", result["com.app2"])
+        assertThat(result.size).isEqualTo(2)
+        assertThat(result["com.app1"]).isEqualTo("Name 1")
+        assertThat(result["com.app2"]).isEqualTo("Name 2")
     }
 
     @Test
@@ -195,7 +195,7 @@ class CustomNamesRepositoryImplTest {
 
         val result = customNamesManager.getAllCustomNames()
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -204,22 +204,19 @@ class CustomNamesRepositoryImplTest {
             mapOf("com.app1" to "Name 1", "com.app2" to "Name 2")
         )
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
         // IMPORTANT: exactly ONE DataStore transaction for the whole batch (so
         // customNamesFlow also re-emits exactly once).
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
-        Assert.assertEquals(
-            mapOf("com.app1" to "Name 1", "com.app2" to "Name 2"),
-            customNamesManager.getAllCustomNames()
-        )
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+        assertThat(customNamesManager.getAllCustomNames()).isEqualTo(mapOf("com.app1" to "Name 1", "com.app2" to "Name 2"))
     }
 
     @Test
     fun `setCustomNamesInBatch - with empty map - does nothing`() = runTest {
         val result = customNamesManager.setCustomNamesInBatch(emptyMap())
 
-        Assert.assertTrue(result)
-        Assert.assertEquals(0, fakeDataStore.updateDataCallCount)
+        assertThat(result).isTrue()
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(0)
     }
 
     @Test
@@ -230,8 +227,8 @@ class CustomNamesRepositoryImplTest {
 
         customNamesManager.purgeRepository()
 
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
-        Assert.assertTrue(customNamesManager.getAllCustomNames().isEmpty())
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
+        assertThat(customNamesManager.getAllCustomNames().isEmpty()).isTrue()
     }
 
     @Test
@@ -242,6 +239,6 @@ class CustomNamesRepositoryImplTest {
         customNamesManager.purgeRepository()
 
         // FakeDataStore zählt den Versuch auch bei Fehler
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
     }
 }

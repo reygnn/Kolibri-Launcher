@@ -5,9 +5,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 
@@ -44,16 +44,13 @@ class SwipeActionsRepositoryImplTest {
 
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, "com.new/Component")
 
-        Assert.assertEquals(
-            "com.new/Component",
-            repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT),
-        )
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)).isEqualTo("com.new/Component")
     }
 
     @Test
     fun `getSwipeActionComponent - returns null for an unassigned slot`() = runTest {
         val repo = newRepo(FakeDataStore())
-        Assert.assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)).isNull()
     }
 
     @Test
@@ -64,6 +61,6 @@ class SwipeActionsRepositoryImplTest {
         store.setInitialData(preferencesOf(leftKey to "com.app/Component"))
         val repo = newRepo(store)
         store.makeReadFail()
-        Assert.assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)).isNull()
     }
 }

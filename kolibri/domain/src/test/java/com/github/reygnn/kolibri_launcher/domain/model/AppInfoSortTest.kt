@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.sortedByDisplayName
 import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.withDefaultLocale
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import java.util.Locale
 
@@ -33,10 +33,7 @@ class AppInfoSortTest {
         // 'b'=0x62) would do, putting "Cherry" before "banana".
         val apps = listOf(app("banana"), app("Apple"), app("Cherry"))
 
-        assertEquals(
-            listOf("Apple", "banana", "Cherry"),
-            apps.sortedByDisplayName().map { it.displayName },
-        )
+        assertThat(apps.sortedByDisplayName().map { it.displayName }).isEqualTo(listOf("Apple", "banana", "Cherry"))
     }
 
     @Test
@@ -46,15 +43,9 @@ class AppInfoSortTest {
         val system = app("Settings", pkg = "com.android.settings")
         val oem = app("Settings", pkg = "com.oem.settings")
 
-        assertEquals(
-            listOf("com.android.settings", "com.oem.settings"),
-            listOf(system, oem).sortedByDisplayName().map { it.packageName },
-        )
+        assertThat(listOf(system, oem).sortedByDisplayName().map { it.packageName }).isEqualTo(listOf("com.android.settings", "com.oem.settings"))
         // Reverse input → reverse output: proves stability, not a lucky pre-order.
-        assertEquals(
-            listOf("com.oem.settings", "com.android.settings"),
-            listOf(oem, system).sortedByDisplayName().map { it.packageName },
-        )
+        assertThat(listOf(oem, system).sortedByDisplayName().map { it.packageName }).isEqualTo(listOf("com.oem.settings", "com.android.settings"))
     }
 
     @Test
@@ -70,15 +61,12 @@ class AppInfoSortTest {
         withDefaultLocale(Locale.forLanguageTag("tr-TR")) {
             val apps = listOf(app("Jodel"), app("Instagram"), app("Adblock"))
 
-            assertEquals(
-                listOf("Adblock", "Instagram", "Jodel"),
-                apps.sortedByDisplayName().map { it.displayName },
-            )
+            assertThat(apps.sortedByDisplayName().map { it.displayName }).isEqualTo(listOf("Adblock", "Instagram", "Jodel"))
         }
     }
 
     @Test
     fun `empty list sorts to empty`() {
-        assertEquals(emptyList<AppInfo>(), emptyList<AppInfo>().sortedByDisplayName())
+        assertThat(emptyList<AppInfo>().sortedByDisplayName()).isEqualTo(emptyList<AppInfo>())
     }
 }

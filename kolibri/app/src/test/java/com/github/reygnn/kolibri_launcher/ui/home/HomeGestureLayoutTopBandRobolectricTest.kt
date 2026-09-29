@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui.home
 import android.content.Context
 import android.view.MotionEvent
 import androidx.test.core.app.ApplicationProvider
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -79,14 +79,14 @@ class HomeGestureLayoutTopBandRobolectricTest {
         // in-band test's swipeDowns == 0 is real suppression, not a weak move.
         flick(downX = 200f, downY = 700f, dx = 0f, dy = 600f)
 
-        assertEquals("a downward flick below the band must fire swipeDown", 1, swipeDowns)
+        assertWithMessage("a downward flick below the band must fire swipeDown").that(swipeDowns).isEqualTo(1)
     }
 
     @Test
     fun `a downward flick STARTING inside the top band does not dispatch swipeDown`() {
         flick(downX = 200f, downY = 5f, dx = 0f, dy = 600f)
 
-        assertEquals("a swipe-down starting in the top band is ceded to the shade", 0, swipeDowns)
+        assertWithMessage("a swipe-down starting in the top band is ceded to the shade").that(swipeDowns).isEqualTo(0)
     }
 
     @Test
@@ -95,8 +95,8 @@ class HomeGestureLayoutTopBandRobolectricTest {
         // still fire, proving the exclusion is scoped to swipe-down alone.
         flick(downX = 200f, downY = 5f, dx = 0f, dy = -600f)
 
-        assertEquals("swipeUp from the top band must stay live", 1, swipeUps)
-        assertEquals("no swipeDown must fire for an upward flick", 0, swipeDowns)
+        assertWithMessage("swipeUp from the top band must stay live").that(swipeUps).isEqualTo(1)
+        assertWithMessage("no swipeDown must fire for an upward flick").that(swipeDowns).isEqualTo(0)
     }
 
     @Test
@@ -107,12 +107,8 @@ class HomeGestureLayoutTopBandRobolectricTest {
         // sign convention.
         flick(downX = 200f, downY = 5f, dx = 600f, dy = 0f)
 
-        assertEquals(
-            "a horizontal flick from the top band must fire exactly one side swipe",
-            1,
-            swipeLefts + swipeRights,
-        )
-        assertEquals("no swipeDown must fire for a horizontal flick", 0, swipeDowns)
+        assertWithMessage("a horizontal flick from the top band must fire exactly one side swipe").that(swipeLefts + swipeRights).isEqualTo(1)
+        assertWithMessage("no swipeDown must fire for a horizontal flick").that(swipeDowns).isEqualTo(0)
     }
 
     private companion object {

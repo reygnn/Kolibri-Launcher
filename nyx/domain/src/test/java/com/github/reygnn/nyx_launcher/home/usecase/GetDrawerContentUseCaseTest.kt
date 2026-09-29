@@ -9,7 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.LauncherApp
 import com.github.reygnn.nyx_launcher.home.repository.FakeAppUsageRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -151,7 +151,7 @@ class GetDrawerContentUseCaseTest {
 
     @Test
     fun `use case combines the live apps with the folder membership`() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val a = app("a"); val b = app("b"); val c = app("c")
             val repo = FakeDrawerFoldersRepository(folders(folder("f1", "Stuff", a, b)))
             val useCase = GetDrawerContentUseCase(repo, FakeHiddenAppsRepository(), FakeAppUsageRepository())
@@ -168,7 +168,7 @@ class GetDrawerContentUseCaseTest {
 
     @Test
     fun `use case filters the hidden set out of the loose apps`() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val a = app("a"); val b = app("b")
             val useCase = GetDrawerContentUseCase(
                 FakeDrawerFoldersRepository(),
@@ -183,7 +183,7 @@ class GetDrawerContentUseCaseTest {
 
     @Test
     fun `use case orders loose apps by usage when usage sort is on`() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val a = app("a"); val b = app("b"); val c = app("c")
             // b was launched, a and c were not → b ranks first, then a, c alphabetically.
             val usage = FakeAppUsageRepository()

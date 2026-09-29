@@ -2,13 +2,12 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -87,7 +86,7 @@ abstract class FavoritesOrderRepositoryContract {
     @Test
     fun `fresh repository emits empty list`() = runTest {
         val repo = createRepository()
-        assertEquals(emptyList<String>(), repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(emptyList<String>())
     }
 
     // ---------- saveOrder Roundtrip ----------
@@ -97,13 +96,13 @@ abstract class FavoritesOrderRepositoryContract {
         val repo = createRepository()
         val order = listOf(appA.componentName, appB.componentName)
         repo.saveOrder(order)
-        assertEquals(order, repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(order)
     }
 
     @Test
     fun `saveOrder returns true on success`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.saveOrder(listOf(appA.componentName)))
+        assertThat(repo.saveOrder(listOf(appA.componentName))).isTrue()
     }
 
     @Test
@@ -112,7 +111,7 @@ abstract class FavoritesOrderRepositoryContract {
         // Bewusst nicht-alphabetisch, damit "irgendeine Sortierung" als Bug auffällt.
         val order = listOf(appC.componentName, appA.componentName, appB.componentName)
         repo.saveOrder(order)
-        assertEquals(order, repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(order)
     }
 
     @Test
@@ -120,7 +119,7 @@ abstract class FavoritesOrderRepositoryContract {
         val repo = createRepository()
         repo.saveOrder(listOf(appA.componentName, appB.componentName))
         repo.saveOrder(listOf(appC.componentName))
-        assertEquals(listOf(appC.componentName), repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(listOf(appC.componentName))
     }
 
     @Test
@@ -128,7 +127,7 @@ abstract class FavoritesOrderRepositoryContract {
         val repo = createRepository()
         repo.saveOrder(listOf(appA.componentName))
         repo.saveOrder(emptyList())
-        assertEquals(emptyList<String>(), repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(emptyList<String>())
     }
 
     // ---------- sortFavoriteComponents: trivial cases ----------
@@ -140,7 +139,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = emptyList(),
             order = listOf(appA.componentName)
         )
-        assertEquals(emptyList<AppInfo>(), result)
+        assertThat(result).isEqualTo(emptyList<AppInfo>())
     }
 
     @Test
@@ -151,7 +150,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = listOf(appC, appA, appB),
             order = emptyList()
         )
-        assertEquals(listOf(appA, appB, appC), result)
+        assertThat(result).isEqualTo(listOf(appA, appB, appC))
     }
 
     // ---------- sortFavoriteComponents: Standard-Cases ----------
@@ -164,7 +163,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = listOf(appA, appB, appC),
             order = order
         )
-        assertEquals(listOf(appC, appA, appB), result)
+        assertThat(result).isEqualTo(listOf(appC, appA, appB))
     }
 
     @Test
@@ -176,7 +175,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = listOf(appC, appB, appA),
             order = listOf(appC.componentName)
         )
-        assertEquals(listOf(appC, appA, appB), result)
+        assertThat(result).isEqualTo(listOf(appC, appA, appB))
     }
 
     @Test
@@ -188,7 +187,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = listOf(appA, appB),
             order = listOf("com.ghost.app/.MainActivity", appB.componentName, appA.componentName)
         )
-        assertEquals(listOf(appB, appA), result)
+        assertThat(result).isEqualTo(listOf(appB, appA))
     }
 
     // ---------- sortFavoriteComponents: Divergenz-Tests ----------
@@ -219,7 +218,7 @@ abstract class FavoritesOrderRepositoryContract {
             favoriteApps = listOf(appA, appB),
             order = listOf(appA.componentName, appA.componentName, appB.componentName)
         )
-        assertEquals(listOf(appA, appB), result)
+        assertThat(result).isEqualTo(listOf(appA, appB))
     }
 
     /**
@@ -237,7 +236,7 @@ abstract class FavoritesOrderRepositoryContract {
         )
         // Alle drei Apps müssen drin sein — alphabetisch sortiert, weil keine
         // mit der Order matched.
-        assertEquals(listOf(appA, appB, appC), result)
+        assertThat(result).isEqualTo(listOf(appA, appB, appC))
     }
 
     // ---------- getFavoriteComponentsOrderSnapshot (authoritative read for backup) ----------
@@ -247,7 +246,7 @@ abstract class FavoritesOrderRepositoryContract {
         val repo = createRepository()
         val order = listOf(appC.componentName, appA.componentName, appB.componentName)
         repo.saveOrder(order)
-        assertEquals(order, repo.getFavoriteComponentsOrderSnapshot())
+        assertThat(repo.getFavoriteComponentsOrderSnapshot()).isEqualTo(order)
     }
 
     @Test
@@ -257,16 +256,13 @@ abstract class FavoritesOrderRepositoryContract {
         repo.saveOrder(listOf(appB.componentName, appC.componentName))
         // Core guarantee behind the backup-stale-replay fix: the snapshot read
         // returns the newest persisted order, not the one it replaced.
-        assertEquals(
-            listOf(appB.componentName, appC.componentName),
-            repo.getFavoriteComponentsOrderSnapshot()
-        )
+        assertThat(repo.getFavoriteComponentsOrderSnapshot()).isEqualTo(listOf(appB.componentName, appC.componentName))
     }
 
     @Test
     fun `getFavoriteComponentsOrderSnapshot on fresh repository is empty`() = runTest {
         val repo = createRepository()
-        assertEquals(emptyList<String>(), repo.getFavoriteComponentsOrderSnapshot())
+        assertThat(repo.getFavoriteComponentsOrderSnapshot()).isEqualTo(emptyList<String>())
     }
 
     // ---------- purgeRepository ----------
@@ -276,13 +272,13 @@ abstract class FavoritesOrderRepositoryContract {
         val repo = createRepository()
         repo.saveOrder(listOf(appA.componentName, appB.componentName))
         repo.purgeRepository()
-        assertEquals(emptyList<String>(), repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(emptyList<String>())
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(emptyList<String>(), repo.favoriteComponentsOrderFlow.first())
+        assertThat(repo.favoriteComponentsOrderFlow.first()).isEqualTo(emptyList<String>())
     }
 }

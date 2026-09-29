@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.customnames.RenameDecision
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -29,26 +29,26 @@ class RenameDecisionTest {
     @Test
     fun `decide returns Remove for empty input`() {
         val result = RenameDecision.decide(newName = "", originalName = originalName)
-        assertEquals(RenameDecision.Remove, result)
+        assertThat(result).isEqualTo(RenameDecision.Remove)
     }
 
     @Test
     fun `decide returns TooLong when input exceeds MAX_APP_NAME_LENGTH`() {
         val tooLong = "x".repeat(RenameDecision.MAX_APP_NAME_LENGTH + 1)
         val result = RenameDecision.decide(newName = tooLong, originalName = originalName)
-        assertEquals(RenameDecision.TooLong(RenameDecision.MAX_APP_NAME_LENGTH), result)
+        assertThat(result).isEqualTo(RenameDecision.TooLong(RenameDecision.MAX_APP_NAME_LENGTH))
     }
 
     @Test
     fun `decide returns Remove when input equals original name`() {
         val result = RenameDecision.decide(newName = originalName, originalName = originalName)
-        assertEquals(RenameDecision.Remove, result)
+        assertThat(result).isEqualTo(RenameDecision.Remove)
     }
 
     @Test
     fun `decide returns Set with new name in normal case`() {
         val result = RenameDecision.decide(newName = "Kamera", originalName = originalName)
-        assertEquals(RenameDecision.Set("Kamera"), result)
+        assertThat(result).isEqualTo(RenameDecision.Set("Kamera"))
     }
 
     // ------------------------------------------------------------------
@@ -60,7 +60,7 @@ class RenameDecisionTest {
         val atLimit = "x".repeat(RenameDecision.MAX_APP_NAME_LENGTH)
         val result = RenameDecision.decide(newName = atLimit, originalName = originalName)
         // 50 chars is allowed; the check uses strict greater-than, not >=.
-        assertEquals(RenameDecision.Set(atLimit), result)
+        assertThat(result).isEqualTo(RenameDecision.Set(atLimit))
     }
 
     @Test
@@ -69,7 +69,7 @@ class RenameDecisionTest {
         // Empty input is checked first, so this short-circuits to Remove
         // without ever reaching the equality branch. Either path yields
         // the same outcome here, but the test pins precedence.
-        assertEquals(RenameDecision.Remove, result)
+        assertThat(result).isEqualTo(RenameDecision.Remove)
     }
 
     @Test
@@ -81,7 +81,7 @@ class RenameDecisionTest {
         )
         // Length is checked before equality, so the user gets the
         // length-error feedback even when the name happens to match.
-        assertEquals(RenameDecision.TooLong(RenameDecision.MAX_APP_NAME_LENGTH), result)
+        assertThat(result).isEqualTo(RenameDecision.TooLong(RenameDecision.MAX_APP_NAME_LENGTH))
     }
 
     @Test
@@ -90,7 +90,7 @@ class RenameDecisionTest {
         // user-visible outcome the downstream ViewModel already produced, now
         // decided here at one place (see KDoc on RenameDecision.decide).
         val result = RenameDecision.decide(newName = "   ", originalName = originalName)
-        assertEquals(RenameDecision.Remove, result)
+        assertThat(result).isEqualTo(RenameDecision.Remove)
     }
 
     @Test
@@ -98,7 +98,7 @@ class RenameDecisionTest {
         // A lone U+0301 (combining acute) is visually empty. It must clear the
         // name, not persist an invisible label — the case a plain isBlank() misses.
         val result = RenameDecision.decide(newName = cp(0x0301), originalName = originalName)
-        assertEquals(RenameDecision.Remove, result)
+        assertThat(result).isEqualTo(RenameDecision.Remove)
     }
 
     @Test
@@ -106,12 +106,12 @@ class RenameDecisionTest {
         // U+1F41B (bug) renders fine, so it is a legitimate custom name, not blank.
         val emoji = cp(0x1F41B)
         val result = RenameDecision.decide(newName = emoji, originalName = originalName)
-        assertEquals(RenameDecision.Set(emoji), result)
+        assertThat(result).isEqualTo(RenameDecision.Set(emoji))
     }
 
     @Test
     fun `decide is case sensitive on equality check`() {
         val result = RenameDecision.decide(newName = "camera", originalName = "Camera")
-        assertEquals(RenameDecision.Set("camera"), result)
+        assertThat(result).isEqualTo(RenameDecision.Set("camera"))
     }
 }

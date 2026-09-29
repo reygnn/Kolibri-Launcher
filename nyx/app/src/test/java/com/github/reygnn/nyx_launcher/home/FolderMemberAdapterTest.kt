@@ -2,10 +2,13 @@ package com.github.reygnn.nyx_launcher.home
 
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.google.common.truth.Truth.assertThat
 import io.mockk.mockk
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -22,13 +25,16 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class FolderMemberAdapterTest {
 
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
     private val a = ck("com.a")
     private val b = ck("com.b")
 
     private fun adapter(installed: Set<ComponentKey>) = FolderMemberAdapter(
         iconLoader = mockk<IconLoader>(relaxed = true),
-        scope = TestScope(),
+        scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
         iconSizePx = 96,
         onLaunch = {},
         onStartDrag = { _, _ -> },

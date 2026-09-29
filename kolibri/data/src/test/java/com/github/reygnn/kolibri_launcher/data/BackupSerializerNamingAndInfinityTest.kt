@@ -6,6 +6,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.SerializationException
+import kotlin.test.assertFailsWith
 import org.junit.Assume.assumeTrue
 import org.junit.BeforeClass
 import org.junit.Test
@@ -94,22 +95,26 @@ class BackupSerializerNamingAndInfinityTest {
 
     // ---- Link 1: the app can never emit a non-finite float --------------
 
-    @Test(expected = SerializationException::class)
+    @Test
     fun `encode rejects positive Infinity - app can never write it`() {
         // kotlinx allowSpecialFloatingPointValues=false → encode throws.
         // The linchpin: no app-written backup can carry Infinity, so
         // validateJsonTypes not catching it on the app's own output is by
         // construction, not an oversight.
-        serializer.encodeToJsonString(
-            BackupData(settings = LauncherSettings(layoutScale = Float.POSITIVE_INFINITY)),
-        )
+        assertFailsWith<SerializationException> {
+            serializer.encodeToJsonString(
+                BackupData(settings = LauncherSettings(layoutScale = Float.POSITIVE_INFINITY)),
+            )
+        }
     }
 
-    @Test(expected = SerializationException::class)
+    @Test
     fun `encode rejects NaN - app can never write it`() {
-        serializer.encodeToJsonString(
-            BackupData(settings = LauncherSettings(wallpaperScale = Float.NaN)),
-        )
+        assertFailsWith<SerializationException> {
+            serializer.encodeToJsonString(
+                BackupData(settings = LauncherSettings(wallpaperScale = Float.NaN)),
+            )
+        }
     }
 
     // ---- Link 2: the app writes camelCase -------------------------------

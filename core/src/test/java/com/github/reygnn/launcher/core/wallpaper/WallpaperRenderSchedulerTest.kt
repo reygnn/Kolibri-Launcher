@@ -1,12 +1,12 @@
 package com.github.reygnn.launcher.core.wallpaper
 
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -32,7 +32,7 @@ class WallpaperRenderSchedulerTest {
         scheduler.render(this) { landed += "done" }
         advanceUntilIdle()
 
-        assertEquals(listOf("done"), landed)
+        assertThat(landed).isEqualTo(listOf("done"))
     }
 
     @Test
@@ -48,7 +48,7 @@ class WallpaperRenderSchedulerTest {
             landed += "old"
         }
         runCurrent()
-        assertTrue("old render must actually be in flight before it is superseded", oldStarted)
+        assertWithMessage("old render must actually be in flight before it is superseded").that(oldStarted).isTrue()
 
         // Newer state arrives while the old render is still suspended.
         scheduler.render(this) {
@@ -58,7 +58,7 @@ class WallpaperRenderSchedulerTest {
         advanceUntilIdle()
 
         // The stale old decode was cancelled mid-flight; only the newer one landed.
-        assertEquals(listOf("new"), landed)
+        assertThat(landed).isEqualTo(listOf("new"))
     }
 
     @Test
@@ -74,7 +74,7 @@ class WallpaperRenderSchedulerTest {
         scheduler.cancel()
         advanceUntilIdle()
 
-        assertTrue("cancelled render must not land its result", landed.isEmpty())
+        assertWithMessage("cancelled render must not land its result").that(landed.isEmpty()).isTrue()
     }
 
     @Test
@@ -89,6 +89,6 @@ class WallpaperRenderSchedulerTest {
         scheduler.render(this) { landed += "fresh" }
         advanceUntilIdle()
 
-        assertEquals(listOf("fresh"), landed)
+        assertThat(landed).isEqualTo(listOf("fresh"))
     }
 }

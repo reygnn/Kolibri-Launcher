@@ -40,8 +40,8 @@ set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"               # tools/ -> repo root
-conv="$repo_root/kolibri/tools/check-conventions.sh"    # kolibri orchestrator (canonical lists)
-nyx_conv="$repo_root/nyx/tools/check-conventions.sh"    # nyx orchestrator (its own lists)
+conv="$repo_root/tools/conventions/kolibri.conf"        # kolibri positive lists (A3)
+nyx_conv="$repo_root/tools/conventions/nyx.conf"        # nyx positive lists (A3)
 shared_lint="$repo_root/tools/shared-lint-files.sh"     # shared-module lists (neutral home)
 awkf="$script_dir/check-cancellation-rethrow.awk"
 
@@ -52,15 +52,24 @@ for f in "$conv" "$nyx_conv" "$shared_lint" "$awkf"; do
   fi
 done
 
-# Basenames already on a cancel whitelist — parsed live from BOTH orchestrators AND
+# Basenames already on a cancel whitelist — parsed live from BOTH app configs AND
 # the shared-module list (SHARED_CANCEL_FILES), so this tool never drifts from the
 # enforced set. Basename match: the one realistic cross-app collision (MainActivity.kt)
 # is on both lists, so excluding both is correct; any other same-name collision is rare
 # and only costs a re-report.
+# Positive lists are parsed live from the app configs (tools/conventions/*.conf,
+# SPEC_NYX_REWRITE A3) and the shared-module list, so this tool never drifts from the
+# enforced set. conf_list NAME FILE prints the entries of bash array NAME in FILE
+# (handles both multi-line arrays and the one-line empty form `NAME=()`).
+conf_list() {
+  awk -v n="$1" '
+    $0 ~ "^" n "=\\(" { if ($0 ~ /\)[[:space:]]*(#.*)?$/) { print; next } f = 1 }
+    f { print } f && /^\)/ { f = 0 }' "$2"
+}
 mapfile -t whitelisted < <(
-  { sed -n '/^cancel_files=(/,/^)/p' "$conv"
-    sed -n '/^cancel_files=(/,/^)/p' "$nyx_conv"
-    sed -n '/^SHARED_CANCEL_FILES=(/,/^)/p' "$shared_lint"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
+  { conf_list CANCEL_FILES "$conv"
+    conf_list CANCEL_FILES "$nyx_conv"
+    conf_list SHARED_CANCEL_FILES "$shared_lint"; } | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
 )
 
 # Crash-infra files keep deliberately broad catches (Rule 9 / Rule 7). They are

@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
 import com.github.reygnn.launcher.core.InstalledAppsRepository
@@ -15,6 +15,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.customnames.CustomNamesViewModel
 import com.google.common.truth.Truth
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -23,8 +24,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 /**
  * Local core-typed reactive loader fake (name-reactivity for CustomNamesViewModel).
@@ -166,8 +165,8 @@ class CustomNamesViewModelTest {
         vm.uiState.test {
             val state = awaitItem()
 
-            assertTrue(state.displayedApps.isEmpty())
-            assertTrue(state.appsWithCustomNames.isEmpty())
+            assertThat(state.displayedApps.isEmpty()).isTrue()
+            assertThat(state.appsWithCustomNames.isEmpty()).isTrue()
         }
     }
 
@@ -193,7 +192,7 @@ class CustomNamesViewModelTest {
 
         vm.uiState.test {
             val state = awaitItem()
-            assertNotNull(state)
+            assertThat(state).isNotNull()
         }
     }
 
@@ -340,7 +339,7 @@ class CustomNamesViewModelTest {
 
         vm.uiState.test {
             val state = awaitItem()
-            assertTrue(state.displayedApps.isEmpty())
+            assertThat(state.displayedApps.isEmpty()).isTrue()
         }
     }
 

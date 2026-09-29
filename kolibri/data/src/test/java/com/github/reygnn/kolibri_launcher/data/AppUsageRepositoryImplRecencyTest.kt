@@ -5,12 +5,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -56,7 +56,7 @@ class AppUsageRepositoryImplRecencyTest {
         seed("pkg.b", now - 1_000) // most recent
         seed("pkg.c", now - 2_000)
 
-        assertEquals(listOf("pkg.b", "pkg.c", "pkg.a"), repo.getRecentlyLaunchedPackages(10))
+        assertThat(repo.getRecentlyLaunchedPackages(10)).isEqualTo(listOf("pkg.b", "pkg.c", "pkg.a"))
     }
 
     @Test
@@ -65,6 +65,6 @@ class AppUsageRepositoryImplRecencyTest {
         seed("pkg.a", now - 500, now - 9_000)  // max = now-500 → newest overall
         seed("pkg.b", now - 1_000)
 
-        assertEquals(listOf("pkg.a", "pkg.b"), repo.getRecentlyLaunchedPackages(10))
+        assertThat(repo.getRecentlyLaunchedPackages(10)).isEqualTo(listOf("pkg.a", "pkg.b"))
     }
 }

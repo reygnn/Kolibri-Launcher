@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.ui.appdrawer
 
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.KeyboardShowCoordinator.ShowKeyboardStrategy
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.KeyboardShowCoordinator.SkipReason
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
 
@@ -45,7 +45,7 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertEquals(ShowKeyboardStrategy.ShowImmediately, result)
+        assertThat(result).isEqualTo(ShowKeyboardStrategy.ShowImmediately)
     }
 
     @Test
@@ -58,7 +58,7 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertEquals(ShowKeyboardStrategy.WaitForLayout, result)
+        assertThat(result).isEqualTo(ShowKeyboardStrategy.WaitForLayout)
     }
 
     // ============================================================================
@@ -74,8 +74,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = false
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.SETTING_DISABLED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.SETTING_DISABLED)
     }
 
     @Test
@@ -88,8 +88,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = false
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.SETTING_DISABLED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.SETTING_DISABLED)
     }
 
     @Test
@@ -102,8 +102,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = false
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.SETTING_DISABLED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.SETTING_DISABLED)
     }
 
     // ============================================================================
@@ -119,8 +119,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.FRAGMENT_DETACHED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.FRAGMENT_DETACHED)
     }
 
     @Test
@@ -132,8 +132,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.FRAGMENT_DETACHED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.FRAGMENT_DETACHED)
     }
 
     // ============================================================================
@@ -149,8 +149,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.VIEW_NOT_VISIBLE, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.VIEW_NOT_VISIBLE)
     }
 
     @Test
@@ -163,8 +163,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.VIEW_NOT_VISIBLE, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.VIEW_NOT_VISIBLE)
     }
 
     @Test
@@ -177,8 +177,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.FRAGMENT_DETACHED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.FRAGMENT_DETACHED)
     }
 
     // ============================================================================
@@ -195,8 +195,8 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = false
         )
 
-        assertTrue(result is ShowKeyboardStrategy.Skip)
-        assertEquals(SkipReason.SETTING_DISABLED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat(result).isInstanceOf(ShowKeyboardStrategy.Skip::class.java)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.SETTING_DISABLED)
     }
 
     // ============================================================================
@@ -216,10 +216,7 @@ class KeyboardShowCoordinatorTest {
         )
 
         // MUSS ShowImmediately sein, NICHT WaitForLayout!
-        assertTrue(
-            "Bug regression: When view is already laid out, we must show immediately, not wait!",
-            result is ShowKeyboardStrategy.ShowImmediately
-        )
+        assertWithMessage("Bug regression: When view is already laid out, we must show immediately, not wait!").that(result).isInstanceOf(ShowKeyboardStrategy.ShowImmediately::class.java)
     }
 
     // ============================================================================
@@ -236,7 +233,7 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = false  // <-- Das entscheidet
         )
 
-        assertEquals(SkipReason.SETTING_DISABLED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.SETTING_DISABLED)
     }
 
     @Test
@@ -248,6 +245,6 @@ class KeyboardShowCoordinatorTest {
             isAutoShowEnabled = true
         )
 
-        assertEquals(SkipReason.FRAGMENT_DETACHED, (result as ShowKeyboardStrategy.Skip).reason)
+        assertThat((result as ShowKeyboardStrategy.Skip).reason).isEqualTo(SkipReason.FRAGMENT_DETACHED)
     }
 }

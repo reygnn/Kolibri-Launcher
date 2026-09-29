@@ -2,13 +2,11 @@ package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
 
 import com.github.reygnn.launcher.core.crashreporting.ingestion.LoggedThrowable
 import com.github.reygnn.launcher.core.crashreporting.ingestion.buildAcraReportThrowable
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import java.io.IOException
 import java.util.concurrent.CancellationException
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
+import kotlin.test.assertIs
 import org.junit.Test
 
 /**
@@ -22,14 +20,14 @@ class ReportCarrierTest {
         val original = IOException("disk gone")
         val result = buildAcraReportThrowable(6, "MyTag", "save failed", original)
 
-        assertTrue("carrier must be a LoggedThrowable", result is LoggedThrowable)
-        assertSame("original throwable must be preserved as cause", original, result.cause)
+        assertIs<LoggedThrowable>(result, "carrier must be a LoggedThrowable")
+        assertWithMessage("original throwable must be preserved as cause").that(result.cause).isSameInstanceAs(original)
     }
 
     @Test
     fun `message encodes logcat-style priority label, tag, cause type and message`() {
         val result = buildAcraReportThrowable(6, "MyTag", "save failed", IOException())
-        assertEquals("[E/MyTag] IOException: save failed", result.message)
+        assertThat(result.message).isEqualTo("[E/MyTag] IOException: save failed")
     }
 
     @Test
@@ -37,22 +35,19 @@ class ReportCarrierTest {
         // Top-level report type is always LoggedThrowable, so the real type must
         // survive in the message to stay groupable/filterable server-side.
         val result = buildAcraReportThrowable(6, "T", "boom", IllegalStateException("x"))
-        assertTrue(
-            "message must name the original exception type",
-            result.message!!.contains("IllegalStateException"),
-        )
+        assertWithMessage("message must name the original exception type").that(result.message!!.contains("IllegalStateException")).isTrue()
     }
 
     @Test
     fun `null tag falls back to Unknown`() {
         val result = buildAcraReportThrowable(5, null, "hmm", IOException())
-        assertEquals("[W/Unknown] IOException: hmm", result.message)
+        assertThat(result.message).isEqualTo("[W/Unknown] IOException: hmm")
     }
 
     @Test
     fun `unknown priority falls back to its numeric value`() {
         val result = buildAcraReportThrowable(99, "T", "x", IOException())
-        assertEquals("[99/T] IOException: x", result.message)
+        assertThat(result.message).isEqualTo("[99/T] IOException: x")
     }
 
     @Test
@@ -60,18 +55,15 @@ class ReportCarrierTest {
         val cancellation = CancellationException("job cancelled")
         val result = buildAcraReportThrowable(6, "Scope", "coroutine died", cancellation)
 
-        assertSame("cancellation must be preserved as cause", cancellation, result.cause)
+        assertWithMessage("cancellation must be preserved as cause").that(result.cause).isSameInstanceAs(cancellation)
         val msg = result.message
-        assertNotNull(msg)
-        assertTrue(
-            "cancellation reports must carry the diagnostic note",
-            msg!!.contains("DIAGNOSIS") && msg.contains("CancellationException"),
-        )
+        assertThat(msg).isNotNull()
+        assertWithMessage("cancellation reports must carry the diagnostic note").that(msg!!.contains("DIAGNOSIS") && msg.contains("CancellationException")).isTrue()
     }
 
     @Test
     fun `non-cancellation cause gets no diagnosis note`() {
         val result = buildAcraReportThrowable(6, "T", "normal error", IOException())
-        assertFalse(result.message!!.contains("DIAGNOSIS"))
+        assertThat(result.message!!.contains("DIAGNOSIS")).isFalse()
     }
 }

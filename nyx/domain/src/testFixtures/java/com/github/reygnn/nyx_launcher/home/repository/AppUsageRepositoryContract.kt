@@ -3,7 +3,7 @@ package com.github.reygnn.nyx_launcher.home.repository
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -30,7 +30,7 @@ abstract class AppUsageRepositoryContract {
     private fun app(pkg: String) = LauncherApp(ComponentKey(pkg, "$pkg.Main"), pkg, null)
 
     @Test
-    fun record_makes_the_package_appear_in_the_snapshot() = runTest(mainDispatcherRule.dispatcher) {
+    fun record_makes_the_package_appear_in_the_snapshot() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository()
         assertThat(repo.usageSnapshotFlow.first()).isEmpty()
 
@@ -42,7 +42,7 @@ abstract class AppUsageRepositoryContract {
     }
 
     @Test
-    fun snapshot_flow_re_emits_after_a_launch_within_one_collection() = runTest(mainDispatcherRule.dispatcher) {
+    fun snapshot_flow_re_emits_after_a_launch_within_one_collection() = runTest(mainDispatcherRule.testDispatcher) {
         // The drawer re-orders on launch by reacting to this flow, so a live re-emit is the
         // repo's load-bearing behaviour — pin it for both fake and impl.
         val repo = createRepository()
@@ -55,7 +55,7 @@ abstract class AppUsageRepositoryContract {
     }
 
     @Test
-    fun blank_or_null_record_is_a_no_op() = runTest(mainDispatcherRule.dispatcher) {
+    fun blank_or_null_record_is_a_no_op() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository()
         repo.recordPackageLaunch(null)
         repo.recordPackageLaunch("")
@@ -64,7 +64,7 @@ abstract class AppUsageRepositoryContract {
     }
 
     @Test
-    fun purge_clears_all_usage() = runTest(mainDispatcherRule.dispatcher) {
+    fun purge_clears_all_usage() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository()
         repo.recordPackageLaunch("com.a")
         repo.recordPackageLaunch("com.b")
@@ -76,7 +76,7 @@ abstract class AppUsageRepositoryContract {
     }
 
     @Test
-    fun scoreApps_scores_every_app_and_zeroes_the_unused() = runTest(mainDispatcherRule.dispatcher) {
+    fun scoreApps_scores_every_app_and_zeroes_the_unused() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository()
         val a = app("com.a"); val b = app("com.b")
 
@@ -88,7 +88,7 @@ abstract class AppUsageRepositoryContract {
     }
 
     @Test
-    fun scoreApps_ranks_a_recently_launched_app_above_an_unused_one() = runTest(mainDispatcherRule.dispatcher) {
+    fun scoreApps_ranks_a_recently_launched_app_above_an_unused_one() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository()
         val a = app("com.a"); val b = app("com.b")
         repo.recordPackageLaunch("com.a")

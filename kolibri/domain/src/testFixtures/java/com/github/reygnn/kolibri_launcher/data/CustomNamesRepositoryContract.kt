@@ -2,14 +2,11 @@ package com.github.reygnn.kolibri_launcher.data
 
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -90,19 +87,19 @@ abstract class CustomNamesRepositoryContract {
     @Test
     fun `fresh repository has no custom names`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
     }
 
     @Test
     fun `fresh repository getAllCustomNames returns empty map`() = runTest {
         val repo = createRepository()
-        assertEquals(emptyMap<String, String>(), repo.getAllCustomNames())
+        assertThat(repo.getAllCustomNames()).isEqualTo(emptyMap<String, String>())
     }
 
     @Test
     fun `getDisplayNameForPackage with no custom name returns originalName`() = runTest {
         val repo = createRepository()
-        assertEquals("Original", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Original")
     }
 
     // ---------- setCustomNameForPackage ----------
@@ -110,22 +107,22 @@ abstract class CustomNamesRepositoryContract {
     @Test
     fun `setCustomNameForPackage returns true on success`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.setCustomNameForPackage(pkgA, "Custom A"))
+        assertThat(repo.setCustomNameForPackage(pkgA, "Custom A")).isTrue()
     }
 
     @Test
     fun `setCustomNameForPackage persists the name`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom A")
-        assertTrue(repo.hasCustomNameForPackage(pkgA))
-        assertEquals("Custom A", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Custom A")
     }
 
     @Test
     fun `setCustomNameForPackage trims whitespace from custom name`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "  Padded  ")
-        assertEquals("Padded", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Padded")
     }
 
     @Test
@@ -133,15 +130,15 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "First")
         repo.setCustomNameForPackage(pkgA, "Second")
-        assertEquals("Second", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Second")
     }
 
     @Test
     fun `setCustomNameForPackage on one package does not affect another`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Name A")
-        assertFalse(repo.hasCustomNameForPackage(pkgB))
-        assertEquals("OriginalB", repo.getDisplayNameForPackage(pkgB, "OriginalB"))
+        assertThat(repo.hasCustomNameForPackage(pkgB)).isFalse()
+        assertThat(repo.getDisplayNameForPackage(pkgB, "OriginalB")).isEqualTo("OriginalB")
     }
 
     /**
@@ -153,23 +150,23 @@ abstract class CustomNamesRepositoryContract {
     fun `setCustomNameForPackage with empty string removes the custom name`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom")
-        assertTrue(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
 
         repo.setCustomNameForPackage(pkgA, "")
 
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
-        assertEquals("Original", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Original")
     }
 
     @Test
     fun `setCustomNameForPackage with whitespace-only string removes the custom name`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom")
-        assertTrue(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
 
         repo.setCustomNameForPackage(pkgA, "   ")
 
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
     }
 
     /**
@@ -184,11 +181,11 @@ abstract class CustomNamesRepositoryContract {
         runTest {
             val repo = createRepository()
             repo.setCustomNameForPackage(pkgA, "Custom")
-            assertTrue(repo.hasCustomNameForPackage(pkgA))
+            assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
 
             repo.setCustomNameForPackage(pkgA, cp(0x0301))
 
-            assertFalse(repo.hasCustomNameForPackage(pkgA))
+            assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
         }
 
     /**
@@ -201,8 +198,8 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         val emoji = cp(0x1F41B)
         repo.setCustomNameForPackage(pkgA, emoji)
-        assertTrue(repo.hasCustomNameForPackage(pkgA))
-        assertEquals(emoji, repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo(emoji)
     }
 
     // ---------- removeCustomNameForPackage ----------
@@ -211,8 +208,8 @@ abstract class CustomNamesRepositoryContract {
     fun `removeCustomNameForPackage removes existing custom name`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom A")
-        assertTrue(repo.removeCustomNameForPackage(pkgA))
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.removeCustomNameForPackage(pkgA)).isTrue()
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
     }
 
     /**
@@ -223,8 +220,8 @@ abstract class CustomNamesRepositoryContract {
     fun `removeCustomNameForPackage on non-existent package is idempotent and returns true`() =
         runTest {
             val repo = createRepository()
-            assertTrue(repo.removeCustomNameForPackage(pkgA))
-            assertFalse(repo.hasCustomNameForPackage(pkgA))
+            assertThat(repo.removeCustomNameForPackage(pkgA)).isTrue()
+            assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
         }
 
     @Test
@@ -233,9 +230,9 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNameForPackage(pkgA, "Name A")
         repo.setCustomNameForPackage(pkgB, "Name B")
         repo.removeCustomNameForPackage(pkgA)
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
-        assertTrue(repo.hasCustomNameForPackage(pkgB))
-        assertEquals("Name B", repo.getDisplayNameForPackage(pkgB, "Original"))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
+        assertThat(repo.hasCustomNameForPackage(pkgB)).isTrue()
+        assertThat(repo.getDisplayNameForPackage(pkgB, "Original")).isEqualTo("Name B")
     }
 
     // ---------- customNamesFlow ----------
@@ -251,16 +248,16 @@ abstract class CustomNamesRepositoryContract {
     fun `customNamesFlow emits current mapping and updates on change`() = runTest {
         val repo = createRepository()
         repo.customNamesFlow.test {
-            assertEquals(emptyMap<String, String>(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyMap<String, String>())
 
             repo.setCustomNameForPackage(pkgA, "Name A")
-            assertEquals(mapOf(pkgA to "Name A"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(mapOf(pkgA to "Name A"))
 
             repo.setCustomNameForPackage(pkgB, "Name B")
-            assertEquals(mapOf(pkgA to "Name A", pkgB to "Name B"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(mapOf(pkgA to "Name A", pkgB to "Name B"))
 
             repo.removeCustomNameForPackage(pkgA)
-            assertEquals(mapOf(pkgB to "Name B"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(mapOf(pkgB to "Name B"))
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -272,7 +269,7 @@ abstract class CustomNamesRepositoryContract {
     fun `getDisplayNameForPackage returns custom name when set`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom A")
-        assertEquals("Custom A", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Custom A")
     }
 
     @Test
@@ -280,7 +277,7 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom A")
         repo.removeCustomNameForPackage(pkgA)
-        assertEquals("Original", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Original")
     }
 
     // ---------- hasCustomNameForPackage ----------
@@ -288,14 +285,14 @@ abstract class CustomNamesRepositoryContract {
     @Test
     fun `hasCustomNameForPackage returns false initially`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
     }
 
     @Test
     fun `hasCustomNameForPackage returns true after set`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom")
-        assertTrue(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isTrue()
     }
 
     @Test
@@ -303,7 +300,7 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Custom")
         repo.removeCustomNameForPackage(pkgA)
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
     }
 
     // ---------- getAllCustomNames ----------
@@ -317,10 +314,10 @@ abstract class CustomNamesRepositoryContract {
 
         val all = repo.getAllCustomNames()
 
-        assertEquals(3, all.size)
-        assertEquals("Name A", all[pkgA])
-        assertEquals("Name B", all[pkgB])
-        assertEquals("Name C", all[pkgC])
+        assertThat(all.size).isEqualTo(3)
+        assertThat(all[pkgA]).isEqualTo("Name A")
+        assertThat(all[pkgB]).isEqualTo("Name B")
+        assertThat(all[pkgC]).isEqualTo("Name C")
     }
 
     @Test
@@ -332,15 +329,15 @@ abstract class CustomNamesRepositoryContract {
 
         val all = repo.getAllCustomNames()
 
-        assertEquals(1, all.size)
-        assertEquals("Name B", all[pkgB])
+        assertThat(all.size).isEqualTo(1)
+        assertThat(all[pkgB]).isEqualTo("Name B")
     }
 
     @Test
     fun `getAllCustomNames returns trimmed names`() = runTest {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "  Padded  ")
-        assertEquals("Padded", repo.getAllCustomNames()[pkgA])
+        assertThat(repo.getAllCustomNames()[pkgA]).isEqualTo("Padded")
     }
 
     // ---------- setCustomNamesInBatch ----------
@@ -348,7 +345,7 @@ abstract class CustomNamesRepositoryContract {
     @Test
     fun `setCustomNamesInBatch with empty map returns true`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.setCustomNamesInBatch(emptyMap()))
+        assertThat(repo.setCustomNamesInBatch(emptyMap())).isTrue()
     }
 
     @Test
@@ -356,7 +353,7 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Existing")
         repo.setCustomNamesInBatch(emptyMap())
-        assertEquals("Existing", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Existing")
     }
 
     @Test
@@ -364,22 +361,22 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNamesInBatch(mapOf(pkgA to "A", pkgB to "B", pkgC to "C"))
 
-        assertEquals("A", repo.getDisplayNameForPackage(pkgA, "OriginalA"))
-        assertEquals("B", repo.getDisplayNameForPackage(pkgB, "OriginalB"))
-        assertEquals("C", repo.getDisplayNameForPackage(pkgC, "OriginalC"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "OriginalA")).isEqualTo("A")
+        assertThat(repo.getDisplayNameForPackage(pkgB, "OriginalB")).isEqualTo("B")
+        assertThat(repo.getDisplayNameForPackage(pkgC, "OriginalC")).isEqualTo("C")
     }
 
     @Test
     fun `setCustomNamesInBatch returns true on success`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.setCustomNamesInBatch(mapOf(pkgA to "A")))
+        assertThat(repo.setCustomNamesInBatch(mapOf(pkgA to "A"))).isTrue()
     }
 
     @Test
     fun `setCustomNamesInBatch trims whitespace from names`() = runTest {
         val repo = createRepository()
         repo.setCustomNamesInBatch(mapOf(pkgA to "  Padded  "))
-        assertEquals("Padded", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Padded")
     }
 
     @Test
@@ -387,7 +384,7 @@ abstract class CustomNamesRepositoryContract {
         val repo = createRepository()
         repo.setCustomNameForPackage(pkgA, "Old")
         repo.setCustomNamesInBatch(mapOf(pkgA to "New"))
-        assertEquals("New", repo.getDisplayNameForPackage(pkgA, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("New")
     }
 
     @Test
@@ -396,8 +393,8 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNameForPackage(pkgA, "Keep")
         repo.setCustomNamesInBatch(mapOf(pkgB to "New"))
 
-        assertEquals("Keep", repo.getDisplayNameForPackage(pkgA, "Original"))
-        assertEquals("New", repo.getDisplayNameForPackage(pkgB, "Original"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "Original")).isEqualTo("Keep")
+        assertThat(repo.getDisplayNameForPackage(pkgB, "Original")).isEqualTo("New")
     }
 
     /**
@@ -418,11 +415,11 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNamesInBatch(mapOf(pkgA to "", pkgB to "   ", pkgC to "Valid"))
 
         // pkgA bleibt erhalten — blank-Wert hat den existierenden Eintrag NICHT entfernt.
-        assertEquals("Keep me", repo.getDisplayNameForPackage(pkgA, "OriginalA"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "OriginalA")).isEqualTo("Keep me")
         // pkgB wurde nie gesetzt, Original-Fallback.
-        assertFalse(repo.hasCustomNameForPackage(pkgB))
+        assertThat(repo.hasCustomNameForPackage(pkgB)).isFalse()
         // pkgC wurde gesetzt.
-        assertEquals("Valid", repo.getDisplayNameForPackage(pkgC, "OriginalC"))
+        assertThat(repo.getDisplayNameForPackage(pkgC, "OriginalC")).isEqualTo("Valid")
     }
 
     /**
@@ -437,8 +434,8 @@ abstract class CustomNamesRepositoryContract {
 
         repo.setCustomNamesInBatch(mapOf(pkgA to cp(0x0301), pkgB to "Valid"))
 
-        assertEquals("Keep me", repo.getDisplayNameForPackage(pkgA, "OriginalA"))
-        assertEquals("Valid", repo.getDisplayNameForPackage(pkgB, "OriginalB"))
+        assertThat(repo.getDisplayNameForPackage(pkgA, "OriginalA")).isEqualTo("Keep me")
+        assertThat(repo.getDisplayNameForPackage(pkgB, "OriginalB")).isEqualTo("Valid")
     }
 
     // ---------- purgeRepository ----------
@@ -451,16 +448,16 @@ abstract class CustomNamesRepositoryContract {
 
         repo.purgeRepository()
 
-        assertFalse(repo.hasCustomNameForPackage(pkgA))
-        assertFalse(repo.hasCustomNameForPackage(pkgB))
-        assertEquals(emptyMap<String, String>(), repo.getAllCustomNames())
+        assertThat(repo.hasCustomNameForPackage(pkgA)).isFalse()
+        assertThat(repo.hasCustomNameForPackage(pkgB)).isFalse()
+        assertThat(repo.getAllCustomNames()).isEqualTo(emptyMap<String, String>())
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(emptyMap<String, String>(), repo.getAllCustomNames())
+        assertThat(repo.getAllCustomNames()).isEqualTo(emptyMap<String, String>())
     }
 
     // ---------- Round-trip property ----------
@@ -477,9 +474,9 @@ abstract class CustomNamesRepositoryContract {
         repo.setCustomNameForPackage(pkgB, "Name B")
 
         val all = repo.getAllCustomNames()
-        assertNotNull(all)
-        assertEquals(setOf(pkgA, pkgB), all.keys)
-        assertEquals("Name A", all[pkgA])
-        assertEquals("Name B", all[pkgB])
+        assertThat(all).isNotNull()
+        assertThat(all.keys).isEqualTo(setOf(pkgA, pkgB))
+        assertThat(all[pkgA]).isEqualTo("Name A")
+        assertThat(all[pkgB]).isEqualTo("Name B")
     }
 }

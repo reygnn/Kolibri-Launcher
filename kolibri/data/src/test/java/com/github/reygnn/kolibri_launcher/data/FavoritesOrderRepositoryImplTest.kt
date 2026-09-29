@@ -11,13 +11,14 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
-import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertFailsWith
@@ -51,10 +52,7 @@ class FavoritesOrderRepositoryImplTest {
 
         repo.saveOrder(listOf("com.new.a/Component", "com.new.b/Component"))
 
-        Assert.assertEquals(
-            listOf("com.new.a/Component", "com.new.b/Component"),
-            repo.getFavoriteComponentsOrderSnapshot()
-        )
+        assertThat(repo.getFavoriteComponentsOrderSnapshot()).isEqualTo(listOf("com.new.a/Component", "com.new.b/Component"))
     }
 
     @Test
@@ -70,7 +68,7 @@ class FavoritesOrderRepositoryImplTest {
         val repo = FavoritesOrderRepositoryImpl(dataStore = store)
         store.makeReadFail()
 
-        Assert.assertEquals(emptyList<String>(), repo.getFavoriteComponentsOrderSnapshot())
+        assertThat(repo.getFavoriteComponentsOrderSnapshot()).isEqualTo(emptyList<String>())
     }
 
     // ========== EXISTING TESTS ==========
@@ -108,7 +106,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(unsortedApps, savedOrder)
 
-        Assert.assertEquals(expectedSortedApps, sortedApps)
+        assertThat(sortedApps).isEqualTo(expectedSortedApps)
     }
 
     @Test
@@ -143,7 +141,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(unsortedApps, emptyList())
 
-        Assert.assertEquals(expectedSortedApps, sortedApps)
+        assertThat(sortedApps).isEqualTo(expectedSortedApps)
     }
 
     @Test
@@ -173,7 +171,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val sortedApps = manager.sortAppsWithGivenOrder(installedApps, savedOrder)
 
-        Assert.assertEquals(expectedSortedApps, sortedApps)
+        assertThat(sortedApps).isEqualTo(expectedSortedApps)
     }
 
     @Test
@@ -217,7 +215,7 @@ class FavoritesOrderRepositoryImplTest {
 
             val sortedApps = manager.sortAppsWithGivenOrder(apps, savedOrder)
 
-            Assert.assertEquals(expectedSortedApps, sortedApps)
+            assertThat(sortedApps).isEqualTo(expectedSortedApps)
         }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -228,7 +226,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.sortAppsWithGivenOrder(emptyList(), listOf("com.a/a"))
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -242,8 +240,8 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.sortAppsWithGivenOrder(apps, emptyList())
 
-        Assert.assertEquals("A", result[0].displayName)
-        Assert.assertEquals("Z", result[1].displayName)
+        assertThat(result[0].displayName).isEqualTo("A")
+        assertThat(result[1].displayName).isEqualTo("Z")
     }
 
     @Test
@@ -259,7 +257,7 @@ class FavoritesOrderRepositoryImplTest {
         val result = manager.sortAppsWithGivenOrder(apps, duplicateOrder)
 
         // Sollte keine Duplikate in result haben
-        Assert.assertEquals(apps.size, result.size)
+        assertThat(result.size).isEqualTo(apps.size)
     }
 
     @Test
@@ -275,7 +273,7 @@ class FavoritesOrderRepositoryImplTest {
         val result = manager.sortAppsWithGivenOrder(apps, malformedOrder)
 
         // Sollte Apps trotzdem sortieren
-        Assert.assertEquals(2, result.size)
+        assertThat(result.size).isEqualTo(2)
     }
 
     @Test
@@ -295,7 +293,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.sortAppsWithGivenOrder(apps, listOf("com.a/a"))
 
-        Assert.assertEquals(listOf(first), result)
+        assertThat(result).isEqualTo(listOf(first))
     }
 
     /*    @Test
@@ -316,7 +314,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.saveOrder(listOf("com.a/a"))
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -337,9 +335,9 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.saveOrder(emptyList())
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        Assert.assertTrue(savedOrder.isEmpty())
+        assertThat(savedOrder.isEmpty()).isTrue()
     }
 
     @Test
@@ -349,7 +347,7 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.sortFavoriteComponents(emptyList(), emptyList())
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -367,7 +365,7 @@ class FavoritesOrderRepositoryImplTest {
             val result = manager.sortFavoriteComponents(apps, emptyList())
 
             // Fallback zu alphabetischer Sortierung
-            Assert.assertEquals("A", result[0].displayName)
+            assertThat(result[0].displayName).isEqualTo("A")
         }
 
     @Test
@@ -383,7 +381,7 @@ class FavoritesOrderRepositoryImplTest {
         val result = manager.sortAppsWithGivenOrder(apps, emptyList())
 
         // Sollte eine stabile Sortierung haben
-        Assert.assertEquals(3, result.size)
+        assertThat(result.size).isEqualTo(3)
     }
 
     @Test
@@ -397,9 +395,9 @@ class FavoritesOrderRepositoryImplTest {
 
         val result = manager.sortAppsWithGivenOrder(apps, order)
 
-        Assert.assertEquals(100, result.size)
-        Assert.assertEquals("App 100", result[0].displayName)
-        Assert.assertEquals("App 1", result[99].displayName)
+        assertThat(result.size).isEqualTo(100)
+        assertThat(result[0].displayName).isEqualTo("App 100")
+        assertThat(result[99].displayName).isEqualTo("App 1")
     }
 
     @Test
@@ -412,7 +410,7 @@ class FavoritesOrderRepositoryImplTest {
         println("After saveOrder call, result: $result")
         println("updateDataCallCount: ${fakeDataStore.updateDataCallCount}")
 
-        Assert.assertTrue("Expected true but got false", result)
+        assertWithMessage("Expected true but got false").that(result).isTrue()
     }
 
     @Test
@@ -421,7 +419,7 @@ class FavoritesOrderRepositoryImplTest {
         val jsonArray = JSONArray(list)
         val orderString = jsonArray.toString()
         println("JSON String: $orderString")
-        Assert.assertTrue(orderString.isNotEmpty())
+        assertThat(orderString.isNotEmpty()).isTrue()
     }
 
     // ========== MISSING REMOVE TESTS ==========
@@ -441,17 +439,17 @@ class FavoritesOrderRepositoryImplTest {
 
         // Debug: Prüfen ob Daten korrekt geladen wurden
         val current = manager.favoriteComponentsOrderFlow.first()
-        Assert.assertEquals("Initial load failed", 3, current.size)
-        Assert.assertTrue("Item missing before remove", current.contains("com.b/b"))
+        assertWithMessage("Initial load failed").that(current.size).isEqualTo(3)
+        assertWithMessage("Item missing before remove").that(current.contains("com.b/b")).isTrue()
 
         // Act
         val result = manager.removeComponentFromOrder("com.b/b")
 
         // Assert
-        Assert.assertTrue("Result should be true", result)
+        assertWithMessage("Result should be true").that(result).isTrue()
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        Assert.assertEquals("Should have 2 items left", 2, savedOrder.size)
-        Assert.assertEquals(listOf("com.a/a", "com.c/c"), savedOrder)
+        assertWithMessage("Should have 2 items left").that(savedOrder.size).isEqualTo(2)
+        assertThat(savedOrder).isEqualTo(listOf("com.a/a", "com.c/c"))
     }
 
     @Test
@@ -475,9 +473,9 @@ class FavoritesOrderRepositoryImplTest {
             // atomic edit{} transaction (read-modify-write inside the same
             // transaction), so one write runs even when nothing matches — but
             // the persisted order is left unchanged.
-            Assert.assertTrue(result)
-            Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
-            Assert.assertEquals(initialOrder, manager.favoriteComponentsOrderFlow.first())
+            assertThat(result).isTrue()
+            assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+            assertThat(manager.favoriteComponentsOrderFlow.first()).isEqualTo(initialOrder)
         }
 
     // ========== MISSING LIMIT & PURGE TESTS ==========
@@ -499,15 +497,11 @@ class FavoritesOrderRepositoryImplTest {
         advanceUntilIdle()
 
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        Assert.assertEquals(
-            "saved list must be capped at MAX_ORDER_LIST_SIZE",
-            maxOrderListSize,
-            savedOrder.size
-        )
+        assertWithMessage("saved list must be capped at MAX_ORDER_LIST_SIZE").that(savedOrder.size).isEqualTo(maxOrderListSize)
         // take() keeps the head: first item survives, last is the one at the cap
         // boundary, everything past MAX_ORDER_LIST_SIZE is dropped.
-        Assert.assertEquals("com.app1/Component", savedOrder.first())
-        Assert.assertEquals("com.app$maxOrderListSize/Component", savedOrder.last())
+        assertThat(savedOrder.first()).isEqualTo("com.app1/Component")
+        assertThat(savedOrder.last()).isEqualTo("com.app$maxOrderListSize/Component")
     }
 
     @Test
@@ -529,7 +523,7 @@ class FavoritesOrderRepositoryImplTest {
 
         // Assert
         val savedOrder = manager.favoriteComponentsOrderFlow.first()
-        Assert.assertTrue("Order list should be empty after purge", savedOrder.isEmpty())
+        assertWithMessage("Order list should be empty after purge").that(savedOrder.isEmpty()).isTrue()
     }
 
     // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
@@ -548,7 +542,7 @@ class FavoritesOrderRepositoryImplTest {
             val repo = FavoritesOrderRepositoryImpl(store)
 
             repo.favoriteComponentsOrderFlow.test {
-                Assert.assertEquals(listOf("com.a/A", "com.b/B"), awaitItem())
+                assertThat(awaitItem()).isEqualTo(listOf("com.a/A", "com.b/B"))
 
                 val usageKey = longPreferencesKey("usage_count_com.other/App")
                 store.updateData { prefs ->
@@ -570,7 +564,7 @@ class FavoritesOrderRepositoryImplTest {
         val repo = FavoritesOrderRepositoryImpl(store)
 
         repo.favoriteComponentsOrderFlow.test {
-            Assert.assertEquals(listOf("com.a/A", "com.b/B"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(listOf("com.a/A", "com.b/B"))
 
             store.updateData { prefs ->
                 prefs.toMutablePreferences().apply {
@@ -578,7 +572,7 @@ class FavoritesOrderRepositoryImplTest {
                 }
             }
 
-            Assert.assertEquals(listOf("com.b/B", "com.a/A"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(listOf("com.b/B", "com.a/A"))
         }
     }
 }

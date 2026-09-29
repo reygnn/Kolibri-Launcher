@@ -2,10 +2,9 @@ package com.github.reygnn.launcher.core.installedapps
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,14 +22,14 @@ import org.junit.Test
  * Deliberate drifts (NOT in contract): `purgeRepository()` (impl no-op vs. fake
  * clears — Test-Isolation) and the concrete `rawAppsFlow` backing.
  *
- * Uses [MainDispatcherRuleBase] with a single `StandardTestDispatcher` (family
+ * Uses [MainDispatcherRule] with a single `StandardTestDispatcher` (family
  * convention: one dispatcher source, no ad-hoc TestScope).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 abstract class InstalledAppsStateRepositoryContract {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     protected abstract fun createRepository(): InstalledAppsStateRepository
 
@@ -49,12 +48,12 @@ abstract class InstalledAppsStateRepositoryContract {
 
     @Test
     fun `fresh repository emits empty list on rawAppsFlow`() {
-        assertEquals(emptyList<AppInfo>(), createRepository().rawAppsFlow.value)
+        assertThat(createRepository().rawAppsFlow.value).isEqualTo(emptyList<AppInfo>())
     }
 
     @Test
     fun `fresh repository returns empty from getCurrentApps`() {
-        assertEquals(emptyList<AppInfo>(), createRepository().getCurrentApps())
+        assertThat(createRepository().getCurrentApps()).isEqualTo(emptyList<AppInfo>())
     }
 
     // ---------- updateApps + rawAppsFlow ----------
@@ -63,14 +62,14 @@ abstract class InstalledAppsStateRepositoryContract {
     fun `updateApps reflects in rawAppsFlow value`() {
         val repo = createRepository()
         repo.updateApps(listOf(appA, appB))
-        assertEquals(listOf(appA, appB), repo.rawAppsFlow.value)
+        assertThat(repo.rawAppsFlow.value).isEqualTo(listOf(appA, appB))
     }
 
     @Test
     fun `updateApps reflects in getCurrentApps`() {
         val repo = createRepository()
         repo.updateApps(listOf(appA, appB))
-        assertEquals(listOf(appA, appB), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(listOf(appA, appB))
     }
 
     @Test
@@ -78,7 +77,7 @@ abstract class InstalledAppsStateRepositoryContract {
         val repo = createRepository()
         val input = listOf(appC, appA, appB) // deliberately non-alphabetical
         repo.updateApps(input)
-        assertEquals(input, repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(input)
     }
 
     @Test
@@ -86,7 +85,7 @@ abstract class InstalledAppsStateRepositoryContract {
         val repo = createRepository()
         repo.updateApps(listOf(appA))
         repo.updateApps(listOf(appB, appC))
-        assertEquals(listOf(appB, appC), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(listOf(appB, appC))
     }
 
     // ---------- Last-known-good (SIA-INV-5) — the important property ----------
@@ -98,9 +97,9 @@ abstract class InstalledAppsStateRepositoryContract {
         repo.updateApps(emptyList())
 
         // Direct flow read sees the explicit "empty" state.
-        assertEquals(emptyList<AppInfo>(), repo.rawAppsFlow.value)
+        assertThat(repo.rawAppsFlow.value).isEqualTo(emptyList<AppInfo>())
         // getCurrentApps falls back to last known good.
-        assertEquals(listOf(appA, appB), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(listOf(appA, appB))
     }
 
     @Test
@@ -110,7 +109,7 @@ abstract class InstalledAppsStateRepositoryContract {
         repo.updateApps(emptyList())
         repo.updateApps(emptyList())
         repo.updateApps(emptyList())
-        assertEquals(listOf(appA), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(listOf(appA))
     }
 
     @Test
@@ -119,13 +118,13 @@ abstract class InstalledAppsStateRepositoryContract {
         repo.updateApps(listOf(appA))
         repo.updateApps(listOf(appB, appC))
         repo.updateApps(emptyList())
-        assertEquals(listOf(appB, appC), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(listOf(appB, appC))
     }
 
     @Test
     fun `getCurrentApps with no prior non-empty state returns empty`() {
         val repo = createRepository()
         repo.updateApps(emptyList())
-        assertEquals(emptyList<AppInfo>(), repo.getCurrentApps())
+        assertThat(repo.getCurrentApps()).isEqualTo(emptyList<AppInfo>())
     }
 }

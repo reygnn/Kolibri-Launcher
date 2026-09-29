@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.launcher.common.data.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -18,7 +19,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -64,7 +64,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
         verify(exactly = 0) { alarmManager.nextAlarmClock }
     }
 
@@ -82,9 +82,9 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertEquals(1, result.size)
-        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
-        Assert.assertEquals(TimeBasedEventType.ALARM, result[0].type)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].triggerTimeMillis).isEqualTo(triggerTime)
+        assertThat(result[0].type).isEqualTo(TimeBasedEventType.ALARM)
     }
 
     @Test
@@ -105,7 +105,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -128,7 +128,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -149,9 +149,9 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertEquals(1, result.size)
-        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
-        Assert.assertEquals(TimeBasedEventType.ALARM, result[0].type)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].triggerTimeMillis).isEqualTo(triggerTime)
+        assertThat(result[0].type).isEqualTo(TimeBasedEventType.ALARM)
     }
 
     @Test
@@ -172,8 +172,8 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertEquals(1, result.size)
-        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].triggerTimeMillis).isEqualTo(triggerTime)
     }
 
     @Test
@@ -191,7 +191,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -207,8 +207,8 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertEquals(1, result.size)
-        Assert.assertEquals(triggerTime, result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].triggerTimeMillis).isEqualTo(triggerTime)
     }
 
     @Test
@@ -219,7 +219,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -230,7 +230,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
     }
 
     // ========== SETTINGS ERROR HANDLING ==========
@@ -268,7 +268,7 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertTrue(result.isEmpty())
+        assertThat(result.isEmpty()).isTrue()
         verify(exactly = 0) { contentResolver.query(any(), any(), any(), any(), any()) }
     }
 
@@ -286,8 +286,8 @@ class TimeBasedEventsRepositoryImplTest {
 
         val result = manager.getUpcomingTimeBasedEvents(5)
 
-        Assert.assertEquals(1, result.size)
-        Assert.assertEquals(later, result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].triggerTimeMillis).isEqualTo(later)
     }
 
     // ========== PURGE TEST ==========

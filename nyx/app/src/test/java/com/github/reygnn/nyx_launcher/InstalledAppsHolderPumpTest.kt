@@ -3,7 +3,7 @@ package com.github.reygnn.nyx_launcher
 import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.SyncInstalledAppsToHolder
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
@@ -74,13 +74,13 @@ class InstalledAppsHolderPumpTest {
     }
 
     @Test
-    fun failed_no_cache_outcome_is_reported_to_acra() = runTest(mainDispatcherRule.dispatcher) {
+    fun failed_no_cache_outcome_is_reported_to_acra() = runTest(mainDispatcherRule.testDispatcher) {
         val cause = IllegalStateException("cold-start load failed, no cache")
         every { sync.outcomes() } returns flow {
             emit(SyncInstalledAppsToHolder.Outcome.FailedNoCache(cause))
         }
 
-        InstalledAppsHolderPump(sync, mainDispatcherRule.dispatcher).start()
+        InstalledAppsHolderPump(sync, mainDispatcherRule.testDispatcher).start()
         advanceUntilIdle()
 
         val acraReports = loggedErrors.filter { it.tag == TimberWrapper.ACRA_REPORT_TAG }
@@ -89,7 +89,7 @@ class InstalledAppsHolderPumpTest {
     }
 
     @Test
-    fun quiet_outcomes_are_not_reported_to_acra() = runTest(mainDispatcherRule.dispatcher) {
+    fun quiet_outcomes_are_not_reported_to_acra() = runTest(mainDispatcherRule.testDispatcher) {
         // Loaded / EmptyLoaded / FailedKeptLastGood need no reaction — draining them must
         // not touch the single report site (guards against the report becoming tautological).
         every { sync.outcomes() } returns flow {
@@ -98,7 +98,7 @@ class InstalledAppsHolderPumpTest {
             emit(SyncInstalledAppsToHolder.Outcome.FailedKeptLastGood)
         }
 
-        InstalledAppsHolderPump(sync, mainDispatcherRule.dispatcher).start()
+        InstalledAppsHolderPump(sync, mainDispatcherRule.testDispatcher).start()
         advanceUntilIdle()
 
         assertThat(loggedErrors.filter { it.tag == TimberWrapper.ACRA_REPORT_TAG }).isEmpty()
@@ -106,7 +106,7 @@ class InstalledAppsHolderPumpTest {
 
     @Test
     fun a_freak_upstream_error_re_subscribes_after_the_restart_backoff() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // First collection throws a non-cancellation error; the second drains. retryWhen
             // must log via silentError and re-subscribe only AFTER RESTART_DELAY_MS.
             val collectCount = AtomicInteger(0)
@@ -115,7 +115,7 @@ class InstalledAppsHolderPumpTest {
                 emit(SyncInstalledAppsToHolder.Outcome.Loaded) // second subscription drains
             }
 
-            InstalledAppsHolderPump(sync, mainDispatcherRule.dispatcher).start()
+            InstalledAppsHolderPump(sync, mainDispatcherRule.testDispatcher).start()
             runCurrent() // first collection runs, throws, retryWhen schedules the backoff delay
             assertThat(collectCount.get()).isEqualTo(1) // only the first subscription so far
 
@@ -134,13 +134,13 @@ class InstalledAppsHolderPumpTest {
 
     @Test
     fun a_cancellation_from_outcomes_propagates_and_is_not_retried() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val collectCount = AtomicInteger(0)
             every { sync.outcomes() } returns countingFlow(collectCount) {
                 throw CancellationException("upstream cancelled")
             }
 
-            InstalledAppsHolderPump(sync, mainDispatcherRule.dispatcher).start()
+            InstalledAppsHolderPump(sync, mainDispatcherRule.testDispatcher).start()
             advanceUntilIdle()
 
             // Cancellation ends the collecting coroutine; retryWhen returns false for it, so the
@@ -151,13 +151,13 @@ class InstalledAppsHolderPumpTest {
 
     @Test
     fun start_is_idempotent_a_second_call_launches_no_second_collection() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val collectCount = AtomicInteger(0)
             every { sync.outcomes() } returns countingFlow(collectCount) {
                 emit(SyncInstalledAppsToHolder.Outcome.Loaded)
             }
 
-            val pump = InstalledAppsHolderPump(sync, mainDispatcherRule.dispatcher)
+            val pump = InstalledAppsHolderPump(sync, mainDispatcherRule.testDispatcher)
             pump.start()
             pump.start() // second call must be a no-op (single-writer invariant)
             advanceUntilIdle()

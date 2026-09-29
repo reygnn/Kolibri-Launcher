@@ -12,7 +12,7 @@ import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.model.ReconcileResult
 import com.github.reygnn.nyx_launcher.home.usecase.ReconcileHomeLayoutUseCase
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -69,7 +69,7 @@ class PackageEventCoordinatorTest {
         reconcile = reconcile,
         appUpdateSignal = appUpdateSignal,
         installedAppsRepository = installedAppsRepository,
-        dispatcher = mainDispatcherRule.dispatcher,
+        dispatcher = mainDispatcherRule.testDispatcher,
     )
 
     // The collector guards a throwing reconcile via TimberWrapper.silentError, which
@@ -87,7 +87,7 @@ class PackageEventCoordinatorTest {
     }
 
     @Test
-    fun cold_start_reconcile_is_immediate_not_debounced() = runTest(mainDispatcherRule.dispatcher) {
+    fun cold_start_reconcile_is_immediate_not_debounced() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { reconcile() } returns ReconcileResult.Unchanged
 
         coordinator.start()
@@ -97,7 +97,7 @@ class PackageEventCoordinatorTest {
     }
 
     @Test
-    fun event_storm_within_window_coalesces_to_a_single_reconcile() = runTest(mainDispatcherRule.dispatcher) {
+    fun event_storm_within_window_coalesces_to_a_single_reconcile() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { reconcile() } returns ReconcileResult.Unchanged
 
         coordinator.start()
@@ -127,7 +127,7 @@ class PackageEventCoordinatorTest {
     }
 
     @Test
-    fun a_throwing_reconcile_does_not_kill_the_collector() = runTest(mainDispatcherRule.dispatcher) {
+    fun a_throwing_reconcile_does_not_kill_the_collector() = runTest(mainDispatcherRule.testDispatcher) {
         // First (cold-start) reconcile throws; the guarded collector must survive so a
         // later package event still reconciles — no silent permanent loss of reconciles.
         coEvery { reconcile() } answers { throw RuntimeException("datastore boom") } andThen
@@ -144,7 +144,7 @@ class PackageEventCoordinatorTest {
     }
 
     @Test
-    fun package_event_refreshes_the_shared_loader_and_evicts_the_icon() = runTest(mainDispatcherRule.dispatcher) {
+    fun package_event_refreshes_the_shared_loader_and_evicts_the_icon() = runTest(mainDispatcherRule.testDispatcher) {
         // The no-prune "missing" model (root TODO.md, Windows-shortcut) is only LIVE if a
         // package event re-enumerates the shared installed-apps loader: HomeViewModel
         // .installedKeys reads that loader to grey/un-grey tiles, and the drawer reads it
@@ -168,7 +168,7 @@ class PackageEventCoordinatorTest {
     }
 
     @Test
-    fun package_added_reinstall_drives_the_refresh_and_reconcile() = runTest(mainDispatcherRule.dispatcher) {
+    fun package_added_reinstall_drives_the_refresh_and_reconcile() = runTest(mainDispatcherRule.testDispatcher) {
         // The un-grey path: a reinstall (PackageEvent.Added) must run the SAME funnel as a
         // removal — evict the (now stale) icon, drop the folder composite, refresh the shared
         // loader so HomeViewModel.installedKeys re-emits and the tile un-greys, then a
@@ -191,7 +191,7 @@ class PackageEventCoordinatorTest {
 
     @Test
     fun package_event_marks_the_package_for_a_targeted_icon_repaint_then_drains() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // F1: an in-place icon update (PackageEvent.Changed — same package, still installed)
             // evicts the icon but leaves installedKeys value-equal, so the render collector never
             // repaints and the tile keeps the stale bitmap. The coordinator must expose the changed
@@ -220,7 +220,7 @@ class PackageEventCoordinatorTest {
 
     @Test
     fun multiple_package_events_accumulate_and_a_drain_takes_them_all() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // The set accumulates across events (a storm / several updates while backgrounded);
             // draining takes and clears the whole set atomically (take-and-clear, not subset removal).
             coEvery { reconcile() } returns ReconcileResult.Unchanged
@@ -238,7 +238,7 @@ class PackageEventCoordinatorTest {
 
     @Test
     fun the_same_package_invalidated_after_a_drain_reappears_pending() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // §Audit-2 N7: because a drain takes-and-clears (rather than removing a subset after
             // the fact), a fresh event for a just-drained package re-appears in the pending set
             // instead of being swallowed by a value-equal no-op.

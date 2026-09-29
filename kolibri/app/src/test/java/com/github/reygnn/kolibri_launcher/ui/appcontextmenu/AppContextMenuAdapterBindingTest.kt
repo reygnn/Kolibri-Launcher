@@ -12,10 +12,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherActionLabel
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -95,8 +92,8 @@ class AppContextMenuAdapterBindingTest {
         val separatorType = adapter.getItemViewType(1)
         val shortcutType = adapter.getItemViewType(2)
 
-        assertEquals(actionType, shortcutType)
-        assertNotEquals(actionType, separatorType)
+        assertThat(shortcutType).isEqualTo(actionType)
+        assertThat(separatorType).isNotEqualTo(actionType)
     }
 
     @Test
@@ -107,8 +104,8 @@ class AppContextMenuAdapterBindingTest {
         val actionHolder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         val separatorHolder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(1))
 
-        assertTrue(actionHolder is AppContextMenuAdapter.ActionViewHolder)
-        assertTrue(separatorHolder is AppContextMenuAdapter.SeparatorViewHolder)
+        assertThat(actionHolder).isInstanceOf(AppContextMenuAdapter.ActionViewHolder::class.java)
+        assertThat(separatorHolder).isInstanceOf(AppContextMenuAdapter.SeparatorViewHolder::class.java)
     }
 
     // ---------- label binding ----------
@@ -121,10 +118,7 @@ class AppContextMenuAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         adapter.onBindViewHolder(holder, 0)
 
-        assertEquals(
-            context.getString(R.string.add_to_favorites),
-            (holder.itemView as TextView).text.toString(),
-        )
+        assertThat((holder.itemView as TextView).text.toString()).isEqualTo(context.getString(R.string.add_to_favorites))
     }
 
     @Test
@@ -135,7 +129,7 @@ class AppContextMenuAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         adapter.onBindViewHolder(holder, 0)
 
-        assertEquals("New chat", (holder.itemView as TextView).text.toString())
+        assertThat((holder.itemView as TextView).text.toString()).isEqualTo("New chat")
     }
 
     // ---------- colour push ----------
@@ -150,7 +144,7 @@ class AppContextMenuAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         adapter.onBindViewHolder(holder, 0)
 
-        assertEquals(color, (holder.itemView as TextView).textColors.defaultColor)
+        assertThat((holder.itemView as TextView).textColors.defaultColor).isEqualTo(color)
     }
 
     @Test
@@ -169,8 +163,8 @@ class AppContextMenuAdapterBindingTest {
         adapter.onBindViewHolder(holder, 0, mutableListOf(Any()))
 
         val labelView = holder.itemView as TextView
-        assertEquals(color, labelView.textColors.defaultColor)
-        assertEquals(boundText, labelView.text.toString())
+        assertThat(labelView.textColors.defaultColor).isEqualTo(color)
+        assertThat(labelView.text.toString()).isEqualTo(boundText)
     }
 
     @Test
@@ -181,10 +175,7 @@ class AppContextMenuAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         adapter.onBindViewHolder(holder, 0, mutableListOf())
 
-        assertEquals(
-            context.getString(R.string.add_to_favorites),
-            (holder.itemView as TextView).text.toString(),
-        )
+        assertThat((holder.itemView as TextView).text.toString()).isEqualTo(context.getString(R.string.add_to_favorites))
     }
 
     @Test
@@ -203,7 +194,7 @@ class AppContextMenuAdapterBindingTest {
         adapter.setActionTextColor(color) // first push: notifies the bound range
         adapter.setActionTextColor(color) // same colour: early-return, no notify
 
-        assertEquals(1, changeNotifications)
+        assertThat(changeNotifications).isEqualTo(1)
     }
 
     // ---------- click routing (the core invariant for the F6 hoist) ----------
@@ -223,7 +214,7 @@ class AppContextMenuAdapterBindingTest {
 
         (recyclerView.getChildAt(1) as TextView).performClick()
 
-        assertEquals(listOf(second), received)
+        assertThat(received).isEqualTo(listOf(second))
     }
 
     @Test
@@ -236,8 +227,8 @@ class AppContextMenuAdapterBindingTest {
         val consumed = recyclerView.getChildAt(1).performClick()
 
         // The separator holder wires no listener in either design.
-        assertFalse(consumed)
-        assertTrue(received.isEmpty())
+        assertThat(consumed).isFalse()
+        assertThat(received.isEmpty()).isTrue()
     }
 
     @Test
@@ -250,6 +241,6 @@ class AppContextMenuAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, adapter.getItemViewType(0))
         (holder as AppContextMenuAdapter.ActionViewHolder).itemView.performClick()
 
-        assertTrue(received.isEmpty())
+        assertThat(received.isEmpty()).isTrue()
     }
 }

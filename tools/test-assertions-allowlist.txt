@@ -1,0 +1,6 @@
+# A12 migration ratchet (SPEC_NYX_REWRITE, Phase 1a): test files that still use JUnit
+# Assert / kotlin.test assertions / @Test(expected). Remove a line when the file is
+# migrated to Truth; check-test-conventions.sh reports entries that became clean.
+# Must be empty by the end of Phase 1. Never add a line.
+# (empty since 1a-4d — the JUnit/kotlin.test migration is complete; keep this file so the
+#  ratchet stays wired: any new line here would be a regression and fails review)

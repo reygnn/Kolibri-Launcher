@@ -5,6 +5,8 @@ import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentWriteResult
 import com.github.reygnn.launcher.core.crashreporting.consent.CrashReportConsentRepository
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -22,8 +24,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -156,7 +156,7 @@ class ConsentControllerTest {
         val controller = buildController()
         coEvery { repository.readState() } returns ConsentReadResult.Loaded(ConsentDecision.NeverAsked)
 
-        assertEquals(ConsentController.StartupAction.ShowDialog, controller.resolveStartupAction())
+        assertThat(controller.resolveStartupAction()).isEqualTo(ConsentController.StartupAction.ShowDialog)
     }
 
     @Test
@@ -164,7 +164,7 @@ class ConsentControllerTest {
         val controller = buildController()
         coEvery { repository.readState() } returns ConsentReadResult.Loaded(ConsentDecision.Granted)
 
-        assertEquals(ConsentController.StartupAction.Reaffirm(granted = true), controller.resolveStartupAction())
+        assertThat(controller.resolveStartupAction()).isEqualTo(ConsentController.StartupAction.Reaffirm(granted = true))
     }
 
     @Test
@@ -172,7 +172,7 @@ class ConsentControllerTest {
         val controller = buildController()
         coEvery { repository.readState() } returns ConsentReadResult.Loaded(ConsentDecision.Denied)
 
-        assertEquals(ConsentController.StartupAction.Reaffirm(granted = false), controller.resolveStartupAction())
+        assertThat(controller.resolveStartupAction()).isEqualTo(ConsentController.StartupAction.Reaffirm(granted = false))
     }
 
     @Test
@@ -183,7 +183,7 @@ class ConsentControllerTest {
         val controller = buildController()
         coEvery { repository.readState() } returns ConsentReadResult.Unavailable(IOException("read failed"))
 
-        assertEquals(ConsentController.StartupAction.Skip, controller.resolveStartupAction())
+        assertThat(controller.resolveStartupAction()).isEqualTo(ConsentController.StartupAction.Skip)
     }
 
     @Test
@@ -305,7 +305,7 @@ class ConsentControllerTest {
         controller.applyConsent(false)
         advanceUntilIdle()
 
-        assertTrue("A throwing queue purge escaped applyConsent's catch", uncaught.isEmpty())
+        assertWithMessage("A throwing queue purge escaped applyConsent's catch").that(uncaught.isEmpty()).isTrue()
         verify(exactly = 1) { acraToggle.purgeReportQueue() }
         coVerify(exactly = 1) { repository.setConsent(false) }
     }

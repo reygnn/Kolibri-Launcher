@@ -21,13 +21,14 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResetAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.launcher.core.PackageEvent
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -40,9 +41,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -188,13 +186,13 @@ class AppManagementDelegateTest {
     @Test
     fun `initial favoriteAppsState is Loading`() {
         val delegate = createDelegate()
-        assertEquals(UiState.Loading, delegate.favoriteAppsState.value)
+        assertThat(delegate.favoriteAppsState.value).isEqualTo(UiState.Loading)
     }
 
     @Test
     fun `initial appDrawerSearchQuery is empty`() {
         val delegate = createDelegate()
-        assertEquals("", delegate.appDrawerSearchQuery.value)
+        assertThat(delegate.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     // ===========================================
@@ -208,7 +206,7 @@ class AppManagementDelegateTest {
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.LaunchApp })
+        assertThat(sentEvents.any { it is UiEvent.LaunchApp }).isTrue()
         coVerify { recordAppLaunchUseCase.invoke(testApp) }
     }
 
@@ -236,8 +234,8 @@ class AppManagementDelegateTest {
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.LaunchApp })
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.LaunchApp }).isTrue()
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -250,7 +248,7 @@ class AppManagementDelegateTest {
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.count { it is UiEvent.LaunchApp })
+        assertThat(sentEvents.count { it is UiEvent.LaunchApp }).isEqualTo(1)
         coVerify(exactly = 1) { recordAppLaunchUseCase.invoke(testApp) }
     }
 
@@ -264,7 +262,7 @@ class AppManagementDelegateTest {
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertEquals(2, sentEvents.count { it is UiEvent.LaunchApp })
+        assertThat(sentEvents.count { it is UiEvent.LaunchApp }).isEqualTo(2)
         coVerify(exactly = 2) { recordAppLaunchUseCase.invoke(testApp) }
     }
 
@@ -281,7 +279,7 @@ class AppManagementDelegateTest {
         delegate.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertEquals(2, sentEvents.count { it is UiEvent.LaunchApp })
+        assertThat(sentEvents.count { it is UiEvent.LaunchApp }).isEqualTo(2)
         coVerify(exactly = 2) { recordAppLaunchUseCase.invoke(testApp) }
     }
 
@@ -299,7 +297,7 @@ class AppManagementDelegateTest {
         delegate.onToggleFavorite(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     @Test
@@ -312,7 +310,7 @@ class AppManagementDelegateTest {
         delegate.onToggleFavorite(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     @Test
@@ -324,7 +322,7 @@ class AppManagementDelegateTest {
         delegate.onToggleFavorite(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -339,7 +337,7 @@ class AppManagementDelegateTest {
         advanceUntilIdle()
 
         coVerify { hideAppUseCase.invoke(testApp) }
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     @Test
@@ -351,7 +349,7 @@ class AppManagementDelegateTest {
         delegate.onHideApp(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -361,7 +359,7 @@ class AppManagementDelegateTest {
         delegate.onHideApp(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     @Test
@@ -373,7 +371,7 @@ class AppManagementDelegateTest {
         delegate.onShowApp(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -388,7 +386,7 @@ class AppManagementDelegateTest {
         advanceUntilIdle()
 
         coVerify { resetAppUsageUseCase.invoke(testApp) }
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     @Test
@@ -400,7 +398,7 @@ class AppManagementDelegateTest {
         delegate.onResetAppUsage(testApp)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -426,7 +424,7 @@ class AppManagementDelegateTest {
         delegate.toggleSortOrder()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -439,7 +437,7 @@ class AppManagementDelegateTest {
 
         delegate.onAppDrawerSearchQueryChanged("test")
 
-        assertEquals("test", delegate.appDrawerSearchQuery.value)
+        assertThat(delegate.appDrawerSearchQuery.value).isEqualTo("test")
     }
 
     @Test
@@ -449,7 +447,7 @@ class AppManagementDelegateTest {
         delegate.onAppDrawerSearchQueryChanged("test")
         delegate.onAppDrawerClosed()
 
-        assertEquals("", delegate.appDrawerSearchQuery.value)
+        assertThat(delegate.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     // ===========================================
@@ -476,7 +474,7 @@ class AppManagementDelegateTest {
 
         val delegate = createDelegate()
 
-        assertTrue(delegate.isAutoLaunchEnabled())
+        assertThat(delegate.isAutoLaunchEnabled()).isTrue()
     }
 
     @Test
@@ -485,7 +483,7 @@ class AppManagementDelegateTest {
 
         val delegate = createDelegate()
 
-        assertFalse(delegate.isAutoShowKeyboardEnabled())
+        assertThat(delegate.isAutoShowKeyboardEnabled()).isFalse()
     }
 
     @Test
@@ -494,7 +492,7 @@ class AppManagementDelegateTest {
 
         val delegate = createDelegate()
 
-        assertTrue(delegate.hasUsageData("com.test.app"))
+        assertThat(delegate.hasUsageData("com.test.app")).isTrue()
     }
 
     // ===========================================
@@ -508,7 +506,7 @@ class AppManagementDelegateTest {
         delegate.onAppInfoError()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -518,7 +516,7 @@ class AppManagementDelegateTest {
         delegate.onFavoriteAppsError("Something went wrong")
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToastFromString })
+        assertThat(sentEvents.any { it is UiEvent.ShowToastFromString }).isTrue()
     }
 
     // ===========================================
@@ -544,8 +542,8 @@ class AppManagementDelegateTest {
         advanceUntilIdle()
 
         val state = delegate.favoriteAppsState.value
-        assertTrue(state is UiState.Success)
-        assertEquals(favResult, (state as UiState.Success).data)
+        assertThat(state).isInstanceOf(UiState.Success::class.java)
+        assertThat((state as UiState.Success).data).isEqualTo(favResult)
     }
 
     @Test
@@ -572,8 +570,8 @@ class AppManagementDelegateTest {
         advanceUntilIdle()
 
         val toastCount = sentEvents.count { it is UiEvent.ShowToast }
-        assertEquals(1, toastCount)
-        assertTrue(handle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true)
+        assertThat(toastCount).isEqualTo(1)
+        assertThat(handle.get<Boolean>(AppConstants.KEY_FALLBACK_TOAST_SHOWN) == true).isTrue()
     }
 
     // ===========================================

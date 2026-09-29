@@ -9,7 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeLayoutSerializer
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -32,12 +32,12 @@ class ExportImportUseCaseTest {
     private fun appAt(p: String, x: Int) = PlacedItem(HomeItem.App(ItemId(p), ck(p)), CellPos(0, x, 0))
 
     @Test
-    fun export_serializes_the_current_layout() = runTest(mainDispatcherRule.dispatcher) {
+    fun export_serializes_the_current_layout() = runTest(mainDispatcherRule.testDispatcher) {
         val layout = empty().copy(items = listOf(appAt("pa", 0)))
         val repo = FakeHomeLayoutRepository(layout)
         val serializer = FakeLayoutSerializer(onSerialize = { "BLOB:${it.items.size}" })
 
-        val result = ExportLayoutUseCase(repo, serializer, mainDispatcherRule.dispatcher)()
+        val result = ExportLayoutUseCase(repo, serializer, mainDispatcherRule.testDispatcher)()
 
         assertThat(result).isEqualTo("BLOB:1")
     }

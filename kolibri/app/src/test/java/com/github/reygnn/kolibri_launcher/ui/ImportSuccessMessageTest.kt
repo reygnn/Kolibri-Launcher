@@ -2,8 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.backup.ImportSuccessMessage
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -17,23 +16,23 @@ class ImportSuccessMessageTest {
     @Test
     fun `select returns AppsImportedWithSkipped when both counts positive`() {
         val message = ImportSuccessMessage.select(importedCount = 5, skippedCount = 2)
-        assertTrue(message is ImportSuccessMessage.AppsImportedWithSkipped)
+        assertThat(message).isInstanceOf(ImportSuccessMessage.AppsImportedWithSkipped::class.java)
         val m = message as ImportSuccessMessage.AppsImportedWithSkipped
-        assertEquals(5, m.importedCount)
-        assertEquals(2, m.skippedCount)
+        assertThat(m.importedCount).isEqualTo(5)
+        assertThat(m.skippedCount).isEqualTo(2)
     }
 
     @Test
     fun `select returns AppsImported when imported positive and skipped zero`() {
         val message = ImportSuccessMessage.select(importedCount = 5, skippedCount = 0)
-        assertTrue(message is ImportSuccessMessage.AppsImported)
-        assertEquals(5, (message as ImportSuccessMessage.AppsImported).importedCount)
+        assertThat(message).isInstanceOf(ImportSuccessMessage.AppsImported::class.java)
+        assertThat((message as ImportSuccessMessage.AppsImported).importedCount).isEqualTo(5)
     }
 
     @Test
     fun `select returns SettingsOnly when imported zero and skipped zero`() {
         val message = ImportSuccessMessage.select(importedCount = 0, skippedCount = 0)
-        assertEquals(ImportSuccessMessage.SettingsOnly, message)
+        assertThat(message).isEqualTo(ImportSuccessMessage.SettingsOnly)
     }
 
     @Test
@@ -42,7 +41,7 @@ class ImportSuccessMessageTest {
         // -> Fallback auf SettingsOnly statt unpassendem „0 apps imported, N skipped".
         // Diese Regel ist bewusst und muss erhalten bleiben.
         val message = ImportSuccessMessage.select(importedCount = 0, skippedCount = 3)
-        assertEquals(ImportSuccessMessage.SettingsOnly, message)
+        assertThat(message).isEqualTo(ImportSuccessMessage.SettingsOnly)
     }
 
     // ========== BOUNDARY ==========
@@ -50,36 +49,30 @@ class ImportSuccessMessageTest {
     @Test
     fun `select returns AppsImported at boundary imported equals 1`() {
         val message = ImportSuccessMessage.select(importedCount = 1, skippedCount = 0)
-        assertTrue(message is ImportSuccessMessage.AppsImported)
+        assertThat(message).isInstanceOf(ImportSuccessMessage.AppsImported::class.java)
     }
 
     @Test
     fun `select returns AppsImportedWithSkipped at boundary skipped equals 1`() {
         val message = ImportSuccessMessage.select(importedCount = 1, skippedCount = 1)
-        assertTrue(message is ImportSuccessMessage.AppsImportedWithSkipped)
+        assertThat(message).isInstanceOf(ImportSuccessMessage.AppsImportedWithSkipped::class.java)
     }
 
     // ========== DATA CLASS EQUALITY ==========
 
     @Test
     fun `AppsImported has value-based equality`() {
-        assertEquals(
-            ImportSuccessMessage.AppsImported(3),
-            ImportSuccessMessage.AppsImported(3),
-        )
+        assertThat(ImportSuccessMessage.AppsImported(3)).isEqualTo(ImportSuccessMessage.AppsImported(3))
     }
 
     @Test
     fun `AppsImportedWithSkipped has value-based equality`() {
-        assertEquals(
-            ImportSuccessMessage.AppsImportedWithSkipped(3, 2),
-            ImportSuccessMessage.AppsImportedWithSkipped(3, 2),
-        )
+        assertThat(ImportSuccessMessage.AppsImportedWithSkipped(3, 2)).isEqualTo(ImportSuccessMessage.AppsImportedWithSkipped(3, 2))
     }
 
     @Test
     fun `SettingsOnly is a singleton`() {
         // data object -> alle Referenzen sind identisch
-        assertTrue(ImportSuccessMessage.SettingsOnly === ImportSuccessMessage.SettingsOnly)
+        assertThat(ImportSuccessMessage.SettingsOnly === ImportSuccessMessage.SettingsOnly).isTrue()
     }
 }

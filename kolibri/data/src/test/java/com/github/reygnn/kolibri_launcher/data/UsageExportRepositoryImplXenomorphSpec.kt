@@ -6,12 +6,12 @@ import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertIs
 
 /**
  * XENOMORPH & PREDATOR EDITION
@@ -52,10 +52,7 @@ class UsageExportRepositoryImplXenomorphSpec {
 
         // Der Validator sollte hier entweder false zurückgeben oder Exception fangen
         // Wichtig ist: KEIN CRASH der JVM.
-        assertTrue(
-            "Should reject deeply nested JSON without crashing",
-            result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error
-        )
+        assertWithMessage("Should reject deeply nested JSON without crashing").that(result is UsageImportResult.InvalidFormat || result).isInstanceOf(UsageImportResult.Error::class.java)
     }
 
     @Test
@@ -79,7 +76,7 @@ class UsageExportRepositoryImplXenomorphSpec {
 
         // Da wir im Test viel RAM haben, könnte es klappen, aber der Key ist Quatsch -> Success mit 0 Importen
         // oder InvalidFormat wegen Länge.
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
     }
 
     @Test
@@ -97,7 +94,7 @@ class UsageExportRepositoryImplXenomorphSpec {
         """.trimIndent()
 
         val result = manager.importFromJson(toxicJson, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -117,7 +114,7 @@ class UsageExportRepositoryImplXenomorphSpec {
 
         // Sollte als Success durchgehen (wird gespeichert), darf aber beim Speichern
         // im DataStore keinen Key-Fehler werfen.
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
     }
 
     @Test
@@ -138,6 +135,6 @@ class UsageExportRepositoryImplXenomorphSpec {
 
         // FIX: Wir erwarten jetzt InvalidFormat, da JSONObject(str) bei Duplikaten
         // oft eine Exception wirft, die validateJsonStructure() als false interpretiert.
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 }

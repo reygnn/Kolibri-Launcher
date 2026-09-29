@@ -13,12 +13,12 @@ import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.model.ReconcileOutcome
 import com.github.reygnn.nyx_launcher.home.model.invariantViolations
 import com.github.reygnn.nyx_launcher.home.testing.RandomHomeLayouts
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Ignore
 import org.junit.Test
 import kotlin.random.Random
+import kotlin.test.assertIs
 
 /**
  * Property test for the whole transition surface: apply long chains of RANDOM
@@ -58,13 +58,13 @@ class HomeLayoutInvariantPropertyTest {
             start, ItemId("f"), ck(8), DropTarget.GridInsert(page = 3, index = 20), newId,
         )
         val out = r.layout
-        assertTrue("expected a dissolve with a layout, got $r", out != null)
+        assertWithMessage("expected a dissolve with a layout, got $r").that(out != null).isTrue()
         out!!
-        assertTrue("invariants must hold: ${out.invariantViolations()}", out.invariantViolations().isEmpty())
+        assertWithMessage("invariants must hold: ${out.invariantViolations()}").that(out.invariantViolations().isEmpty()).isTrue()
         // both apps now exist top-level, each exactly once
         val keys = out.items.mapNotNull { (it.item as? HomeItem.App)?.key }
-        assertEquals(1, keys.count { it == ck(8) })
-        assertEquals(1, keys.count { it == ck(10) })
+        assertThat(keys.count { it == ck(8) }).isEqualTo(1)
+        assertThat(keys.count { it == ck(10) }).isEqualTo(1)
     }
 
     /**
@@ -85,9 +85,9 @@ class HomeLayoutInvariantPropertyTest {
         val r = HomeLayoutTransition.removeFromFolder(
             start, ItemId("f"), ck(1), DropTarget.DockItem(0), newId,
         )
-        assertTrue("own-slot drop must be rejected, got $r", r is FolderEditResult.Rejected)
+        assertIs<FolderEditResult.Rejected>(r, "own-slot drop must be rejected, got $r")
         // the folder is untouched (no dissolve, dock unchanged)
-        assertTrue("layout must be unchanged on reject", r.layout == null)
+        assertWithMessage("layout must be unchanged on reject").that(r.layout == null).isTrue()
     }
 
     // ---------------------------------------------------------------- property
@@ -112,7 +112,7 @@ class HomeLayoutInvariantPropertyTest {
             val rnd = Random(run.toLong() * 1_000_003L + 7)
             val sc = RandomHomeLayouts.scenario(rnd)
             var cur = RandomHomeLayouts.seed(rnd, sc)
-            assertTrue("seed invalid (run=$run $sc): ${cur.invariantViolations()}", cur.invariantViolations().isEmpty())
+            assertWithMessage("seed invalid (run=$run $sc): ${cur.invariantViolations()}").that(cur.invariantViolations().isEmpty()).isTrue()
             var idc = 0
             val newId = { ItemId("g${run}_${idc++}") }
             for (step in 0 until steps) {
@@ -136,13 +136,13 @@ class HomeLayoutInvariantPropertyTest {
                 val next = res?.layout ?: continue
                 cur = next
                 val bad = cur.invariantViolations()
-                if (bad.isNotEmpty()) fail("run=$run step=$step $sc violations=$bad\nlayout=$cur")
+                if (bad.isNotEmpty()) throw AssertionError("run=$run step=$step $sc violations=$bad\nlayout=$cur")
                 // §Audit-2 N14: conservation — no app key silently disappears across an accepted
                 // edit. place() may ADD a key; move / removeFromFolder / renameFolder conserve
                 // exactly, so a superset always holds. A structurally-valid-but-app-losing result
                 // (which invariantViolations alone would not catch) fails here.
                 if (!cur.appKeys().containsAll(before.appKeys())) {
-                    fail("run=$run step=$step $sc lost app keys ${before.appKeys() - cur.appKeys()}\nlayout=$cur")
+                    throw AssertionError("run=$run step=$step $sc lost app keys ${before.appKeys() - cur.appKeys()}\nlayout=$cur")
                 }
 
                 if (step % 20 == 19) {
@@ -150,12 +150,12 @@ class HomeLayoutInvariantPropertyTest {
                     val r1 = HomeLayoutReconciler.reconcile(cur, newId)
                     val after1 = (r1 as? ReconcileOutcome.Changed)?.layout ?: cur
                     val rbad = after1.invariantViolations()
-                    if (rbad.isNotEmpty()) fail("reconcile invalid run=$run step=$step $sc $rbad")
+                    if (rbad.isNotEmpty()) throw AssertionError("reconcile invalid run=$run step=$step $sc $rbad")
                     val r2 = HomeLayoutReconciler.reconcile(after1, newId)
-                    assertTrue("reconcile not idempotent run=$run step=$step $sc", r2 is ReconcileOutcome.Unchanged)
+                    assertWithMessage("reconcile not idempotent run=$run step=$step $sc").that(r2).isInstanceOf(ReconcileOutcome.Unchanged::class.java)
                     // §Audit-2 N14: reconcile is no-prune → the DISTINCT app-key set is conserved
                     // exactly (dedup only removes duplicates that survive elsewhere in the set).
-                    assertEquals("reconcile changed the app-key set run=$run step=$step $sc", cur.appKeys(), after1.appKeys())
+                    assertWithMessage("reconcile changed the app-key set run=$run step=$step $sc").that(after1.appKeys()).isEqualTo(cur.appKeys())
                     cur = after1
                 }
             }

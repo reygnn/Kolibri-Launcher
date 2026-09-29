@@ -1,17 +1,14 @@
 package com.github.reygnn.launcher.core
 
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -24,13 +21,14 @@ import org.junit.Test
  * from blanking a consumer on either launcher.
  *
  * Single-dispatcher convention: one [StandardTestDispatcher] from the rule, passed to
- * `runTest`; the collector runs on `backgroundScope` and is driven by `advanceUntilIdle`.
+ * `runTest`; each collector is a `recordEmissions(...)` child that the test cancels at
+ * the end (TESTING_CONVENTIONS §5/§6), driven by `advanceUntilIdle`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncInstalledAppsToHolderTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     /** Hot loader fake: a [MutableStateFlow] of [AppLoad] that never completes. */
     private class FakeLoader(initial: AppLoad) : InstalledAppsRepository {
@@ -62,11 +60,12 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
+            val collector = recordEmissions(SyncInstalledAppsToHolder(loader, holder).outcomes(), into = seen)
             advanceUntilIdle()
 
-            assertEquals(apps, holder.rawAppsFlow.value)
-            assertEquals(SyncInstalledAppsToHolder.Outcome.Loaded, seen.last())
+            assertThat(holder.rawAppsFlow.value).isEqualTo(apps)
+            assertThat(seen.last()).isEqualTo(SyncInstalledAppsToHolder.Outcome.Loaded)
+            collector.cancel()
         }
 
     @Test
@@ -75,16 +74,17 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
+            val collector = recordEmissions(SyncInstalledAppsToHolder(loader, holder).outcomes(), into = seen)
             advanceUntilIdle()
 
             loader.flow.value = AppLoad.Loaded(emptyList())
             advanceUntilIdle()
 
             // rawAppsFlow reflects the genuine empty; getCurrentApps() keeps last-good.
-            assertTrue(holder.rawAppsFlow.value.isEmpty())
-            assertEquals(apps, holder.getCurrentApps())
-            assertEquals(SyncInstalledAppsToHolder.Outcome.EmptyLoaded, seen.last())
+            assertThat(holder.rawAppsFlow.value.isEmpty()).isTrue()
+            assertThat(holder.getCurrentApps()).isEqualTo(apps)
+            assertThat(seen.last()).isEqualTo(SyncInstalledAppsToHolder.Outcome.EmptyLoaded)
+            collector.cancel()
         }
 
     @Test
@@ -94,13 +94,14 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Failed(cause))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
+            val collector = recordEmissions(SyncInstalledAppsToHolder(loader, holder).outcomes(), into = seen)
             advanceUntilIdle()
 
             val outcome = seen.last()
-            assertTrue(outcome is SyncInstalledAppsToHolder.Outcome.FailedNoCache)
-            assertEquals(cause, (outcome as SyncInstalledAppsToHolder.Outcome.FailedNoCache).cause)
-            assertTrue(holder.getCurrentApps().isEmpty())
+            assertThat(outcome).isInstanceOf(SyncInstalledAppsToHolder.Outcome.FailedNoCache::class.java)
+            assertThat((outcome as SyncInstalledAppsToHolder.Outcome.FailedNoCache).cause).isEqualTo(cause)
+            assertThat(holder.getCurrentApps().isEmpty()).isTrue()
+            collector.cancel()
         }
 
     @Test
@@ -109,13 +110,14 @@ class SyncInstalledAppsToHolderTest {
             val loader = FakeLoader(AppLoad.Loaded(apps))
             val holder = FakeHolder()
             val seen = mutableListOf<SyncInstalledAppsToHolder.Outcome>()
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { SyncInstalledAppsToHolder(loader, holder).outcomes().collect { seen += it } }
+            val collector = recordEmissions(SyncInstalledAppsToHolder(loader, holder).outcomes(), into = seen)
             advanceUntilIdle()
 
             loader.flow.value = AppLoad.Failed(RuntimeException("glitch"))
             advanceUntilIdle()
 
-            assertEquals(SyncInstalledAppsToHolder.Outcome.FailedKeptLastGood, seen.last())
-            assertEquals(apps, holder.getCurrentApps())
+            assertThat(seen.last()).isEqualTo(SyncInstalledAppsToHolder.Outcome.FailedKeptLastGood)
+            assertThat(holder.getCurrentApps()).isEqualTo(apps)
+            collector.cancel()
         }
 }

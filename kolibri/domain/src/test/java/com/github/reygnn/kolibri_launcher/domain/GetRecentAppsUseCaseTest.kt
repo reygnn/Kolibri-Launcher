@@ -6,12 +6,11 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeAppUsageRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -53,7 +52,7 @@ class GetRecentAppsUseCaseTest {
         usage.recordPackageLaunch("pkg.b")
         usage.recordPackageLaunch("pkg.c")
 
-        assertEquals(listOf("C", "B", "A"), names(useCase(8)))
+        assertThat(names(useCase(8))).isEqualTo(listOf("C", "B", "A"))
     }
 
     @Test
@@ -63,7 +62,7 @@ class GetRecentAppsUseCaseTest {
         usage.recordPackageLaunch("pkg.b")
         usage.recordPackageLaunch("pkg.a") // A launched again → most recent
 
-        assertEquals(listOf("A", "B"), names(useCase(8)))
+        assertThat(names(useCase(8))).isEqualTo(listOf("A", "B"))
     }
 
     @Test
@@ -73,7 +72,7 @@ class GetRecentAppsUseCaseTest {
         usage.recordPackageLaunch("pkg.b")
         usage.recordPackageLaunch("pkg.c")
 
-        assertEquals(2, useCase(2).size)
+        assertThat(useCase(2).size).isEqualTo(2)
     }
 
     @Test
@@ -84,7 +83,7 @@ class GetRecentAppsUseCaseTest {
         usage.recordPackageLaunch("pkg.b")
         usage.recordPackageLaunch("pkg.c")
 
-        assertEquals(listOf("C", "A"), names(useCase(8)))
+        assertThat(names(useCase(8))).isEqualTo(listOf("C", "A"))
     }
 
     @Test
@@ -94,19 +93,19 @@ class GetRecentAppsUseCaseTest {
         usage.recordPackageLaunch("pkg.b")
         usage.recordPackageLaunch("pkg.c")
 
-        assertEquals(listOf("C", "A"), names(useCase(8)))
+        assertThat(names(useCase(8))).isEqualTo(listOf("C", "A"))
     }
 
     @Test
     fun `empty when nothing was launched`() = runTest(mainDispatcherRule.testDispatcher) {
         installed.updateApps(listOf(appA, appB))
-        assertTrue(useCase(8).isEmpty())
+        assertThat(useCase(8).isEmpty()).isTrue()
     }
 
     @Test
     fun `non-positive limit returns empty`() = runTest(mainDispatcherRule.testDispatcher) {
         installed.updateApps(listOf(appA))
         usage.recordPackageLaunch("pkg.a")
-        assertTrue(useCase(0).isEmpty())
+        assertThat(useCase(0).isEmpty()).isTrue()
     }
 }

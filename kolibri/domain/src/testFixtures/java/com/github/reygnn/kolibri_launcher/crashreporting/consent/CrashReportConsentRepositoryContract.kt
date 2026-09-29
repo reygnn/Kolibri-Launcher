@@ -1,14 +1,14 @@
 package com.github.reygnn.kolibri_launcher.crashreporting.consent
 
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentReadResult
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentWriteResult
 import com.github.reygnn.launcher.core.crashreporting.consent.CrashReportConsentRepository
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -59,7 +59,7 @@ abstract class CrashReportConsentRepositoryContract {
     @Test
     fun `fresh repository is NeverAsked`() = runTest {
         val repo = createRepository()
-        assertEquals(ConsentReadResult.Loaded(ConsentDecision.NeverAsked), repo.readState())
+        assertThat(repo.readState()).isEqualTo(ConsentReadResult.Loaded(ConsentDecision.NeverAsked))
     }
 
     // ---------- setConsent roundtrip ----------
@@ -67,15 +67,15 @@ abstract class CrashReportConsentRepositoryContract {
     @Test
     fun `setConsent true records Granted`() = runTest {
         val repo = createRepository()
-        assertEquals(ConsentWriteResult.Saved, repo.setConsent(true))
-        assertEquals(ConsentReadResult.Loaded(ConsentDecision.Granted), repo.readState())
+        assertThat(repo.setConsent(true)).isEqualTo(ConsentWriteResult.Saved)
+        assertThat(repo.readState()).isEqualTo(ConsentReadResult.Loaded(ConsentDecision.Granted))
     }
 
     @Test
     fun `setConsent false records Denied`() = runTest {
         val repo = createRepository()
-        assertEquals(ConsentWriteResult.Saved, repo.setConsent(false))
-        assertEquals(ConsentReadResult.Loaded(ConsentDecision.Denied), repo.readState())
+        assertThat(repo.setConsent(false)).isEqualTo(ConsentWriteResult.Saved)
+        assertThat(repo.readState()).isEqualTo(ConsentReadResult.Loaded(ConsentDecision.Denied))
     }
 
     @Test
@@ -83,6 +83,6 @@ abstract class CrashReportConsentRepositoryContract {
         val repo = createRepository()
         repo.setConsent(true)
         repo.setConsent(false)
-        assertEquals(ConsentReadResult.Loaded(ConsentDecision.Denied), repo.readState())
+        assertThat(repo.readState()).isEqualTo(ConsentReadResult.Loaded(ConsentDecision.Denied))
     }
 }

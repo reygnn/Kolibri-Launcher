@@ -23,13 +23,14 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveUiColorsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.RecordAppLaunchUseCase
 import com.github.reygnn.launcher.core.RefreshAppsUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.launcher.core.PackageEvent
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -43,9 +44,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -205,7 +203,7 @@ class LauncherViewModelDoomsdayTest {
         coVerify { observeInstalledAppsUseCase.invoke() }
 
         // ViewModel ist initialisiert und funktional
-        assertNotNull(vm.uiState.value)
+        assertThat(vm.uiState.value).isNotNull()
     }
 
     // ===========================================
@@ -228,7 +226,7 @@ class LauncherViewModelDoomsdayTest {
 
         // VM lebt noch und hat versucht zu refreshen
         coVerify(atLeast = 1) { refreshAppsUseCase.invoke() }
-        assertNotNull(vm.uiState.value)
+        assertThat(vm.uiState.value).isNotNull()
     }
 
     // ===========================================
@@ -248,10 +246,10 @@ class LauncherViewModelDoomsdayTest {
             vm.onAppClicked(testApp)
 
             // Launch-Event kommt zuerst (vor dem Recording)
-            assertTrue(awaitItem() is UiEvent.LaunchApp)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.LaunchApp::class.java)
 
             // Dann Error-Toast (wegen recordAppLaunch Failure)
-            assertTrue(awaitItem() is UiEvent.ShowToast)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.ShowToast::class.java)
 
             // No crash despite the recording exception.
         }
@@ -274,6 +272,6 @@ class LauncherViewModelDoomsdayTest {
         advanceUntilIdle()
 
         // Der Search-Query hat den Prozess-Tod überlebt
-        assertEquals("Vor dem Crash", vm.appDrawerSearchQuery.value)
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("Vor dem Crash")
     }
 }

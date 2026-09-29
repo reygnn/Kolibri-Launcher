@@ -1,10 +1,10 @@
 package com.github.reygnn.launcher.common.ui.wallpaper
 
 import android.graphics.Bitmap
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -27,39 +27,33 @@ class WallpaperCompositeCacheTest {
     fun `get returns the entry put under the same path`() {
         val entry = decoded()
         cache.put("file:///composite_1.webp", entry)
-        assertSame(entry, cache.get("file:///composite_1.webp"))
+        assertThat(cache.get("file:///composite_1.webp")).isSameInstanceAs(entry)
     }
 
     @Test
     fun `get misses on a different path`() {
         cache.put("file:///composite_1.webp", decoded())
-        assertNull(cache.get("file:///composite_2.webp"))
+        assertThat(cache.get("file:///composite_2.webp")).isNull()
     }
 
     @Test
     fun `get drops a recycled bitmap`() {
         cache.put("file:///composite_1.webp", decoded(recycled = true))
-        assertNull(cache.get("file:///composite_1.webp"))
+        assertThat(cache.get("file:///composite_1.webp")).isNull()
     }
 
     @Test
     fun `invalidate drops the held entry`() {
         cache.put("file:///composite_1.webp", decoded())
         cache.invalidate()
-        assertNull(
-            "AUDIT-20 F3: the cache must be empty after invalidate()",
-            cache.get("file:///composite_1.webp"),
-        )
+        assertWithMessage("AUDIT-20 F3: the cache must be empty after invalidate()").that(cache.get("file:///composite_1.webp")).isNull()
     }
 
     @Test
     fun `invalidateIfNotKey drops a stale-key entry`() {
         cache.put("composite://portrait", decoded())
         cache.invalidateIfNotKey("composite://landscape")
-        assertNull(
-            "AUDIT-20 F12: an entry under a now-dead key must be dropped",
-            cache.get("composite://portrait"),
-        )
+        assertWithMessage("AUDIT-20 F12: an entry under a now-dead key must be dropped").that(cache.get("composite://portrait")).isNull()
     }
 
     @Test
@@ -67,16 +61,12 @@ class WallpaperCompositeCacheTest {
         val entry = decoded()
         cache.put("composite://portrait", entry)
         cache.invalidateIfNotKey("composite://portrait")
-        assertSame(
-            "AUDIT-20 F12: the live current-key entry must survive",
-            entry,
-            cache.get("composite://portrait"),
-        )
+        assertWithMessage("AUDIT-20 F12: the live current-key entry must survive").that(cache.get("composite://portrait")).isSameInstanceAs(entry)
     }
 
     @Test
     fun `invalidateIfNotKey is a no-op on an empty cache`() {
         cache.invalidateIfNotKey("composite://anything")
-        assertNull(cache.get("composite://anything"))
+        assertThat(cache.get("composite://anything")).isNull()
     }
 }

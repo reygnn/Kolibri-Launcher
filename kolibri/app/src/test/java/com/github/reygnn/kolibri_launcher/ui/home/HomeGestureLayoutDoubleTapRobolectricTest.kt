@@ -5,8 +5,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.test.core.app.ApplicationProvider
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -95,7 +94,7 @@ class HomeGestureLayoutDoubleTapRobolectricTest {
         // Release cleanly.
         dispatch(MotionEvent.ACTION_UP, downTime = base + 100, eventTime = base + 110, x = tapX, y = tapY)
 
-        assertEquals("the second tap must be recognised as a double tap", 1, doubleTaps)
+        assertWithMessage("the second tap must be recognised as a double tap").that(doubleTaps).isEqualTo(1)
     }
 
     @Test
@@ -107,8 +106,8 @@ class HomeGestureLayoutDoubleTapRobolectricTest {
         dispatch(MotionEvent.ACTION_DOWN, downTime = base, eventTime = base, x = tapX, y = tapY)
         dispatch(MotionEvent.ACTION_MOVE, downTime = base, eventTime = base + 16, x = tapX, y = tapY - 600f)
 
-        assertEquals("a fast upward flick must dispatch exactly one swipe", 1, swipes)
-        assertEquals("no double tap was performed", 0, doubleTaps)
+        assertWithMessage("a fast upward flick must dispatch exactly one swipe").that(swipes).isEqualTo(1)
+        assertWithMessage("no double tap was performed").that(doubleTaps).isEqualTo(0)
     }
 
     @Test
@@ -121,8 +120,8 @@ class HomeGestureLayoutDoubleTapRobolectricTest {
         // the analyzer would fire onSwipeUp here.
         dispatch(MotionEvent.ACTION_MOVE, downTime = base + 100, eventTime = base + 116, x = tapX, y = tapY - 600f)
 
-        assertEquals("the double tap must still have fired", 1, doubleTaps)
-        assertEquals("a flick off the double tap must not dispatch a swipe", 0, swipes)
+        assertWithMessage("the double tap must still have fired").that(doubleTaps).isEqualTo(1)
+        assertWithMessage("a flick off the double tap must not dispatch a swipe").that(swipes).isEqualTo(0)
     }
 
     @Test
@@ -134,8 +133,8 @@ class HomeGestureLayoutDoubleTapRobolectricTest {
         // advancing the paused looper past the long-press timeout.
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
 
-        assertEquals("the double tap must have fired", 1, doubleTaps)
-        assertEquals("a hold after a double tap must not fire the long-press", 0, longPresses)
+        assertWithMessage("the double tap must have fired").that(doubleTaps).isEqualTo(1)
+        assertWithMessage("a hold after a double tap must not fire the long-press").that(longPresses).isEqualTo(0)
     }
 
     @Test
@@ -149,7 +148,7 @@ class HomeGestureLayoutDoubleTapRobolectricTest {
         dispatchDoubleTapUpToSecondDown(base)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
 
-        assertEquals("a nulled double tap must not be counted", 0, doubleTaps)
-        assertEquals("the long-press must stay free when double tap is unwired", 1, longPresses)
+        assertWithMessage("a nulled double tap must not be counted").that(doubleTaps).isEqualTo(0)
+        assertWithMessage("the long-press must stay free when double tap is unwired").that(longPresses).isEqualTo(1)
     }
 }

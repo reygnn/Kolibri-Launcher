@@ -3,8 +3,9 @@ package com.github.reygnn.kolibri_launcher.ui
 import android.view.View
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.HomeFragment
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.mockk
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -43,7 +44,7 @@ class DoubleClickListenerTest {
         // Kein Warten (sofortiger 2. Klick -> 0ms Diff)
         listener.onClick(view)
 
-        assertEquals("Sollte Double Click feuern bei < 300ms", 1, listener.calls)
+        assertWithMessage("Sollte Double Click feuern bei < 300ms").that(listener.calls).isEqualTo(1)
     }
 
     @Test
@@ -67,7 +68,7 @@ class DoubleClickListenerTest {
         // 2. Klick
         listener.onClick(view)
 
-        assertEquals("Sollte KEIN Double Click feuern bei > 300ms", 0, listener.calls)
+        assertWithMessage("Sollte KEIN Double Click feuern bei > 300ms").that(listener.calls).isEqualTo(0)
     }
 
     @Test
@@ -84,10 +85,10 @@ class DoubleClickListenerTest {
 
         // Klick 2 (zu spät -> Reset Timer)
         listener.onClick(view)
-        assertEquals(0, listener.calls)
+        assertThat(listener.calls).isEqualTo(0)
 
         // Klick 3 (sofort nach Klick 2 -> Double Click!)
         listener.onClick(view)
-        assertEquals(1, listener.calls)
+        assertThat(listener.calls).isEqualTo(1)
     }
 }

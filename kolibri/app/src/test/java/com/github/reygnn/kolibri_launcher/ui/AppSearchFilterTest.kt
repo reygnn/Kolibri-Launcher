@@ -3,8 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppSearchFilter
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -33,31 +32,31 @@ class AppSearchFilterTest {
     @Test
     fun `empty query returns full list`() {
         val result = filter.filterAndDecide(list, "", false)
-        assertTrue(result is AppSearchFilter.FilterResult.ShowList)
-        assertEquals(3, (result as AppSearchFilter.FilterResult.ShowList).apps.size)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.ShowList::class.java)
+        assertThat((result as AppSearchFilter.FilterResult.ShowList).apps.size).isEqualTo(3)
     }
 
     @Test
     fun `query finds single match`() {
         val result = filter.filterAndDecide(list, "Alpha", false)
-        assertTrue(result is AppSearchFilter.FilterResult.ShowList)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.ShowList::class.java)
         val apps = (result as AppSearchFilter.FilterResult.ShowList).apps
-        assertEquals(1, apps.size)
-        assertEquals("Alpha", apps[0].displayName)
+        assertThat(apps.size).isEqualTo(1)
+        assertThat(apps[0].displayName).isEqualTo("Alpha")
     }
 
     @Test
     fun `query is case insensitive`() {
         val result = filter.filterAndDecide(list, "alpha", false) // klein geschrieben
         val apps = (result as AppSearchFilter.FilterResult.ShowList).apps
-        assertEquals(1, apps.size)
+        assertThat(apps.size).isEqualTo(1)
     }
 
     @Test
     fun `query finds no match returns empty list`() {
         val result = filter.filterAndDecide(list, "Zebra", false)
         val apps = (result as AppSearchFilter.FilterResult.ShowList).apps
-        assertTrue(apps.isEmpty())
+        assertThat(apps.isEmpty()).isTrue()
     }
 
     // ========== AUTO LAUNCH LOGIC ==========
@@ -65,14 +64,14 @@ class AppSearchFilterTest {
     @Test
     fun `auto launch triggered when enabled and single match`() {
         val result = filter.filterAndDecide(list, "Alpha", true) // Enabled!
-        assertTrue(result is AppSearchFilter.FilterResult.AutoLaunch)
-        assertEquals("Alpha", (result as AppSearchFilter.FilterResult.AutoLaunch).app.displayName)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.AutoLaunch::class.java)
+        assertThat((result as AppSearchFilter.FilterResult.AutoLaunch).app.displayName).isEqualTo("Alpha")
     }
 
     @Test
     fun `auto launch NOT triggered if disabled`() {
         val result = filter.filterAndDecide(list, "Alpha", false) // Disabled!
-        assertTrue(result is AppSearchFilter.FilterResult.ShowList)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.ShowList::class.java)
     }
 
     @Test
@@ -81,8 +80,8 @@ class AppSearchFilterTest {
         val result = filter.filterAndDecide(listWithTwoAlphas, "Alpha", true)
 
         // 2 Treffer -> Kein AutoLaunch, User muss wählen
-        assertTrue(result is AppSearchFilter.FilterResult.ShowList)
-        assertEquals(2, (result as AppSearchFilter.FilterResult.ShowList).apps.size)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.ShowList::class.java)
+        assertThat((result as AppSearchFilter.FilterResult.ShowList).apps.size).isEqualTo(2)
     }
 
     // ========== PARANOID EDGE CASES ==========
@@ -95,14 +94,14 @@ class AppSearchFilterTest {
 
         val result = filter.filterAndDecide(singleAppList, "", true)
 
-        assertTrue(result is AppSearchFilter.FilterResult.ShowList)
-        assertEquals(1, (result as AppSearchFilter.FilterResult.ShowList).apps.size)
+        assertThat(result).isInstanceOf(AppSearchFilter.FilterResult.ShowList::class.java)
+        assertThat((result as AppSearchFilter.FilterResult.ShowList).apps.size).isEqualTo(1)
     }
 
     @Test
     fun `handles empty input list gracefully`() {
         val result = filter.filterAndDecide(emptyList(), "Search", true)
         val apps = (result as AppSearchFilter.FilterResult.ShowList).apps
-        assertTrue(apps.isEmpty())
+        assertThat(apps.isEmpty()).isTrue()
     }
 }

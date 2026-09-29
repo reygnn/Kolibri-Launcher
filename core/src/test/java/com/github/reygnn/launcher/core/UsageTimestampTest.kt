@@ -1,7 +1,6 @@
 package com.github.reygnn.launcher.core
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -21,34 +20,34 @@ class UsageTimestampTest {
     @Test
     fun `a timestamp exactly now is valid`() {
         // `timestamp <= currentTime` is inclusive: a launch recorded this instant counts.
-        assertTrue(isValidUsageTimestamp(now, now))
+        assertThat(isValidUsageTimestamp(now, now)).isTrue()
     }
 
     @Test
     fun `one millisecond in the future is rejected`() {
-        assertFalse(isValidUsageTimestamp(now + 1, now))
+        assertThat(isValidUsageTimestamp(now + 1, now)).isFalse()
     }
 
     @Test
     fun `zero is rejected — must be strictly positive`() {
-        assertFalse(isValidUsageTimestamp(0L, now))
+        assertThat(isValidUsageTimestamp(0L, now)).isFalse()
     }
 
     @Test
     fun `a negative timestamp is rejected`() {
-        assertFalse(isValidUsageTimestamp(-1L, now))
+        assertThat(isValidUsageTimestamp(-1L, now)).isFalse()
     }
 
     @Test
     fun `the oldest allowed timestamp — exactly MAX age — is valid`() {
         // currentTime - timestamp == MAX_TIMESTAMP_AGE_MS, and the age guard is `<=`.
         val oldest = now - AppConstants.MAX_TIMESTAMP_AGE_MS
-        assertTrue(isValidUsageTimestamp(oldest, now))
+        assertThat(isValidUsageTimestamp(oldest, now)).isTrue()
     }
 
     @Test
     fun `one millisecond older than MAX age is rejected`() {
         val tooOld = now - AppConstants.MAX_TIMESTAMP_AGE_MS - 1
-        assertFalse(isValidUsageTimestamp(tooOld, now))
+        assertThat(isValidUsageTimestamp(tooOld, now)).isFalse()
     }
 }

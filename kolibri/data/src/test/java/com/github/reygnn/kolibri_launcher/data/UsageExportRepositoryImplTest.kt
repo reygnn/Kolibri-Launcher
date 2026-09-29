@@ -9,11 +9,10 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -48,9 +47,9 @@ class UsageExportRepositoryImplTest {
         val json = appUsageExportManager.exportToJson()
 
         // Assert
-        assertTrue(json.contains("\"version\""))
-        assertTrue(json.contains("\"exportTimestamp\""))
-        assertTrue(json.contains("\"usageData\""))
+        assertThat(json.contains("\"version\"")).isTrue()
+        assertThat(json.contains("\"exportTimestamp\"")).isTrue()
+        assertThat(json.contains("\"usageData\"")).isTrue()
     }
 
     @Test
@@ -78,11 +77,11 @@ class UsageExportRepositoryImplTest {
         val json = appUsageExportManager.exportToJson()
 
         // Assert
-        assertTrue(json.contains("com.app1"))
-        assertTrue(json.contains("com.app2"))
+        assertThat(json.contains("com.app1")).isTrue()
+        assertThat(json.contains("com.app2")).isTrue()
         // Check for ISO strings instead of raw longs
-        assertTrue("JSON should contain ISO string $iso1", json.contains(iso1))
-        assertTrue("JSON should contain ISO string $iso2", json.contains(iso2))
+        assertWithMessage("JSON should contain ISO string $iso1").that(json.contains(iso1)).isTrue()
+        assertWithMessage("JSON should contain ISO string $iso2").that(json.contains(iso2)).isTrue()
     }
 
     @Test
@@ -105,8 +104,8 @@ class UsageExportRepositoryImplTest {
         val json = appUsageExportManager.exportToJson()
 
         // Assert
-        assertTrue(json.contains(validIso))
-        assertFalse(json.contains(futureIso))
+        assertThat(json.contains(validIso)).isTrue()
+        assertThat(json.contains(futureIso)).isFalse()
     }
 
     @Test
@@ -129,8 +128,8 @@ class UsageExportRepositoryImplTest {
         val json = appUsageExportManager.exportToJson()
 
         // Assert
-        assertTrue(json.contains(validIso))
-        assertFalse(json.contains(oldIso))
+        assertThat(json.contains(validIso)).isTrue()
+        assertThat(json.contains(oldIso)).isFalse()
     }
 
     @Test
@@ -151,8 +150,8 @@ class UsageExportRepositoryImplTest {
         val json = appUsageExportManager.exportToJson()
 
         // Assert
-        assertTrue(json.contains("com.valid"))
-        assertFalse(json.contains("com.invalid"))
+        assertThat(json.contains("com.valid")).isTrue()
+        assertThat(json.contains("com.invalid")).isFalse()
     }
 
     @Test
@@ -179,9 +178,9 @@ class UsageExportRepositoryImplTest {
         val newestIndex = json.indexOf(newestIso)
         val oldestIndex = json.indexOf(oldestIso)
 
-        assertTrue("Newest timestamp should be found", newestIndex != -1)
-        assertTrue("Oldest timestamp should be found", oldestIndex != -1)
-        assertTrue("Timestamps should be sorted descending", newestIndex < oldestIndex)
+        assertWithMessage("Newest timestamp should be found").that(newestIndex != -1).isTrue()
+        assertWithMessage("Oldest timestamp should be found").that(oldestIndex != -1).isTrue()
+        assertWithMessage("Timestamps should be sorted descending").that(newestIndex < oldestIndex).isTrue()
     }
 
     // ========== IMPORT TESTS (HYBRID: ISO & LONG) ==========
@@ -208,16 +207,16 @@ class UsageExportRepositoryImplTest {
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.packagesImported)
-        assertEquals(1, result.timestampsImported)
+        assertThat(result.packagesImported).isEqualTo(1)
+        assertThat(result.timestampsImported).isEqualTo(1)
 
         // Verify data was stored as Long string in DataStore
         val prefs = fakeDataStore.data.first()
         val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test.app")
         val stored = prefs[key]
 
-        assertTrue(stored != null)
-        assertTrue(stored!!.contains(timestamp.toString()))
+        assertThat(stored != null).isTrue()
+        assertThat(stored!!.contains(timestamp.toString())).isTrue()
     }
 
     @Test
@@ -240,7 +239,7 @@ class UsageExportRepositoryImplTest {
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(1)
     }
 
     @Test
@@ -264,7 +263,7 @@ class UsageExportRepositoryImplTest {
 
         // Assert
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(2, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(2)
     }
 
     @Test
@@ -292,7 +291,7 @@ class UsageExportRepositoryImplTest {
         // Assert
         assertIs<UsageImportResult.Success>(result)
         // Nur der valide Timestamp sollte importiert werden
-        assertEquals(1, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(1)
     }
 
     @Test
@@ -322,7 +321,7 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(1)
     }
 
     @Test
@@ -353,15 +352,15 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
 
         // Assert
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val prefs = fakeDataStore.data.first()
         val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
         val storedTimestamps = prefs[key] ?: emptySet()
 
-        assertEquals(2, storedTimestamps.size)
-        assertTrue(storedTimestamps.contains(existingTimestamp.toString()))
-        assertTrue(storedTimestamps.contains(newTimestamp.toString()))
+        assertThat(storedTimestamps.size).isEqualTo(2)
+        assertThat(storedTimestamps.contains(existingTimestamp.toString())).isTrue()
+        assertThat(storedTimestamps.contains(newTimestamp.toString())).isTrue()
     }
 
     @Test
@@ -389,14 +388,14 @@ class UsageExportRepositoryImplTest {
         """.trimIndent()
 
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val stored = fakeDataStore.data.first()[key] ?: emptySet()
         // shared collapses: union of 3 distinct timestamps, not 4.
-        assertEquals(3, stored.size)
-        assertTrue(stored.contains(onlyExisting.toString()))
-        assertTrue(stored.contains(shared.toString()))
-        assertTrue(stored.contains(onlyImported.toString()))
+        assertThat(stored.size).isEqualTo(3)
+        assertThat(stored.contains(onlyExisting.toString())).isTrue()
+        assertThat(stored.contains(shared.toString())).isTrue()
+        assertThat(stored.contains(onlyImported.toString())).isTrue()
     }
 
     @Test
@@ -425,13 +424,13 @@ class UsageExportRepositoryImplTest {
         """.trimIndent()
 
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = true)
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val stored = fakeDataStore.data.first()[key] ?: emptySet()
-        assertEquals(limit, stored.size) // capped at MAX after merge, not MAX + 3
-        newer.forEach { assertTrue("newest import must survive", stored.contains(it.toString())) }
+        assertThat(stored.size).isEqualTo(limit) // capped at MAX after merge, not MAX + 3
+        newer.forEach { assertWithMessage("newest import must survive").that(stored.contains(it.toString())).isTrue() }
         existing.sorted().take(3).forEach {
-            assertFalse("the oldest existing must be evicted", stored.contains(it.toString()))
+            assertWithMessage("the oldest existing must be evicted").that(stored.contains(it.toString())).isFalse()
         }
     }
 
@@ -461,17 +460,17 @@ class UsageExportRepositoryImplTest {
         """.trimIndent()
 
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val stored = fakeDataStore.data.first()[key] ?: emptySet()
-        assertEquals(limit, stored.size)
+        assertThat(stored.size).isEqualTo(limit)
         // The newest `limit` all survive...
         ascending.sortedDescending().take(limit).forEach {
-            assertTrue("newest must survive, ts=$it", stored.contains(it.toString()))
+            assertWithMessage("newest must survive, ts=$it").that(stored.contains(it.toString())).isTrue()
         }
         // ...and the oldest `overflow` are dropped (would have been kept by take-before-sort).
         ascending.sorted().take(overflow).forEach {
-            assertFalse("oldest must be dropped, ts=$it", stored.contains(it.toString()))
+            assertWithMessage("oldest must be dropped, ts=$it").that(stored.contains(it.toString())).isFalse()
         }
     }
 
@@ -497,14 +496,14 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val prefs = fakeDataStore.data.first()
         val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
         val storedTimestamps = prefs[key] ?: emptySet()
 
-        assertEquals(1, storedTimestamps.size)
-        assertTrue(storedTimestamps.contains(validTs.toString()))
+        assertThat(storedTimestamps.size).isEqualTo(1)
+        assertThat(storedTimestamps.contains(validTs.toString())).isTrue()
     }
 
     @Test
@@ -529,13 +528,13 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         // Assert
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
 
         val prefs = fakeDataStore.data.first()
         val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.test")
         val storedTimestamps = prefs[key] ?: emptySet()
 
-        assertEquals(limit, storedTimestamps.size)
+        assertThat(storedTimestamps.size).isEqualTo(limit)
     }
 
     // ========== INVALID FORMAT & STRUCTURE TESTS ==========
@@ -543,13 +542,13 @@ class UsageExportRepositoryImplTest {
     @Test
     fun `importFromJson - with blank string - returns InvalidFormat`() = runTest {
         val result = appUsageExportManager.importFromJson("", false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
     fun `importFromJson - with malformed JSON - returns InvalidFormat`() = runTest {
         val result = appUsageExportManager.importFromJson("{{{{", false)
-        assertTrue(result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error)
+        assertThat(result is UsageImportResult.InvalidFormat || result).isInstanceOf(UsageImportResult.Error::class.java)
     }
 
     @Test
@@ -558,7 +557,7 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, false)
         // Ohne Version könnte "1.0.0" assumed werden (siehe parseUsageData default), oder Validierung schlägt fehl.
         // Der aktuelle Manager setzt default "1.0.0" beim Parsen, aber validateJsonStructure prüft nur EXISTENZ von Typen.
-        assertIs<UsageImportResult.Success>(result) // Da default 1.0.0 im Code gesetzt ist
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java) // Da default 1.0.0 im Code gesetzt ist
     }
 
     // ========== TYPE CONFUSION & ATTACK TESTS ==========
@@ -572,7 +571,7 @@ class UsageExportRepositoryImplTest {
             }
         """.trimIndent()
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -586,7 +585,7 @@ class UsageExportRepositoryImplTest {
             }
         """.trimIndent()
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -598,7 +597,7 @@ class UsageExportRepositoryImplTest {
             }
         """.trimIndent()
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -613,7 +612,7 @@ class UsageExportRepositoryImplTest {
             }
         """.trimIndent()
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -636,8 +635,8 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.packagesImported)
-        assertEquals(1, result.packagesSkipped)
+        assertThat(result.packagesImported).isEqualTo(1)
+        assertThat(result.packagesSkipped).isEqualTo(1)
     }
 
     @Test
@@ -652,7 +651,7 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         assertIs<UsageImportResult.UnsupportedVersion>(result)
-        assertEquals("2.0.0", result.version)
+        assertThat(result.version).isEqualTo("2.0.0")
     }
 
     @Test
@@ -666,8 +665,8 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(json, mergeWithExisting = false)
 
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.packagesImported)
-        assertEquals(1, result.packagesSkipped)
+        assertThat(result.packagesImported).isEqualTo(1)
+        assertThat(result.packagesSkipped).isEqualTo(1)
     }
 
     // ========== DOS PROTECTION TESTS ==========
@@ -686,7 +685,7 @@ class UsageExportRepositoryImplTest {
         """.trimIndent()
 
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     @Test
@@ -704,7 +703,7 @@ class UsageExportRepositoryImplTest {
         """.trimIndent()
 
         val result = appUsageExportManager.importFromJson(json, false)
-        assertIs<UsageImportResult.InvalidFormat>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     // ========== ERROR HANDLING TESTS ==========
@@ -715,7 +714,7 @@ class UsageExportRepositoryImplTest {
         val exception = assertFailsWith<IOException> {
             appUsageExportManager.exportToJson()
         }
-        assertTrue(exception.message?.contains("Export failed") == true)
+        assertThat(exception.message?.contains("Export failed") == true).isTrue()
     }
 
     @Test
@@ -723,7 +722,7 @@ class UsageExportRepositoryImplTest {
         fakeDataStore.makeEditFail()
         val json = """{ "version": "1.0.0", "usage_data": { "com.test": [123] } }"""
         val result = appUsageExportManager.importFromJson(json, false)
-        assertTrue(result is UsageImportResult.Error || result is UsageImportResult.InvalidFormat)
+        assertThat(result is UsageImportResult.Error || result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
     }
 
     // ========== ROUNDTRIP TESTS ==========
@@ -749,12 +748,12 @@ class UsageExportRepositoryImplTest {
         val result = appUsageExportManager.importFromJson(exportedJson, mergeWithExisting = false)
 
         // Assert
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
         val prefs = fakeDataStore.data.first()
         val key = stringSetPreferencesKey(AppConstants.KEY_USAGE_PREFIX + "com.app1")
 
-        assertTrue(prefs.contains(key))
+        assertThat(prefs.contains(key)).isTrue()
         val stored = prefs[key]
-        assertTrue(stored!!.contains(timestamp1.toString()))
+        assertThat(stored!!.contains(timestamp1.toString())).isTrue()
     }
 }

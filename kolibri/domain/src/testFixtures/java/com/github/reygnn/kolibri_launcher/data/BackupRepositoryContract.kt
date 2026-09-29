@@ -2,11 +2,11 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -77,7 +77,7 @@ abstract class BackupRepositoryContract {
     @Test
     fun `exportToJson returns a non-null string`() = runTest {
         val repo = createRepository()
-        assertNotNull(repo.exportToJson())
+        assertThat(repo.exportToJson()).isNotNull()
     }
 
     @Test
@@ -91,13 +91,13 @@ abstract class BackupRepositoryContract {
         val repo = createRepository()
         // Argument-Form bewusst nicht semantisch geprüft — der Fake interpretiert
         // den JSON-String nicht. Vertrag ist nur "wirft nicht ohne Throw-Hook".
-        assertNotNull(repo.importFromJson("{}", defaultOptions))
+        assertThat(repo.importFromJson("{}", defaultOptions)).isNotNull()
     }
 
     @Test
     fun `loadBackupFromFile does not throw on default repository`() = runTest {
         val repo = createRepository()
-        assertNotNull(repo.loadBackupFromFile(fakeUri, defaultOptions))
+        assertThat(repo.loadBackupFromFile(fakeUri, defaultOptions)).isNotNull()
     }
 
     @Test

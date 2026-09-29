@@ -8,7 +8,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -32,7 +32,7 @@ abstract class HomeLayoutRepositoryContract {
     abstract fun createRepository(initial: HomeLayout): HomeLayoutRepository
 
     @Test
-    fun layout_emits_the_initial_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun layout_emits_the_initial_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_APP)
         repo.layout().test {
             assertThat(awaitItem()).isEqualTo(WITH_APP)
@@ -41,7 +41,7 @@ abstract class HomeLayoutRepositoryContract {
     }
 
     @Test
-    fun save_then_layout_emits_the_saved_value() = runTest(mainDispatcherRule.dispatcher) {
+    fun save_then_layout_emits_the_saved_value() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(EMPTY)
         repo.layout().test {
             assertThat(awaitItem()).isEqualTo(EMPTY)
@@ -52,7 +52,7 @@ abstract class HomeLayoutRepositoryContract {
     }
 
     @Test
-    fun update_persists_the_transformed_layout() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_persists_the_transformed_layout() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(EMPTY)
         repo.layout().test {
             assertThat(awaitItem()).isEqualTo(EMPTY)
@@ -63,7 +63,7 @@ abstract class HomeLayoutRepositoryContract {
     }
 
     @Test
-    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_returning_null_does_not_write() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_APP)
         repo.layout().test {
             assertThat(awaitItem()).isEqualTo(WITH_APP)
@@ -74,7 +74,7 @@ abstract class HomeLayoutRepositoryContract {
     }
 
     @Test
-    fun update_receives_the_current_layout() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_receives_the_current_layout() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(WITH_APP)
         var seen: HomeLayout? = null
         repo.update { current ->
@@ -98,7 +98,7 @@ abstract class HomeLayoutRepositoryContract {
      * `update` does not hold across the transform.
      */
     @Test
-    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.dispatcher) {
+    fun concurrent_updates_do_not_lose_writes() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = createRepository(EMPTY)
         val increment: suspend (HomeLayout) -> HomeLayout = { current ->
             yield()

@@ -6,6 +6,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coVerify
 import io.mockk.every
@@ -16,7 +17,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertSame
 
 @ExperimentalCoroutinesApi
 class LayoutSettingsUseCasesTest {
@@ -48,11 +48,11 @@ class LayoutSettingsUseCasesTest {
     fun `GetLayoutSettingsUseCase - wires up repository flows correctly`() {
         val useCase = GetLayoutSettingsUseCase(repository)
 
-        assertSame(layoutScaleFlow, useCase.layoutScale)
-        assertSame(verticalPaddingFlow, useCase.verticalPadding)
-        assertSame(isFontBoldFlow, useCase.isFontBold)
-        assertSame(contentTopMarginFlow, useCase.contentTopMargin)
-        assertSame(favoritesAlignmentFlow, useCase.favoritesAlignment)
+        assertThat(useCase.layoutScale).isSameInstanceAs(layoutScaleFlow)
+        assertThat(useCase.verticalPadding).isSameInstanceAs(verticalPaddingFlow)
+        assertThat(useCase.isFontBold).isSameInstanceAs(isFontBoldFlow)
+        assertThat(useCase.contentTopMargin).isSameInstanceAs(contentTopMarginFlow)
+        assertThat(useCase.favoritesAlignment).isSameInstanceAs(favoritesAlignmentFlow)
     }
 
     @Test

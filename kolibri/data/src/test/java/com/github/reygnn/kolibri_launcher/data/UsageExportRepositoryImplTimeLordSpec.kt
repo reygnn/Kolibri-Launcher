@@ -6,8 +6,8 @@ import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -44,7 +44,7 @@ class UsageExportRepositoryImplTimeLordSpec {
 
         assertIs<UsageImportResult.Success>(result)
         // Sollte gefiltert werden, da > currentTime
-        assertEquals(0, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(0)
     }
 
     @Test
@@ -57,7 +57,7 @@ class UsageExportRepositoryImplTimeLordSpec {
 
         assertIs<UsageImportResult.Success>(result)
         // Sollte gefiltert werden, da zu alt (MAX_TIMESTAMP_AGE)
-        assertEquals(0, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(0)
     }
 
     @Test
@@ -83,7 +83,7 @@ class UsageExportRepositoryImplTimeLordSpec {
 
         assertIs<UsageImportResult.Success>(result)
         // Alle sollten ignoriert werden
-        assertEquals(0, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(0)
     }
 
     @Test
@@ -100,7 +100,7 @@ class UsageExportRepositoryImplTimeLordSpec {
         val result = manager.importFromJson(json, false)
 
         assertIs<UsageImportResult.Success>(result)
-        assertEquals(1, result.timestampsImported)
+        assertThat(result.timestampsImported).isEqualTo(1)
     }
 
     @Test
@@ -114,7 +114,7 @@ class UsageExportRepositoryImplTimeLordSpec {
 
         // Wenn Java es parsen kann -> gut. Wenn nicht -> catch block -> ignore.
         // Hauptsache Success result.
-        assertIs<UsageImportResult.Success>(result)
+        assertThat(result).isInstanceOf(UsageImportResult.Success::class.java)
     }
 
     private fun buildJson(pkg: String, timestamps: List<String>): String {

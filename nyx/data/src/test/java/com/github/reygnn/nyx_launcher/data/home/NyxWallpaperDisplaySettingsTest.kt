@@ -7,7 +7,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -26,7 +26,7 @@ class NyxWallpaperDisplaySettingsTest {
 
     // ---------------------------------------------------------------- defaults
     @Test
-    fun empty_store_yields_all_defaults() = runTest(mainDispatcherRule.dispatcher) {
+    fun empty_store_yields_all_defaults() = runTest(mainDispatcherRule.testDispatcher) {
         val settings = NyxWallpaperDisplaySettings(FakeDataStore())
 
         assertThat(settings.wallpaperScrimAlphaStateFlow.first())
@@ -37,7 +37,7 @@ class NyxWallpaperDisplaySettingsTest {
 
     // ---------------------------------------------------------------- round-trips
     @Test
-    fun scrim_alpha_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun scrim_alpha_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
         val settings = NyxWallpaperDisplaySettings(FakeDataStore())
 
         settings.setWallpaperScrimAlpha(0.42f)
@@ -46,7 +46,7 @@ class NyxWallpaperDisplaySettingsTest {
     }
 
     @Test
-    fun surface_mode_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun surface_mode_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
         val settings = NyxWallpaperDisplaySettings(FakeDataStore())
 
         settings.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
@@ -55,7 +55,7 @@ class NyxWallpaperDisplaySettingsTest {
     }
 
     @Test
-    fun backdrop_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun backdrop_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
         val settings = NyxWallpaperDisplaySettings(FakeDataStore())
 
         settings.setWallpaperBackdrop(WallpaperBackdrop.BLACK)
@@ -65,7 +65,7 @@ class NyxWallpaperDisplaySettingsTest {
 
     // ---------------------------------------------------------------- defensive decode
     @Test
-    fun corrupt_surface_mode_falls_back_to_default() = runTest(mainDispatcherRule.dispatcher) {
+    fun corrupt_surface_mode_falls_back_to_default() = runTest(mainDispatcherRule.testDispatcher) {
         val store = FakeDataStore()
         store.edit { it[stringPreferencesKey("wallpaper_surface_mode")] = "NOT_A_MODE" }
         val settings = NyxWallpaperDisplaySettings(store)
@@ -74,7 +74,7 @@ class NyxWallpaperDisplaySettingsTest {
     }
 
     @Test
-    fun corrupt_backdrop_falls_back_to_default() = runTest(mainDispatcherRule.dispatcher) {
+    fun corrupt_backdrop_falls_back_to_default() = runTest(mainDispatcherRule.testDispatcher) {
         val store = FakeDataStore()
         store.edit { it[stringPreferencesKey("wallpaper_backdrop")] = "" }
         val settings = NyxWallpaperDisplaySettings(store)
@@ -83,7 +83,7 @@ class NyxWallpaperDisplaySettingsTest {
     }
 
     @Test
-    fun valid_persisted_enum_name_decodes() = runTest(mainDispatcherRule.dispatcher) {
+    fun valid_persisted_enum_name_decodes() = runTest(mainDispatcherRule.testDispatcher) {
         val store = FakeDataStore()
         store.edit {
             it[stringPreferencesKey("wallpaper_surface_mode")] = WallpaperSurfaceMode.LIGHT.name

@@ -2,6 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coVerify
 import io.mockk.every
@@ -12,7 +13,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertSame
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WallpaperScrimUseCasesTest {
@@ -34,7 +34,7 @@ class WallpaperScrimUseCasesTest {
     @Test
     fun `GetWallpaperScrimAlphaUseCase - wires up repository flow`() {
         val useCase = GetWallpaperScrimAlphaUseCase(repository)
-        assertSame(scrimFlow, useCase())
+        assertThat(useCase()).isSameInstanceAs(scrimFlow)
     }
 
     @Test

@@ -1,8 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -19,7 +18,7 @@ class ApplyCustomNamesTest {
         val apps = listOf(app("com.a", "A"), app("com.b", "B"))
         // Same reference: no per-element copy, no new backing list — the common
         // path for a user with no custom names.
-        assertSame(apps, applyCustomNames(apps, emptyMap()))
+        assertThat(applyCustomNames(apps, emptyMap())).isSameInstanceAs(apps)
     }
 
     @Test
@@ -27,15 +26,15 @@ class ApplyCustomNamesTest {
         val a = app("com.a", "A")
         val b = app("com.b", "B")
         val result = applyCustomNames(listOf(a, b), mapOf("com.b" to "Bee"))
-        assertSame(a, result[0])
-        assertEquals("Bee", result[1].displayName)
+        assertThat(result[0]).isSameInstanceAs(a)
+        assertThat(result[1].displayName).isEqualTo("Bee")
     }
 
     @Test
     fun `a custom name overrides displayName but keeps originalName`() {
         val result = applyCustomNames(listOf(app("com.a", "Alpha")), mapOf("com.a" to "Renamed"))
-        assertEquals("Renamed", result[0].displayName)
-        assertEquals("Alpha", result[0].originalName)
+        assertThat(result[0].displayName).isEqualTo("Renamed")
+        assertThat(result[0].originalName).isEqualTo("Alpha")
     }
 
     @Test
@@ -48,13 +47,10 @@ class ApplyCustomNamesTest {
 
         val result = applyCustomNames(listOf(a, b), mapOf("com.dual" to "Phone"))
 
-        assertEquals(listOf("Phone", "Phone"), result.map { it.displayName })
+        assertThat(result.map { it.displayName }).isEqualTo(listOf("Phone", "Phone"))
         // Distinct components survive; only the display name changed.
-        assertEquals(
-            listOf("com.dual/com.dual.A", "com.dual/com.dual.B"),
-            result.map { it.componentName },
-        )
-        assertEquals(listOf("Dialer", "Dialer"), result.map { it.originalName })
+        assertThat(result.map { it.componentName }).isEqualTo(listOf("com.dual/com.dual.A", "com.dual/com.dual.B"))
+        assertThat(result.map { it.originalName }).isEqualTo(listOf("Dialer", "Dialer"))
     }
 
     @Test
@@ -66,7 +62,7 @@ class ApplyCustomNamesTest {
 
         val result = applyCustomNames(listOf(a), mapOf("com.gone" to "Ghost"))
 
-        assertEquals(1, result.size)
-        assertSame(a, result[0])
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0]).isSameInstanceAs(a)
     }
 }

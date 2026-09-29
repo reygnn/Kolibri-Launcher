@@ -2,12 +2,12 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -92,13 +92,13 @@ abstract class WallpaperRepositoryContract {
     @Test
     fun `fresh repository emits WallpaperState NONE on flow`() = runTest {
         val repo = createRepository()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
     fun `fresh repository returns WallpaperState NONE on sync getter`() = runTest {
         val repo = createRepository()
-        assertEquals(WallpaperState.NONE, repo.getWallpaperStateSync())
+        assertThat(repo.getWallpaperStateSync()).isEqualTo(WallpaperState.NONE)
     }
 
     // ---------- saveWallpaperState ----------
@@ -107,7 +107,7 @@ abstract class WallpaperRepositoryContract {
     fun `saveWallpaperState with imageUri persists imageUri`() = runTest {
         val repo = createRepository()
         repo.saveWallpaperState(WallpaperState.single(testUri))
-        assertEquals(testUri, repo.wallpaperState.first().singleImageUri)
+        assertThat(repo.wallpaperState.first().singleImageUri).isEqualTo(testUri)
     }
 
     @Test
@@ -115,8 +115,8 @@ abstract class WallpaperRepositoryContract {
         val repo = createRepository()
         repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.5f))
         val layer = repo.wallpaperState.first().layers.single()
-        assertEquals(testUri, layer.imageUri)
-        assertEquals(2.5f, layer.scale)
+        assertThat(layer.imageUri).isEqualTo(testUri)
+        assertThat(layer.scale).isEqualTo(2.5f)
     }
 
     @Test
@@ -126,8 +126,8 @@ abstract class WallpaperRepositoryContract {
             WallpaperState.single(testUri, translateX = 100f, translateY = -50f)
         )
         val layer = repo.wallpaperState.first().layers.single()
-        assertEquals(100f, layer.translateX)
-        assertEquals(-50f, layer.translateY)
+        assertThat(layer.translateX).isEqualTo(100f)
+        assertThat(layer.translateY).isEqualTo(-50f)
     }
 
     @Test
@@ -136,8 +136,8 @@ abstract class WallpaperRepositoryContract {
         repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
         repo.saveWallpaperState(WallpaperState.single(testUri2, scale = 1.5f))
         val layer = repo.wallpaperState.first().layers.single()
-        assertEquals(testUri2, layer.imageUri)
-        assertEquals(1.5f, layer.scale)
+        assertThat(layer.imageUri).isEqualTo(testUri2)
+        assertThat(layer.scale).isEqualTo(1.5f)
     }
 
     // ---------- Consistency: sync == flow.first() ----------
@@ -155,7 +155,7 @@ abstract class WallpaperRepositoryContract {
         val viaFlow = repo.wallpaperState.first()
         val viaSync = repo.getWallpaperStateSync()
 
-        assertEquals(viaFlow, viaSync)
+        assertThat(viaSync).isEqualTo(viaFlow)
     }
 
     @Test
@@ -164,7 +164,7 @@ abstract class WallpaperRepositoryContract {
         repo.saveWallpaperState(WallpaperState.single(testUri, scale = 1.0f))
         repo.saveWallpaperState(WallpaperState.single(testUri2, scale = 2.0f))
 
-        assertEquals(repo.wallpaperState.first(), repo.getWallpaperStateSync())
+        assertThat(repo.getWallpaperStateSync()).isEqualTo(repo.wallpaperState.first())
     }
 
     @Test
@@ -173,7 +173,7 @@ abstract class WallpaperRepositoryContract {
         repo.saveWallpaperState(WallpaperState.single(testUri))
         repo.clearWallpaper()
 
-        assertEquals(repo.wallpaperState.first(), repo.getWallpaperStateSync())
+        assertThat(repo.getWallpaperStateSync()).isEqualTo(repo.wallpaperState.first())
     }
 
     // ---------- clearWallpaper ----------
@@ -183,14 +183,14 @@ abstract class WallpaperRepositoryContract {
         val repo = createRepository()
         repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
         repo.clearWallpaper()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
     fun `clearWallpaper on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.clearWallpaper()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
@@ -199,7 +199,7 @@ abstract class WallpaperRepositoryContract {
         repo.saveWallpaperState(WallpaperState.single(testUri))
         repo.clearWallpaper()
         repo.clearWallpaper()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 
     // ---------- purgeRepository ----------
@@ -209,13 +209,13 @@ abstract class WallpaperRepositoryContract {
         val repo = createRepository()
         repo.saveWallpaperState(WallpaperState.single(testUri, scale = 2.0f))
         repo.purgeRepository()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(WallpaperState.NONE, repo.wallpaperState.first())
+        assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
     }
 }

@@ -10,9 +10,10 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetFavoritesAlignmentUs
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetFontBoldUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -24,8 +25,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -94,7 +93,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate()
         advanceUntilIdle()
 
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, delegate.layoutScaleState.value)
+        assertThat(delegate.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
     }
 
     @Test
@@ -102,7 +101,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate()
         advanceUntilIdle()
 
-        assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, delegate.verticalPaddingState.value)
+        assertThat(delegate.verticalPaddingState.value).isEqualTo(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
     }
 
     @Test
@@ -110,7 +109,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate()
         advanceUntilIdle()
 
-        assertEquals(AppConstants.DEFAULT_FONT_BOLD, delegate.isFontBoldState.value)
+        assertThat(delegate.isFontBoldState.value).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
     }
 
     @Test
@@ -118,7 +117,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate()
         advanceUntilIdle()
 
-        assertEquals(0f, delegate.contentTopMarginState.value)
+        assertThat(delegate.contentTopMarginState.value).isEqualTo(0f)
     }
 
     @Test
@@ -126,10 +125,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate()
         advanceUntilIdle()
 
-        assertEquals(
-            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
-            delegate.favoritesAlignmentState.value,
-        )
+        assertThat(delegate.favoritesAlignmentState.value).isEqualTo(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 
     @Test
@@ -148,7 +144,7 @@ class LayoutDelegateTest {
 
         alignmentFlow.value = FavoritesAlignment.CENTER
         advanceUntilIdle()
-        assertEquals(FavoritesAlignment.CENTER, delegate.favoritesAlignmentState.value)
+        assertThat(delegate.favoritesAlignmentState.value).isEqualTo(FavoritesAlignment.CENTER)
     }
 
     @Test
@@ -166,10 +162,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
         advanceUntilIdle()
 
-        assertEquals(
-            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
-            delegate.favoritesAlignmentState.value,
-        )
+        assertThat(delegate.favoritesAlignmentState.value).isEqualTo(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 
     // ===========================================
@@ -190,11 +183,11 @@ class LayoutDelegateTest {
         val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
 
         advanceUntilIdle()
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, delegate.layoutScaleState.value)
+        assertThat(delegate.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
 
         scaleFlow.value = 1.5f
         advanceUntilIdle()
-        assertEquals(1.5f, delegate.layoutScaleState.value)
+        assertThat(delegate.layoutScaleState.value).isEqualTo(1.5f)
     }
 
     @Test
@@ -212,7 +205,7 @@ class LayoutDelegateTest {
         val delegate = createDelegate(getLayoutSettingsUseCase = useCase)
         advanceUntilIdle()
 
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, delegate.layoutScaleState.value)
+        assertThat(delegate.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
     }
 
     // ===========================================
@@ -389,6 +382,6 @@ class LayoutDelegateTest {
         delegate.onResetLayoutSettings()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 }

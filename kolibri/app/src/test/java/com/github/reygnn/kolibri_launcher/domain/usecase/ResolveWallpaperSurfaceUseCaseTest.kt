@@ -3,14 +3,14 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -52,7 +52,7 @@ class ResolveWallpaperSurfaceUseCaseTest {
             settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.LIGHT)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.DARK)
-            assertEquals(LuminanceClassification.LIGHT, useCase().first())
+            assertThat(useCase().first()).isEqualTo(LuminanceClassification.LIGHT)
         }
 
     @Test
@@ -61,7 +61,7 @@ class ResolveWallpaperSurfaceUseCaseTest {
             settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.LIGHT)
-            assertEquals(LuminanceClassification.DARK, useCase().first())
+            assertThat(useCase().first()).isEqualTo(LuminanceClassification.DARK)
         }
 
     @Test
@@ -70,7 +70,7 @@ class ResolveWallpaperSurfaceUseCaseTest {
             settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.AUTO)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.LIGHT)
-            assertEquals(LuminanceClassification.LIGHT, useCase().first())
+            assertThat(useCase().first()).isEqualTo(LuminanceClassification.LIGHT)
         }
 
     @Test
@@ -79,6 +79,6 @@ class ResolveWallpaperSurfaceUseCaseTest {
             settingsRepository.setWallpaperSurfaceMode(WallpaperSurfaceMode.AUTO)
             every { classifyWallpaperUseCase() } returns
                     flowOf(LuminanceClassification.DARK)
-            assertEquals(LuminanceClassification.DARK, useCase().first())
+            assertThat(useCase().first()).isEqualTo(LuminanceClassification.DARK)
         }
 }

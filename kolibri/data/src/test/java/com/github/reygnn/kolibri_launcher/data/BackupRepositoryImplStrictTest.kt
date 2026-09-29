@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import io.mockk.mockk
 
 import android.content.Context
@@ -18,7 +19,6 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -28,6 +28,9 @@ class BackupRepositoryImplStrictTest {
 
     @get:Rule
     val timberRule = TimberRule()
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     // Fakes (Stateful in-memory implementations)
     private lateinit var favoritesRepo: FakeFavoritesRepository
@@ -46,7 +49,6 @@ class BackupRepositoryImplStrictTest {
     // System Under Test
     private lateinit var backupManager: BackupRepositoryImpl
 
-    private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
@@ -99,7 +101,7 @@ class BackupRepositoryImplStrictTest {
      * 5. The strict parsing logic successfully extracts the settings.
      */
     @Test
-    fun `importFromJson triggers strict parsing fallback when kotlinx fails and imports correctly`() = runTest(testDispatcher) {
+    fun `importFromJson triggers strict parsing fallback when kotlinx fails and imports correctly`() = runTest(mainDispatcherRule.testDispatcher) {
         // GIVEN - A JSON that breaks kotlinx (timestamp is string) but works with org.json
         val trickyJson = """
             {
@@ -141,7 +143,7 @@ class BackupRepositoryImplStrictTest {
      * `validateJsonTypes` detects the mismatch and returns false *before* any parsing is attempted.
      */
     @Test
-    fun `importFromJson rejects malformed types via validateJsonTypes before parsing`() = runTest(testDispatcher) {
+    fun `importFromJson rejects malformed types via validateJsonTypes before parsing`() = runTest(mainDispatcherRule.testDispatcher) {
         // GIVEN - JSON with Type Confusion Attack (String instead of Int)
         val maliciousJson = """
             {
@@ -174,7 +176,7 @@ class BackupRepositoryImplStrictTest {
      * the snake_case keys and maps them to the internal model.
      */
     @Test
-    fun `importFromJson correctly imports strict snake_case values`() = runTest(testDispatcher) {
+    fun `importFromJson correctly imports strict snake_case values`() = runTest(mainDispatcherRule.testDispatcher) {
         // GIVEN - JSON using snake_case keys explicitly
         val validJson = """
             {
@@ -213,7 +215,7 @@ class BackupRepositoryImplStrictTest {
      * The strict parser logic `getLong(key).toInt()` handles the overflow correctly.
      */
     @Test
-    fun `importFromJson via strict parsing handles unsigned integer colors correctly`() = runTest(testDispatcher) {
+    fun `importFromJson via strict parsing handles unsigned integer colors correctly`() = runTest(mainDispatcherRule.testDispatcher) {
         // GIVEN - JSON with White color as unsigned integer (4294967295)
         // We force strict parsing by breaking the timestamp again
         val jsonWithUnsignedColor = """
@@ -245,7 +247,7 @@ class BackupRepositoryImplStrictTest {
      * Scenario: Ensure `getStrictStringList` works with actual data.
      */
     @Test
-    fun `importFromJson via strict parsing correctly reads populated string lists`() = runTest(testDispatcher) {
+    fun `importFromJson via strict parsing correctly reads populated string lists`() = runTest(mainDispatcherRule.testDispatcher) {
         // GIVEN - A valid app that matches the installed app in setup()
         // Note: AppInfo logic generates "package/package.Class" if class name doesn't start with dot
         val validApp = "com.example.app/com.example.app.MainActivity"
@@ -284,7 +286,7 @@ class BackupRepositoryImplStrictTest {
      * the camelCase scalars are recovered on the strict path.
      */
     @Test
-    fun `importFromJson strict fallback recovers camelCase scalar settings`() = runTest(testDispatcher) {
+    fun `importFromJson strict fallback recovers camelCase scalar settings`() = runTest(mainDispatcherRule.testDispatcher) {
         // camelCase settings (the app's real encodeToString output); timestamp
         // is a string to force the org.json strict path.
         val camelCaseJson = """

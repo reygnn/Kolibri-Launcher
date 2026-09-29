@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.domain
 
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
@@ -10,6 +10,8 @@ import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetDrawerAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -19,8 +21,6 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -28,10 +28,6 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetDrawerAppsUseCaseTest {
@@ -96,9 +92,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps filters hidden apps correctly`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -108,8 +102,8 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val drawerApps = results.last()
-            assertEquals(2, drawerApps.size)
-            assertFalse(drawerApps.any { it.componentName == app2.componentName })
+            assertThat(drawerApps.size).isEqualTo(2)
+            assertThat(drawerApps.any { it.componentName == app2.componentName }).isFalse()
         } finally {
             collectorJob.cancel()
         }
@@ -118,9 +112,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps are sorted alphabetically when sortOrder is Alphabetical`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -130,10 +122,10 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val drawerApps = results.last()
-            assertEquals(3, drawerApps.size)
-            assertEquals("App A", drawerApps[0].displayName)
-            assertEquals("App B", drawerApps[1].displayName)
-            assertEquals("App C", drawerApps[2].displayName)
+            assertThat(drawerApps.size).isEqualTo(3)
+            assertThat(drawerApps[0].displayName).isEqualTo("App A")
+            assertThat(drawerApps[1].displayName).isEqualTo("App B")
+            assertThat(drawerApps[2].displayName).isEqualTo("App C")
         } finally {
             collectorJob.cancel()
         }
@@ -142,9 +134,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps are sorted by time-weighted usage when sortOrder is correct`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         val timeWeightedSortedList = listOf(app2, app3, app1)
         coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) } returns timeWeightedSortedList
@@ -157,10 +147,10 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val drawerApps = results.last()
-            assertEquals(3, drawerApps.size)
-            assertEquals("App C", drawerApps[0].displayName)
-            assertEquals("App B", drawerApps[1].displayName)
-            assertEquals("App A", drawerApps[2].displayName)
+            assertThat(drawerApps.size).isEqualTo(3)
+            assertThat(drawerApps[0].displayName).isEqualTo("App C")
+            assertThat(drawerApps[1].displayName).isEqualTo("App B")
+            assertThat(drawerApps[2].displayName).isEqualTo("App A")
 
             coVerify(atLeast = 1) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
@@ -171,9 +161,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps recalculates when sortOrder changes`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -183,7 +171,7 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val initialDrawerApps = results.last()
-            assertEquals("App A", initialDrawerApps[0].displayName)
+            assertThat(initialDrawerApps[0].displayName).isEqualTo("App A")
 
             val timeWeightedSortedList = listOf(app2, app3, app1)
             coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) } returns timeWeightedSortedList
@@ -192,7 +180,7 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val updatedDrawerApps = results.last()
-            assertEquals("App C", updatedDrawerApps[0].displayName)
+            assertThat(updatedDrawerApps[0].displayName).isEqualTo("App C")
         } finally {
             collectorJob.cancel()
         }
@@ -201,15 +189,13 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps is empty when raw app list is empty`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
 
             val drawerApps = results.last()
-            assertTrue(drawerApps.isEmpty())
+            assertThat(drawerApps.isEmpty()).isTrue()
             coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
             collectorJob.cancel()
@@ -221,9 +207,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - when appUsageRepository throws exception - falls back to alphabetical`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) } answers {
             throw RuntimeException("Sorting failed")
@@ -237,10 +221,10 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val result = results.last()
-            assertEquals(3, result.size)
-            assertEquals("App A", result[0].displayName)
-            assertEquals("App B", result[1].displayName)
-            assertEquals("App C", result[2].displayName)
+            assertThat(result.size).isEqualTo(3)
+            assertThat(result[0].displayName).isEqualTo("App A")
+            assertThat(result[1].displayName).isEqualTo("App B")
+            assertThat(result[2].displayName).isEqualTo("App C")
         } finally {
             collectorJob.cancel()
         }
@@ -249,9 +233,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - when appUsageRepository throws IOException - falls back to alphabetical`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) } answers {
             throw IOException("Cannot read usage data")
@@ -265,9 +247,9 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val result = results.last()
-            assertEquals("App A", result[0].displayName)
-            assertEquals("App B", result[1].displayName)
-            assertEquals("App C", result[2].displayName)
+            assertThat(result[0].displayName).isEqualTo("App A")
+            assertThat(result[1].displayName).isEqualTo("App B")
+            assertThat(result[2].displayName).isEqualTo("App C")
         } finally {
             collectorJob.cancel()
         }
@@ -276,9 +258,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - with all apps hidden - returns empty list`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -287,7 +267,7 @@ class GetDrawerAppsUseCaseTest {
             rawAppsFlow.value = allApps
             advanceUntilIdle()
 
-            assertTrue(results.last().isEmpty())
+            assertThat(results.last().isEmpty()).isTrue()
         } finally {
             collectorJob.cancel()
         }
@@ -296,9 +276,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - with duplicate apps in raw list - handles gracefully`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -307,8 +285,8 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val result = results.last()
-            assertNotNull(result)
-            assertTrue(result.size <= 4)
+            assertThat(result).isNotNull()
+            assertThat(result.size <= 4).isTrue()
         } finally {
             collectorJob.cancel()
         }
@@ -317,9 +295,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - with very large app list - handles efficiently`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -328,7 +304,7 @@ class GetDrawerAppsUseCaseTest {
             rawAppsFlow.value = largeAppList
             advanceUntilIdle()
 
-            assertEquals(1000, results.last().size)
+            assertThat(results.last().size).isEqualTo(1000)
         } finally {
             collectorJob.cancel()
         }
@@ -337,9 +313,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - when filtering creates empty list - returns empty`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -348,7 +322,7 @@ class GetDrawerAppsUseCaseTest {
             rawAppsFlow.value = allApps
             advanceUntilIdle()
 
-            assertTrue(results.last().isEmpty())
+            assertThat(results.last().isEmpty()).isTrue()
             coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
             collectorJob.cancel()
@@ -358,24 +332,22 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - rapid flow updates - handles correctly`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
 
             rawAppsFlow.value = listOf(app1)
             advanceUntilIdle()
-            assertEquals(1, results.last().size)
+            assertThat(results.last().size).isEqualTo(1)
 
             rawAppsFlow.value = listOf(app1, app2)
             advanceUntilIdle()
-            assertEquals(2, results.last().size)
+            assertThat(results.last().size).isEqualTo(2)
 
             rawAppsFlow.value = allApps
             advanceUntilIdle()
-            assertEquals(3, results.last().size)
+            assertThat(results.last().size).isEqualTo(3)
         } finally {
             collectorJob.cancel()
         }
@@ -384,9 +356,7 @@ class GetDrawerAppsUseCaseTest {
     @Test
     fun `drawerApps - with null componentNames in hidden set - filters correctly`() = runTest {
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
@@ -396,8 +366,8 @@ class GetDrawerAppsUseCaseTest {
             advanceUntilIdle()
 
             val result = results.last()
-            assertEquals(2, result.size)
-            assertFalse(result.any { it.componentName == app1.componentName })
+            assertThat(result.size).isEqualTo(2)
+            assertThat(result.any { it.componentName == app1.componentName }).isFalse()
         } finally {
             collectorJob.cancel()
         }
@@ -410,15 +380,13 @@ class GetDrawerAppsUseCaseTest {
         // Default sortOrder is ALPHABETICAL. usageSnapshotFlow must not be an input here,
         // so a per-launch usage tick cannot re-run the pipeline (F2 bullet 1).
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             rawAppsFlow.value = allApps
             advanceUntilIdle()
 
-            assertEquals(3, results.last().size)
+            assertThat(results.last().size).isEqualTo(3)
             verify(exactly = 0) { appUsageRepository.usageSnapshotFlow }
             coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
@@ -430,9 +398,7 @@ class GetDrawerAppsUseCaseTest {
     fun `drawerApps - in TIME_WEIGHTED mode - collects usageSnapshotFlow`() = runTest {
         coEvery { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) } returns allApps
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
@@ -470,20 +436,18 @@ class GetDrawerAppsUseCaseTest {
         rawAppsFlow.value = allApps
 
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
-            assertEquals("App C", results.last()[0].displayName)
+            assertThat(results.last()[0].displayName).isEqualTo("App C")
 
             // A usage tick must re-run the pipeline and surface the new order.
             weightedOrder = listOf(app1, app3, app2) // App A, App B, App C
             usageTicks.emit(emptyMap())
             advanceUntilIdle()
 
-            assertEquals("App A", results.last()[0].displayName)
+            assertThat(results.last()[0].displayName).isEqualTo("App A")
             coVerify(atLeast = 2) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
             collectorJob.cancel()
@@ -499,21 +463,19 @@ class GetDrawerAppsUseCaseTest {
         rawAppsFlow.value = allApps // sortOrder stays ALPHABETICAL (default)
 
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
             val emissionsBefore = results.size
-            assertEquals(3, results.last().size)
+            assertThat(results.last().size).isEqualTo(3)
 
             // Even a DELIVERABLE tick (SharedFlow emits every value) must not reach
             // the ALPHABETICAL pipeline — usageSnapshotFlow is not one of its inputs (F2 #1).
             repeat(3) { usageTicks.emit(emptyMap()) }
             advanceUntilIdle()
 
-            assertEquals(emissionsBefore, results.size)
+            assertThat(results.size).isEqualTo(emissionsBefore)
             coVerify(exactly = 0) { appUsageRepository.sortAppsByTimeWeightedUsage(any(), any()) }
         } finally {
             collectorJob.cancel()
@@ -537,19 +499,17 @@ class GetDrawerAppsUseCaseTest {
             rawAppsFlow.value = allApps
 
             val results = mutableListOf<List<AppInfo>>()
-            val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-                useCase.drawerApps.collect { results.add(it) }
-            }
+            val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
             try {
                 advanceUntilIdle()
-                assertEquals("App C", results.last()[0].displayName)
+                assertThat(results.last()[0].displayName).isEqualTo("App C")
 
                 // flatMapLatest cancels the 4-way inner combine (incl. usage) and
                 // builds the 3-way one.
                 sortOrderFlow.value = SortOrder.ALPHABETICAL
                 advanceUntilIdle()
-                assertEquals("App A", results.last()[0].displayName)
+                assertThat(results.last()[0].displayName).isEqualTo("App A")
 
                 val callsAfterSwitch = weightedCalls.get()
                 val emissionsAfterSwitch = results.size
@@ -558,8 +518,8 @@ class GetDrawerAppsUseCaseTest {
                 repeat(3) { usageTicks.emit(emptyMap()) }
                 advanceUntilIdle()
 
-                assertEquals(callsAfterSwitch, weightedCalls.get())
-                assertEquals(emissionsAfterSwitch, results.size)
+                assertThat(weightedCalls.get()).isEqualTo(callsAfterSwitch)
+                assertThat(results.size).isEqualTo(emissionsAfterSwitch)
             } finally {
                 collectorJob.cancel()
             }
@@ -575,14 +535,12 @@ class GetDrawerAppsUseCaseTest {
         rawAppsFlow.value = allApps // ALPHABETICAL default
 
         val results = mutableListOf<List<AppInfo>>()
-        val collectorJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            useCase.drawerApps.collect { results.add(it) }
-        }
+        val collectorJob = recordEmissions(useCase.drawerApps, into = results)
 
         try {
             advanceUntilIdle()
             val emissionsBefore = results.size
-            assertEquals(listOf("App A", "App B", "App C"), results.last().map { it.displayName })
+            assertThat(results.last().map { it.displayName }).isEqualTo(listOf("App A", "App B", "App C"))
 
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
             advanceUntilIdle()
@@ -590,7 +548,7 @@ class GetDrawerAppsUseCaseTest {
             // The terminal distinctUntilChanged sits downstream of flatMapLatest, so
             // its last value persists across the inner-flow rebuild: an identical
             // ordering is suppressed rather than churning the adapter.
-            assertEquals(emissionsBefore, results.size)
+            assertThat(results.size).isEqualTo(emissionsBefore)
         } finally {
             collectorJob.cancel()
         }

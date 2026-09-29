@@ -5,16 +5,14 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,8 +55,8 @@ class WallpaperBitmapLuminanceImplTest {
         val bitmap = solidBitmap(Color.WHITE)
         stubContentResolver(bitmap)
         val result = luminance.compute("file:///white.png")
-        assertNotNull(result)
-        assertEquals(1.0f, result!!, 0.01f)
+        assertThat(result).isNotNull()
+        assertThat(result!!).isWithin(0.01f).of(1.0f)
     }
 
     @Test
@@ -66,8 +64,8 @@ class WallpaperBitmapLuminanceImplTest {
         val bitmap = solidBitmap(Color.BLACK)
         stubContentResolver(bitmap)
         val result = luminance.compute("file:///black.png")
-        assertNotNull(result)
-        assertEquals(0.0f, result!!, 0.01f)
+        assertThat(result).isNotNull()
+        assertThat(result!!).isWithin(0.01f).of(0.0f)
     }
 
     @Test
@@ -80,8 +78,8 @@ class WallpaperBitmapLuminanceImplTest {
             val bitmap = solidBitmap(Color.rgb(0x80, 0x80, 0x80))
             stubContentResolver(bitmap)
             val result = luminance.compute("file:///grey.png")
-            assertNotNull(result)
-            assertTrue("expected ~0.215, got $result", result!! in 0.18f..0.25f)
+            assertThat(result).isNotNull()
+            assertWithMessage("expected ~0.215, got $result").that(result!! in 0.18f..0.25f).isTrue()
         }
 
     @Test
@@ -91,7 +89,7 @@ class WallpaperBitmapLuminanceImplTest {
             val bitmap = solidBitmap(Color.TRANSPARENT)
             stubContentResolver(bitmap)
             val result = luminance.compute("file:///fully-transparent.png")
-            assertNull(result)
+            assertThat(result).isNull()
         }
 
     @Test
@@ -107,7 +105,7 @@ class WallpaperBitmapLuminanceImplTest {
             )
             stubContentResolver(bitmap)
             val result = luminance.compute("file:///mostly-transparent.png")
-            assertNull(result)
+            assertThat(result).isNull()
         }
 
     @Test
@@ -124,8 +122,8 @@ class WallpaperBitmapLuminanceImplTest {
             )
             stubContentResolver(bitmap)
             val result = luminance.compute("file:///mostly-white.png")
-            assertNotNull(result)
-            assertEquals(1.0f, result!!, 0.01f)
+            assertThat(result).isNotNull()
+            assertThat(result!!).isWithin(0.01f).of(1.0f)
         }
 
     // ============================================================
@@ -154,11 +152,8 @@ class WallpaperBitmapLuminanceImplTest {
         runTest(mainDispatcherRule.testDispatcher) {
             stubContentResolverFromResource("/wallpaper/amoled.png")
             val result = luminance.compute("file:///amoled.png")
-            assertNotNull("expected non-null for fully-opaque image", result)
-            assertTrue(
-                "expected near-black luminance for AMOLED original, got $result",
-                result!! < 0.05f,
-            )
+            assertWithMessage("expected non-null for fully-opaque image").that(result).isNotNull()
+            assertWithMessage("expected near-black luminance for AMOLED original, got $result").that(result!! < 0.05f).isTrue()
         }
 
     @Test
@@ -166,10 +161,7 @@ class WallpaperBitmapLuminanceImplTest {
         runTest(mainDispatcherRule.testDispatcher) {
             stubContentResolverFromResource("/wallpaper/transparent.png")
             val result = luminance.compute("file:///transparent.png")
-            assertNull(
-                "expected null because 13.8% opaque coverage is below the 50% gate",
-                result,
-            )
+            assertWithMessage("expected null because 13.8% opaque coverage is below the 50% gate").that(result).isNull()
         }
 
     @Test
@@ -192,12 +184,9 @@ class WallpaperBitmapLuminanceImplTest {
             // solved at the glyph edge instead. Band chosen with margin.
             stubContentResolverFromResource("/wallpaper/checkerboard_diagonal.png")
             val result = luminance.compute("file:///checkerboard_diagonal.png")
-            assertNotNull("expected non-null for fully-opaque image", result)
-            assertTrue(
-                "expected a mid-gray median (~0.21), distinct from near-black " +
-                    "AMOLED and below the LIGHT threshold, got $result",
-                result!! in 0.05f..0.5f,
-            )
+            assertWithMessage("expected non-null for fully-opaque image").that(result).isNotNull()
+            assertWithMessage("expected a mid-gray median (~0.21), distinct from near-black " +
+                    "AMOLED and below the LIGHT threshold, got $result").that(result!! in 0.05f..0.5f).isTrue()
         }
 
     // Note: `BitmapFactory.decodeStream` on malformed bytes is not
@@ -211,14 +200,14 @@ class WallpaperBitmapLuminanceImplTest {
     fun `IOException during open returns null`() = runTest(mainDispatcherRule.testDispatcher) {
         every { contentResolver.openInputStream(any()) } throws IOException("file gone")
         val result = luminance.compute("file:///missing.png")
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     @Test
     fun `null input stream returns null`() = runTest(mainDispatcherRule.testDispatcher) {
         every { contentResolver.openInputStream(any()) } returns null
         val result = luminance.compute("file:///opens-but-null.png")
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     @Test
@@ -237,11 +226,11 @@ class WallpaperBitmapLuminanceImplTest {
             }
 
             val first = luminance.compute("file:///flaky.png")
-            assertNull("transient load failure yields null", first)
+            assertWithMessage("transient load failure yields null").that(first).isNull()
 
             failNext = false
             val second = luminance.compute("file:///flaky.png")
-            assertNotNull("failure must not have been cached — retry must decode", second)
+            assertWithMessage("failure must not have been cached — retry must decode").that(second).isNotNull()
         }
 
     // ============================================================
@@ -259,13 +248,9 @@ class WallpaperBitmapLuminanceImplTest {
             val opensAfterFirst = opens.get()
             val second = luminance.compute("file:///same.png")
 
-            assertEquals(first, second)
-            assertTrue("first compute must have actually decoded", opensAfterFirst > 0)
-            assertEquals(
-                "second compute for the same URI must be a cache hit (no new open/decode)",
-                opensAfterFirst,
-                opens.get(),
-            )
+            assertThat(second).isEqualTo(first)
+            assertWithMessage("first compute must have actually decoded").that(opensAfterFirst > 0).isTrue()
+            assertWithMessage("second compute for the same URI must be a cache hit (no new open/decode)").that(opens.get()).isEqualTo(opensAfterFirst)
         }
 
     @Test
@@ -282,7 +267,7 @@ class WallpaperBitmapLuminanceImplTest {
 
             luminance.compute("file:///wp.png")
 
-            assertEquals(2, opens.get())
+            assertThat(opens.get()).isEqualTo(2)
         }
 
     @Test
@@ -295,10 +280,7 @@ class WallpaperBitmapLuminanceImplTest {
             val opensAfterA = opens.get()
             luminance.compute("file:///b.png")
 
-            assertTrue(
-                "a different URI must trigger a fresh decode",
-                opens.get() > opensAfterA,
-            )
+            assertWithMessage("a different URI must trigger a fresh decode").that(opens.get() > opensAfterA).isTrue()
         }
 
     private fun solidBitmap(@androidx.annotation.ColorInt color: Int): Bitmap {
@@ -392,8 +374,8 @@ class WallpaperBitmapLuminanceImplTest {
             val bitmap = bitmapWithCoverage(opaqueColor = Color.WHITE, opaqueFraction = 0.5f)
             stubContentResolver(bitmap)
             val result = luminance.compute("file:///half-opaque-white.png")
-            assertNotNull(result)
-            assertEquals(1.0f, result!!, 0.01f)
+            assertThat(result).isNotNull()
+            assertThat(result!!).isWithin(0.01f).of(1.0f)
         }
 
     @Test
@@ -406,7 +388,7 @@ class WallpaperBitmapLuminanceImplTest {
                 opaqueFraction = 1.0f,
             )
             stubContentResolver(bitmap)
-            assertNotNull(luminance.compute("file:///alpha-204.png"))
+            assertThat(luminance.compute("file:///alpha-204.png")).isNotNull()
         }
 
     @Test
@@ -419,6 +401,6 @@ class WallpaperBitmapLuminanceImplTest {
                 opaqueFraction = 1.0f,
             )
             stubContentResolver(bitmap)
-            assertNull(luminance.compute("file:///alpha-203.png"))
+            assertThat(luminance.compute("file:///alpha-203.png")).isNull()
         }
 }

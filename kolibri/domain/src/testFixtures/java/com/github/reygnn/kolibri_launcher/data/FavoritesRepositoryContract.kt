@@ -2,14 +2,13 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -85,7 +84,7 @@ abstract class FavoritesRepositoryContract {
     @Test
     fun `fresh repository emits empty set`() = runTest {
         val repo = createRepository()
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     // ---------- getFavoriteComponentsSnapshot (authoritative read for backup) ----------
@@ -95,7 +94,7 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
-        assertEquals(setOf(compA, compB), repo.getFavoriteComponentsSnapshot())
+        assertThat(repo.getFavoriteComponentsSnapshot()).isEqualTo(setOf(compA, compB))
     }
 
     @Test
@@ -106,13 +105,13 @@ abstract class FavoritesRepositoryContract {
         repo.addFavoriteComponent(compB)
         // Core guarantee behind the backup-stale-replay fix: the snapshot read
         // returns the newest persisted set, not the one it replaced.
-        assertEquals(setOf(compB), repo.getFavoriteComponentsSnapshot())
+        assertThat(repo.getFavoriteComponentsSnapshot()).isEqualTo(setOf(compB))
     }
 
     @Test
     fun `getFavoriteComponentsSnapshot on fresh repository is empty`() = runTest {
         val repo = createRepository()
-        assertEquals(emptySet<String>(), repo.getFavoriteComponentsSnapshot())
+        assertThat(repo.getFavoriteComponentsSnapshot()).isEqualTo(emptySet<String>())
     }
 
     // ---------- readFavoritesForEdit (distinguishable editor read, Belang C) ----------
@@ -124,13 +123,13 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
-        assertEquals(FavoritesEditRead.Loaded(setOf(compA, compB)), repo.readFavoritesForEdit())
+        assertThat(repo.readFavoritesForEdit()).isEqualTo(FavoritesEditRead.Loaded(setOf(compA, compB)))
     }
 
     @Test
     fun `readFavoritesForEdit on fresh repository returns Loaded empty`() = runTest {
         val repo = createRepository()
-        assertEquals(FavoritesEditRead.Loaded(emptySet()), repo.readFavoritesForEdit())
+        assertThat(repo.readFavoritesForEdit()).isEqualTo(FavoritesEditRead.Loaded(emptySet()))
     }
 
     @Test
@@ -139,7 +138,7 @@ abstract class FavoritesRepositoryContract {
         repo.addFavoriteComponent(compA)
         repo.removeFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
-        assertEquals(FavoritesEditRead.Loaded(setOf(compB)), repo.readFavoritesForEdit())
+        assertThat(repo.readFavoritesForEdit()).isEqualTo(FavoritesEditRead.Loaded(setOf(compB)))
     }
 
     // ---------- addFavoriteComponent ----------
@@ -147,26 +146,26 @@ abstract class FavoritesRepositoryContract {
     @Test
     fun `addFavoriteComponent returns true for valid component`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.addFavoriteComponent(compA))
+        assertThat(repo.addFavoriteComponent(compA)).isTrue()
     }
 
     @Test
     fun `addFavoriteComponent persists component to flow`() = runTest {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
-        assertTrue(compA in repo.favoriteComponentsFlow.first())
+        assertThat(compA in repo.favoriteComponentsFlow.first()).isTrue()
     }
 
     @Test
     fun `addFavoriteComponent returns false for empty string`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.addFavoriteComponent(""))
+        assertThat(repo.addFavoriteComponent("")).isFalse()
     }
 
     @Test
     fun `addFavoriteComponent returns false for whitespace-only string`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.addFavoriteComponent("   "))
+        assertThat(repo.addFavoriteComponent("   ")).isFalse()
     }
 
     @Test
@@ -176,9 +175,9 @@ abstract class FavoritesRepositoryContract {
         // survives as a stale favorite that the backup restore later drops for not
         // matching an installed component (TODO §15).
         val repo = createRepository()
-        assertFalse("bare package, no class", repo.addFavoriteComponent("com.example.alpha"))
-        assertFalse("trailing slash, empty class", repo.addFavoriteComponent("com.example.alpha/"))
-        assertFalse("leading slash, empty package", repo.addFavoriteComponent("/.MainActivity"))
+        assertWithMessage("bare package, no class").that(repo.addFavoriteComponent("com.example.alpha")).isFalse()
+        assertWithMessage("trailing slash, empty class").that(repo.addFavoriteComponent("com.example.alpha/")).isFalse()
+        assertWithMessage("leading slash, empty package").that(repo.addFavoriteComponent("/.MainActivity")).isFalse()
     }
 
     @Test
@@ -186,7 +185,7 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent("com.example.alpha")
-        assertEquals(setOf(compA), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
@@ -195,15 +194,15 @@ abstract class FavoritesRepositoryContract {
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent("")
         repo.addFavoriteComponent("   ")
-        assertEquals(setOf(compA), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
     fun `addFavoriteComponent twice with same component is idempotent`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.addFavoriteComponent(compA))
-        assertTrue(repo.addFavoriteComponent(compA))
-        assertEquals(setOf(compA), repo.favoriteComponentsFlow.first())
+        assertThat(repo.addFavoriteComponent(compA)).isTrue()
+        assertThat(repo.addFavoriteComponent(compA)).isTrue()
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
@@ -211,7 +210,7 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
-        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA, compB))
     }
 
     // ---------- removeFavoriteComponent ----------
@@ -220,7 +219,7 @@ abstract class FavoritesRepositoryContract {
     fun `removeFavoriteComponent returns true for existing component`() = runTest {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
-        assertTrue(repo.removeFavoriteComponent(compA))
+        assertThat(repo.removeFavoriteComponent(compA)).isTrue()
     }
 
     @Test
@@ -229,14 +228,14 @@ abstract class FavoritesRepositoryContract {
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
         repo.removeFavoriteComponent(compA)
-        assertEquals(setOf(compB), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compB))
     }
 
     @Test
     fun `removeFavoriteComponent returns false for blank`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.removeFavoriteComponent(""))
-        assertFalse(repo.removeFavoriteComponent("   "))
+        assertThat(repo.removeFavoriteComponent("")).isFalse()
+        assertThat(repo.removeFavoriteComponent("   ")).isFalse()
     }
 
     @Test
@@ -245,8 +244,8 @@ abstract class FavoritesRepositoryContract {
         // Fake via no-op-Set-Minus. Beide liefern `true` zurück — der "Zustand nach
         // dem Aufruf ist wie gewünscht" ist erfüllt, egal ob vorher schon so.
         val repo = createRepository()
-        assertTrue(repo.removeFavoriteComponent(compA))
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.removeFavoriteComponent(compA)).isTrue()
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     // ---------- isFavoriteComponent ----------
@@ -255,25 +254,25 @@ abstract class FavoritesRepositoryContract {
     fun `isFavoriteComponent returns true for added component`() = runTest {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
-        assertTrue(repo.isFavoriteComponent(compA))
+        assertThat(repo.isFavoriteComponent(compA)).isTrue()
     }
 
     @Test
     fun `isFavoriteComponent returns false for non-existing component`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isFavoriteComponent(compA))
+        assertThat(repo.isFavoriteComponent(compA)).isFalse()
     }
 
     @Test
     fun `isFavoriteComponent returns false for null`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isFavoriteComponent(null))
+        assertThat(repo.isFavoriteComponent(null)).isFalse()
     }
 
     @Test
     fun `isFavoriteComponent returns false for empty string`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isFavoriteComponent(""))
+        assertThat(repo.isFavoriteComponent("")).isFalse()
     }
 
     /**
@@ -288,7 +287,7 @@ abstract class FavoritesRepositoryContract {
     fun `saveFavoriteComponents filters out blank entries`() = runTest {
         val repo = createRepository()
         repo.saveFavoriteComponents(listOf(compA, "", "   ", compB))
-        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA, compB))
     }
 
     // ---------- toggleFavoriteComponent ----------
@@ -296,16 +295,16 @@ abstract class FavoritesRepositoryContract {
     @Test
     fun `toggleFavoriteComponent adds non-existing component and returns true`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.toggleFavoriteComponent(compA))
-        assertTrue(compA in repo.favoriteComponentsFlow.first())
+        assertThat(repo.toggleFavoriteComponent(compA)).isTrue()
+        assertThat(compA in repo.favoriteComponentsFlow.first()).isTrue()
     }
 
     @Test
     fun `toggleFavoriteComponent removes existing component and returns false`() = runTest {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
-        assertFalse(repo.toggleFavoriteComponent(compA))
-        assertFalse(compA in repo.favoriteComponentsFlow.first())
+        assertThat(repo.toggleFavoriteComponent(compA)).isFalse()
+        assertThat(compA in repo.favoriteComponentsFlow.first()).isFalse()
     }
 
     @Test
@@ -313,7 +312,7 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.toggleFavoriteComponent(compA) // add
         repo.toggleFavoriteComponent(compA) // remove
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     // ---------- saveFavoriteComponents ----------
@@ -323,7 +322,7 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.saveFavoriteComponents(listOf(compB, compC))
-        assertEquals(setOf(compB, compC), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compB, compC))
     }
 
     @Test
@@ -331,14 +330,14 @@ abstract class FavoritesRepositoryContract {
         val repo = createRepository()
         repo.addFavoriteComponent(compA)
         repo.saveFavoriteComponents(emptyList())
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
     fun `saveFavoriteComponents deduplicates input`() = runTest {
         val repo = createRepository()
         repo.saveFavoriteComponents(listOf(compA, compA, compB))
-        assertEquals(setOf(compA, compB), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(setOf(compA, compB))
     }
 
     // ---------- purgeRepository ----------
@@ -349,13 +348,13 @@ abstract class FavoritesRepositoryContract {
         repo.addFavoriteComponent(compA)
         repo.addFavoriteComponent(compB)
         repo.purgeRepository()
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
     fun `purgeRepository is safe on empty repository`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(emptySet<String>(), repo.favoriteComponentsFlow.first())
+        assertThat(repo.favoriteComponentsFlow.first()).isEqualTo(emptySet<String>())
     }
 }

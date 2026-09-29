@@ -4,6 +4,7 @@ import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -13,7 +14,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 class FactoryResetUseCaseTest {
@@ -46,7 +46,7 @@ class FactoryResetUseCaseTest {
         val result = useCase(includeUsageData = true)
 
         // Assert
-        assertEquals(FactoryResetUseCase.Result.Success, result)
+        assertThat(result).isEqualTo(FactoryResetUseCase.Result.Success)
         coVerify { resetRepository.resetSettings() }
         coVerify { resetRepository.resetUserData() }
         coVerify { resetRepository.resetAppUsageData() }
@@ -64,7 +64,7 @@ class FactoryResetUseCaseTest {
         val result = useCase(includeUsageData = false)
 
         // Assert
-        assertEquals(FactoryResetUseCase.Result.Success, result)
+        assertThat(result).isEqualTo(FactoryResetUseCase.Result.Success)
         coVerify { resetRepository.resetSettings() }
         coVerify { resetRepository.resetUserData() }
         coVerify(exactly = 0) { resetRepository.resetAppUsageData() }
@@ -82,7 +82,7 @@ class FactoryResetUseCaseTest {
         val result = useCase(includeUsageData = true)
 
         // Assert
-        assertEquals(FactoryResetUseCase.Result.PartialFailure, result)
+        assertThat(result).isEqualTo(FactoryResetUseCase.Result.PartialFailure)
         coVerify(exactly = 0) { installedAppsRepository.triggerAppsUpdate() }
     }
 
@@ -95,6 +95,6 @@ class FactoryResetUseCaseTest {
         val result = useCase(includeUsageData = false)
 
         // Assert
-        assertEquals(FactoryResetUseCase.Result.Error, result)
+        assertThat(result).isEqualTo(FactoryResetUseCase.Result.Error)
     }
 }

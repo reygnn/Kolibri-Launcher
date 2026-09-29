@@ -35,11 +35,13 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.truth) // A12: Truth is the one assertion library
     testImplementation(libs.kotlinx.coroutines.test)
 
     // Shared test fixtures: MainDispatcherRuleBase (JUnit TestWatcher + swaps
     // Dispatchers.Main for a TestDispatcher). Each module's tiny MainDispatcherRule
     // subclass consumes it via `testFixtures(project(":core"))`.
     testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.truth) // contracts assert with Truth (A12)
     testFixturesImplementation(libs.kotlinx.coroutines.test)
 }

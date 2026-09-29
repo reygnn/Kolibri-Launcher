@@ -12,13 +12,14 @@ import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsReposito
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -68,7 +69,7 @@ class ResetRepositoryImplTest {
     fun `resetUserData - calls purge on all relevant repositories`() = runTest {
         val result = resetManager.resetUserData()
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
 
         coVerify { favoritesRepository.purgeRepository() }
         coVerify { favoritesOrderRepository.purgeRepository() }
@@ -91,7 +92,7 @@ class ResetRepositoryImplTest {
 
         val result = resetManager.resetUserData()
 
-        Assert.assertFalse("Result should be false if one component fails", result)
+        assertWithMessage("Result should be false if one component fails").that(result).isFalse()
 
         coVerify { favoritesRepository.purgeRepository() }
         coVerify { favoritesOrderRepository.purgeRepository() }
@@ -104,7 +105,7 @@ class ResetRepositoryImplTest {
     fun `resetSettings - calls purge on settings repository`() = runTest {
         val result = resetManager.resetSettings()
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
         coVerify { settingsRepository.purgeRepository() }
     }
 
@@ -114,7 +115,7 @@ class ResetRepositoryImplTest {
 
         val result = resetManager.resetSettings()
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     // ========== RESET APP USAGE TESTS ==========
@@ -123,7 +124,7 @@ class ResetRepositoryImplTest {
     fun `resetAppUsageData - calls purge on app usage repository`() = runTest {
         val result = resetManager.resetAppUsageData()
 
-        Assert.assertTrue(result)
+        assertThat(result).isTrue()
         coVerify { appUsageRepository.purgeRepository() }
     }
 
@@ -133,6 +134,6 @@ class ResetRepositoryImplTest {
 
         val result = resetManager.resetAppUsageData()
 
-        Assert.assertFalse(result)
+        assertThat(result).isFalse()
     }
 }

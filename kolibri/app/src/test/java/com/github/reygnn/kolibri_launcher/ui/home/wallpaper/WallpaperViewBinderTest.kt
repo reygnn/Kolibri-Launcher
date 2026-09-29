@@ -7,7 +7,7 @@ import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewDiff
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -78,8 +78,8 @@ class WallpaperViewBinderTest {
         )
 
         // Fast path: same instance list, indices 0..3 untouched.
-        assertEquals(plan.updates, result)
-        assertEquals(listOf(0, 1, 2, 3), result.map { it.layerIndex })
+        assertThat(result).isEqualTo(plan.updates)
+        assertThat(result.map { it.layerIndex }).isEqualTo(listOf(0, 1, 2, 3))
     }
 
     // ===========================================
@@ -98,10 +98,10 @@ class WallpaperViewBinderTest {
         )
 
         // L1's update is dropped; L0/L2/L3 map to real positions 0/1/2.
-        assertEquals(3, result.size)
-        assertEquals(10f to 0, result[0].transform?.translateX to result[0].layerIndex) // L0
-        assertEquals(30f to 1, result[1].transform?.translateX to result[1].layerIndex) // L2
-        assertEquals(40f to 2, result[2].transform?.translateX to result[2].layerIndex) // L3
+        assertThat(result.size).isEqualTo(3)
+        assertThat(result[0].transform?.translateX to result[0].layerIndex).isEqualTo(10f to 0) // L0
+        assertThat(result[1].transform?.translateX to result[1].layerIndex).isEqualTo(30f to 1) // L2
+        assertThat(result[2].transform?.translateX to result[2].layerIndex).isEqualTo(40f to 2) // L3
     }
 
     @Test
@@ -115,10 +115,10 @@ class WallpaperViewBinderTest {
             addedLayerIds = listOf("L1", "L2", "L3")
         )
 
-        assertEquals(3, result.size)
-        assertEquals(20f to 0, result[0].transform?.translateX to result[0].layerIndex) // L1
-        assertEquals(30f to 1, result[1].transform?.translateX to result[1].layerIndex) // L2
-        assertEquals(40f to 2, result[2].transform?.translateX to result[2].layerIndex) // L3
+        assertThat(result.size).isEqualTo(3)
+        assertThat(result[0].transform?.translateX to result[0].layerIndex).isEqualTo(20f to 0) // L1
+        assertThat(result[1].transform?.translateX to result[1].layerIndex).isEqualTo(30f to 1) // L2
+        assertThat(result[2].transform?.translateX to result[2].layerIndex).isEqualTo(40f to 2) // L3
     }
 
     // ===========================================
@@ -136,9 +136,9 @@ class WallpaperViewBinderTest {
             addedLayerIds = listOf("L0", "L1", "L2")
         )
 
-        assertEquals(3, result.size)
-        assertEquals(listOf(0, 1, 2), result.map { it.layerIndex })
-        assertEquals(listOf(10f, 20f, 30f), result.map { it.transform?.translateX })
+        assertThat(result.size).isEqualTo(3)
+        assertThat(result.map { it.layerIndex }).isEqualTo(listOf(0, 1, 2))
+        assertThat(result.map { it.transform?.translateX }).isEqualTo(listOf(10f, 20f, 30f))
     }
 
     // ===========================================
@@ -155,6 +155,6 @@ class WallpaperViewBinderTest {
             addedLayerIds = emptyList()
         )
 
-        assertEquals(emptyList<LayerPropertyUpdate>(), result)
+        assertThat(result).isEqualTo(emptyList<LayerPropertyUpdate>())
     }
 }

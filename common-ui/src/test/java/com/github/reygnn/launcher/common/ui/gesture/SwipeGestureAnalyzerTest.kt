@@ -1,7 +1,7 @@
 package com.github.reygnn.launcher.common.ui.gesture
 
 import com.github.reygnn.launcher.common.ui.gesture.SwipeGestureAnalyzer.SwipeResult
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -29,36 +29,36 @@ class SwipeGestureAnalyzerTest {
     // ---- boundary ----
 
     @Test fun `diff 51 just above threshold is valid`() =
-        assertEquals(SwipeResult.TOWARDS_RIGHT, analyzer.analyze(51f, 0f, 51f, 0f))
+        assertThat(analyzer.analyze(51f, 0f, 51f, 0f)).isEqualTo(SwipeResult.TOWARDS_RIGHT)
 
     @Test fun `diff 50 exact threshold is ignored`() =
-        assertEquals(SwipeResult.IGNORED, analyzer.analyze(50f, 0f, 51f, 0f))
+        assertThat(analyzer.analyze(50f, 0f, 51f, 0f)).isEqualTo(SwipeResult.IGNORED)
 
     @Test fun `velocity 50 exact threshold is ignored`() =
-        assertEquals(SwipeResult.IGNORED, analyzer.analyze(51f, 0f, 50f, 0f))
+        assertThat(analyzer.analyze(51f, 0f, 50f, 0f)).isEqualTo(SwipeResult.IGNORED)
 
     @Test fun `diff 49 just below threshold is ignored`() =
-        assertEquals(SwipeResult.IGNORED, analyzer.analyze(49f, 0f, 100f, 0f))
+        assertThat(analyzer.analyze(49f, 0f, 100f, 0f)).isEqualTo(SwipeResult.IGNORED)
 
     // ---- direction + dominance ----
 
     @Test fun `clear swipe LEFT`() =
-        assertEquals(SwipeResult.TOWARDS_LEFT, analyzer.analyze(-60f, 0f, 60f, 0f))
+        assertThat(analyzer.analyze(-60f, 0f, 60f, 0f)).isEqualTo(SwipeResult.TOWARDS_LEFT)
 
     @Test fun `clear swipe UP`() =
-        assertEquals(SwipeResult.UP, analyzer.analyze(0f, -60f, 0f, 60f))
+        assertThat(analyzer.analyze(0f, -60f, 0f, 60f)).isEqualTo(SwipeResult.UP)
 
     @Test fun `clear swipe DOWN`() =
-        assertEquals(SwipeResult.DOWN, analyzer.analyze(0f, 60f, 0f, 60f))
+        assertThat(analyzer.analyze(0f, 60f, 0f, 60f)).isEqualTo(SwipeResult.DOWN)
 
     @Test fun `diagonal favors dominant axis X`() =
-        assertEquals(SwipeResult.TOWARDS_RIGHT, analyzer.analyze(100f, 60f, 100f, 100f))
+        assertThat(analyzer.analyze(100f, 60f, 100f, 100f)).isEqualTo(SwipeResult.TOWARDS_RIGHT)
 
     @Test fun `diagonal favors dominant axis Y`() =
-        assertEquals(SwipeResult.DOWN, analyzer.analyze(60f, 100f, 100f, 100f))
+        assertThat(analyzer.analyze(60f, 100f, 100f, 100f)).isEqualTo(SwipeResult.DOWN)
 
     // ---- 1.5x dominance: near-diagonal is rejected ----
 
     @Test fun `near-diagonal under 1_5x dominance is ignored`() =
-        assertEquals(SwipeResult.IGNORED, dominant.analyze(250f, 300f, 250f, 300f))
+        assertThat(dominant.analyze(250f, 300f, 250f, 300f)).isEqualTo(SwipeResult.IGNORED)
 }

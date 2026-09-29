@@ -3,11 +3,12 @@ package com.github.reygnn.launcher.common.ui.timeinfo
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
-import com.github.reygnn.launcher.common.ui.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.timeinfo.ChargeState
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -19,8 +20,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -70,31 +69,31 @@ class ClockDelegateTest {
     @Test
     fun `initial timeString is default placeholder`() {
         val delegate = createDelegate()
-        assertEquals("--:--", delegate.timeString.value)
+        assertThat(delegate.timeString.value).isEqualTo("--:--")
     }
 
     @Test
     fun `initial dateString is default placeholder`() {
         val delegate = createDelegate()
-        assertEquals("---", delegate.dateString.value)
+        assertThat(delegate.dateString.value).isEqualTo("---")
     }
 
     @Test
     fun `initial batteryString is default placeholder`() {
         val delegate = createDelegate()
-        assertEquals("---%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("---%")
     }
 
     @Test
     fun `initial chargeState is NONE`() {
         val delegate = createDelegate()
-        assertEquals(ChargeState.NONE, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.NONE)
     }
 
     @Test
     fun `initial timeBasedEvents is empty`() {
         val delegate = createDelegate()
-        assertEquals(emptyList<Any>(), delegate.timeBasedEvents.value)
+        assertThat(delegate.timeBasedEvents.value).isEqualTo(emptyList<Any>())
     }
 
     // ===========================================
@@ -107,7 +106,7 @@ class ClockDelegateTest {
 
         delegate.refreshTimeNow()
 
-        assertNotEquals("--:--", delegate.timeString.value)
+        assertThat(delegate.timeString.value).isNotEqualTo("--:--")
     }
 
     @Test
@@ -116,7 +115,7 @@ class ClockDelegateTest {
 
         delegate.refreshTimeNow()
 
-        assertNotEquals("---", delegate.dateString.value)
+        assertThat(delegate.dateString.value).isNotEqualTo("---")
     }
 
     @Test
@@ -142,7 +141,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 75, scale = 100)
 
-        assertEquals("75%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("75%")
     }
 
     @Test
@@ -151,7 +150,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 100, scale = 100)
 
-        assertEquals("100%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("100%")
     }
 
     @Test
@@ -160,7 +159,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 0, scale = 100)
 
-        assertEquals("0%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("0%")
     }
 
     @Test
@@ -169,7 +168,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 128, scale = 255)
 
-        assertEquals("50%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("50%")
     }
 
     @Test
@@ -178,7 +177,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = -1, scale = 100)
 
-        assertEquals("---%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("---%")
     }
 
     @Test
@@ -187,7 +186,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 50, scale = -1)
 
-        assertEquals("---%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("---%")
     }
 
     @Test
@@ -196,7 +195,7 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevel(level = 50, scale = 0)
 
-        assertEquals("---%", delegate.batteryString.value)
+        assertThat(delegate.batteryString.value).isEqualTo("---%")
     }
 
     // Builds a mocked battery Intent stubbing the four extras the delegate reads.
@@ -223,8 +222,8 @@ class ClockDelegateTest {
             )
         )
 
-        assertEquals("80%", delegate.batteryString.value)
-        assertEquals(ChargeState.NONE, delegate.chargeState.value)
+        assertThat(delegate.batteryString.value).isEqualTo("80%")
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.NONE)
     }
 
     @Test
@@ -233,8 +232,8 @@ class ClockDelegateTest {
 
         delegate.updateBatteryLevelFromIntent(null)
 
-        assertEquals("---%", delegate.batteryString.value)
-        assertEquals(ChargeState.NONE, delegate.chargeState.value)
+        assertThat(delegate.batteryString.value).isEqualTo("---%")
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.NONE)
     }
 
     @Test
@@ -250,7 +249,7 @@ class ClockDelegateTest {
             )
         )
 
-        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.CHARGING)
     }
 
     @Test
@@ -266,7 +265,7 @@ class ClockDelegateTest {
             )
         )
 
-        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.CHARGING)
     }
 
     @Test
@@ -283,7 +282,7 @@ class ClockDelegateTest {
             )
         )
 
-        assertEquals(ChargeState.PROTECTED, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.PROTECTED)
     }
 
     @Test
@@ -299,7 +298,7 @@ class ClockDelegateTest {
                 plugged = BatteryManager.BATTERY_PLUGGED_AC
             )
         )
-        assertEquals(ChargeState.CHARGING, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.CHARGING)
 
         delegate.updateBatteryLevelFromIntent(
             batteryIntent(
@@ -310,7 +309,7 @@ class ClockDelegateTest {
             )
         )
 
-        assertEquals(ChargeState.NONE, delegate.chargeState.value)
+        assertThat(delegate.chargeState.value).isEqualTo(ChargeState.NONE)
     }
 
     // ===========================================
@@ -328,7 +327,7 @@ class ClockDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertEquals(testEvents, delegate.timeBasedEvents.value)
+        assertThat(delegate.timeBasedEvents.value).isEqualTo(testEvents)
     }
 
     // ===========================================
@@ -341,7 +340,7 @@ class ClockDelegateTest {
 
         delegate.refreshAll()
 
-        assertNotEquals("--:--", delegate.timeString.value)
+        assertThat(delegate.timeString.value).isNotEqualTo("--:--")
         verify { observeTimeBasedEventsUseCase.refresh() }
     }
 }

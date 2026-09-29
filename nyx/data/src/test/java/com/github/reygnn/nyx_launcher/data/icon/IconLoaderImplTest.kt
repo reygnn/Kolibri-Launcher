@@ -8,7 +8,7 @@ import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.FakePreferencesRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -48,9 +48,9 @@ class IconLoaderImplTest {
     private fun ref(pkg: String) = IconRef.System(ComponentKey(pkg, "$pkg.Main"))
 
     @Test
-    fun second_request_for_same_icon_hits_memory() = runTest(mainDispatcherRule.dispatcher) {
+    fun second_request_for_same_icon_hits_memory() = runTest(mainDispatcherRule.testDispatcher) {
         val source = FakeSource()
-        val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, FakePreferencesRepository())
+        val loader = IconLoaderImpl(context, mainDispatcherRule.testDispatcher, source, FakePreferencesRepository())
 
         loader.bitmap(ref("com.foo"), 64)
         loader.bitmap(ref("com.foo"), 64)
@@ -59,9 +59,9 @@ class IconLoaderImplTest {
     }
 
     @Test
-    fun different_size_is_a_different_key_and_reloads() = runTest(mainDispatcherRule.dispatcher) {
+    fun different_size_is_a_different_key_and_reloads() = runTest(mainDispatcherRule.testDispatcher) {
         val source = FakeSource()
-        val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, FakePreferencesRepository())
+        val loader = IconLoaderImpl(context, mainDispatcherRule.testDispatcher, source, FakePreferencesRepository())
 
         loader.bitmap(ref("com.foo"), 64)
         loader.bitmap(ref("com.foo"), 128)
@@ -70,9 +70,9 @@ class IconLoaderImplTest {
     }
 
     @Test
-    fun evict_clears_memory_index_and_forces_a_reload() = runTest(mainDispatcherRule.dispatcher) {
+    fun evict_clears_memory_index_and_forces_a_reload() = runTest(mainDispatcherRule.testDispatcher) {
         val source = FakeSource()
-        val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, FakePreferencesRepository())
+        val loader = IconLoaderImpl(context, mainDispatcherRule.testDispatcher, source, FakePreferencesRepository())
 
         loader.bitmap(ref("com.foo"), 64) // 1st resolve, indexed under com.foo
         loader.evict("com.foo")           // must drop it from memory + index (A1-15)
@@ -82,10 +82,10 @@ class IconLoaderImplTest {
     }
 
     @Test
-    fun a_fresh_loader_serves_the_same_key_from_the_disk_cache() = runTest(mainDispatcherRule.dispatcher) {
+    fun a_fresh_loader_serves_the_same_key_from_the_disk_cache() = runTest(mainDispatcherRule.testDispatcher) {
         // First loader resolves once and writes the composited WEBP to disk.
         val first = FakeSource()
-        IconLoaderImpl(context, mainDispatcherRule.dispatcher, first, FakePreferencesRepository())
+        IconLoaderImpl(context, mainDispatcherRule.testDispatcher, first, FakePreferencesRepository())
             .bitmap(ref("com.disk"), 64)
         advanceUntilIdle() // let the best-effort disk write + prune settle
         assertThat(first.calls).isEqualTo(1)
@@ -93,7 +93,7 @@ class IconLoaderImplTest {
         // A brand-new loader (empty memory, shared cacheDir) must read the disk
         // tier instead of resolving again (ICL disk cache, §4).
         val second = FakeSource()
-        IconLoaderImpl(context, mainDispatcherRule.dispatcher, second, FakePreferencesRepository())
+        IconLoaderImpl(context, mainDispatcherRule.testDispatcher, second, FakePreferencesRepository())
             .bitmap(ref("com.disk"), 64)
 
         assertThat(second.calls).isEqualTo(0)
@@ -101,9 +101,9 @@ class IconLoaderImplTest {
 
     @Test
     fun trim_drops_memory_but_the_disk_tier_still_serves_the_reload() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val source = FakeSource()
-            val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, FakePreferencesRepository())
+            val loader = IconLoaderImpl(context, mainDispatcherRule.testDispatcher, source, FakePreferencesRepository())
 
             val resolved = loader.bitmap(ref("com.trim"), 64)      // memory + disk
             val memoryHit = loader.bitmap(ref("com.trim"), 64)     // same cached instance
@@ -119,11 +119,11 @@ class IconLoaderImplTest {
 
     @Test
     fun monochrome_preference_makes_the_source_render_themed() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val source = FakeSource()
             val loader = IconLoaderImpl(
                 context,
-                mainDispatcherRule.dispatcher,
+                mainDispatcherRule.testDispatcher,
                 source,
                 FakePreferencesRepository(iconStyle = IconStyle.MONOCHROME),
             )
@@ -136,11 +136,11 @@ class IconLoaderImplTest {
 
     @Test
     fun grayscale_preference_makes_the_source_render_grayscale() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             val source = FakeSource()
             val loader = IconLoaderImpl(
                 context,
-                mainDispatcherRule.dispatcher,
+                mainDispatcherRule.testDispatcher,
                 source,
                 FakePreferencesRepository(iconStyle = IconStyle.GRAYSCALE),
             )
@@ -153,7 +153,7 @@ class IconLoaderImplTest {
 
     @Test
     fun the_first_decode_waits_for_the_real_style_instead_of_the_color_seed() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // NOTE: no advanceUntilIdle before the request (unlike the two tests above). The
             // icon-style preference has not landed yet, so without the styleReady gate the first
             // decode would run under the COLOR seed. The gate makes bitmap() wait for the real
@@ -162,7 +162,7 @@ class IconLoaderImplTest {
             val source = FakeSource()
             val loader = IconLoaderImpl(
                 context,
-                mainDispatcherRule.dispatcher,
+                mainDispatcherRule.testDispatcher,
                 source,
                 FakePreferencesRepository(iconStyle = IconStyle.MONOCHROME),
             )
@@ -174,7 +174,7 @@ class IconLoaderImplTest {
 
     @Test
     fun `an icon-style flow that ends without emitting does not hang bitmap loading`() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // §Audit-3 A3-03: styleReady is completed via onCompletion, so even if iconStyle() ends
             // before its first emission (here an empty flow; in the field, a non-IOException flow
             // death that readFlowFailOpen doesn't catch), bitmap() resumes under the COLOR seed
@@ -183,7 +183,7 @@ class IconLoaderImplTest {
             val emptyStylePrefs = object : PreferencesRepository by FakePreferencesRepository() {
                 override fun iconStyle(): Flow<IconStyle> = emptyFlow()
             }
-            val loader = IconLoaderImpl(context, mainDispatcherRule.dispatcher, source, emptyStylePrefs)
+            val loader = IconLoaderImpl(context, mainDispatcherRule.testDispatcher, source, emptyStylePrefs)
 
             loader.bitmap(ref("com.late"), 64) // must NOT hang
 

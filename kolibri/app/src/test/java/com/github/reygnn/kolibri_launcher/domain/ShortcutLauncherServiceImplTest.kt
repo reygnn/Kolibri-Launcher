@@ -14,10 +14,9 @@ import io.mockk.runs
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import android.os.Process
+import com.google.common.truth.Truth.assertThat
+import kotlin.test.assertFailsWith
 import org.junit.After
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 
@@ -79,14 +78,14 @@ class ShortcutLauncherServiceImplTest {
     @Test
     fun `isAvailable returns true when LauncherApps service exists`() {
         service = ShortcutLauncherServiceImpl(context)
-        assertTrue(service.isAvailable())
+        assertThat(service.isAvailable()).isTrue()
     }
 
     @Test
     fun `isAvailable returns false when LauncherApps service is null`() {
         every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
         service = ShortcutLauncherServiceImpl(context)
-        assertFalse(service.isAvailable())
+        assertThat(service.isAvailable()).isFalse()
     }
 
     @Test
@@ -96,7 +95,7 @@ class ShortcutLauncherServiceImplTest {
 
         try {
             val result = service.isAvailable()
-            assertFalse(result)
+            assertThat(result).isFalse()
         } catch (e: SecurityException) {
             // Acceptable behavior for this edge case
         }
@@ -126,12 +125,14 @@ class ShortcutLauncherServiceImplTest {
         }
     }
 
-    @Test(expected = ShortcutLaunchException::class)
+    @Test
     fun `startShortcut throws ShortcutLaunchException when service unavailable`() {
         every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
-        service = ShortcutLauncherServiceImpl(context)
 
-        service.startShortcut(shortcutInfo)
+        assertFailsWith<ShortcutLaunchException> {
+            service = ShortcutLauncherServiceImpl(context)
+            service.startShortcut(shortcutInfo)
+        }
     }
 
     @Test
@@ -144,10 +145,10 @@ class ShortcutLauncherServiceImplTest {
 
         try {
             service.startShortcut(shortcutInfo)
-            fail("Expected ShortcutLaunchException")
+            throw AssertionError("Expected ShortcutLaunchException")
         } catch (e: ShortcutLaunchException) {
-            assertTrue(e.message!!.contains("test-shortcut-id"))
-            assertTrue(e.cause is IllegalStateException)
+            assertThat(e.message!!.contains("test-shortcut-id")).isTrue()
+            assertThat(e.cause).isInstanceOf(IllegalStateException::class.java)
         }
     }
 
@@ -166,9 +167,9 @@ class ShortcutLauncherServiceImplTest {
 
         try {
             service.startShortcut(customShortcut)
-            fail("Expected ShortcutLaunchException")
+            throw AssertionError("Expected ShortcutLaunchException")
         } catch (e: ShortcutLaunchException) {
-            assertTrue(e.message!!.contains("my-unique-shortcut-123"))
+            assertThat(e.message!!.contains("my-unique-shortcut-123")).isTrue()
         }
     }
 

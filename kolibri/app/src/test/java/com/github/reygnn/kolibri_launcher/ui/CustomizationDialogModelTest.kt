@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.main.CustomizationDialogModel
 import com.github.reygnn.kolibri_launcher.ui.main.CustomizationOption
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -31,7 +31,7 @@ class CustomizationDialogModelTest {
             hasWallpaper = false,
             isWallpaperEditMode = true,
         )
-        assertEquals(CustomizationDialogModel.Hidden, result)
+        assertThat(result).isEqualTo(CustomizationDialogModel.Hidden)
     }
 
     @Test
@@ -41,7 +41,7 @@ class CustomizationDialogModelTest {
             hasWallpaper = true,
             isWallpaperEditMode = true,
         )
-        assertEquals(CustomizationDialogModel.Hidden, result)
+        assertThat(result).isEqualTo(CustomizationDialogModel.Hidden)
     }
 
     // ------------------------------------------------------------------
@@ -62,7 +62,7 @@ class CustomizationDialogModelTest {
                 CustomizationOption.MoreSettings,
             ),
         )
-        assertEquals(expected, result)
+        assertThat(result).isEqualTo(expected)
     }
 
     @Test
@@ -81,7 +81,7 @@ class CustomizationDialogModelTest {
                 CustomizationOption.MoreSettings,
             ),
         )
-        assertEquals(expected, result)
+        assertThat(result).isEqualTo(expected)
     }
 
     // ------------------------------------------------------------------
@@ -99,8 +99,8 @@ class CustomizationDialogModelTest {
             isWallpaperEditMode = false,
         ) as CustomizationDialogModel.Visible
 
-        assertEquals(CustomizationOption.ChooseWallpaper, withWallpaper.options.first())
-        assertEquals(CustomizationOption.ChooseWallpaper, withoutWallpaper.options.first())
+        assertThat(withWallpaper.options.first()).isEqualTo(CustomizationOption.ChooseWallpaper)
+        assertThat(withoutWallpaper.options.first()).isEqualTo(CustomizationOption.ChooseWallpaper)
     }
 
     @Test
@@ -121,8 +121,8 @@ class CustomizationDialogModelTest {
             CustomizationOption.CustomizeLayout,
             CustomizationOption.MoreSettings,
         )
-        assertEquals(tail, withWallpaper.options.takeLast(3))
-        assertEquals(tail, withoutWallpaper.options.takeLast(3))
+        assertThat(withWallpaper.options.takeLast(3)).isEqualTo(tail)
+        assertThat(withoutWallpaper.options.takeLast(3)).isEqualTo(tail)
     }
 
     @Test
@@ -136,6 +136,6 @@ class CustomizationDialogModelTest {
             CustomizationOption.RemoveWallpaper,
         )
         val intersect = result.options.toSet().intersect(forbidden)
-        assertEquals(emptySet<CustomizationOption>(), intersect)
+        assertThat(intersect).isEqualTo(emptySet<CustomizationOption>())
     }
 }

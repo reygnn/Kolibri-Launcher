@@ -3,19 +3,17 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.kolibri_launcher.domain.model.UsageImportResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportUsageToFileUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportUsageFromFileUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportUiEvent
 import com.github.reygnn.kolibri_launcher.ui.usageexport.UsageExportViewModel
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -50,17 +48,15 @@ class UsageExportViewModelTest {
         // Event Collector starten — UnconfinedTestDispatcher gemäß Konvention,
         // sonst startet der Collector zu spät und verpasst Events.
         val events = mutableListOf<UsageExportUiEvent>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.event.toList(events)
-        }
+        val job = recordEmissions(viewModel.event, into = events)
 
         // Act
         viewModel.exportToFile(uri)
         advanceUntilIdle()
 
         // Assert
-        Assert.assertEquals(1, events.size)
-        Assert.assertEquals(UsageExportUiEvent.ExportSuccess, events.first())
+        assertThat(events.size).isEqualTo(1)
+        assertThat(events.first()).isEqualTo(UsageExportUiEvent.ExportSuccess)
 
         job.cancel()
     }
@@ -73,18 +69,16 @@ class UsageExportViewModelTest {
         coEvery { exportUseCase(uri) } returns Result.failure(Exception(errorMsg))
 
         val events = mutableListOf<UsageExportUiEvent>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.event.toList(events)
-        }
+        val job = recordEmissions(viewModel.event, into = events)
 
         // Act
         viewModel.exportToFile(uri)
         advanceUntilIdle()
 
         // Assert
-        Assert.assertEquals(1, events.size)
+        assertThat(events.size).isEqualTo(1)
         val event = events.first() as UsageExportUiEvent.ExportError
-        Assert.assertEquals(errorMsg, event.message)
+        assertThat(event.message).isEqualTo(errorMsg)
 
         job.cancel()
     }
@@ -99,19 +93,17 @@ class UsageExportViewModelTest {
         coEvery { importUseCase(uri, false) } returns successResult
 
         val events = mutableListOf<UsageExportUiEvent>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.event.toList(events)
-        }
+        val job = recordEmissions(viewModel.event, into = events)
 
         // Act
         viewModel.importFromFile(uri, false)
         advanceUntilIdle()
 
         // Assert
-        Assert.assertEquals(1, events.size)
+        assertThat(events.size).isEqualTo(1)
         val event = events.first() as UsageExportUiEvent.ImportSuccess
-        Assert.assertEquals(10, event.packagesImported)
-        Assert.assertEquals(50, event.timestampsImported)
+        assertThat(event.packagesImported).isEqualTo(10)
+        assertThat(event.timestampsImported).isEqualTo(50)
 
         job.cancel()
     }
@@ -123,16 +115,14 @@ class UsageExportViewModelTest {
         coEvery { importUseCase(uri, true) } returns UsageImportResult.InvalidFormat
 
         val events = mutableListOf<UsageExportUiEvent>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.event.toList(events)
-        }
+        val job = recordEmissions(viewModel.event, into = events)
 
         // Act
         viewModel.importFromFile(uri, true)
         advanceUntilIdle()
 
         // Assert
-        Assert.assertEquals(UsageExportUiEvent.InvalidFormat, events.first())
+        assertThat(events.first()).isEqualTo(UsageExportUiEvent.InvalidFormat)
         job.cancel()
     }
 
@@ -143,9 +133,7 @@ class UsageExportViewModelTest {
         coEvery { importUseCase(uri, false) } returns UsageImportResult.UnsupportedVersion("9.0")
 
         val events = mutableListOf<UsageExportUiEvent>()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.event.toList(events)
-        }
+        val job = recordEmissions(viewModel.event, into = events)
 
         // Act
         viewModel.importFromFile(uri, false)
@@ -153,7 +141,7 @@ class UsageExportViewModelTest {
 
         // Assert
         val event = events.first() as UsageExportUiEvent.UnsupportedVersion
-        Assert.assertEquals("9.0", event.version)
+        assertThat(event.version).isEqualTo("9.0")
         job.cancel()
     }
 
@@ -170,6 +158,6 @@ class UsageExportViewModelTest {
         advanceUntilIdle()
 
         // Am Ende muss loading wieder aus sein
-        Assert.assertTrue(viewModel.isLoading.value == false)
+        assertThat(viewModel.isLoading.value == false).isTrue()
     }
 }

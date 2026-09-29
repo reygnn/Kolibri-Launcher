@@ -6,18 +6,17 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppEnumerator
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.AppLoad
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 
@@ -35,7 +34,7 @@ import org.junit.Test
  * `processResolveInfoList` PackageManager path is gone; enumeration is now the
  * enumerator's job, so those cases live in [LauncherAppsEnumeratorTest]).
  *
- * Single dispatcher via [MainDispatcherRuleBase] (convention: one dispatcher
+ * Single dispatcher via [MainDispatcherRule] (convention: one dispatcher
  * source, passed to both `runTest` and the code under test). The dispatcher backs
  * the motor's own sharing scope, so `WhileSubscribed` + `debounce` run on virtual
  * time.
@@ -44,7 +43,7 @@ import org.junit.Test
 class InstalledAppsRepositoryImplTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     @get:Rule
     val timberRule = TimberRule()
@@ -120,12 +119,12 @@ class InstalledAppsRepositoryImplTest {
             val trigger = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
 
             repository(MutableSharedFlow(extraBufferCapacity = 16)).reloadTriggers(trigger).test {
-                Assert.assertEquals(Unit, awaitItem())
+                assertThat(awaitItem()).isEqualTo(Unit)
                 // DBNC-INV-1: the priming emit lands at virtual t=0 — NOT after the
                 // debounce window. The value alone is not enough (runTest auto-advances
                 // the clock while parked on awaitItem, so a delayed-priming regression
                 // would still deliver Unit); the clock assertion is the actual guard.
-                Assert.assertEquals(0L, testScheduler.currentTime)
+                assertThat(testScheduler.currentTime).isEqualTo(0L)
                 expectNoEvents()
                 cancelAndIgnoreRemainingEvents()
             }
@@ -137,7 +136,7 @@ class InstalledAppsRepositoryImplTest {
             val trigger = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
 
             repository(MutableSharedFlow(extraBufferCapacity = 16)).reloadTriggers(trigger).test {
-                Assert.assertEquals("priming", Unit, awaitItem())
+                assertWithMessage("priming").that(awaitItem()).isEqualTo(Unit)
 
                 // A burst within the window: nothing until the quiet period elapses.
                 repeat(5) { trigger.emit(Unit) }
@@ -145,7 +144,7 @@ class InstalledAppsRepositoryImplTest {
 
                 // DBNC-INV-4: exactly one reload after the window.
                 advanceTimeBy(AppConstants.APP_RELOAD_DEBOUNCE_MS + 1)
-                Assert.assertEquals("one coalesced reload", Unit, awaitItem())
+                assertWithMessage("one coalesced reload").that(awaitItem()).isEqualTo(Unit)
                 expectNoEvents()
 
                 cancelAndIgnoreRemainingEvents()

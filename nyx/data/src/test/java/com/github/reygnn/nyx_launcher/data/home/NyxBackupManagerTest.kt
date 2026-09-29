@@ -26,7 +26,7 @@ import com.github.reygnn.nyx_launcher.home.model.CellPos
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -96,12 +96,12 @@ class NyxBackupManagerTest {
     private val manager = NyxBackupManager(
         homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
         wallpaperRepository, fabPositionStore, fileManager, NyxBackupSerializer(),
-        reconcileHomeLayout, mainDispatcherRule.dispatcher,
+        reconcileHomeLayout, mainDispatcherRule.testDispatcher,
     )
 
 
     @Test
-    fun export_then_import_restores_layout_and_prefs() = runTest(mainDispatcherRule.dispatcher) {
+    fun export_then_import_restores_layout_and_prefs() = runTest(mainDispatcherRule.testDispatcher) {
         val out = ByteArrayOutputStream()
         assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 42L)).isTrue()
 
@@ -126,7 +126,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun export_then_import_restores_drawer_folders() = runTest(mainDispatcherRule.dispatcher) {
+    fun export_then_import_restores_drawer_folders() = runTest(mainDispatcherRule.testDispatcher) {
         drawerFoldersRepository.update {
             DrawerFolders(
                 listOf(
@@ -153,7 +153,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_sanitizes_malformed_drawer_folders_before_persisting() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_sanitizes_malformed_drawer_folders_before_persisting() = runTest(mainDispatcherRule.testDispatcher) {
         // §Audit-2 N10: a crafted / cross-device backup can carry a sub-two-member folder; the
         // restore must repair it (drop it here) rather than persist a malformed folder that only
         // heals at read time. Mirrors the home layout's post-restore reconcile.
@@ -170,7 +170,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.dispatcher) {
+    fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.testDispatcher) {
         hiddenAppsRepository.update { setOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")) }
         val out = ByteArrayOutputStream()
         assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
@@ -185,7 +185,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_with_null_hidden_apps_leaves_current_set_intact() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_with_null_hidden_apps_leaves_current_set_intact() = runTest(mainDispatcherRule.testDispatcher) {
         // An older backup carries no hiddenApps field (null); restore must not clear the current set.
         hiddenAppsRepository.update { setOf(ComponentKey("com.keep", "com.keep.M")) }
         val backup = NyxBackup(timestamp = 1L, appVersion = "old", hiddenApps = null)
@@ -203,13 +203,13 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun malformed_zip_returns_invalid_data() = runTest(mainDispatcherRule.dispatcher) {
+    fun malformed_zip_returns_invalid_data() = runTest(mainDispatcherRule.testDispatcher) {
         val result = manager.import(ByteArrayInputStream("not a zip".toByteArray()), NyxBackupOptions())
         assertThat(result).isEqualTo(com.github.reygnn.nyx_launcher.home.model.ImportResult.InvalidData)
     }
 
     @Test
-    fun import_rejects_an_archive_with_too_many_wallpaper_blobs() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_rejects_an_archive_with_too_many_wallpaper_blobs() = runTest(mainDispatcherRule.testDispatcher) {
         // Count cap (MAX_BLOB_ENTRIES = 64): a real backup has one blob per layer; an archive
         // spamming the wallpaper dir with far more entries is rejected before it can.
         every { fileManager.copyFromInputStream(any()) } returns null // extraction result irrelevant here
@@ -219,7 +219,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_rejects_a_blob_larger_than_the_per_blob_cap() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_rejects_a_blob_larger_than_the_per_blob_cap() = runTest(mainDispatcherRule.testDispatcher) {
         // Per-blob decompressed cap (MAX_BLOB_BYTES = 10 MiB): drain the stream like the real
         // copyFromInputStream so the per-blob CappedInputStream counts the bytes; an 11 MiB blob
         // (compresses tiny, so the whole-archive cap is untouched) trips the cap → InvalidData.
@@ -240,7 +240,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_rejects_an_archive_exceeding_the_whole_archive_cap() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_rejects_an_archive_exceeding_the_whole_archive_cap() = runTest(mainDispatcherRule.testDispatcher) {
         // §Audit-2 N5: the whole-archive cap bounds the total COMPRESSED bytes ZipInputStream may
         // pull — including the closeEntry skip of a non-wallpaper padding entry. WITHOUT the cap
         // the padding is skipped and the (valid) manifest imports fine; WITH it the archive is
@@ -260,7 +260,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun options_gate_selective_import() = runTest(mainDispatcherRule.dispatcher) {
+    fun options_gate_selective_import() = runTest(mainDispatcherRule.testDispatcher) {
         val out = ByteArrayOutputStream()
         manager.export(out, "v", 0L)
 
@@ -274,7 +274,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_saves_the_layout_then_reconciles_it() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_saves_the_layout_then_reconciles_it() = runTest(mainDispatcherRule.testDispatcher) {
         // A restored layout must be reconciled AFTER it lands, not before: reconcile()
         // is a structural-only cleanup of what was just saved (dedup keys, 0-1 folders,
         // over-capacity dock). Order is the contract, so a cross-device backup renders
@@ -290,7 +290,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_does_not_reconcile_when_layout_import_is_off() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_does_not_reconcile_when_layout_import_is_off() = runTest(mainDispatcherRule.testDispatcher) {
         // reconcile() is scoped to the layout restore; with importLayout=false the layout is
         // never saved, so there is nothing to reconcile — it must not run.
         val backup = NyxBackup(layout = layout.toDto())
@@ -327,7 +327,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_restores_blob_backed_wallpaper_layers() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_restores_blob_backed_wallpaper_layers() = runTest(mainDispatcherRule.testDispatcher) {
         // Uri is mocked (not parsed) — restoreWallpaper only stores its toString().
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
@@ -343,7 +343,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_drops_layers_whose_blob_failed_to_extract() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_drops_layers_whose_blob_failed_to_extract() = runTest(mainDispatcherRule.testDispatcher) {
         // Two layers; the first blob extracts, the second copy returns null → dropped.
         val ok = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns ok andThen null
@@ -366,7 +366,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_keeps_current_wallpaper_when_every_blob_fails() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_keeps_current_wallpaper_when_every_blob_fails() = runTest(mainDispatcherRule.testDispatcher) {
         every { fileManager.copyFromInputStream(any()) } returns null // corrupt backup: nothing extracts
         val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
         manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
@@ -378,7 +378,7 @@ class NyxBackupManagerTest {
     // ---- §Audit-3 A3-05: extracted blobs never outlive a failed / partial import ----
 
     @Test
-    fun import_deletes_extracted_blobs_when_the_manifest_is_invalid() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_deletes_extracted_blobs_when_the_manifest_is_invalid() = runTest(mainDispatcherRule.testDispatcher) {
         // Blobs are extracted BEFORE the manifest is parsed; a garbage manifest aborts the import
         // and must not leave the already-extracted blob orphaned in internal storage.
         val uri = mockk<Uri>()
@@ -401,7 +401,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_deletes_a_blob_that_no_restored_layer_references() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_deletes_a_blob_that_no_restored_layer_references() = runTest(mainDispatcherRule.testDispatcher) {
         // Two blobs extracted, but the manifest only references layer_0 → layer_1 is garbage.
         val used = mockk<Uri>()
         val stray = mockk<Uri>()
@@ -421,7 +421,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_keeps_restored_blobs_when_a_later_step_fails() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_keeps_restored_blobs_when_a_later_step_fails() = runTest(mainDispatcherRule.testDispatcher) {
         // The wallpaper state is saved (and so references the blob) before the layout step; a
         // failure AFTER that save must not delete a file the persisted wallpaper now points at.
         val uri = mockk<Uri>()
@@ -437,7 +437,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_keeps_claimed_blobs_when_the_wallpaper_save_is_interrupted() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_keeps_claimed_blobs_when_the_wallpaper_save_is_interrupted() = runTest(mainDispatcherRule.testDispatcher) {
         // The blobs are claimed BEFORE the save: DataStore can commit the write and the call still
         // end in a CancellationException (import runs in the settings screen's lifecycleScope).
         // Deleting then would break the persisted wallpaper, so an interrupted save keeps them
@@ -455,13 +455,13 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_with_empty_wallpaper_layers_clears_the_current_wallpaper() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_with_empty_wallpaper_layers_clears_the_current_wallpaper() = runTest(mainDispatcherRule.testDispatcher) {
         manager.import(ByteArrayInputStream(zipOf(NyxBackup(wallpaperLayers = emptyList()))), NyxBackupOptions())
         coVerify { wallpaperRepository.saveWallpaperState(WallpaperState.NONE) }
     }
 
     @Test
-    fun import_skips_wallpaper_when_option_off_even_with_layers() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_skips_wallpaper_when_option_off_even_with_layers() = runTest(mainDispatcherRule.testDispatcher) {
         val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
         manager.import(
             ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))),
@@ -472,7 +472,7 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_skips_unknown_enum_pref_names_without_failing() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_skips_unknown_enum_pref_names_without_failing() = runTest(mainDispatcherRule.testDispatcher) {
         val backup = NyxBackup(
             prefs = NyxBackupPrefs(
                 monochromeIcons = true,
@@ -491,7 +491,7 @@ class NyxBackupManagerTest {
 
     @Test
     fun import_leaves_the_home_layout_untouched_when_a_settings_write_fails() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest(mainDispatcherRule.testDispatcher) {
             // Settings are applied before the layout write; a mid-import settings failure
             // must not have already replaced the existing home layout (layout is last).
             coEvery { preferences.setIconStyle(any()) } throws java.io.IOException("disk full")

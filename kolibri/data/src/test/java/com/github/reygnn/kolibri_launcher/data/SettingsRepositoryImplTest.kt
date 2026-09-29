@@ -15,6 +15,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
 import junit.framework.TestCase.assertEquals
@@ -25,12 +27,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class SettingsRepositoryImplTest {
@@ -59,21 +59,21 @@ class SettingsRepositoryImplTest {
 
     @Test
     fun `sortOrderFlow - when no value is set - returns default value`() = runTest {
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     @Test
     fun `sortOrderFlow - when a value is set - returns that value`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = SortOrder.ALPHABETICAL.name }
 
-        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.ALPHABETICAL)
     }
 
     @Test
     fun `sortOrderFlow - when invalid value is stored - returns default value`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = "INVALID_ENUM_VALUE" }
 
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     @Test
@@ -81,7 +81,7 @@ class SettingsRepositoryImplTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
 
         val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
-        Assert.assertEquals(SortOrder.ALPHABETICAL.name, savedValue)
+        assertThat(savedValue).isEqualTo(SortOrder.ALPHABETICAL.name)
     }
 
     private val FAVORITES_ALIGNMENT_KEY = stringPreferencesKey("favorites_alignment")
@@ -90,10 +90,7 @@ class SettingsRepositoryImplTest {
     fun `favoritesAlignmentFlow - when invalid value is stored - returns default`() = runTest {
         fakeDataStore.edit { it[FAVORITES_ALIGNMENT_KEY] = "INVALID_ALIGNMENT_VALUE" }
 
-        Assert.assertEquals(
-            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
-            settingsManager.favoritesAlignmentFlow.first(),
-        )
+        assertThat(settingsManager.favoritesAlignmentFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 
     @Test
@@ -101,7 +98,7 @@ class SettingsRepositoryImplTest {
         settingsManager.setFavoritesAlignment(FavoritesAlignment.CENTER)
 
         val savedValue = fakeDataStore.data.first()[FAVORITES_ALIGNMENT_KEY]
-        Assert.assertEquals(FavoritesAlignment.CENTER.name, savedValue)
+        assertThat(savedValue).isEqualTo(FavoritesAlignment.CENTER.name)
     }
 
     @Test
@@ -114,17 +111,17 @@ class SettingsRepositoryImplTest {
         settingsManager.setOnboardingCompleted()
 
         val savedValue = fakeDataStore.data.first()[ONBOARDING_COMPLETED]
-        assertTrue(savedValue ?: false)
+        assertThat(savedValue ?: false).isTrue()
     }
 
     @Test
     fun `flows - emit new values when they are changed`() = runTest {
         settingsManager.sortOrderFlow.test {
-            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            assertThat(awaitItem()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
 
             settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
 
-            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+            assertThat(awaitItem()).isEqualTo(SortOrder.ALPHABETICAL)
         }
     }
 
@@ -137,7 +134,7 @@ class SettingsRepositoryImplTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
 
         val savedValue = fakeDataStore.data.first()[SORT_ORDER_KEY]
-        assertTrue(savedValue == null || savedValue != SortOrder.ALPHABETICAL.name)
+        assertThat(savedValue == null || savedValue != SortOrder.ALPHABETICAL.name).isTrue()
     }
 
     @Test
@@ -171,7 +168,7 @@ class SettingsRepositoryImplTest {
     fun `sortOrderFlow - when DataStore read fails - returns default value`() = runTest {
         fakeDataStore.makeReadFail()
 
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     @Test
@@ -184,13 +181,13 @@ class SettingsRepositoryImplTest {
     @Test
     fun `setSortOrder - called multiple times - all values are saved`() = runTest {
         settingsManager.sortOrderFlow.test {
-            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            assertThat(awaitItem()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
 
             settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
-            Assert.assertEquals(SortOrder.ALPHABETICAL, awaitItem())
+            assertThat(awaitItem()).isEqualTo(SortOrder.ALPHABETICAL)
 
             settingsManager.setSortOrder(SortOrder.TIME_WEIGHTED_USAGE)
-            Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, awaitItem())
+            assertThat(awaitItem()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
         }
     }
 
@@ -199,20 +196,20 @@ class SettingsRepositoryImplTest {
         settingsManager.setSortOrder(SortOrder.ALPHABETICAL)
         settingsManager.setOnboardingCompleted()
 
-        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
-        assertTrue(settingsManager.onboardingCompletedFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.ALPHABETICAL)
+        assertThat(settingsManager.onboardingCompletedFlow.first()).isTrue()
     }
 
     @Test
     fun `sortOrderFlow - with corrupted data - returns default`() = runTest {
         fakeDataStore.edit { it[SORT_ORDER_KEY] = "" }
 
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     @Test
     fun `sortOrderFlow - with null value - returns default`() = runTest {
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     // ========== SHOW ALARM TESTS ==========
@@ -231,7 +228,7 @@ class SettingsRepositoryImplTest {
     @Test
     fun `showAlarmFlow - when value is set to true - returns true`() = runTest {
         fakeDataStore.edit { it[SHOW_ALARM] = true }
-        assertTrue(settingsManager.showAlarmFlow.first())
+        assertThat(settingsManager.showAlarmFlow.first()).isTrue()
     }
 
     @Test
@@ -243,7 +240,7 @@ class SettingsRepositoryImplTest {
     @Test
     fun `setShowAlarm - correctly saves true`() = runTest {
         settingsManager.setShowAlarm(true)
-        assertTrue(fakeDataStore.data.first()[SHOW_ALARM] ?: false)
+        assertThat(fakeDataStore.data.first()[SHOW_ALARM] ?: false).isTrue()
     }
 
     @Test
@@ -268,36 +265,36 @@ class SettingsRepositoryImplTest {
     @Test
     fun `showAlarmFlow - emits new values when changed`() = runTest {
         settingsManager.showAlarmFlow.test {
-            Assert.assertEquals(false, awaitItem())
+            assertThat(awaitItem()).isEqualTo(false)
             settingsManager.setShowAlarm(true)
-            Assert.assertEquals(true, awaitItem())
+            assertThat(awaitItem()).isEqualTo(true)
             settingsManager.setShowAlarm(false)
-            Assert.assertEquals(false, awaitItem())
+            assertThat(awaitItem()).isEqualTo(false)
         }
     }
 
     @Test
     fun `setShowAlarm - toggling multiple times - works correctly`() = runTest {
         settingsManager.showAlarmFlow.test {
-            Assert.assertEquals(false, awaitItem())
+            assertThat(awaitItem()).isEqualTo(false)
             settingsManager.setShowAlarm(true)
-            Assert.assertEquals(true, awaitItem())
+            assertThat(awaitItem()).isEqualTo(true)
             settingsManager.setShowAlarm(false)
-            Assert.assertEquals(false, awaitItem())
+            assertThat(awaitItem()).isEqualTo(false)
             settingsManager.setShowAlarm(true)
-            Assert.assertEquals(true, awaitItem())
+            assertThat(awaitItem()).isEqualTo(true)
         }
     }
 
     @Test
     fun `showAlarmFlow - independent from showCalendarEventFlow`() = runTest {
         settingsManager.setShowCalendarEvent(true)
-        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertThat(settingsManager.showCalendarEventFlow.first()).isTrue()
         assertFalse(settingsManager.showAlarmFlow.first())
 
         settingsManager.setShowAlarm(true)
-        assertTrue(settingsManager.showAlarmFlow.first())
-        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertThat(settingsManager.showAlarmFlow.first()).isTrue()
+        assertThat(settingsManager.showCalendarEventFlow.first()).isTrue()
     }
 
     @Test
@@ -306,8 +303,8 @@ class SettingsRepositoryImplTest {
         settingsManager.setShowCalendarEvent(true)
         settingsManager.setShowAlarm(false)
 
-        Assert.assertEquals(SortOrder.ALPHABETICAL, settingsManager.sortOrderFlow.first())
-        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.ALPHABETICAL)
+        assertThat(settingsManager.showCalendarEventFlow.first()).isTrue()
         assertFalse(settingsManager.showAlarmFlow.first())
     }
 
@@ -317,36 +314,36 @@ class SettingsRepositoryImplTest {
     fun `autoShowKeyboardFlow - defaults to false and updates correctly`() = runTest {
         assertFalse(settingsManager.autoShowKeyboardFlow.first())
         settingsManager.setAutoShowKeyboard(true)
-        assertTrue(settingsManager.autoShowKeyboardFlow.first())
+        assertThat(settingsManager.autoShowKeyboardFlow.first()).isTrue()
     }
 
     @Test
     fun `autoLaunchAppFlow - defaults to false and updates correctly`() = runTest {
         assertFalse(settingsManager.autoLaunchAppFlow.first())
         settingsManager.setAutoLaunchApp(true)
-        assertTrue(settingsManager.autoLaunchAppFlow.first())
+        assertThat(settingsManager.autoLaunchAppFlow.first()).isTrue()
     }
 
     // ========== THEME & APPEARANCE TESTS ==========
 
     @Test
     fun `textShadowEnabledFlow - defaults to TRUE and updates correctly`() = runTest {
-        assertTrue(settingsManager.textShadowEnabledFlow.first(), "Default should be true")
+        assertWithMessage("Default should be true").that(settingsManager.textShadowEnabledFlow.first()).isTrue()
         settingsManager.setTextShadowEnabled(false)
         assertFalse(settingsManager.textShadowEnabledFlow.first())
     }
 
     @Test
     fun `textColorFlow - defaults to 0 and updates correctly`() = runTest {
-        Assert.assertEquals(0, settingsManager.textColorFlow.first())
+        assertThat(settingsManager.textColorFlow.first()).isEqualTo(0)
         settingsManager.setTextColor(-16777216)
-        Assert.assertEquals(-16777216, settingsManager.textColorFlow.first())
+        assertThat(settingsManager.textColorFlow.first()).isEqualTo(-16777216)
     }
 
     @Test
     fun `isFontBoldStateFlow - updates correctly`() = runTest {
         settingsManager.setFontBold(true)
-        assertTrue(settingsManager.isFontBoldStateFlow.first())
+        assertThat(settingsManager.isFontBoldStateFlow.first()).isTrue()
         settingsManager.setFontBold(false)
         assertFalse(settingsManager.isFontBoldStateFlow.first())
     }
@@ -357,9 +354,9 @@ class SettingsRepositoryImplTest {
         settingsManager.setVerticalPadding(2.0f)
         settingsManager.setContentTopMarginScale(0.5f)
 
-        Assert.assertEquals(1.5f, settingsManager.layoutScaleStateFlow.first())
-        Assert.assertEquals(2.0f, settingsManager.verticalPaddingStateFlow.first())
-        Assert.assertEquals(0.5f, settingsManager.contentTopMarginScaleFlow.first())
+        assertThat(settingsManager.layoutScaleStateFlow.first()).isEqualTo(1.5f)
+        assertThat(settingsManager.verticalPaddingStateFlow.first()).isEqualTo(2.0f)
+        assertThat(settingsManager.contentTopMarginScaleFlow.first()).isEqualTo(0.5f)
     }
 
     // ========== HOME EVENT TESTS ==========
@@ -368,7 +365,7 @@ class SettingsRepositoryImplTest {
     fun `showCalendarEventFlow - defaults to false and updates correctly`() = runTest {
         assertFalse(settingsManager.showCalendarEventFlow.first())
         settingsManager.setShowCalendarEvent(true)
-        assertTrue(settingsManager.showCalendarEventFlow.first())
+        assertThat(settingsManager.showCalendarEventFlow.first()).isTrue()
     }
 
     // ========== PURGE TEST ==========
@@ -380,7 +377,7 @@ class SettingsRepositoryImplTest {
 
         settingsManager.purgeRepository()
 
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, settingsManager.sortOrderFlow.first())
+        assertThat(settingsManager.sortOrderFlow.first()).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
         assertFalse(settingsManager.showAlarmFlow.first())
     }
 
@@ -435,7 +432,7 @@ class SettingsRepositoryImplTest {
 
         val result = doomsdayManager.sortOrderFlow.first()
 
-        Assert.assertEquals(SortOrder.TIME_WEIGHTED_USAGE, result)
+        assertThat(result).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
     }
 
     @Test

@@ -8,11 +8,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.MenuContext
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,7 +55,7 @@ class AppContextMenuDialogFragmentRobolectricTest {
                 dialog.show(activity.supportFragmentManager, "test")
                 activity.supportFragmentManager.executePendingTransactions()
 
-                assertNotNull(activity.supportFragmentManager.findFragmentByTag("test"))
+                assertThat(activity.supportFragmentManager.findFragmentByTag("test")).isNotNull()
             }
         }
     }
@@ -101,10 +101,7 @@ class AppContextMenuDialogFragmentRobolectricTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 fm.executePendingTransactions()
 
-                assertNull(
-                    "Fragment must have dismissed itself cleanly, not crashed",
-                    fm.findFragmentByTag("menu")
-                )
+                assertWithMessage("Fragment must have dismissed itself cleanly, not crashed").that(fm.findFragmentByTag("menu")).isNull()
             }
         }
     }

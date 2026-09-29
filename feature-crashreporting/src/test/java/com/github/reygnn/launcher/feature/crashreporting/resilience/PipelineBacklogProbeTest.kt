@@ -1,11 +1,10 @@
 package com.github.reygnn.launcher.feature.crashreporting.resilience
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import java.io.File
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -33,9 +32,9 @@ class PipelineBacklogProbeTest {
 
         val backlog = probe.read()
 
-        assertEquals(2, backlog.approved)
-        assertEquals(1, backlog.unapproved)
-        assertEquals(1_000L, backlog.oldestMillis)
+        assertThat(backlog.approved).isEqualTo(2)
+        assertThat(backlog.unapproved).isEqualTo(1)
+        assertThat(backlog.oldestMillis).isEqualTo(1_000L)
     }
 
     @Test
@@ -44,9 +43,9 @@ class PipelineBacklogProbeTest {
 
         val backlog = probe.read()
 
-        assertEquals(0, backlog.approved)
-        assertEquals(0, backlog.unapproved)
-        assertNull(backlog.oldestMillis)
+        assertThat(backlog.approved).isEqualTo(0)
+        assertThat(backlog.unapproved).isEqualTo(0)
+        assertThat(backlog.oldestMillis).isNull()
     }
 
     @Test
@@ -58,8 +57,8 @@ class PipelineBacklogProbeTest {
 
         val backlog = probe.read()
 
-        assertEquals(0, backlog.approved)
-        assertEquals(0, backlog.unapproved)
-        assertNull(backlog.oldestMillis)
+        assertThat(backlog.approved).isEqualTo(0)
+        assertThat(backlog.unapproved).isEqualTo(0)
+        assertThat(backlog.oldestMillis).isNull()
     }
 }

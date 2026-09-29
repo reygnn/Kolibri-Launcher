@@ -10,17 +10,16 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlin.test.assertIs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 /**
  * Pins the provisional first-paint behaviour AFTER the ghost-free rule was dropped: while
@@ -70,19 +69,19 @@ class GetFavoriteAppsProvisionalMissingTest {
 
         useCase(resolver).favoriteApps.test {
             val state = awaitItem()
-            assertTrue(state is UiState.Success, "expected a provisional Success, not Loading")
+            assertIs<UiState.Success>(state, "expected a provisional Success, not Loading")
             val result = state.data
 
             // The gone favorite SURVIVES the provisional paint (not dropped) …
-            assertTrue(result.apps.any { it.componentName == ghost.flat })
+            assertThat(result.apps.any { it.componentName == ghost.flat }).isTrue()
             // … and is flagged missing (so the row renders greyed / tap offers removal) …
-            assertTrue(ghost.flat in result.missingComponents)
+            assertThat(ghost.flat in result.missingComponents).isTrue()
             // … while the installed favorite is present and NOT flagged.
-            assertTrue(result.apps.any { it.componentName == present.flat })
-            assertFalse(present.flat in result.missingComponents)
+            assertThat(result.apps.any { it.componentName == present.flat }).isTrue()
+            assertThat(present.flat in result.missingComponents).isFalse()
 
-            assertEquals(2, result.apps.size)
-            assertFalse(result.isFallback)
+            assertThat(result.apps.size).isEqualTo(2)
+            assertThat(result.isFallback).isFalse()
 
             cancelAndIgnoreRemainingEvents()
         }

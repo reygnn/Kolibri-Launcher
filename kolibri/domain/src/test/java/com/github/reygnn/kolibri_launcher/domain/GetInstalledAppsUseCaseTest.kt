@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepositor
 import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -17,7 +18,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 class GetInstalledAppsUseCaseTest {
@@ -55,7 +55,7 @@ class GetInstalledAppsUseCaseTest {
 
         useCase.unsortedInstalledAppsFlow.test {
             val result = awaitItem()
-            assertEquals(listOf("Zebra", "Apple"), result.map { it.displayName })
+            assertThat(result.map { it.displayName }).isEqualTo(listOf("Zebra", "Apple"))
             awaitComplete()
         }
 
@@ -68,7 +68,7 @@ class GetInstalledAppsUseCaseTest {
             flowOf(AppLoad.Failed(RuntimeException("boom")))
 
         useCase.unsortedInstalledAppsFlow.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             awaitComplete()
         }
     }

@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # The init-order gate (tools/check-init-order-launch.awk, driven by the
-# `initorder_files` positive list in each orchestrator) enforces only the files
+# `INITORDER_FILES` positive list in each tools/conventions/<app>.conf) enforces only the files
 # it lists — a regression lock on reviewed-clean files. This script is the
 # DISCOVERY half: it sweeps EVERY module's main source (shared modules included,
 # since the shared-code refactors move launch/init code between them) with the
@@ -23,7 +23,7 @@
 # HOW TO TRIAGE: open the file; if the init-launched coroutine can touch the
 # later-declared property (directly or via a method like clear()), it is a real
 # init-order race — move the state ABOVE the init block. Then add the file to
-# the relevant `initorder_files` list to lock it. If the launch provably cannot
+# the relevant `INITORDER_FILES` list to lock it. If the launch provably cannot
 # touch the later state, reorder anyway (harmless) or leave it and do not list.
 #
 # Run via `./gradlew scanInitOrderLaunch` or invoke this script directly.
@@ -73,7 +73,7 @@ printf '%s\n' "${rows[@]}" | sort -t$'\t' -k1,1nr | \
 echo
 echo " Triage: if the init-launched coroutine can reach the later property (e.g."
 echo " via a method it calls), it is a real init-order race — move the state ABOVE"
-echo " the init block, then add the file to the initorder_files list to lock it."
+echo " the init block, then add the file to the INITORDER_FILES list to lock it."
 echo " Detail per file:  awk -f tools/check-init-order-launch.awk <file>"
 echo "════════════════════════════════════════════════════════════════════════"
 exit 0

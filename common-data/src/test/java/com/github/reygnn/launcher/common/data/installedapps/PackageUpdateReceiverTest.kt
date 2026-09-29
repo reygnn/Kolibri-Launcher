@@ -5,17 +5,17 @@ import android.content.Intent
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.TimberRule
 import com.github.reygnn.launcher.core.PackageEvent
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import io.mockk.spyk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -25,7 +25,7 @@ import org.junit.Test
  * the ACTION filter, the `EXTRA_REPLACING` skip, and fail-safe onFinish. Ported from
  * Kolibri's retired receiver test when the receiver moved to `:common-data` (C3).
  *
- * Single dispatcher via [MainDispatcherRuleBase] (the shared receiver launches its
+ * Single dispatcher via [MainDispatcherRule] (the shared receiver launches its
  * processing coroutine on `Dispatchers.Main`); MockK for Context/Intent/Uri so no
  * device or Robolectric is needed.
  */
@@ -33,7 +33,7 @@ import org.junit.Test
 class PackageUpdateReceiverTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     @get:Rule
     val timberRule = TimberRule()
@@ -73,7 +73,7 @@ class PackageUpdateReceiverTest {
 
         receiver.handleReceive(context, intent) { finishCalled = true }
 
-        Assert.assertTrue("onFinish should be called for null action", finishCalled)
+        assertWithMessage("onFinish should be called for null action").that(finishCalled).isTrue()
     }
 
     @Test
@@ -83,7 +83,7 @@ class PackageUpdateReceiverTest {
 
         receiver.handleReceive(context, intent) { finishCalled = true }
 
-        Assert.assertTrue("onFinish should be called for irrelevant action", finishCalled)
+        assertWithMessage("onFinish should be called for irrelevant action").that(finishCalled).isTrue()
     }
 
     @Test
@@ -100,7 +100,7 @@ class PackageUpdateReceiverTest {
 
         advanceUntilIdle()
 
-        Assert.assertTrue("onFinish should be called after processing", finishCalled)
+        assertWithMessage("onFinish should be called after processing").that(finishCalled).isTrue()
     }
 
     @Test
@@ -110,7 +110,7 @@ class PackageUpdateReceiverTest {
 
         receiver.handleReceive(context, intent) { finishCalled = true }
 
-        Assert.assertTrue("onFinish should be called even on critical error", finishCalled)
+        assertWithMessage("onFinish should be called even on critical error").that(finishCalled).isTrue()
     }
 
     @Test
@@ -129,7 +129,7 @@ class PackageUpdateReceiverTest {
 
         advanceUntilIdle()
 
-        Assert.assertTrue(finishCalled)
+        assertThat(finishCalled).isTrue()
     }
 
     @Test
@@ -151,37 +151,25 @@ class PackageUpdateReceiverTest {
         // fired no reconcile signal — the paired PACKAGE_ADDED handles the refresh.
         receiver.handleReceive(context, intent) { finishCalled = true }
 
-        Assert.assertTrue(
-            "replace-removal should finish immediately without launching processing",
-            finishCalled,
-        )
+        assertWithMessage("replace-removal should finish immediately without launching processing").that(finishCalled).isTrue()
     }
 
     // ========== Intent -> PackageEvent mapping ==========
 
     @Test
     fun `mapToPackageEvent - PACKAGE_ADDED maps to Added`() {
-        Assert.assertEquals(
-            PackageEvent.Added("com.example"),
-            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_ADDED, "com.example"),
-        )
+        assertThat(receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_ADDED, "com.example")).isEqualTo(PackageEvent.Added("com.example"))
     }
 
     @Test
     fun `mapToPackageEvent - PACKAGE_REMOVED maps to Removed`() {
-        Assert.assertEquals(
-            PackageEvent.Removed("com.example"),
-            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_REMOVED, "com.example"),
-        )
+        assertThat(receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_REMOVED, "com.example")).isEqualTo(PackageEvent.Removed("com.example"))
     }
 
     // AUDIT-19 F5: enable/disable of an app or launcher component is now reactive.
     @Test
     fun `mapToPackageEvent - PACKAGE_CHANGED maps to Changed`() {
-        Assert.assertEquals(
-            PackageEvent.Changed("com.example"),
-            receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_CHANGED, "com.example"),
-        )
+        assertThat(receiver.mapToPackageEvent(Intent.ACTION_PACKAGE_CHANGED, "com.example")).isEqualTo(PackageEvent.Changed("com.example"))
     }
 
     @Test
@@ -198,6 +186,6 @@ class PackageUpdateReceiverTest {
 
         advanceUntilIdle()
 
-        Assert.assertTrue(finishCalled)
+        assertThat(finishCalled).isTrue()
     }
 }

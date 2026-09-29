@@ -9,7 +9,7 @@
 # favorites to sort", "which app to launch" — that is a real bug (the swipe
 # regression f1a1464c, then the two favorites UI consumers in AUDIT-13).
 #
-# POSITIVE LIST OF FILES, exactly like `cancel_files` / `oom_files`. This gate is
+# POSITIVE LIST OF FILES, exactly like `CANCEL_FILES` / `OOM_FILES`. This gate is
 # BLIND by design to any file not in `stale_files`: it verifies only the reviewed
 # files that legitimately point-read a hot flow. Enforcement on them is the same
 # shape as the sibling gates — every hot-flow point-read in a listed file must

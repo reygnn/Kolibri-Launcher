@@ -7,11 +7,11 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import androidx.test.core.app.ActivityScenario
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,20 +66,15 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
 
                 // Pre-restore scale is the default 1.0. Old ceiling would be
                 // maxOf(MAX_SCALE=5, maxOf(base=0.1, current=1.0) * 3) = 5.
-                assertEquals(1.0f, view.currentScale, 0.0001f)
+                assertThat(view.currentScale).isWithin(0.0001f).of(1.0f)
 
                 // Restore a zoom of 8x — reachable interactively because the
                 // ceiling grows with the current scale (5 → 15 → …), so 8x is
                 // a legitimately persisted state.
                 view.applyTransform(8.0f, 0f, 0f)
 
-                assertEquals(
-                    "Restored zoom must be honored, not clamped to MAX_SCALE (5x). " +
-                        "The bounds must reference the restored scale, not the stale pre-restore one.",
-                    8.0f,
-                    view.currentScale,
-                    0.0001f,
-                )
+                assertWithMessage("Restored zoom must be honored, not clamped to MAX_SCALE (5x). " +
+                        "The bounds must reference the restored scale, not the stale pre-restore one.").that(view.currentScale).isWithin(0.0001f).of(8.0f)
             }
         }
     }
@@ -94,9 +89,9 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
 
                 view.applyTransform(3.0f, 12f, -7f)
 
-                assertEquals(3.0f, view.currentScale, 0.0001f)
-                assertEquals(12f, view.currentTranslateX, 0.0001f)
-                assertEquals(-7f, view.currentTranslateY, 0.0001f)
+                assertThat(view.currentScale).isWithin(0.0001f).of(3.0f)
+                assertThat(view.currentTranslateX).isWithin(0.0001f).of(12f)
+                assertThat(view.currentTranslateY).isWithin(0.0001f).of(-7f)
             }
         }
     }
@@ -124,13 +119,8 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
 
                     view.applyTransform(corrupt, 0f, 0f)
 
-                    assertEquals(
-                        "Corrupt persisted scale $corrupt must fall back to DEFAULT_SCALE (1.0), " +
-                            "not propagate into the image matrix.",
-                        1.0f,
-                        view.currentScale,
-                        0.0001f,
-                    )
+                    assertWithMessage("Corrupt persisted scale $corrupt must fall back to DEFAULT_SCALE (1.0), " +
+                            "not propagate into the image matrix.").that(view.currentScale).isWithin(0.0001f).of(1.0f)
                 }
             }
         }
@@ -160,15 +150,9 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
                     view.applyTransform(2.0f, corrupt, corrupt)
 
                     // Scale is valid and honored; only the translate is sanitized.
-                    assertEquals(2.0f, view.currentScale, 0.0001f)
-                    assertEquals(
-                        "Corrupt translateX $corrupt must fall back to 0, not reach the matrix.",
-                        0f, view.currentTranslateX, 0.0001f,
-                    )
-                    assertEquals(
-                        "Corrupt translateY $corrupt must fall back to 0, not reach the matrix.",
-                        0f, view.currentTranslateY, 0.0001f,
-                    )
+                    assertThat(view.currentScale).isWithin(0.0001f).of(2.0f)
+                    assertWithMessage("Corrupt translateX $corrupt must fall back to 0, not reach the matrix.").that(view.currentTranslateX).isWithin(0.0001f).of(0f)
+                    assertWithMessage("Corrupt translateY $corrupt must fall back to 0, not reach the matrix.").that(view.currentTranslateY).isWithin(0.0001f).of(0f)
                 }
             }
         }
@@ -190,19 +174,16 @@ class ZoomableImageViewRestoreScaleRobolectricTest {
                 // A real bitmap layer becomes the active layer -> multi-layer mode.
                 val bitmap = Bitmap.createBitmap(1000, 1000, Bitmap.Config.ARGB_8888)
                 view.addLayer(bitmap)
-                assertTrue("addLayer must enter multi-layer mode", view.isMultiLayerMode)
+                assertWithMessage("addLayer must enter multi-layer mode").that(view.isMultiLayerMode).isTrue()
 
                 // Corrupt scale: coerceIn would keep NaN; must become finite/positive.
                 view.applyTransform(Float.NaN, 0f, 0f)
-                assertTrue(
-                    "Corrupt multi-layer scale must not survive as non-finite",
-                    view.currentScale.isFinite() && view.currentScale > 0f,
-                )
+                assertWithMessage("Corrupt multi-layer scale must not survive as non-finite").that(view.currentScale.isFinite() && view.currentScale > 0f).isTrue()
 
                 // Corrupt translate on the active layer: must fall back to 0.
                 view.applyTransform(1.0f, Float.NaN, Float.POSITIVE_INFINITY)
-                assertEquals(0f, view.currentTranslateX, 0.0001f)
-                assertEquals(0f, view.currentTranslateY, 0.0001f)
+                assertThat(view.currentTranslateX).isWithin(0.0001f).of(0f)
+                assertThat(view.currentTranslateY).isWithin(0.0001f).of(0f)
             }
         }
     }

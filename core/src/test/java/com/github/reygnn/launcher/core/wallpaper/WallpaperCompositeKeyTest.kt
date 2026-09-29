@@ -2,9 +2,8 @@ package com.github.reygnn.launcher.core.wallpaper
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import java.lang.reflect.Modifier
 
@@ -47,12 +46,12 @@ class WallpaperCompositeKeyTest {
     fun `identical content and dimensions produce an identical key`() {
         val a = state(layer(), layer(imageUri = "file:///2.jpg"))
         val b = state(layer(), layer(imageUri = "file:///2.jpg"))
-        assertEquals(key(a), key(b))
+        assertThat(key(b)).isEqualTo(key(a))
     }
 
     @Test
     fun `the key carries the composite scheme`() {
-        assertTrue(key(state(layer())).startsWith(WallpaperCompositeKey.SCHEME))
+        assertThat(key(state(layer())).startsWith(WallpaperCompositeKey.SCHEME)).isTrue()
     }
 
     @Test
@@ -60,31 +59,31 @@ class WallpaperCompositeKeyTest {
         val base = state(layer())
         val baseKey = key(base)
         // Each single-field mutation must move the key.
-        assertNotEquals("imageUri", baseKey, key(state(layer(imageUri = "file:///other.jpg"))))
-        assertNotEquals("scale", baseKey, key(state(layer(scale = 1.5f))))
-        assertNotEquals("translateX", baseKey, key(state(layer(translateX = 10f))))
-        assertNotEquals("translateY", baseKey, key(state(layer(translateY = 10f))))
-        assertNotEquals("captureSampleSize", baseKey, key(state(layer(captureSampleSize = 2))))
+        assertWithMessage("imageUri").that(key(state(layer(imageUri = "file:///other.jpg")))).isNotEqualTo(baseKey)
+        assertWithMessage("scale").that(key(state(layer(scale = 1.5f)))).isNotEqualTo(baseKey)
+        assertWithMessage("translateX").that(key(state(layer(translateX = 10f)))).isNotEqualTo(baseKey)
+        assertWithMessage("translateY").that(key(state(layer(translateY = 10f)))).isNotEqualTo(baseKey)
+        assertWithMessage("captureSampleSize").that(key(state(layer(captureSampleSize = 2)))).isNotEqualTo(baseKey)
     }
 
     @Test
     fun `layer order is significant (z-order changes the composite)`() {
         val a = state(layer(imageUri = "file:///a.jpg"), layer(imageUri = "file:///b.jpg"))
         val b = state(layer(imageUri = "file:///b.jpg"), layer(imageUri = "file:///a.jpg"))
-        assertNotEquals(key(a), key(b))
+        assertThat(key(b)).isNotEqualTo(key(a))
     }
 
     @Test
     fun `render dimensions are part of the key (rotate or fold must miss)`() {
         val s = state(layer())
-        assertNotEquals("width", key(s, width = w), key(s, width = w + 1))
-        assertNotEquals("height", key(s, height = h), key(s, height = h + 1))
+        assertWithMessage("width").that(key(s, width = w + 1)).isNotEqualTo(key(s, width = w))
+        assertWithMessage("height").that(key(s, height = h + 1)).isNotEqualTo(key(s, height = h))
     }
 
     @Test
     fun `non-pixel field id does NOT change the key`() {
         val base = state(layer(id = "id-1"))
-        assertEquals("id", key(base), key(state(layer(id = "id-2"))))
+        assertWithMessage("id").that(key(state(layer(id = "id-2")))).isEqualTo(key(base))
     }
 
     /**
@@ -106,11 +105,8 @@ class WallpaperCompositeKeyTest {
             // NOT in the key (identity / UI only):
             "id",
         )
-        assertEquals(
-            "WallpaperLayerState fields changed. If the new/removed field affects rendered " +
+        assertWithMessage("WallpaperLayerState fields changed. If the new/removed field affects rendered " +
                 "pixels, update WallpaperCompositeKey.of AND this test; else add it to the " +
-                "non-pixel allow-list.",
-            expected, actual,
-        )
+                "non-pixel allow-list.").that(actual).isEqualTo(expected)
     }
 }

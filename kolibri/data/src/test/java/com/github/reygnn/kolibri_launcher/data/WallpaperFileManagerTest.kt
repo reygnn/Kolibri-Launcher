@@ -3,10 +3,10 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
 import android.net.Uri
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -63,8 +63,8 @@ class WallpaperFileManagerTest {
 
         manager.gcOrphans(referencedUris = setOf(Uri.fromFile(kept)))
 
-        assertTrue("referenced file must survive", kept.exists())
-        assertFalse("unreferenced file must be removed", orphan.exists())
+        assertWithMessage("referenced file must survive").that(kept.exists()).isTrue()
+        assertWithMessage("unreferenced file must be removed").that(orphan.exists()).isFalse()
     }
 
     @Test
@@ -74,8 +74,8 @@ class WallpaperFileManagerTest {
 
         manager.gcOrphans(referencedUris = emptySet())
 
-        assertFalse(o1.exists())
-        assertFalse(o2.exists())
+        assertThat(o1.exists()).isFalse()
+        assertThat(o2.exists()).isFalse()
     }
 
     @Test
@@ -88,9 +88,9 @@ class WallpaperFileManagerTest {
             referencedUris = setOf(Uri.fromFile(f1), Uri.fromFile(f2))
         )
 
-        assertTrue(f1.exists())
-        assertTrue(f2.exists())
-        assertFalse(orphan.exists())
+        assertThat(f1.exists()).isTrue()
+        assertThat(f2.exists()).isTrue()
+        assertThat(orphan.exists()).isFalse()
     }
 
     // ===========================================
@@ -106,10 +106,7 @@ class WallpaperFileManagerTest {
 
         manager.gcOrphans(referencedUris = emptySet())
 
-        assertTrue(
-            "file younger than minAgeMillis must survive GC even when not referenced",
-            young.exists()
-        )
+        assertWithMessage("file younger than minAgeMillis must survive GC even when not referenced").that(young.exists()).isTrue()
     }
 
     @Test
@@ -118,7 +115,7 @@ class WallpaperFileManagerTest {
 
         manager.gcOrphans(referencedUris = emptySet(), minAgeMillis = 1_000L)
 
-        assertFalse("with shrunk min age, file is now eligible for GC", young.exists())
+        assertWithMessage("with shrunk min age, file is now eligible for GC").that(young.exists()).isFalse()
     }
 
     @Test
@@ -131,8 +128,8 @@ class WallpaperFileManagerTest {
             minAgeMillis = 0L
         )
 
-        assertFalse(youngOrphan.exists())
-        assertTrue(kept.exists())
+        assertThat(youngOrphan.exists()).isFalse()
+        assertThat(kept.exists()).isTrue()
     }
 
     // ===========================================
@@ -153,21 +150,21 @@ class WallpaperFileManagerTest {
         manager.gcOrphans(referencedUris = setOf(contentUri))
 
         // content:// URI doesn't match file paths → orphan is still gone
-        assertFalse(orphan.exists())
+        assertThat(orphan.exists()).isFalse()
     }
 
     @Test
     fun `gcOrphans with empty wallpaper directory is a safe no-op`() {
         // Directory exists but is empty — must not crash.
         manager.gcOrphans(referencedUris = emptySet())
-        assertTrue(wallpaperDir.exists())
+        assertThat(wallpaperDir.exists()).isTrue()
     }
 
     @Test
     fun `gcOrphans is safe when wallpaper directory does not exist yet`() {
         // Force-remove the directory we created in setUp()
         wallpaperDir.deleteRecursively()
-        assertFalse(wallpaperDir.exists())
+        assertThat(wallpaperDir.exists()).isFalse()
 
         // Should NOT crash — just return silently.
         manager.gcOrphans(referencedUris = emptySet())
@@ -182,10 +179,7 @@ class WallpaperFileManagerTest {
 
         manager.gcOrphans(referencedUris = emptySet())
 
-        assertTrue(
-            "files outside wallpapers/ must never be touched by GC",
-            outsider.exists()
-        )
+        assertWithMessage("files outside wallpapers/ must never be touched by GC").that(outsider.exists()).isTrue()
     }
 
     // ===========================================
@@ -205,10 +199,10 @@ class WallpaperFileManagerTest {
     @Test
     fun `deleteFile removes an internal file`() {
         val f = createFileWithAge("wp_to_delete", ageMillis = 120_000L)
-        assertTrue(f.exists())
+        assertThat(f.exists()).isTrue()
 
         manager.deleteFile(Uri.fromFile(f))
 
-        assertFalse(f.exists())
+        assertThat(f.exists()).isFalse()
     }
 }

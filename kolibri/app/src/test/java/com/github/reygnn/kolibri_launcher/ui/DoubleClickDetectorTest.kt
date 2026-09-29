@@ -2,8 +2,8 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.DoubleClickDetector
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 
@@ -24,7 +24,7 @@ class DoubleClickDetectorTest {
     fun `first click never counts as double click`() {
         val detector = DoubleClickDetector(thresholdMillis = 300L, clock = clock)
         fakeTime = 1_000L
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
     }
 
     @Test
@@ -33,7 +33,7 @@ class DoubleClickDetectorTest {
         fakeTime = 1_000L
         detector.registerClick()
         fakeTime = 1_200L // 200ms später
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
     }
 
     @Test
@@ -42,7 +42,7 @@ class DoubleClickDetectorTest {
         fakeTime = 1_000L
         detector.registerClick()
         fakeTime = 1_400L // 400ms später
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
     }
 
     // ========== BOUNDARY ==========
@@ -54,7 +54,7 @@ class DoubleClickDetectorTest {
         fakeTime = 1_000L
         detector.registerClick()
         fakeTime = 1_300L // exakt am Limit
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
     }
 
     @Test
@@ -63,7 +63,7 @@ class DoubleClickDetectorTest {
         fakeTime = 1_000L
         detector.registerClick()
         fakeTime = 1_299L
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
     }
 
     // ========== SEQUENCE BEHAVIOR ==========
@@ -76,11 +76,11 @@ class DoubleClickDetectorTest {
 
         // zu spät -> kein DC, aber lastClickTime wird auf 2_000L gesetzt
         fakeTime = 2_000L
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
 
         // direkt danach -> DC
         fakeTime = 2_100L
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
     }
 
     @Test
@@ -92,11 +92,11 @@ class DoubleClickDetectorTest {
         // clock/date/battery double-tap.
         val detector = DoubleClickDetector(thresholdMillis = 300L, clock = clock)
         fakeTime = 1_000L
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
         fakeTime = 1_100L
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
         fakeTime = 1_200L
-        assertFalse("third rapid tap must NOT re-fire the double click", detector.registerClick())
+        assertWithMessage("third rapid tap must NOT re-fire the double click").that(detector.registerClick()).isFalse()
     }
 
     @Test
@@ -105,13 +105,13 @@ class DoubleClickDetectorTest {
         // tap4 completes the second pair. N rapid taps → floor(N/2) hits.
         val detector = DoubleClickDetector(thresholdMillis = 300L, clock = clock)
         fakeTime = 1_000L
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
         fakeTime = 1_100L
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
         fakeTime = 1_200L
-        assertFalse(detector.registerClick())
+        assertThat(detector.registerClick()).isFalse()
         fakeTime = 1_300L
-        assertTrue("fourth tap completes the second pair", detector.registerClick())
+        assertWithMessage("fourth tap completes the second pair").that(detector.registerClick()).isTrue()
     }
 
     // ========== DEFAULTS ==========
@@ -123,6 +123,6 @@ class DoubleClickDetectorTest {
         fakeTime = 1_000L
         detector.registerClick()
         fakeTime = 1_299L
-        assertTrue(detector.registerClick())
+        assertThat(detector.registerClick()).isTrue()
     }
 }

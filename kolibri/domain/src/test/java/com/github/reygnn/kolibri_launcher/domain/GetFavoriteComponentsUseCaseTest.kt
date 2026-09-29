@@ -4,6 +4,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.FavoritesEditRead
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteComponentsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.impl.annotations.MockK
@@ -13,9 +14,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetFavoriteComponentsUseCaseTest {
@@ -43,7 +42,7 @@ class GetFavoriteComponentsUseCaseTest {
         )
         coEvery { favoritesRepository.readFavoritesForEdit() } returns expected
 
-        assertEquals(expected, useCase())
+        assertThat(useCase()).isEqualTo(expected)
     }
 
     @Test
@@ -53,7 +52,7 @@ class GetFavoriteComponentsUseCaseTest {
         coEvery { favoritesRepository.readFavoritesForEdit() } returns
             FavoritesEditRead.Unavailable(IOException("read failed"))
 
-        assertTrue(useCase() is FavoritesEditRead.Unavailable)
+        assertThat(useCase()).isInstanceOf(FavoritesEditRead.Unavailable::class.java)
     }
 
     @Test
@@ -64,6 +63,6 @@ class GetFavoriteComponentsUseCaseTest {
         coEvery { favoritesRepository.readFavoritesForEdit() } throws expectedError
 
         val exception = assertFailsWith<RuntimeException> { useCase() }
-        assertEquals(expectedError.message, exception.message)
+        assertThat(exception.message).isEqualTo(expectedError.message)
     }
 }

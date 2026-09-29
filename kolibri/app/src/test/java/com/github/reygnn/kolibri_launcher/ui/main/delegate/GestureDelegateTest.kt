@@ -6,10 +6,11 @@ import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetRecentAppsUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.HandleSwipeActionUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -17,8 +18,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -74,8 +73,8 @@ class GestureDelegateTest {
         delegate.onSwipeDown()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.ShowRecentApps(recent), sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.ShowRecentApps(recent))
     }
 
     @Test
@@ -88,7 +87,7 @@ class GestureDelegateTest {
             delegate.onDoubleTap()
             advanceUntilIdle()
 
-            assertEquals(listOf(UiEvent.ShowTimeBasedEventsDialog(events)), sentEvents)
+            assertThat(sentEvents).isEqualTo(listOf(UiEvent.ShowTimeBasedEventsDialog(events)))
         }
 
     @Test
@@ -99,7 +98,7 @@ class GestureDelegateTest {
         delegate.onDoubleTap()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -112,8 +111,8 @@ class GestureDelegateTest {
         delegate.onDoubleTap()
         advanceUntilIdle()
 
-        assertEquals(2, sentEvents.size)
-        assertTrue(sentEvents.all { it is UiEvent.ShowTimeBasedEventsDialog })
+        assertThat(sentEvents.size).isEqualTo(2)
+        assertThat(sentEvents.all { it is UiEvent.ShowTimeBasedEventsDialog }).isTrue()
     }
 
     @Test
@@ -134,7 +133,7 @@ class GestureDelegateTest {
             delegate.onDoubleTap()
             advanceUntilIdle()
 
-            assertEquals(listOf(UiEvent.ShowTimeBasedEventsDialog(later)), sentEvents)
+            assertThat(sentEvents).isEqualTo(listOf(UiEvent.ShowTimeBasedEventsDialog(later)))
         }
 
     // ===========================================
@@ -148,8 +147,8 @@ class GestureDelegateTest {
         delegate.onFlingUp()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.ShowAppDrawer, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.ShowAppDrawer)
     }
 
     // ===========================================
@@ -167,10 +166,10 @@ class GestureDelegateTest {
         delegate.onSwipeFromRightToLeft()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
+        assertThat(sentEvents.size).isEqualTo(1)
         val event = sentEvents.first()
-        assertTrue(event is UiEvent.LaunchApp)
-        assertEquals(app, (event as UiEvent.LaunchApp).app)
+        assertThat(event).isInstanceOf(UiEvent.LaunchApp::class.java)
+        assertThat((event as UiEvent.LaunchApp).app).isEqualTo(app)
     }
 
     @Test
@@ -183,7 +182,7 @@ class GestureDelegateTest {
         delegate.onSwipeFromRightToLeft()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -199,10 +198,10 @@ class GestureDelegateTest {
         delegate.onSwipeFromRightToLeft()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
+        assertThat(sentEvents.size).isEqualTo(1)
         val event = sentEvents.first()
-        assertTrue(event is UiEvent.ShowToast)
-        assertEquals(R.string.swipe_app_not_installed, (event as UiEvent.ShowToast).messageResId)
+        assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
+        assertThat((event as UiEvent.ShowToast).messageResId).isEqualTo(R.string.swipe_app_not_installed)
     }
 
     @Test
@@ -214,7 +213,7 @@ class GestureDelegateTest {
         delegate.onSwipeFromRightToLeft()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -228,10 +227,10 @@ class GestureDelegateTest {
         delegate.onSwipeFromLeftToRight()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
+        assertThat(sentEvents.size).isEqualTo(1)
         val event = sentEvents.first()
-        assertTrue(event is UiEvent.LaunchApp)
-        assertEquals(app, (event as UiEvent.LaunchApp).app)
+        assertThat(event).isInstanceOf(UiEvent.LaunchApp::class.java)
+        assertThat((event as UiEvent.LaunchApp).app).isEqualTo(app)
     }
 
     @Test
@@ -244,7 +243,7 @@ class GestureDelegateTest {
         delegate.onSwipeFromLeftToRight()
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -260,10 +259,10 @@ class GestureDelegateTest {
         delegate.onSwipeFromLeftToRight()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
+        assertThat(sentEvents.size).isEqualTo(1)
         val event = sentEvents.first()
-        assertTrue(event is UiEvent.ShowToast)
-        assertEquals(R.string.swipe_app_not_installed, (event as UiEvent.ShowToast).messageResId)
+        assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
+        assertThat((event as UiEvent.ShowToast).messageResId).isEqualTo(R.string.swipe_app_not_installed)
     }
 
     // ===========================================
@@ -277,8 +276,8 @@ class GestureDelegateTest {
         delegate.onLongPress()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.ShowCustomizationOptions, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.ShowCustomizationOptions)
     }
 
     // ===========================================
@@ -292,8 +291,8 @@ class GestureDelegateTest {
         delegate.onTimeDoubleClick()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.OpenClock, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.OpenClock)
     }
 
     @Test
@@ -303,8 +302,8 @@ class GestureDelegateTest {
         delegate.onDateDoubleClick()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.OpenCalendar, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.OpenCalendar)
     }
 
     @Test
@@ -314,7 +313,7 @@ class GestureDelegateTest {
         delegate.onBatteryDoubleClick()
         advanceUntilIdle()
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.OpenBatterySettings, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.OpenBatterySettings)
     }
 }

@@ -1,10 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.hiddenapps
 
 import androidx.test.core.app.ActivityScenario
+import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,7 +22,7 @@ class HiddenAppsActivityRobolectricTest {
     @Test
     fun `activity launches without crashing`() {
         ActivityScenario.launch(HiddenAppsActivity::class.java).use { scenario ->
-            scenario.onActivity { activity -> assertNotNull(activity) }
+            scenario.onActivity { activity -> assertThat(activity).isNotNull() }
         }
     }
 }

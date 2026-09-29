@@ -3,22 +3,17 @@ package com.github.reygnn.kolibri_launcher.ui.base
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.core.testing.recordEmissions
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -98,7 +93,7 @@ class BaseViewModelTest {
 
         vm.event.test {
             vm.testSendEvent(UiEvent.ShowAppDrawer)
-            assertEquals(UiEvent.ShowAppDrawer, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.ShowAppDrawer)
         }
     }
 
@@ -111,9 +106,9 @@ class BaseViewModelTest {
             vm.testSendEvent(UiEvent.OpenClock)
             vm.testSendEvent(UiEvent.OpenCalendar)
 
-            assertEquals(UiEvent.ShowAppDrawer, awaitItem())
-            assertEquals(UiEvent.OpenClock, awaitItem())
-            assertEquals(UiEvent.OpenCalendar, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.ShowAppDrawer)
+            assertThat(awaitItem()).isEqualTo(UiEvent.OpenClock)
+            assertThat(awaitItem()).isEqualTo(UiEvent.OpenCalendar)
         }
     }
 
@@ -130,7 +125,7 @@ class BaseViewModelTest {
         // instead of silently missing it (AUDIT-3 #7). A replay=0
         // MutableSharedFlow dropped it here.
         vm.event.test {
-            assertEquals(UiEvent.ShowAppDrawer, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.ShowAppDrawer)
         }
     }
 
@@ -146,7 +141,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { executed = true }
         advanceUntilIdle()
 
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 
     @Test
@@ -157,7 +152,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { threadName = Thread.currentThread().name }
         advanceUntilIdle()
 
-        assertTrue(threadName.isNotEmpty())
+        assertThat(threadName.isNotEmpty()).isTrue()
     }
 
     // ===========================================
@@ -171,8 +166,8 @@ class BaseViewModelTest {
         vm.testLaunchSafe { throw RuntimeException("Boom") }
         advanceUntilIdle()
 
-        assertNotNull(vm.lastHandledError)
-        assertTrue(vm.lastHandledError is RuntimeException)
+        assertThat(vm.lastHandledError).isNotNull()
+        assertThat(vm.lastHandledError).isInstanceOf(RuntimeException::class.java)
     }
 
     @Test
@@ -182,7 +177,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { throw IllegalStateException("Bad state") }
         advanceUntilIdle()
 
-        assertTrue(vm.lastHandledError is IllegalStateException)
+        assertThat(vm.lastHandledError).isInstanceOf(IllegalStateException::class.java)
     }
 
     @Test
@@ -192,7 +187,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { throw OutOfMemoryError("Heap full") }
         advanceUntilIdle()
 
-        assertTrue(vm.lastHandledError is OutOfMemoryError)
+        assertThat(vm.lastHandledError).isInstanceOf(OutOfMemoryError::class.java)
     }
 
     @Test
@@ -202,7 +197,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { throw StackOverflowError("Stack blown") }
         advanceUntilIdle()
 
-        assertTrue(vm.lastHandledError is StackOverflowError)
+        assertThat(vm.lastHandledError).isInstanceOf(StackOverflowError::class.java)
     }
 
     @Test
@@ -213,7 +208,7 @@ class BaseViewModelTest {
         advanceUntilIdle()
 
         // CancellationException is NOT handled by handleError - it's re-thrown
-        assertNull(vm.lastHandledError)
+        assertThat(vm.lastHandledError).isNull()
     }
 
     @Test
@@ -229,7 +224,7 @@ class BaseViewModelTest {
         vm.testLaunchSafe { executed = true }
         advanceUntilIdle()
 
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 
     @Test
@@ -241,13 +236,13 @@ class BaseViewModelTest {
         }
         advanceUntilIdle()
 
-        assertEquals(10, vm.handleErrorCallCount)
+        assertThat(vm.handleErrorCallCount).isEqualTo(10)
 
         // VM still works
         var executed = false
         vm.testLaunchSafe { executed = true }
         advanceUntilIdle()
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 
     // ===========================================
@@ -259,12 +254,12 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testLaunchSafe { throw RuntimeException("Boom") }
         advanceUntilIdle()
 
-        assertTrue(events.any { it is UiEvent.ShowToast && it.messageResId == R.string.error_generic })
+        assertThat(events.any { it is UiEvent.ShowToast && it.messageResId == R.string.error_generic }).isTrue()
         job.cancel()
     }
 
@@ -273,13 +268,13 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testLaunchSafe { throw OutOfMemoryError("Heap full") }
         advanceUntilIdle()
 
         // OOM should NOT produce a toast (user can't do anything)
-        assertFalse(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isFalse()
         job.cancel()
     }
 
@@ -288,12 +283,12 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testLaunchSafe { throw StackOverflowError("Stack blown") }
         advanceUntilIdle()
 
-        assertFalse(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isFalse()
         job.cancel()
     }
 
@@ -302,12 +297,12 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testLaunchSafe { throw CancellationException("Cancelled") }
         advanceUntilIdle()
 
-        assertFalse(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isFalse()
         job.cancel()
     }
 
@@ -316,12 +311,12 @@ class BaseViewModelTest {
         val vm = TestViewModelWithoutErrorEvent(mainDispatcherRule.testDispatcher)
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testLaunchSafe { throw RuntimeException("Boom") }
         advanceUntilIdle()
 
-        assertFalse(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isFalse()
         job.cancel()
     }
 
@@ -335,7 +330,7 @@ class BaseViewModelTest {
 
         val result = vm.testExecuteSafe { 42 }
 
-        assertEquals(42, result)
+        assertThat(result).isEqualTo(42)
     }
 
     @Test
@@ -344,7 +339,7 @@ class BaseViewModelTest {
 
         val result = vm.testExecuteSafe { "hello" }
 
-        assertEquals("hello", result)
+        assertThat(result).isEqualTo("hello")
     }
 
     @Test
@@ -353,7 +348,7 @@ class BaseViewModelTest {
 
         val result = vm.testExecuteSafe<Int> { throw RuntimeException("Boom") }
 
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     @Test
@@ -362,7 +357,7 @@ class BaseViewModelTest {
 
         val result = vm.testExecuteSafe<Int> { throw OutOfMemoryError("OOM") }
 
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     @Test
@@ -376,7 +371,7 @@ class BaseViewModelTest {
             thrown = true
         }
 
-        assertTrue(thrown)
+        assertThat(thrown).isTrue()
     }
 
     @Test
@@ -390,8 +385,8 @@ class BaseViewModelTest {
             throw IllegalArgumentException("Bad arg")
         }
 
-        assertNotNull(capturedError)
-        assertTrue(capturedError is IllegalArgumentException)
+        assertThat(capturedError).isNotNull()
+        assertThat(capturedError).isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -405,7 +400,7 @@ class BaseViewModelTest {
             throw IllegalStateException("Original error")
         }
 
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     @Test
@@ -414,7 +409,7 @@ class BaseViewModelTest {
 
         val result = vm.testExecuteSafe<String?> { null }
 
-        assertNull(result)
+        assertThat(result).isNull()
     }
 
     // ===========================================
@@ -429,7 +424,7 @@ class BaseViewModelTest {
         vm.testHandleError(RuntimeException("Test"), "test-context")
         advanceUntilIdle()
 
-        assertEquals(1, vm.handleErrorCallCount)
+        assertThat(vm.handleErrorCallCount).isEqualTo(1)
     }
 
     @Test
@@ -440,7 +435,7 @@ class BaseViewModelTest {
         vm.testHandleError(OutOfMemoryError("OOM"), "test-context")
         advanceUntilIdle()
 
-        assertTrue(vm.lastHandledError is OutOfMemoryError)
+        assertThat(vm.lastHandledError).isInstanceOf(OutOfMemoryError::class.java)
     }
 
     @Test
@@ -451,7 +446,7 @@ class BaseViewModelTest {
         vm.testHandleError(StackOverflowError("Stack"), "test-context")
         advanceUntilIdle()
 
-        assertTrue(vm.lastHandledError is StackOverflowError)
+        assertThat(vm.lastHandledError).isInstanceOf(StackOverflowError::class.java)
     }
 
     @Test
@@ -459,13 +454,13 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.testHandleError(CancellationException("Cancelled"), "test-context")
         advanceUntilIdle()
 
         // CancellationException should be suppressed (no toast)
-        assertFalse(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isFalse()
         job.cancel()
     }
 
@@ -499,14 +494,14 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         repeat(100) {
             vm.testSendEvent(UiEvent.ShowAppDrawer)
         }
         advanceUntilIdle()
 
-        assertEquals(100, events.size)
+        assertThat(events.size).isEqualTo(100)
         job.cancel()
     }
 
@@ -526,8 +521,8 @@ class BaseViewModelTest {
         }
         advanceUntilIdle()
 
-        assertEquals(10, successCount)
-        assertEquals(10, vm.handleErrorCallCount)
+        assertThat(successCount).isEqualTo(10)
+        assertThat(vm.handleErrorCallCount).isEqualTo(10)
     }
 
     @Test
@@ -535,13 +530,13 @@ class BaseViewModelTest {
         val vm = createViewModel()
 
         val syncResult = vm.testExecuteSafe { "sync value" }
-        assertEquals("sync value", syncResult)
+        assertThat(syncResult).isEqualTo("sync value")
 
         var asyncResult = ""
         vm.testLaunchSafe { asyncResult = "async value" }
         advanceUntilIdle()
 
-        assertEquals("async value", asyncResult)
+        assertThat(asyncResult).isEqualTo("async value")
     }
 
     @Test
@@ -555,12 +550,12 @@ class BaseViewModelTest {
         vm.testLaunchSafe { throw NullPointerException("NPE") }
         advanceUntilIdle()
 
-        assertEquals(5, vm.handleErrorCallCount)
+        assertThat(vm.handleErrorCallCount).isEqualTo(5)
 
         // VM still works
         var executed = false
         vm.testLaunchSafe { executed = true }
         advanceUntilIdle()
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 }

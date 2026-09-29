@@ -1,0 +1,27 @@
+{
+  "case": "kolibri-in-nyx",
+  "backup": "kolibri-voll.zip",
+  "importer": "nyx",
+  "pins": [
+    "legacy format without a bound LegacyFormatReader"
+  ],
+  "writtenBy": {
+    "app": "kolibri",
+    "appVersion": "1.0.0-rc3",
+    "format": "legacy-zip (backup.json + wallpapers/)"
+  },
+  "importOptions": "all",
+  "installed": "every component referenced by the backup",
+  "targetBefore": "<any>",
+  "expected": {
+    "importResult": {
+      "type": "UnsupportedLegacyFormat",
+      "message": "Backup einer älteren Version – nicht mehr unterstützt"
+    },
+    "stateChanged": false
+  },
+  "notes": [
+    "Nyx binds no legacy reader; the engine recognizes backup.json without manifest.json.",
+    "Nothing is written; the message is the targeted 'older version' one, not a generic error."
+  ]
+}

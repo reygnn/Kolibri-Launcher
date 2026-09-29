@@ -1,10 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.onboarding
 
 import androidx.test.core.app.ActivityScenario
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +40,7 @@ class OnboardingActivityRobolectricTest {
     fun `activity launches without crashing`() {
         ActivityScenario.launch(OnboardingActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                assertNotNull("Activity instance must be non-null after launch", activity)
+                assertWithMessage("Activity instance must be non-null after launch").that(activity).isNotNull()
             }
         }
     }

@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Process
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,13 +83,13 @@ class InstalledAppsEnumerationParityTest {
 
         // Neither API should be empty on a real image (there is always >= 1
         // launchable app); an empty side means the query itself is wrong.
-        assertTrue("PackageManager returned no launchers", pm.isNotEmpty())
-        assertTrue("LauncherApps returned no launchers", la.isNotEmpty())
+        assertWithMessage("PackageManager returned no launchers").that(pm.isNotEmpty()).isTrue()
+        assertWithMessage("LauncherApps returned no launchers").that(la.isNotEmpty()).isTrue()
 
         val onlyInPm = (pm - la) - KNOWN_DIVERGENCE
         val onlyInLa = (la - pm) - KNOWN_DIVERGENCE
 
-        assertTrue(
+        assertWithMessage(
             buildString {
                 appendLine("Enumeration parity mismatch (investigate before shipping):")
                 appendLine("  only via PackageManager: $onlyInPm")
@@ -97,8 +97,7 @@ class InstalledAppsEnumerationParityTest {
                 appendLine("If a difference is expected on this image, add it to")
                 appendLine("KNOWN_DIVERGENCE with a per-package reason.")
             },
-            onlyInPm.isEmpty() && onlyInLa.isEmpty(),
-        )
+        ).that(onlyInPm.isEmpty() && onlyInLa.isEmpty()).isTrue()
     }
 
     companion object {

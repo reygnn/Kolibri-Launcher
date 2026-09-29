@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 import com.github.reygnn.launcher.core.AppConstants
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class HomeSettingsTest {
@@ -15,6 +15,6 @@ class HomeSettingsTest {
      */
     @Test
     fun `default sortOrder matches the project-wide default constant`() {
-        assertEquals(SettingsDefaults.DEFAULT_SORT_ORDER, HomeSettings().sortOrder)
+        assertThat(HomeSettings().sortOrder).isEqualTo(SettingsDefaults.DEFAULT_SORT_ORDER)
     }
 }

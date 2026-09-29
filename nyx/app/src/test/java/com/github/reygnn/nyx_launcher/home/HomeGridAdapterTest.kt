@@ -2,12 +2,15 @@ package com.github.reygnn.nyx_launcher.home
 
 import androidx.recyclerview.widget.RecyclerView
 import com.github.reygnn.launcher.core.ComponentKey
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.google.common.truth.Truth.assertThat
 import io.mockk.mockk
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,12 +28,15 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class HomeGridAdapterTest {
 
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     private fun ck(p: String) = ComponentKey(p, "$p.Main")
 
     private fun adapter() = HomeGridAdapter(
         iconLoader = mockk<IconLoader>(relaxed = true),
         folderRenderer = mockk<FolderIconRenderer>(relaxed = true),
-        scope = TestScope(),
+        scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
         iconSizePx = 96,
         rows = 5,
         dotPackages = { emptySet() },

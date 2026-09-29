@@ -396,7 +396,9 @@ configurations.all {
 
 // Project-convention linter — checks the CLAUDE.md rules whose drift was
 // the biggest defect class in the post-audit-Sweep-Session 2026-05-03.
-// Source script: `tools/check-conventions.sh`. Add new checks there, not here.
+// Source script: `../tools/check-conventions.sh --app kolibri` (one orchestrator for both
+// apps, SPEC_NYX_REWRITE A3); kolibri's lists/decisions are data in
+// `../tools/conventions/kolibri.conf`. Add new checks there, not here.
 //
 // Currently checks:
 //   - Rule 9    — bare `Timber.e(` outside the documented crash-infra files

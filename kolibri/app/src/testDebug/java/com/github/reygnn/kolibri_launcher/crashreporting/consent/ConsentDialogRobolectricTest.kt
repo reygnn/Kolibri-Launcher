@@ -6,17 +6,16 @@ import androidx.appcompat.app.AlertDialog
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,18 +68,15 @@ class ConsentDialogRobolectricTest {
                 val reported = mutableListOf<Boolean>()
                 val dialog = ConsentDialog.show(activity) { reported.add(it) }
 
-                assertNotNull(
-                    "A shown dialog must be returned so the caller can track and dismiss it (AUDIT-10 #9)",
-                    dialog,
-                )
-                assertTrue("onResult must not fire before a tap", reported.isEmpty())
+                assertWithMessage("A shown dialog must be returned so the caller can track and dismiss it (AUDIT-10 #9)").that(dialog).isNotNull()
+                assertWithMessage("onResult must not fire before a tap").that(reported.isEmpty()).isTrue()
 
                 dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                 // AlertDialog dispatches button clicks through a Handler, so the
                 // listener runs on the next looper turn, not inline.
                 shadowOf(Looper.getMainLooper()).idle()
 
-                assertEquals(listOf(true), reported)
+                assertThat(reported).isEqualTo(listOf(true))
             }
         }
 
@@ -94,11 +90,11 @@ class ConsentDialogRobolectricTest {
                 val reported = mutableListOf<Boolean>()
                 val dialog = ConsentDialog.show(activity) { reported.add(it) }
 
-                assertNotNull(dialog)
+                assertThat(dialog).isNotNull()
                 dialog!!.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
                 shadowOf(Looper.getMainLooper()).idle()
 
-                assertEquals(listOf(false), reported)
+                assertThat(reported).isEqualTo(listOf(false))
             }
         }
 }

@@ -1,8 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui.base
 
 import com.github.reygnn.launcher.core.TimberWrapper
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -17,21 +16,21 @@ class BaseActivityToastSuppressionTest {
 
     @Test
     fun `SILENT_ERROR suppresses the dev-toast`() {
-        assertTrue(BaseActivity.isDevToastSuppressed(TimberWrapper.SILENT_LOG_TAG))
+        assertThat(BaseActivity.isDevToastSuppressed(TimberWrapper.SILENT_LOG_TAG)).isTrue()
     }
 
     @Test
     fun `ACRA_REPORT does NOT suppress the dev-toast`() {
-        assertFalse(BaseActivity.isDevToastSuppressed(TimberWrapper.ACRA_REPORT_TAG))
+        assertThat(BaseActivity.isDevToastSuppressed(TimberWrapper.ACRA_REPORT_TAG)).isFalse()
     }
 
     @Test
     fun `an unrelated tag does NOT suppress`() {
-        assertFalse(BaseActivity.isDevToastSuppressed("SomeOtherClass"))
+        assertThat(BaseActivity.isDevToastSuppressed("SomeOtherClass")).isFalse()
     }
 
     @Test
     fun `a null tag does NOT suppress`() {
-        assertFalse(BaseActivity.isDevToastSuppressed(null))
+        assertThat(BaseActivity.isDevToastSuppressed(null)).isFalse()
     }
 }

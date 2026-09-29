@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -10,7 +11,6 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,7 +38,7 @@ class GetHiddenAppsUseCaseTest {
         every { repository.hiddenAppsFlow } returns flowOf(expectedSet)
 
         useCase().collect { result ->
-            assertEquals(expectedSet, result)
+            assertThat(result).isEqualTo(expectedSet)
         }
         verify { repository.hiddenAppsFlow }
     }

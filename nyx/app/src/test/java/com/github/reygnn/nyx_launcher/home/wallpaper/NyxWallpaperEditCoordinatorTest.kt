@@ -6,7 +6,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -49,14 +49,14 @@ class NyxWallpaperEditCoordinatorTest {
             repository = repository,
             fileManager = fileManager,
             displaySettings = displaySettings,
-            scope = kotlinx.coroutines.CoroutineScope(mainDispatcherRule.dispatcher),
-            ioDispatcher = mainDispatcherRule.dispatcher,
+            scope = kotlinx.coroutines.CoroutineScope(mainDispatcherRule.testDispatcher),
+            ioDispatcher = mainDispatcherRule.testDispatcher,
         ).also { it.start() }
 
     private fun uri(s: String): Uri = Uri.parse(s)
 
     @Test
-    fun `add layer outside edit appends and persists`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `add layer outside edit appends and persists`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_1")
         val c = coordinator()
         advanceUntilIdle()
@@ -70,7 +70,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `enter add commit keeps the added layer and its file`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `enter add commit keeps the added layer and its file`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_1")
         val c = coordinator()
         advanceUntilIdle()
@@ -88,7 +88,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `committing while an add copy is still in flight discards the add`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `committing while an add copy is still in flight discards the add`() = runTest(mainDispatcherRule.testDispatcher) {
         // §Audit-3 A3-02: the copy coroutine only runs on advanceUntilIdle, so here the user
         // commits BEFORE it resumes. The resuming add must discard (delete the copied file) rather
         // than append + persist a layer that was never in the committed preview. WITHOUT the
@@ -108,7 +108,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `enter add cancel reverts state and deletes the added file`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `enter add cancel reverts state and deletes the added file`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_new")
         val c = coordinator()
         advanceUntilIdle()
@@ -132,7 +132,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `a second enter during a live session does not clobber the rollback snapshot`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `a second enter during a live session does not clobber the rollback snapshot`() = runTest(mainDispatcherRule.testDispatcher) {
         // §Audit-3 A3-10: re-entering mid-session used to re-snapshot the EDITED state and clear
         // the pending lists, so Cancel kept the added layer and leaked its file.
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_re")
@@ -152,7 +152,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `remove outside edit deletes the file immediately`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `remove outside edit deletes the file immediately`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_x")
         val c = coordinator()
         advanceUntilIdle()
@@ -166,7 +166,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `remove in edit defers file delete until commit`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `remove in edit defers file delete until commit`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_2")
         val c = coordinator()
         advanceUntilIdle()
@@ -189,7 +189,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `remove in edit then cancel keeps the file`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `remove in edit then cancel keeps the file`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_2")
         val c = coordinator()
         advanceUntilIdle()
@@ -210,7 +210,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `swap layers reorders the state`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `swap layers reorders the state`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returnsMany listOf(uri("file:///a"), uri("file:///b"))
         val c = coordinator()
         advanceUntilIdle()
@@ -225,7 +225,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `stale repo emission during edit does not clobber optimistic state`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `stale repo emission during edit does not clobber optimistic state`() = runTest(mainDispatcherRule.testDispatcher) {
         // Guards #2/#4: a delayed persist round-trip of an earlier mutation (or an
         // old wallpaper) must not overwrite the live edit state via the mirror.
         coEvery { fileManager.copyToInternal(any()) } returnsMany listOf(uri("file:///a"), uri("file:///b"))
@@ -245,7 +245,7 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `toggle backdrop flips and persists`() = runTest(mainDispatcherRule.dispatcher) {
+    fun `toggle backdrop flips and persists`() = runTest(mainDispatcherRule.testDispatcher) {
         coEvery { displaySettings.wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.SYSTEM_WALLPAPER)
         val c = coordinator()
         advanceUntilIdle()

@@ -10,9 +10,10 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurface
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -24,9 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -98,7 +96,7 @@ class ThemingDelegateTest {
     @Test
     fun `initial uiColorsState is default`() {
         val delegate = createDelegate()
-        assertEquals(UiColorsState(), delegate.uiColorsState.value)
+        assertThat(delegate.uiColorsState.value).isEqualTo(UiColorsState())
     }
 
     // ===========================================
@@ -115,7 +113,7 @@ class ThemingDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertEquals(expectedColors, delegate.uiColorsState.value)
+        assertThat(delegate.uiColorsState.value).isEqualTo(expectedColors)
     }
 
     @Test
@@ -131,12 +129,12 @@ class ThemingDelegateTest {
         delegate.start()
         advanceUntilIdle()
 
-        assertEquals(colors1, delegate.uiColorsState.value)
+        assertThat(delegate.uiColorsState.value).isEqualTo(colors1)
 
         colorsFlow.value = colors2
         advanceUntilIdle()
 
-        assertEquals(colors2, delegate.uiColorsState.value)
+        assertThat(delegate.uiColorsState.value).isEqualTo(colors2)
     }
 
     // ===========================================
@@ -163,7 +161,7 @@ class ThemingDelegateTest {
         delegate.onSetTextColor(0xFF0000)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     @Test
@@ -173,7 +171,7 @@ class ThemingDelegateTest {
         delegate.onSetTextColor(0xFF0000)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.isEmpty())
+        assertThat(sentEvents.isEmpty()).isTrue()
     }
 
     // ===========================================
@@ -209,7 +207,7 @@ class ThemingDelegateTest {
         delegate.onSetTextShadowEnabled(true)
         advanceUntilIdle()
 
-        assertTrue(sentEvents.any { it is UiEvent.ShowToast })
+        assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================
@@ -226,7 +224,7 @@ class ThemingDelegateTest {
 
         val delegate = createDelegate()
 
-        assertTrue(delegate.isTextShadowEnabled())
+        assertThat(delegate.isTextShadowEnabled()).isTrue()
     }
 
     @Test
@@ -235,7 +233,7 @@ class ThemingDelegateTest {
 
         val delegate = createDelegate()
 
-        assertFalse(delegate.isTextShadowEnabled())
+        assertThat(delegate.isTextShadowEnabled()).isFalse()
     }
 
     // ===========================================
@@ -246,11 +244,7 @@ class ThemingDelegateTest {
     fun `wallpaperScrimAlphaState starts with default value`() = runTest {
         val delegate = createDelegate()
         advanceUntilIdle()
-        assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
-            delegate.wallpaperScrimAlphaState.value,
-            0.0001f
-        )
+        assertThat(delegate.wallpaperScrimAlphaState.value).isWithin(0.0001f).of(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
     }
 
     @Test
@@ -260,15 +254,11 @@ class ThemingDelegateTest {
 
         val delegate = createDelegate()
         advanceUntilIdle()
-        assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
-            delegate.wallpaperScrimAlphaState.value,
-            0.0001f
-        )
+        assertThat(delegate.wallpaperScrimAlphaState.value).isWithin(0.0001f).of(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
 
         scrimFlow.value = 0.3f
         advanceUntilIdle()
-        assertEquals(0.3f, delegate.wallpaperScrimAlphaState.value, 0.0001f)
+        assertThat(delegate.wallpaperScrimAlphaState.value).isWithin(0.0001f).of(0.3f)
     }
 
     @Test

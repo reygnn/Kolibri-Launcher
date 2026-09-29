@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -13,7 +14,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 class ObserveHomeSettingsUseCaseTest {
@@ -40,12 +40,12 @@ class ObserveHomeSettingsUseCaseTest {
 
         useCase().test {
             val initialResult = awaitItem()
-            assertEquals(SortOrder.ALPHABETICAL, initialResult.sortOrder)
+            assertThat(initialResult.sortOrder).isEqualTo(SortOrder.ALPHABETICAL)
 
             sortOrderFlow.value = SortOrder.TIME_WEIGHTED_USAGE
 
             val updatedResult = awaitItem()
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, updatedResult.sortOrder)
+            assertThat(updatedResult.sortOrder).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
         }
     }
 }

@@ -4,13 +4,12 @@ import android.content.ComponentName
 import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
 import android.os.Process
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertFailsWith
 import org.junit.Rule
@@ -24,7 +23,7 @@ import org.robolectric.RobolectricTestRunner
  * resolve; [LauncherApps] and its `LauncherActivityInfo` are MockK mocks so the
  * fail-closed policy is exercised without a device.
  *
- * Single dispatcher via [MainDispatcherRuleBase] (convention: one dispatcher
+ * Single dispatcher via [MainDispatcherRule] (convention: one dispatcher
  * source, passed to both `runTest` and the code under test; no ad-hoc TestScope).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -32,7 +31,7 @@ import org.robolectric.RobolectricTestRunner
 class LauncherAppsEnumeratorTest {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     private val launcherApps = mockk<LauncherApps>()
     private val enumerator = LauncherAppsEnumerator(launcherApps, mainDispatcherRule.testDispatcher)

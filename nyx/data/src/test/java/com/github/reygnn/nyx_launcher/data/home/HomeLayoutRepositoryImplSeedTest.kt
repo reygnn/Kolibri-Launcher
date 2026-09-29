@@ -14,7 +14,7 @@ import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -42,7 +42,7 @@ class HomeLayoutRepositoryImplSeedTest {
     private fun newRepo() = HomeLayoutRepositoryImpl(FakeDataStore(), HomeLayoutSerializer(), ids)
 
     @Test
-    fun seeds_the_dock_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_the_dock_on_a_fresh_store() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialLayout({ listOf(PHONE, SMS) }, { emptyList() })
@@ -53,7 +53,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun seeds_grid_apps_top_left_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_grid_apps_top_left_on_a_fresh_store() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialLayout({ emptyList() }, { listOf(PLAY_STORE) })
@@ -65,7 +65,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun seeds_dock_and_grid_together() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_dock_and_grid_together() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialLayout({ listOf(PHONE) }, { listOf(PLAY_STORE) })
@@ -77,7 +77,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun seeds_only_once() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_only_once() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         assertThat(repo.seedInitialLayout({ listOf(PHONE) }, { emptyList() })).isTrue()
 
@@ -91,7 +91,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun preserves_a_grid_already_stamped_by_fit() = runTest(mainDispatcherRule.dispatcher) {
+    fun preserves_a_grid_already_stamped_by_fit() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         // Simulate FitHomeGridUseCase landing first: an empty layout on the device grid.
         val deviceGrid = GridSpec(columns = 5, rows = 7)
@@ -106,7 +106,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun does_not_seed_when_content_already_exists() = runTest(mainDispatcherRule.dispatcher) {
+    fun does_not_seed_when_content_already_exists() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         repo.save(
             HomeLayout(
@@ -125,7 +125,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun does_not_seed_with_no_apps() = runTest(mainDispatcherRule.dispatcher) {
+    fun does_not_seed_with_no_apps() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialLayout({ emptyList() }, { emptyList() })
@@ -134,7 +134,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun does_not_resolve_apps_on_a_returning_install() = runTest(mainDispatcherRule.dispatcher) {
+    fun does_not_resolve_apps_on_a_returning_install() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         assertThat(repo.seedInitialLayout({ listOf(PHONE) }, { emptyList() })).isTrue()
 
@@ -152,7 +152,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun update_propagates_read_failure_and_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_propagates_read_failure_and_does_not_write() = runTest(mainDispatcherRule.testDispatcher) {
         // The RMW read is fail-CLOSED: an IOException propagates and the write never runs, so a
         // transient store failure can't clobber the real layout with DEFAULT. (A fail-open revert
         // would read DEFAULT, not throw, and proceed to write.)
@@ -178,7 +178,7 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     @Test
-    fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.dispatcher) {
+    fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.testDispatcher) {
         // Contained fail-closed: an IOException on the seed read is caught → no seed, no crash.
         val throwing = object : DataStore<Preferences> {
             override val data: Flow<Preferences> = flow { throw IOException("boom") }

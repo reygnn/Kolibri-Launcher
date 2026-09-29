@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.ui
 
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenanceRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
@@ -11,6 +11,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsViewModel
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -27,11 +28,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class SettingsViewModelTest {
@@ -81,7 +79,7 @@ class SettingsViewModelTest {
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
-        assertTrue(viewModel.installedApps.value.isEmpty())
+        assertThat(viewModel.installedApps.value.isEmpty()).isTrue()
     }
 
     @Test
@@ -96,19 +94,19 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
 
             rawAppsFlow.value = testApps
 
             val emittedList = awaitItem()
-            assertEquals(2, emittedList.size)
-            assertEquals("App A", emittedList[0].displayName)
+            assertThat(emittedList.size).isEqualTo(2)
+            assertThat(emittedList[0].displayName).isEqualTo("App A")
 
             rawAppsFlow.value = listOf(app2)
 
             val secondEmittedList = awaitItem()
-            assertEquals(1, secondEmittedList.size)
-            assertEquals("App B", secondEmittedList[0].displayName)
+            assertThat(secondEmittedList.size).isEqualTo(1)
+            assertThat(secondEmittedList[0].displayName).isEqualTo("App B")
         }
     }
 
@@ -134,7 +132,7 @@ class SettingsViewModelTest {
             advanceUntilIdle()
             // Should emit empty list or handle error gracefully
             val result = awaitItem()
-            assertNotNull(result)
+            assertThat(result).isNotNull()
         }
     }
 
@@ -157,7 +155,7 @@ class SettingsViewModelTest {
             viewModel.installedApps.test {
                 advanceUntilIdle()
                 val result = awaitItem()
-                assertNotNull(result)
+                assertThat(result).isNotNull()
             }
         }
 
@@ -177,10 +175,10 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             rawAppsFlow.value = largeAppList
             val result = awaitItem()
-            assertEquals(1000, result.size)
+            assertThat(result.size).isEqualTo(1000)
         }
     }
 
@@ -196,20 +194,20 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
 
             // Rapid updates
             rawAppsFlow.value = listOf(app1)
-            assertEquals(1, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(1)
 
             rawAppsFlow.value = testApps
-            assertEquals(2, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(2)
 
             rawAppsFlow.value = emptyList()
-            assertEquals(0, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(0)
 
             rawAppsFlow.value = testApps
-            assertEquals(2, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(2)
         }
     }
 
@@ -225,11 +223,11 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             val duplicates = listOf(app1, app1, app2)
             rawAppsFlow.value = duplicates
             val result = awaitItem()
-            assertEquals(3, result.size)
+            assertThat(result.size).isEqualTo(3)
         }
     }
 
@@ -245,10 +243,10 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             rawAppsFlow.value = testApps
             val result = awaitItem()
-            assertEquals(2, result.size)
+            assertThat(result.size).isEqualTo(2)
         }
     }
 
@@ -264,17 +262,17 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
 
             viewModel.installedApps.test {
-                assertEquals(emptyList(), awaitItem())
+                assertThat(awaitItem()).isEqualTo(emptyList())
                 rawAppsFlow.value = testApps
                 // Both subscribers should receive the update
                 val result1 = awaitItem()
-                assertEquals(2, result1.size)
+                assertThat(result1.size).isEqualTo(2)
             }
             val result2 = awaitItem()
-            assertEquals(2, result2.size)
+            assertThat(result2.size).isEqualTo(2)
         }
     }
 
@@ -299,13 +297,13 @@ class SettingsViewModelTest {
             )
 
             viewModel1.installedApps.test {
-                assertEquals(emptyList(), awaitItem())
+                assertThat(awaitItem()).isEqualTo(emptyList())
                 viewModel2.installedApps.test {
-                    assertEquals(emptyList(), awaitItem())
+                    assertThat(awaitItem()).isEqualTo(emptyList())
                     rawAppsFlow.value = testApps
-                    assertEquals(2, awaitItem().size)
+                    assertThat(awaitItem().size).isEqualTo(2)
                 }
-                assertEquals(2, awaitItem().size)
+                assertThat(awaitItem().size).isEqualTo(2)
             }
         }
 
@@ -327,8 +325,8 @@ class SettingsViewModelTest {
         // New collector should immediately get the last value
         viewModel.installedApps.test {
             val result = awaitItem()
-            assertEquals(2, result.size)
-            assertEquals("App A", result[0].displayName)
+            assertThat(result.size).isEqualTo(2)
+            assertThat(result[0].displayName).isEqualTo("App A")
         }
     }
 
@@ -351,7 +349,7 @@ class SettingsViewModelTest {
         // New collector should still work
         viewModel.installedApps.test {
             val result = awaitItem()
-            assertNotNull(result)
+            assertThat(result).isNotNull()
         }
     }
 
@@ -373,11 +371,11 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             rawAppsFlow.value = specialApps
             val result = awaitItem()
-            assertEquals(3, result.size)
-            assertEquals("App 🚀", result[0].displayName)
+            assertThat(result.size).isEqualTo(3)
+            assertThat(result[0].displayName).isEqualTo("App 🚀")
         }
     }
 
@@ -393,12 +391,12 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertEquals(emptyList(), awaitItem())
+            assertThat(awaitItem()).isEqualTo(emptyList())
             val largeList = (1..100).map { AppInfo("App $it", "App $it", "com.$it", "class$it") }
             rawAppsFlow.value = largeList
-            assertEquals(100, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(100)
             rawAppsFlow.value = emptyList()
-            assertEquals(0, awaitItem().size)
+            assertThat(awaitItem().size).isEqualTo(0)
         }
     }
 
@@ -471,7 +469,7 @@ class SettingsViewModelTest {
 
                 val event = awaitItem()
                 assertIs<UiEvent.ShowToast>(event)
-                assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_done, event.messageResId)
+                assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_done)
             }
             coVerify { dataStoreMaintenanceRepository.removeOrphanKeys() }
         }
@@ -495,7 +493,7 @@ class SettingsViewModelTest {
 
             val event = awaitItem()
             assertIs<UiEvent.ShowToast>(event)
-            assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_none, event.messageResId)
+            assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_none)
         }
     }
 
@@ -519,7 +517,7 @@ class SettingsViewModelTest {
 
                 val event = awaitItem()
                 assertIs<UiEvent.ShowToast>(event)
-                assertEquals(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_error, event.messageResId)
+                assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_error)
             }
         }
 
@@ -545,9 +543,9 @@ class SettingsViewModelTest {
             viewModel.onFactoryResetConfirmed(true)
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertIs<UiEvent.ShowToast>(event)
             // Prüfe, ob die korrekte Error-Message kommt
-            assertEquals(com.github.reygnn.kolibri_launcher.R.string.reset_failed, event.messageResId)
+            assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.reset_failed)
         }
     }
 
@@ -570,8 +568,8 @@ class SettingsViewModelTest {
             viewModel.onFactoryResetConfirmed(true)
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(com.github.reygnn.kolibri_launcher.R.string.reset_failed, event.messageResId)
+            assertIs<UiEvent.ShowToast>(event)
+            assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.reset_failed)
         }
     }
 
@@ -598,7 +596,7 @@ class SettingsViewModelTest {
         // Assert: ViewModel lebt noch.
         // Da launchSafe Exceptions meist nur loggt (oder generisch behandelt),
         // prüfen wir hier primär, dass der Test nicht rot wird (kein Crash).
-        assertNotNull(viewModel)
+        assertThat(viewModel).isNotNull()
     }
 
     @Test
@@ -623,8 +621,8 @@ class SettingsViewModelTest {
         viewModel.event.test {
             // Wir erwarten den Error-Toast, da dein ViewModel 'Throwable' fängt
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(com.github.reygnn.kolibri_launcher.R.string.error_loading_apps, event.messageResId)
+            assertIs<UiEvent.ShowToast>(event)
+            assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.error_loading_apps)
         }
     }
 
@@ -650,7 +648,7 @@ class SettingsViewModelTest {
 
         val outcome = createViewModel().prepareFavoritesForSorting(testApps)
 
-        assertIs<SettingsViewModel.SortFavoritesOutcome.Ready>(outcome)
+        assertThat(outcome).isInstanceOf(SettingsViewModel.SortFavoritesOutcome.Ready::class.java)
         // Authoritative fresh reads were used...
         coVerify(exactly = 1) { favoritesRepository.getFavoriteComponentsSnapshot() }
         coVerify(exactly = 1) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
@@ -664,7 +662,7 @@ class SettingsViewModelTest {
         runTest {
             val outcome = createViewModel().prepareFavoritesForSorting(emptyList())
 
-            assertEquals(SettingsViewModel.SortFavoritesOutcome.AppsNotLoaded, outcome)
+            assertThat(outcome).isEqualTo(SettingsViewModel.SortFavoritesOutcome.AppsNotLoaded)
             coVerify(exactly = 0) { favoritesRepository.getFavoriteComponentsSnapshot() }
             coVerify(exactly = 0) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
         }
@@ -676,7 +674,7 @@ class SettingsViewModelTest {
 
             val outcome = createViewModel().prepareFavoritesForSorting(testApps)
 
-            assertEquals(SettingsViewModel.SortFavoritesOutcome.NoFavorites, outcome)
+            assertThat(outcome).isEqualTo(SettingsViewModel.SortFavoritesOutcome.NoFavorites)
             // Order is only read once there is something to sort.
             coVerify(exactly = 0) { favoritesOrderRepository.getFavoriteComponentsOrderSnapshot() }
         }
@@ -693,7 +691,7 @@ class SettingsViewModelTest {
         val outcome = createViewModel().prepareFavoritesForSorting(testApps)
 
         assertIs<SettingsViewModel.SortFavoritesOutcome.Ready>(outcome)
-        assertEquals(listOf(app2, app1), outcome.orderedFavorites)
+        assertThat(outcome.orderedFavorites).isEqualTo(listOf(app2, app1))
         coVerify(exactly = 1) { favoritesOrderRepository.sortFavoriteComponents(listOf(app1, app2), savedOrder) }
     }
 
@@ -706,7 +704,7 @@ class SettingsViewModelTest {
 
             val outcome = createViewModel().prepareFavoritesForSorting(testApps)
 
-            assertEquals(SettingsViewModel.SortFavoritesOutcome.NoFavorites, outcome)
+            assertThat(outcome).isEqualTo(SettingsViewModel.SortFavoritesOutcome.NoFavorites)
         }
 
     @Test
@@ -725,10 +723,7 @@ class SettingsViewModelTest {
 
         val preview = createViewModel().getCleanupPreview()
 
-        assertEquals(
-            SettingsViewModel.CleanupPreview.Loaded(listOf("usage_com.foo", "obsolete_key")),
-            preview,
-        )
+        assertThat(preview).isEqualTo(SettingsViewModel.CleanupPreview.Loaded(listOf("usage_com.foo", "obsolete_key")))
     }
 
     @Test
@@ -736,6 +731,6 @@ class SettingsViewModelTest {
         coEvery { dataStoreMaintenanceRepository.previewOrphanKeys() } returns
             DataStoreMaintenanceRepository.PreviewResult.Failed
 
-        assertEquals(SettingsViewModel.CleanupPreview.Failed, createViewModel().getCleanupPreview())
+        assertThat(createViewModel().getCleanupPreview()).isEqualTo(SettingsViewModel.CleanupPreview.Failed)
     }
 }

@@ -8,11 +8,10 @@ import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -54,10 +53,10 @@ class WallpaperViewBinderSingleLayerTest {
 
         binder.bind(view, WallpaperState.single("file:///wallpaper.jpg"))
 
-        assertEquals("routed through the bounded loader, not setImageURI", 1, loaderCalls)
-        assertFalse("single-layer mode, not multi-layer", view.isMultiLayerMode)
-        assertEquals("bitmap set on the view", bmp, (view.drawable as? BitmapDrawable)?.bitmap)
-        assertEquals(View.VISIBLE, view.visibility)
+        assertWithMessage("routed through the bounded loader, not setImageURI").that(loaderCalls).isEqualTo(1)
+        assertWithMessage("single-layer mode, not multi-layer").that(view.isMultiLayerMode).isFalse()
+        assertWithMessage("bitmap set on the view").that((view.drawable as? BitmapDrawable)?.bitmap).isEqualTo(bmp)
+        assertThat(view.visibility).isEqualTo(View.VISIBLE)
         // Pins the actual fix, not just its side effect: on the measured path the
         // transform runs SYNCHRONOUSLY (centerCrop scales the 8x8 bitmap to cover
         // the 1080x1920 view → currentScale >> 1). A revert to the buggy
@@ -66,10 +65,7 @@ class WallpaperViewBinderSingleLayerTest {
         // looper — and turns this assertion red. Without it the test would stay
         // green through a full revert (it only re-asserts VISIBLE, which the buggy
         // code also produced).
-        assertTrue(
-            "transform applied synchronously on the measured path — got scale ${view.currentScale}",
-            view.currentScale > 1f
-        )
+        assertWithMessage("transform applied synchronously on the measured path — got scale ${view.currentScale}").that(view.currentScale > 1f).isTrue()
     }
 
     @Test
@@ -79,6 +75,6 @@ class WallpaperViewBinderSingleLayerTest {
 
         binder.bind(view, WallpaperState.single("file:///broken.jpg"))
 
-        assertEquals(View.GONE, view.visibility)
+        assertThat(view.visibility).isEqualTo(View.GONE)
     }
 }

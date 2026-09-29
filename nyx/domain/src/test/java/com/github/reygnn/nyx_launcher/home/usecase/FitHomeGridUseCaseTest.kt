@@ -9,7 +9,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.ThrowingHomeLayoutRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -36,10 +36,10 @@ class FitHomeGridUseCaseTest {
     )
 
     private fun useCase(repo: FakeHomeLayoutRepository) =
-        FitHomeGridUseCase(repo, mainDispatcherRule.dispatcher)
+        FitHomeGridUseCase(repo, mainDispatcherRule.testDispatcher)
 
     @Test
-    fun already_matching_grid_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun already_matching_grid_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = FakeHomeLayoutRepository(layout(grid))
 
         useCase(repo)(grid) // target == current grid
@@ -49,7 +49,7 @@ class FitHomeGridUseCaseTest {
     }
 
     @Test
-    fun differing_grid_saves_the_regridded_layout_once() = runTest(mainDispatcherRule.dispatcher) {
+    fun differing_grid_saves_the_regridded_layout_once() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = FakeHomeLayoutRepository(layout(grid))
         val target = GridSpec(columns = 5, rows = 8)
 
@@ -62,12 +62,12 @@ class FitHomeGridUseCaseTest {
     }
 
     @Test
-    fun a_failed_persist_propagates_out_of_the_use_case() = runTest(mainDispatcherRule.dispatcher) {
+    fun a_failed_persist_propagates_out_of_the_use_case() = runTest(mainDispatcherRule.testDispatcher) {
         // B1: FitHomeGridUseCase writes via repository.update inside withContext with no
         // runCatching — a throwing repository must surface, not be swallowed and reported as
         // a successful (silent) layout pass.
         val repo = ThrowingHomeLayoutRepository(layout(grid))
-        val useCase = FitHomeGridUseCase(repo, mainDispatcherRule.dispatcher)
+        val useCase = FitHomeGridUseCase(repo, mainDispatcherRule.testDispatcher)
         val target = GridSpec(columns = 5, rows = 8) // a real regrid → the write path fires
 
         val thrown = runCatching { useCase(target) }.exceptionOrNull()

@@ -2,9 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.home
 
 import androidx.core.graphics.ColorUtils
 import com.github.reygnn.launcher.core.AppConstants
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertSame
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -32,7 +30,7 @@ class HomeFavoritesAdapterColorCacheTest {
         val second = adapter.subtlePressColor(color)
 
         // Cache hit: the styling rebind binds N rows with one color -> one alloc.
-        assertSame(first, second)
+        assertThat(second).isSameInstanceAs(first)
     }
 
     @Test
@@ -42,11 +40,11 @@ class HomeFavoritesAdapterColorCacheTest {
 
         val a = adapter.subtlePressColor(colorA)
         val b = adapter.subtlePressColor(colorB)
-        assertNotSame(a, b)
+        assertThat(b).isNotSameInstanceAs(a)
 
         // Single-entry cache: colorB evicted colorA, so colorA re-allocates.
         val aAgain = adapter.subtlePressColor(colorA)
-        assertNotSame(a, aAgain)
+        assertThat(aAgain).isNotSameInstanceAs(a)
     }
 
     @Test
@@ -55,14 +53,11 @@ class HomeFavoritesAdapterColorCacheTest {
 
         val stateList = adapter.subtlePressColor(normal)
 
-        assertEquals(normal, stateList.defaultColor)
+        assertThat(stateList.defaultColor).isEqualTo(normal)
         val pressed = stateList.getColorForState(
             intArrayOf(android.R.attr.state_pressed),
             normal,
         )
-        assertEquals(
-            ColorUtils.setAlphaComponent(normal, AppConstants.PRESSED_STATE_ALPHA),
-            pressed,
-        )
+        assertThat(pressed).isEqualTo(ColorUtils.setAlphaComponent(normal, AppConstants.PRESSED_STATE_ALPHA))
     }
 }

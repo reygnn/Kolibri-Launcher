@@ -1,13 +1,12 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -75,13 +74,13 @@ abstract class SwipeActionsRepositoryContract {
     @Test
     fun `fresh repository returns null for LEFT slot`() = runTest {
         val repo = createRepository()
-        assertNull(repo.left())
+        assertThat(repo.left()).isNull()
     }
 
     @Test
     fun `fresh repository returns null for RIGHT slot`() = runTest {
         val repo = createRepository()
-        assertNull(repo.right())
+        assertThat(repo.right()).isNull()
     }
 
     // ---------- setSwipeAction LEFT ----------
@@ -90,14 +89,14 @@ abstract class SwipeActionsRepositoryContract {
     fun `setSwipeAction LEFT reflects in the LEFT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertEquals(appA, repo.left())
+        assertThat(repo.left()).isEqualTo(appA)
     }
 
     @Test
     fun `setSwipeAction LEFT does not affect the RIGHT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertNull(repo.right())
+        assertThat(repo.right()).isNull()
     }
 
     @Test
@@ -105,7 +104,7 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appB)
-        assertEquals(appB, repo.left())
+        assertThat(repo.left()).isEqualTo(appB)
     }
 
     @Test
@@ -113,7 +112,7 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
-        assertNull(repo.left())
+        assertThat(repo.left()).isNull()
     }
 
     // ---------- setSwipeAction RIGHT (Spiegel von LEFT) ----------
@@ -122,14 +121,14 @@ abstract class SwipeActionsRepositoryContract {
     fun `setSwipeAction RIGHT reflects in the RIGHT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
-        assertEquals(appA, repo.right())
+        assertThat(repo.right()).isEqualTo(appA)
     }
 
     @Test
     fun `setSwipeAction RIGHT does not affect the LEFT slot`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
-        assertNull(repo.left())
+        assertThat(repo.left()).isNull()
     }
 
     @Test
@@ -137,7 +136,7 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
-        assertNull(repo.right())
+        assertThat(repo.right()).isNull()
     }
 
     // ---------- Slot-Unabhängigkeit ----------
@@ -153,8 +152,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
 
-        assertEquals(appA, repo.left())
-        assertEquals(appB, repo.right())
+        assertThat(repo.left()).isEqualTo(appA)
+        assertThat(repo.right()).isEqualTo(appB)
     }
 
     /**
@@ -167,8 +166,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appA)
 
-        assertEquals(appA, repo.left())
-        assertEquals(appA, repo.right())
+        assertThat(repo.left()).isEqualTo(appA)
+        assertThat(repo.right()).isEqualTo(appA)
     }
 
     @Test
@@ -179,8 +178,8 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
 
-        assertNull(repo.left())
-        assertEquals(appB, repo.right())
+        assertThat(repo.left()).isNull()
+        assertThat(repo.right()).isEqualTo(appB)
     }
 
     // ---------- NONE-Slot ----------
@@ -199,8 +198,8 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.NONE, "irrelevant")
         repo.setSwipeAction(SwipeSlot.NONE, null)
 
-        assertEquals(appA, repo.left())
-        assertEquals(appB, repo.right())
+        assertThat(repo.left()).isEqualTo(appA)
+        assertThat(repo.right()).isEqualTo(appB)
     }
 
     @Test
@@ -208,8 +207,8 @@ abstract class SwipeActionsRepositoryContract {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.NONE, appA)
 
-        assertNull(repo.left())
-        assertNull(repo.right())
+        assertThat(repo.left()).isNull()
+        assertThat(repo.right()).isNull()
     }
 
     // ---------- getSwipeActionComponent (authoritative read for the launch path) ----------
@@ -218,14 +217,14 @@ abstract class SwipeActionsRepositoryContract {
     fun `getSwipeActionComponent returns the assigned LEFT component`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertEquals(appA, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)).isEqualTo(appA)
     }
 
     @Test
     fun `getSwipeActionComponent returns the assigned RIGHT component`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
-        assertEquals(appB, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)).isEqualTo(appB)
     }
 
     @Test
@@ -235,20 +234,20 @@ abstract class SwipeActionsRepositoryContract {
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, appB)
         // The core guarantee behind the swipe-stale-replay fix: the launch read
         // returns the newest value, not the one it replaced.
-        assertEquals(appB, repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT)).isEqualTo(appB)
     }
 
     @Test
     fun `getSwipeActionComponent returns null for an unassigned slot`() = runTest {
         val repo = createRepository()
-        assertNull(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT)).isNull()
     }
 
     @Test
     fun `getSwipeActionComponent returns null for NONE`() = runTest {
         val repo = createRepository()
         repo.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, appA)
-        assertNull(repo.getSwipeActionComponent(SwipeSlot.NONE))
+        assertThat(repo.getSwipeActionComponent(SwipeSlot.NONE)).isNull()
     }
 
     // ---------- purgeRepository ----------
@@ -261,15 +260,15 @@ abstract class SwipeActionsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertNull(repo.left())
-        assertNull(repo.right())
+        assertThat(repo.left()).isNull()
+        assertThat(repo.right()).isNull()
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertNull(repo.left())
-        assertNull(repo.right())
+        assertThat(repo.left()).isNull()
+        assertThat(repo.right()).isNull()
     }
 }

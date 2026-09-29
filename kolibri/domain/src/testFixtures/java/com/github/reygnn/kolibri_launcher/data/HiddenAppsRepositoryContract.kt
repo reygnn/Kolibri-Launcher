@@ -1,14 +1,13 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -66,13 +65,13 @@ abstract class HiddenAppsRepositoryContract {
     @Test
     fun `fresh repository emits empty set`() = runTest {
         val repo = createRepository()
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
     fun `fresh repository reports nothing as hidden`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isComponentHidden(compA))
+        assertThat(repo.isComponentHidden(compA)).isFalse()
     }
 
     // ---------- hideComponent ----------
@@ -80,40 +79,40 @@ abstract class HiddenAppsRepositoryContract {
     @Test
     fun `hideComponent returns true for valid component`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.hideComponent(compA))
+        assertThat(repo.hideComponent(compA)).isTrue()
     }
 
     @Test
     fun `hideComponent persists component to flow`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
-        assertTrue(compA in repo.hiddenAppsFlow.first())
+        assertThat(compA in repo.hiddenAppsFlow.first()).isTrue()
     }
 
     @Test
     fun `hideComponent twice with same component is idempotent`() = runTest {
         val repo = createRepository()
-        assertTrue(repo.hideComponent(compA))
-        assertTrue(repo.hideComponent(compA))
-        assertEquals(setOf(compA), repo.hiddenAppsFlow.first())
+        assertThat(repo.hideComponent(compA)).isTrue()
+        assertThat(repo.hideComponent(compA)).isTrue()
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
     fun `hideComponent returns false for null`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hideComponent(null))
+        assertThat(repo.hideComponent(null)).isFalse()
     }
 
     @Test
     fun `hideComponent returns false for empty string`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hideComponent(""))
+        assertThat(repo.hideComponent("")).isFalse()
     }
 
     @Test
     fun `hideComponent returns false for whitespace-only string`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.hideComponent("   "))
+        assertThat(repo.hideComponent("   ")).isFalse()
     }
 
     @Test
@@ -123,7 +122,7 @@ abstract class HiddenAppsRepositoryContract {
         repo.hideComponent("")
         repo.hideComponent("   ")
         repo.hideComponent(null)
-        assertEquals(setOf(compA), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
@@ -131,7 +130,7 @@ abstract class HiddenAppsRepositoryContract {
         val repo = createRepository()
         repo.hideComponent(compA)
         repo.hideComponent(compB)
-        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compA, compB))
     }
 
     // ---------- showComponent ----------
@@ -140,7 +139,7 @@ abstract class HiddenAppsRepositoryContract {
     fun `showComponent returns true for hidden component`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
-        assertTrue(repo.showComponent(compA))
+        assertThat(repo.showComponent(compA)).isTrue()
     }
 
     @Test
@@ -149,7 +148,7 @@ abstract class HiddenAppsRepositoryContract {
         repo.hideComponent(compA)
         repo.hideComponent(compB)
         repo.showComponent(compA)
-        assertEquals(setOf(compB), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compB))
     }
 
     @Test
@@ -158,16 +157,16 @@ abstract class HiddenAppsRepositoryContract {
         // true, Fake führt no-op Set-Minus aus. Vertrag: keine Exception, true,
         // Zustand bleibt leer.
         val repo = createRepository()
-        assertTrue(repo.showComponent(compA))
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertThat(repo.showComponent(compA)).isTrue()
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
     fun `showComponent returns false for null and blank`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.showComponent(null))
-        assertFalse(repo.showComponent(""))
-        assertFalse(repo.showComponent("   "))
+        assertThat(repo.showComponent(null)).isFalse()
+        assertThat(repo.showComponent("")).isFalse()
+        assertThat(repo.showComponent("   ")).isFalse()
     }
 
     // ---------- isComponentHidden ----------
@@ -176,27 +175,27 @@ abstract class HiddenAppsRepositoryContract {
     fun `isComponentHidden returns true for hidden component`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
-        assertTrue(repo.isComponentHidden(compA))
+        assertThat(repo.isComponentHidden(compA)).isTrue()
     }
 
     @Test
     fun `isComponentHidden returns false for non-hidden component`() = runTest {
         val repo = createRepository()
         repo.hideComponent(compA)
-        assertFalse(repo.isComponentHidden(compB))
+        assertThat(repo.isComponentHidden(compB)).isFalse()
     }
 
     @Test
     fun `isComponentHidden returns false for null`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isComponentHidden(null))
+        assertThat(repo.isComponentHidden(null)).isFalse()
     }
 
     @Test
     fun `isComponentHidden returns false for blank`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.isComponentHidden(""))
-        assertFalse(repo.isComponentHidden("   "))
+        assertThat(repo.isComponentHidden("")).isFalse()
+        assertThat(repo.isComponentHidden("   ")).isFalse()
     }
 
     // ---------- updateComponentVisibilities (Bulk) ----------
@@ -208,7 +207,7 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = setOf(compA, compB),
             componentsToShow = emptySet()
         )
-        assertEquals(setOf(compA, compB), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compA, compB))
     }
 
     @Test
@@ -220,7 +219,7 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = emptySet(),
             componentsToShow = setOf(compA)
         )
-        assertEquals(setOf(compB), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compB))
     }
 
     @Test
@@ -231,7 +230,7 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = setOf(compB, compC),
             componentsToShow = setOf(compA)
         )
-        assertEquals(setOf(compB, compC), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compB, compC))
     }
 
     /**
@@ -249,11 +248,8 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = setOf(compA),
             componentsToShow = setOf(compA)
         )
-        assertFalse(
-            "Bei Overlap zwischen toHide und toShow muss show gewinnen",
-            repo.isComponentHidden(compA)
-        )
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertWithMessage("Bei Overlap zwischen toHide und toShow muss show gewinnen").that(repo.isComponentHidden(compA)).isFalse()
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
@@ -264,7 +260,7 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = emptySet(),
             componentsToShow = emptySet()
         )
-        assertEquals(setOf(compA), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(setOf(compA))
     }
 
     @Test
@@ -274,7 +270,7 @@ abstract class HiddenAppsRepositoryContract {
             componentsToHide = emptySet(),
             componentsToShow = setOf(compA)
         )
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     // ---------- purgeRepository ----------
@@ -285,13 +281,13 @@ abstract class HiddenAppsRepositoryContract {
         repo.hideComponent(compA)
         repo.hideComponent(compB)
         repo.purgeRepository()
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(emptySet<String>(), repo.hiddenAppsFlow.first())
+        assertThat(repo.hiddenAppsFlow.first()).isEqualTo(emptySet<String>())
     }
 }

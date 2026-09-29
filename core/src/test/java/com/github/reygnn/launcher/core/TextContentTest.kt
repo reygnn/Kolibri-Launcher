@@ -1,7 +1,6 @@
 package com.github.reygnn.launcher.core
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -23,48 +22,48 @@ class TextContentTest {
 
     @Test
     fun `empty string is effectively blank`() {
-        assertTrue("".isEffectivelyBlank())
+        assertThat("".isEffectivelyBlank()).isTrue()
     }
 
     @Test
     fun `whitespace-only strings are effectively blank`() {
-        assertTrue("   ".isEffectivelyBlank())
-        assertTrue("\t\n ".isEffectivelyBlank())
+        assertThat("   ".isEffectivelyBlank()).isTrue()
+        assertThat("\t\n ".isEffectivelyBlank()).isTrue()
     }
 
     @Test
     fun `a lone combining mark is effectively blank`() {
         // U+0301 COMBINING ACUTE / U+0300 GRAVE with no base letter: an empty row.
-        assertTrue(cp(0x0301).isEffectivelyBlank())
-        assertTrue(cp(0x0301, 0x0300).isEffectivelyBlank())
+        assertThat(cp(0x0301).isEffectivelyBlank()).isTrue()
+        assertThat(cp(0x0301, 0x0300).isEffectivelyBlank()).isTrue()
     }
 
     @Test
     fun `zero-width and format characters are effectively blank`() {
-        assertTrue(cp(0x200B).isEffectivelyBlank()) // ZERO WIDTH SPACE
-        assertTrue(cp(0x200D).isEffectivelyBlank()) // ZERO WIDTH JOINER
-        assertTrue(cp(0x202E).isEffectivelyBlank()) // RIGHT-TO-LEFT OVERRIDE
-        assertTrue(cp(0xFEFF).isEffectivelyBlank()) // ZERO WIDTH NO-BREAK SPACE (BOM)
+        assertThat(cp(0x200B).isEffectivelyBlank()).isTrue() // ZERO WIDTH SPACE
+        assertThat(cp(0x200D).isEffectivelyBlank()).isTrue() // ZERO WIDTH JOINER
+        assertThat(cp(0x202E).isEffectivelyBlank()).isTrue() // RIGHT-TO-LEFT OVERRIDE
+        assertThat(cp(0xFEFF).isEffectivelyBlank()).isTrue() // ZERO WIDTH NO-BREAK SPACE (BOM)
     }
 
     @Test
     fun `plain text is not effectively blank`() {
-        assertFalse("Camera".isEffectivelyBlank())
-        assertFalse("a".isEffectivelyBlank())
-        assertFalse("  x  ".isEffectivelyBlank()) // a base char among whitespace
+        assertThat("Camera".isEffectivelyBlank()).isFalse()
+        assertThat("a".isEffectivelyBlank()).isFalse()
+        assertThat("  x  ".isEffectivelyBlank()).isFalse() // a base char among whitespace
     }
 
     @Test
     fun `a base letter with a combining mark is not effectively blank`() {
-        assertFalse(cp(0x0065, 0x0301).isEffectivelyBlank()) // "e" + combining acute
-        assertFalse(cp(0x00E9).isEffectivelyBlank())         // precomposed "é"
+        assertThat(cp(0x0065, 0x0301).isEffectivelyBlank()).isFalse() // "e" + combining acute
+        assertThat(cp(0x00E9).isEffectivelyBlank()).isFalse()         // precomposed "é"
     }
 
     @Test
     fun `emoji-only names are not effectively blank`() {
         // The README rename example U+1F41B (bug) — an OTHER_SYMBOL that renders
         // fine, so it stays a valid custom name (it just sorts to the end).
-        assertFalse(cp(0x1F41B).isEffectivelyBlank())
-        assertFalse(cp(0x1F41B, 0x1F41B).isEffectivelyBlank())
+        assertThat(cp(0x1F41B).isEffectivelyBlank()).isFalse()
+        assertThat(cp(0x1F41B, 0x1F41B).isEffectivelyBlank()).isFalse()
     }
 }

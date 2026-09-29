@@ -2,12 +2,12 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -54,7 +54,7 @@ abstract class FabPositionRepositoryContract {
     @Test
     fun `fresh repository emits DEFAULT position`() = runTest {
         val repo = createRepository()
-        assertEquals(FabPosition.DEFAULT, repo.fabPositionFlow.first())
+        assertThat(repo.fabPositionFlow.first()).isEqualTo(FabPosition.DEFAULT)
     }
 
     // ---------- saveFabPosition roundtrip ----------
@@ -64,7 +64,7 @@ abstract class FabPositionRepositoryContract {
         val repo = createRepository()
         val position = FabPosition(xFraction = 0.25f, yFraction = 0.5f)
         repo.saveFabPosition(position)
-        assertEquals(position, repo.fabPositionFlow.first())
+        assertThat(repo.fabPositionFlow.first()).isEqualTo(position)
     }
 
     @Test
@@ -73,7 +73,7 @@ abstract class FabPositionRepositoryContract {
         repo.saveFabPosition(FabPosition(xFraction = 0.1f, yFraction = 0.1f))
         val newPosition = FabPosition(xFraction = 0.9f, yFraction = 0.9f)
         repo.saveFabPosition(newPosition)
-        assertEquals(newPosition, repo.fabPositionFlow.first())
+        assertThat(repo.fabPositionFlow.first()).isEqualTo(newPosition)
     }
 
     /**
@@ -88,8 +88,8 @@ abstract class FabPositionRepositoryContract {
         val position = FabPosition(xFraction = 0.123f, yFraction = 0.876f)
         repo.saveFabPosition(position)
         val read = repo.fabPositionFlow.first()
-        assertEquals(0.123f, read.xFraction)
-        assertEquals(0.876f, read.yFraction)
+        assertThat(read.xFraction).isEqualTo(0.123f)
+        assertThat(read.yFraction).isEqualTo(0.876f)
     }
 
     /**
@@ -104,8 +104,8 @@ abstract class FabPositionRepositoryContract {
         val position = FabPosition(xFraction = -0.5f, yFraction = 1.5f)
         repo.saveFabPosition(position)
         val read = repo.fabPositionFlow.first()
-        assertEquals(-0.5f, read.xFraction)
-        assertEquals(1.5f, read.yFraction)
+        assertThat(read.xFraction).isEqualTo(-0.5f)
+        assertThat(read.yFraction).isEqualTo(1.5f)
     }
 
     // ---------- purgeRepository ----------
@@ -115,13 +115,13 @@ abstract class FabPositionRepositoryContract {
         val repo = createRepository()
         repo.saveFabPosition(FabPosition(xFraction = 0.3f, yFraction = 0.7f))
         repo.purgeRepository()
-        assertEquals(FabPosition.DEFAULT, repo.fabPositionFlow.first())
+        assertThat(repo.fabPositionFlow.first()).isEqualTo(FabPosition.DEFAULT)
     }
 
     @Test
     fun `purgeRepository on fresh repository is safe`() = runTest {
         val repo = createRepository()
         repo.purgeRepository()
-        assertEquals(FabPosition.DEFAULT, repo.fabPositionFlow.first())
+        assertThat(repo.fabPositionFlow.first()).isEqualTo(FabPosition.DEFAULT)
     }
 }

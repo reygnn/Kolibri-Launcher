@@ -4,11 +4,10 @@ import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,10 +46,7 @@ class HomeFragmentRobolectricTest {
                     .add(android.R.id.content, fragment, "test")
                     .commitNow()
 
-                assertNotNull(
-                    "HomeFragment must attach without throwing",
-                    activity.supportFragmentManager.findFragmentByTag("test")
-                )
+                assertWithMessage("HomeFragment must attach without throwing").that(activity.supportFragmentManager.findFragmentByTag("test")).isNotNull()
             }
         }
     }
@@ -80,10 +76,7 @@ class HomeFragmentRobolectricTest {
                     .remove(fragment)
                     .commitNow()
 
-                assertNull(
-                    "HomeFragment must be removed cleanly",
-                    fm.findFragmentByTag("test")
-                )
+                assertWithMessage("HomeFragment must be removed cleanly").that(fm.findFragmentByTag("test")).isNull()
             }
         }
     }
@@ -112,10 +105,7 @@ class HomeFragmentRobolectricTest {
             scenario.recreate()
 
             scenario.onActivity { activity ->
-                assertNotNull(
-                    "HomeFragment must survive recreate",
-                    activity.supportFragmentManager.findFragmentByTag("test")
-                )
+                assertWithMessage("HomeFragment must survive recreate").that(activity.supportFragmentManager.findFragmentByTag("test")).isNotNull()
             }
         }
     }

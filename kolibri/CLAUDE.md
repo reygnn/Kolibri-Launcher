@@ -507,8 +507,8 @@ activities.
     "Triple-catch kept", "Outer Catchall kept") or
     `[Rr]ethrow per canonical` (CancellationException rethrow). To add
     a file to the whitelist: confirm every broad catch has an inline
-    annotation, then append the path to the `rule11_files` array in
-    `tools/check-conventions.sh`. Narrowed exception types are not
+    annotation, then append the path to the `RULE11_FILES` array in
+    `../tools/conventions/kolibri.conf`. Narrowed exception types are not
     flagged — narrowing IS following Rule 11. The detection logic
     itself lives in `../tools/check-rule11-annotation.awk`; regression-
     test any regex change via `../tools/check-conventions-test.sh` (not
@@ -577,8 +577,8 @@ activities.
     one suspend-frame catch, the `showSortFavoritesFragment` fragment
     transaction, gained a `CancellationException`-first arm to match its
     three siblings); append to the
-    `cancel_files` array in
-    `tools/check-conventions.sh` to add a file (adding one with
+    `CANCEL_FILES` array in
+    `../tools/conventions/kolibri.conf` to add a file (adding one with
     unreviewed catches just turns the build red — that IS the review
     prompt). Logic in `../tools/check-cancellation-rethrow.awk`, whose
     case-(a) walk is indentation-based so a cancellation-first arm still
@@ -789,7 +789,7 @@ allocation core joined as pure regression locks, all already `Throwable`-only:
 view classes (`MainActivity`, `SettingsFragment`, `AppDrawerFragment`, …) were
 deliberately NOT added despite being clean today — half of `ui/` on the list would
 make "is listed" stop meaning anything. Append to
-the `oom_files` array in `tools/check-conventions.sh` to add a file. Regression-
+the `OOM_FILES` array in `../tools/conventions/kolibri.conf` to add a file. Regression-
 tested via `../tools/check-exception-breadth-test.sh` (manual rerun, not a CI gate).
 
 **Discovery — `./gradlew scanOomCandidates`.** Sibling of `scanCancelCandidates`

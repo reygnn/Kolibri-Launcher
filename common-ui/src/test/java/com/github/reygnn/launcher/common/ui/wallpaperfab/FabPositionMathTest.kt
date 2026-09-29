@@ -1,6 +1,6 @@
 package com.github.reygnn.launcher.common.ui.wallpaperfab
 
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class FabPositionMathTest {
@@ -15,7 +15,7 @@ class FabPositionMathTest {
             parentSize = 1000,
         )
         // Center at 500, top-left at 500 - 50 = 450.
-        assertEquals(450, topLeft)
+        assertThat(topLeft).isEqualTo(450)
     }
 
     @Test
@@ -26,7 +26,7 @@ class FabPositionMathTest {
             parentSize = 1000,
         )
         // Center would be 0 → top-left = -50, clamped to 0.
-        assertEquals(0, topLeft)
+        assertThat(topLeft).isEqualTo(0)
     }
 
     @Test
@@ -37,7 +37,7 @@ class FabPositionMathTest {
             parentSize = 1000,
         )
         // Center would be 1000 → top-left = 950, max top-left = 900.
-        assertEquals(900, topLeft)
+        assertThat(topLeft).isEqualTo(900)
     }
 
     @Test
@@ -47,7 +47,7 @@ class FabPositionMathTest {
             fabSize = 200,
             parentSize = 100,
         )
-        assertEquals(0, topLeft)
+        assertThat(topLeft).isEqualTo(0)
     }
 
     @Test
@@ -60,7 +60,7 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(0, topLeft)
+        assertThat(topLeft).isEqualTo(0)
     }
 
     // Non-finite persisted fractions (RC edge-case audit B7). Exact 0f/1f are already
@@ -76,7 +76,7 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(0, topLeft)
+        assertThat(topLeft).isEqualTo(0)
     }
 
     @Test
@@ -86,7 +86,7 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(900, topLeft) // max top-left = parent - fab
+        assertThat(topLeft).isEqualTo(900) // max top-left = parent - fab
     }
 
     @Test
@@ -96,7 +96,7 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(0, topLeft)
+        assertThat(topLeft).isEqualTo(0)
     }
 
     // ---------- topLeftPxToCenterFraction ----------
@@ -113,7 +113,7 @@ class FabPositionMathTest {
             fabSize = 80,
             parentSize = 500,
         )
-        assertEquals(0.3f, fraction, 0.01f)
+        assertThat(fraction).isWithin(0.01f).of(0.3f)
     }
 
     @Test
@@ -124,7 +124,7 @@ class FabPositionMathTest {
             fabSize = 50,
             parentSize = 0,
         )
-        assertEquals(0.5f, fraction)
+        assertThat(fraction).isEqualTo(0.5f)
     }
 
     @Test
@@ -134,7 +134,7 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(1f, fraction)
+        assertThat(fraction).isEqualTo(1f)
     }
 
     @Test
@@ -144,35 +144,29 @@ class FabPositionMathTest {
             fabSize = 100,
             parentSize = 1000,
         )
-        assertEquals(0f, fraction)
+        assertThat(fraction).isEqualTo(0f)
     }
 
     // ---------- clampTopLeft ----------
 
     @Test
     fun `clampTopLeft keeps in-range values untouched`() {
-        assertEquals(123f, FabPositionMath.clampTopLeft(123f, fabSize = 50, parentSize = 500))
+        assertThat(FabPositionMath.clampTopLeft(123f, fabSize = 50, parentSize = 500)).isEqualTo(123f)
     }
 
     @Test
     fun `clampTopLeft clamps below-zero to zero`() {
-        assertEquals(0f, FabPositionMath.clampTopLeft(-10f, fabSize = 50, parentSize = 500))
+        assertThat(FabPositionMath.clampTopLeft(-10f, fabSize = 50, parentSize = 500)).isEqualTo(0f)
     }
 
     @Test
     fun `clampTopLeft clamps above-max to max`() {
-        assertEquals(
-            450f,
-            FabPositionMath.clampTopLeft(1000f, fabSize = 50, parentSize = 500),
-        )
+        assertThat(FabPositionMath.clampTopLeft(1000f, fabSize = 50, parentSize = 500)).isEqualTo(450f)
     }
 
     @Test
     fun `clampTopLeft yields zero when fab equals parent`() {
-        assertEquals(
-            0f,
-            FabPositionMath.clampTopLeft(100f, fabSize = 500, parentSize = 500),
-        )
+        assertThat(FabPositionMath.clampTopLeft(100f, fabSize = 500, parentSize = 500)).isEqualTo(0f)
     }
 
     // ---------- clampTopLeft + insets ----------
@@ -182,32 +176,26 @@ class FabPositionMathTest {
         // Status bar / left cutout reserves the first 80 px on this
         // axis; the FAB must not land below that, even if the user
         // dragged into the bar.
-        assertEquals(
-            80f,
-            FabPositionMath.clampTopLeft(
+        assertThat(FabPositionMath.clampTopLeft(
                 topLeftPx = -10f,
                 fabSize = 100,
                 parentSize = 1000,
                 insetStart = 80,
                 insetEnd = 0,
-            ),
-        )
+            )).isEqualTo(80f)
     }
 
     @Test
     fun `clampTopLeft respects insetEnd as new maximum`() {
         // Nav bar / right cutout reserves the last 120 px on this axis.
         // Max top-left = 1000 - 100 - 120 = 780.
-        assertEquals(
-            780f,
-            FabPositionMath.clampTopLeft(
+        assertThat(FabPositionMath.clampTopLeft(
                 topLeftPx = 10_000f,
                 fabSize = 100,
                 parentSize = 1000,
                 insetStart = 0,
                 insetEnd = 120,
-            ),
-        )
+            )).isEqualTo(780f)
     }
 
     @Test
@@ -215,16 +203,13 @@ class FabPositionMathTest {
         // Edge case: the FAB literally doesn't fit between the insets.
         // We bias to the start edge (top / left) so it remains tap-
         // reachable.
-        assertEquals(
-            80f,
-            FabPositionMath.clampTopLeft(
+        assertThat(FabPositionMath.clampTopLeft(
                 topLeftPx = 200f,
                 fabSize = 900,
                 parentSize = 1000,
                 insetStart = 80,
                 insetEnd = 80,
-            ),
-        )
+            )).isEqualTo(80f)
     }
 
     // ---------- centerFractionToTopLeftPx + insets ----------
@@ -233,44 +218,35 @@ class FabPositionMathTest {
     fun `centerFractionToTopLeftPx clamps fraction 0 to insetStart not zero`() {
         // A persisted fraction of 0.0 (left/top edge of the screen)
         // must not place the FAB behind the status-bar / left-cutout.
-        assertEquals(
-            80,
-            FabPositionMath.centerFractionToTopLeftPx(
+        assertThat(FabPositionMath.centerFractionToTopLeftPx(
                 centerFraction = 0.0f,
                 fabSize = 100,
                 parentSize = 1000,
                 insetStart = 80,
                 insetEnd = 0,
-            ),
-        )
+            )).isEqualTo(80)
     }
 
     @Test
     fun `centerFractionToTopLeftPx clamps fraction 1 to maximum minus insetEnd`() {
         // Mirror of the above for the trailing edge.
-        assertEquals(
-            780,
-            FabPositionMath.centerFractionToTopLeftPx(
+        assertThat(FabPositionMath.centerFractionToTopLeftPx(
                 centerFraction = 1.0f,
                 fabSize = 100,
                 parentSize = 1000,
                 insetStart = 0,
                 insetEnd = 120,
-            ),
-        )
+            )).isEqualTo(780)
     }
 
     @Test
     fun `centerFractionToTopLeftPx returns insetStart when fab plus insets exceed parent`() {
-        assertEquals(
-            80,
-            FabPositionMath.centerFractionToTopLeftPx(
+        assertThat(FabPositionMath.centerFractionToTopLeftPx(
                 centerFraction = 0.5f,
                 fabSize = 900,
                 parentSize = 1000,
                 insetStart = 80,
                 insetEnd = 80,
-            ),
-        )
+            )).isEqualTo(80)
     }
 }

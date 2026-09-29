@@ -2,6 +2,8 @@ package com.github.reygnn.kolibri_launcher.ui.main.delegate
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -9,8 +11,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -36,8 +36,8 @@ class DelegateScopeTest {
 
         scope.sendEvent(UiEvent.ShowAppDrawer)
 
-        assertEquals(1, sentEvents.size)
-        assertEquals(UiEvent.ShowAppDrawer, sentEvents.first())
+        assertThat(sentEvents.size).isEqualTo(1)
+        assertThat(sentEvents.first()).isEqualTo(UiEvent.ShowAppDrawer)
     }
 
     @Test
@@ -58,7 +58,7 @@ class DelegateScopeTest {
         scope.sendEvent(event2)
         scope.sendEvent(event3)
 
-        assertEquals(listOf(event1, event2, event3), sentEvents)
+        assertThat(sentEvents).isEqualTo(listOf(event1, event2, event3))
     }
 
     // ===========================================
@@ -81,7 +81,7 @@ class DelegateScopeTest {
         }
         advanceUntilIdle()
 
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 
     @Test
@@ -98,7 +98,7 @@ class DelegateScopeTest {
         }
         advanceUntilIdle()
 
-        assertTrue(true)
+        assertThat(true).isTrue()
     }
 
     @Test
@@ -115,7 +115,7 @@ class DelegateScopeTest {
         }
         advanceUntilIdle()
 
-        assertTrue(true)
+        assertThat(true).isTrue()
     }
 
     @Test
@@ -137,7 +137,7 @@ class DelegateScopeTest {
             executed = true
         }
         advanceUntilIdle()
-        assertTrue("Scope should remain functional after CancellationException", executed)
+        assertWithMessage("Scope should remain functional after CancellationException").that(executed).isTrue()
     }
 
     @Test
@@ -160,6 +160,6 @@ class DelegateScopeTest {
         }
         advanceUntilIdle()
 
-        assertTrue(executed)
+        assertThat(executed).isTrue()
     }
 }

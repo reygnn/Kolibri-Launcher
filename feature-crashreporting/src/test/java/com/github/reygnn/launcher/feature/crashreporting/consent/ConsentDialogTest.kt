@@ -1,14 +1,12 @@
 package com.github.reygnn.launcher.feature.crashreporting.consent
 
 import android.content.Context
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -42,12 +40,9 @@ class ConsentDialogTest {
 
             val dialog = ConsentDialog.show(nonActivityContext) { reported.add(it) }
 
-            assertNull("No dialog can be shown without an Activity context", dialog)
-            assertTrue(
-                "A show failure must NOT invoke onResult — otherwise it would " +
-                    "persist a decline the user never made (A3)",
-                reported.isEmpty(),
-            )
+            assertWithMessage("No dialog can be shown without an Activity context").that(dialog).isNull()
+            assertWithMessage("A show failure must NOT invoke onResult — otherwise it would " +
+                    "persist a decline the user never made (A3)").that(reported.isEmpty()).isTrue()
         }
 
     @Test
@@ -60,6 +55,6 @@ class ConsentDialogTest {
                 if (!granted) declineReported = true
             }
 
-            assertEquals("A show failure must not fire onResult(false)", false, declineReported)
+            assertWithMessage("A show failure must not fire onResult(false)").that(declineReported).isEqualTo(false)
         }
 }

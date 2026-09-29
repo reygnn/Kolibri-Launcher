@@ -1,9 +1,8 @@
 package com.github.reygnn.launcher.core
 
-import com.github.reygnn.launcher.core.testing.MainDispatcherRuleBase
-import kotlinx.coroutines.test.StandardTestDispatcher
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,13 +29,13 @@ import org.junit.Test
  * not-loaded guard.
  *
  * Standard project contract shape: abstract behaviour here, run once per concrete subclass;
- * `MainDispatcherRuleBase` + `runTest(testDispatcher)` per the one-dispatcher rule, and the
+ * `MainDispatcherRule` + `runTest(testDispatcher)` per the one-dispatcher rule, and the
  * subclass wires the SAME dispatcher into its use case.
  */
 abstract class NoAutoPruneContract {
 
     @get:Rule
-    val mainDispatcherRule = MainDispatcherRuleBase(StandardTestDispatcher())
+    val mainDispatcherRule = MainDispatcherRule()
 
     /** The curated reference whose target is absent from the (non-empty) installed view. */
     protected val candidate = ComponentKey("com.ghost.gone", "com.ghost.gone.Main")
@@ -52,10 +51,7 @@ abstract class NoAutoPruneContract {
     @Test
     fun `a curated reference to a no-longer-installed app is never auto-pruned`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            assertTrue(
-                "a curated reference must survive a non-empty load/reconcile that omits it " +
-                    "(no auto-prune, Windows-shortcut model)",
-                candidateSurvivesUninstall(),
-            )
+            assertWithMessage("a curated reference must survive a non-empty load/reconcile that omits it " +
+                    "(no auto-prune, Windows-shortcut model)").that(candidateSurvivesUninstall()).isTrue()
         }
 }

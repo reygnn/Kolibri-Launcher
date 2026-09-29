@@ -1,6 +1,6 @@
 package com.github.reygnn.launcher.core.wallpaper
 
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,7 +30,7 @@ class WallpaperSaveActionTest {
             allLayerTransforms = sampleAllTransforms,
             singleTransform = sampleSingleTransform,
         )
-        assertEquals(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms), result)
+        assertThat(result).isEqualTo(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms))
     }
 
     @Test
@@ -41,10 +41,7 @@ class WallpaperSaveActionTest {
             allLayerTransforms = sampleAllTransforms,
             singleTransform = sampleSingleTransform,
         )
-        assertEquals(
-            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3),
-            result,
-        )
+        assertThat(result).isEqualTo(WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3))
     }
 
     @Test
@@ -55,7 +52,7 @@ class WallpaperSaveActionTest {
             allLayerTransforms = emptyList(),
             singleTransform = LayerTransform(1f, 0f, 0f, 1),
         )
-        assertEquals(WallpaperSaveAction.NoOp, result)
+        assertThat(result).isEqualTo(WallpaperSaveAction.NoOp)
     }
 
     // ------------------------------------------------------------------------
@@ -74,7 +71,7 @@ class WallpaperSaveActionTest {
             allLayerTransforms = sampleAllTransforms,
             singleTransform = sampleSingleTransform,
         )
-        assertEquals(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms), result)
+        assertThat(result).isEqualTo(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms))
     }
 
     // ------------------------------------------------------------------------
@@ -89,10 +86,7 @@ class WallpaperSaveActionTest {
             allLayerTransforms = listOf(LayerTransform(99f, 99f, 99f, 1)),  // garbage
             singleTransform = sampleSingleTransform,
         )
-        assertEquals(
-            WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3),
-            result,
-        )
+        assertThat(result).isEqualTo(WallpaperSaveAction.SaveSingle(scale = 1.25f, translateX = 5f, translateY = 7f, sampleSize = 3))
     }
 
     @Test
@@ -103,6 +97,6 @@ class WallpaperSaveActionTest {
             allLayerTransforms = sampleAllTransforms,
             singleTransform = LayerTransform(99f, 99f, 99f, 1),  // garbage
         )
-        assertEquals(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms), result)
+        assertThat(result).isEqualTo(WallpaperSaveAction.SaveAllLayers(sampleAllTransforms))
     }
 }

@@ -13,11 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.ui.appdrawer.AppDrawerAdapter
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -65,11 +61,11 @@ class HomeFavoritesAdapterBindingTest {
 
         // Part 3: listeners hoisted into init -> the button carries the click /
         // long-press signal WITHOUT any bind having run.
-        assertTrue(holder.button.isClickable)
-        assertTrue(holder.button.isLongClickable)
+        assertThat(holder.button.isClickable).isTrue()
+        assertThat(holder.button.isLongClickable).isTrue()
         // The container must stay non-long-clickable so the empty row space is
         // the wrapper's long-press area (the contract onCreateViewHolder protects).
-        assertFalse((holder.itemView as FrameLayout).isLongClickable)
+        assertThat((holder.itemView as FrameLayout).isLongClickable).isFalse()
     }
 
     @Test
@@ -82,10 +78,10 @@ class HomeFavoritesAdapterBindingTest {
         val holder = adapter.onCreateViewHolder(parent, 0)
         adapter.onBindViewHolder(holder, 0)
 
-        assertEquals("Camera", holder.button.text.toString())
-        assertEquals(40f, holder.button.textSize, 0.5f)
-        assertEquals(Typeface.DEFAULT_BOLD, holder.button.typeface)
-        assertEquals(stylingA.textColor, holder.button.textColors.defaultColor)
+        assertThat(holder.button.text.toString()).isEqualTo("Camera")
+        assertThat(holder.button.textSize).isWithin(0.5f).of(40f)
+        assertThat(holder.button.typeface).isEqualTo(Typeface.DEFAULT_BOLD)
+        assertThat(holder.button.textColors.defaultColor).isEqualTo(stylingA.textColor)
     }
 
     @Test
@@ -96,7 +92,7 @@ class HomeFavoritesAdapterBindingTest {
 
         val holder = adapter.onCreateViewHolder(parent, 0)
         adapter.onBindViewHolder(holder, 0)
-        assertEquals(40f, holder.button.textSize, 0.5f)
+        assertThat(holder.button.textSize).isWithin(0.5f).of(40f)
 
         // A styling change flows through the payload override (part 1). Use the
         // REAL STYLING_PAYLOAD: after AUDIT-17 F1 only that instance takes the
@@ -105,11 +101,11 @@ class HomeFavoritesAdapterBindingTest {
         adapter.setStyling(stylingB)
         adapter.onBindViewHolder(holder, 0, mutableListOf(HomeFavoritesAdapter.STYLING_PAYLOAD))
 
-        assertEquals(60f, holder.button.textSize, 0.5f)
-        assertEquals(Typeface.DEFAULT, holder.button.typeface)
-        assertEquals(stylingB.textColor, holder.button.textColors.defaultColor)
+        assertThat(holder.button.textSize).isWithin(0.5f).of(60f)
+        assertThat(holder.button.typeface).isEqualTo(Typeface.DEFAULT)
+        assertThat(holder.button.textColors.defaultColor).isEqualTo(stylingB.textColor)
         // Text is untouched by the payload path.
-        assertEquals("Camera", holder.button.text.toString())
+        assertThat(holder.button.text.toString()).isEqualTo("Camera")
     }
 
     @Test
@@ -130,7 +126,7 @@ class HomeFavoritesAdapterBindingTest {
         adapter.onBindViewHolder(holder, 0, mutableListOf<Any>(AppDrawerAdapter.PAYLOAD_NAME_CHANGE))
 
         // Full bind ran -> text refreshed to the current item's displayName.
-        assertEquals("Cam", holder.button.text.toString())
+        assertThat(holder.button.text.toString()).isEqualTo("Cam")
     }
 
     @Test
@@ -143,8 +139,8 @@ class HomeFavoritesAdapterBindingTest {
         // Empty payload -> super -> full onBindViewHolder sets the text too.
         adapter.onBindViewHolder(holder, 0, mutableListOf())
 
-        assertEquals("Camera", holder.button.text.toString())
-        assertEquals(40f, holder.button.textSize, 0.5f)
+        assertThat(holder.button.text.toString()).isEqualTo("Camera")
+        assertThat(holder.button.textSize).isWithin(0.5f).of(40f)
     }
 
     @Test
@@ -171,10 +167,10 @@ class HomeFavoritesAdapterBindingTest {
         val button = container.getChildAt(0) as Button
 
         button.performClick()
-        assertSame(camera, clicked)
+        assertThat(clicked).isSameInstanceAs(camera)
 
-        assertTrue(button.performLongClick())
-        assertSame(camera, longClicked)
+        assertThat(button.performLongClick()).isTrue()
+        assertThat(longClicked).isSameInstanceAs(camera)
     }
 
     @Test
@@ -189,7 +185,7 @@ class HomeFavoritesAdapterBindingTest {
         // Not attached to a RecyclerView -> bindingAdapterPosition == NO_POSITION.
         val consumed = holder.button.performLongClick()
 
-        assertFalse(consumed)
-        assertNull(longClicked)
+        assertThat(consumed).isFalse()
+        assertThat(longClicked).isNull()
     }
 }

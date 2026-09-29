@@ -3,12 +3,11 @@ package com.github.reygnn.launcher.common.ui
 import android.os.Bundle
 import android.view.View
 import android.view.ViewPropertyAnimator
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -33,51 +32,51 @@ class DrawerOverlayControllerTest {
     )
 
     @Test fun `starts closed`() {
-        assertFalse(newController().isOpen)
+        assertThat(newController().isOpen).isFalse()
     }
 
     @Test fun `show opens and invokes onShown with the animate flag`() {
         val c = newController()
         c.show()
-        assertTrue(c.isOpen)
-        assertEquals(1, shownCount)
-        assertEquals(true, lastShownAnimate)
+        assertThat(c.isOpen).isTrue()
+        assertThat(shownCount).isEqualTo(1)
+        assertThat(lastShownAnimate).isEqualTo(true)
     }
 
     @Test fun `show(animate=false) passes the restore flag through to onShown`() {
         val c = newController()
         c.show(animate = false)
-        assertTrue(c.isOpen)
-        assertEquals(false, lastShownAnimate)
+        assertThat(c.isOpen).isTrue()
+        assertThat(lastShownAnimate).isEqualTo(false)
     }
 
     @Test fun `show is a no-op when already open`() {
         val c = newController()
         c.show()
         c.show()
-        assertEquals("onShown must fire once per logical open", 1, shownCount)
+        assertWithMessage("onShown must fire once per logical open").that(shownCount).isEqualTo(1)
     }
 
     @Test fun `hide closes and invokes onHidden`() {
         val c = newController()
         c.show()
         c.hide()
-        assertFalse(c.isOpen)
-        assertEquals(1, hiddenCount)
+        assertThat(c.isOpen).isFalse()
+        assertThat(hiddenCount).isEqualTo(1)
     }
 
     @Test fun `hide is a no-op when already closed`() {
         val c = newController()
         c.hide()
-        assertEquals(0, hiddenCount)
-        assertFalse(c.isOpen)
+        assertThat(hiddenCount).isEqualTo(0)
+        assertThat(c.isOpen).isFalse()
     }
 
     @Test fun `restore of a saved-open state normalises the container and reports open`() {
         val saved = mockk<Bundle>(relaxed = true)
         every { saved.getBoolean("drawer_overlay_open", false) } returns true
 
-        assertTrue(newController().restore(saved))
+        assertThat(newController().restore(saved)).isTrue()
         // Container forced hidden first so a restored view-visibility cannot
         // desync from isOpen.
         verify { container.visibility = View.GONE }
@@ -86,8 +85,8 @@ class DrawerOverlayControllerTest {
     @Test fun `restore of a saved-closed state or null reports closed`() {
         val saved = mockk<Bundle>(relaxed = true)
         every { saved.getBoolean("drawer_overlay_open", false) } returns false
-        assertFalse(newController().restore(saved))
-        assertFalse(newController().restore(null))
+        assertThat(newController().restore(saved)).isFalse()
+        assertThat(newController().restore(null)).isFalse()
     }
 
     @Test fun `onSaveInstanceState persists the open flag`() {
@@ -133,7 +132,7 @@ class DrawerOverlayControllerTest {
         c.show() // reopen mid-hide → isOpen true again
         endActions.last().run() // the superseded hide end action fires
 
-        assertTrue("A mid-hide reopen must stay open", c.isOpen)
+        assertWithMessage("A mid-hide reopen must stay open").that(c.isOpen).isTrue()
         verify(exactly = 0) { container.visibility = View.GONE }
     }
 

@@ -12,7 +12,7 @@ import com.github.reygnn.nyx_launcher.home.model.MoveResult
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.FakeHomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.ThrowingHomeLayoutRepository
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -41,10 +41,10 @@ class MoveItemUseCaseTest {
     )
 
     private fun useCase(repo: FakeHomeLayoutRepository) =
-        MoveItemUseCase(repo, ids, mainDispatcherRule.dispatcher)
+        MoveItemUseCase(repo, ids, mainDispatcherRule.testDispatcher)
 
     @Test
-    fun move_persists_the_new_layout_and_returns_moved() = runTest(mainDispatcherRule.dispatcher) {
+    fun move_persists_the_new_layout_and_returns_moved() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = FakeHomeLayoutRepository(layoutWithAppAtOrigin())
         val result = useCase(repo)(ItemId("a"), DropTarget.Cell(CellPos(0, 1, 1)))
 
@@ -54,7 +54,7 @@ class MoveItemUseCaseTest {
     }
 
     @Test
-    fun noop_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun noop_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = FakeHomeLayoutRepository(layoutWithAppAtOrigin())
         val result = useCase(repo)(ItemId("a"), DropTarget.Cell(CellPos(0, 0, 0))) // self-drop
 
@@ -63,7 +63,7 @@ class MoveItemUseCaseTest {
     }
 
     @Test
-    fun rejected_does_not_save() = runTest(mainDispatcherRule.dispatcher) {
+    fun rejected_does_not_save() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = FakeHomeLayoutRepository(layoutWithAppAtOrigin())
         val result = useCase(repo)(ItemId("a"), DropTarget.Cell(CellPos(0, 9, 9))) // off-grid
 
@@ -72,7 +72,7 @@ class MoveItemUseCaseTest {
     }
 
     @Test
-    fun folder_creation_persists_and_passes_through_the_folder_id() = runTest(mainDispatcherRule.dispatcher) {
+    fun folder_creation_persists_and_passes_through_the_folder_id() = runTest(mainDispatcherRule.testDispatcher) {
         // B7: FolderCreated is a save-triggering result whose `folder` field must survive the
         // shell. Only Moved was pinned before; the transition matrix is tested elsewhere, so
         // here we only assert the save + result pass-through.
@@ -88,7 +88,7 @@ class MoveItemUseCaseTest {
     }
 
     @Test
-    fun add_to_folder_persists_and_passes_through_the_folder_id() = runTest(mainDispatcherRule.dispatcher) {
+    fun add_to_folder_persists_and_passes_through_the_folder_id() = runTest(mainDispatcherRule.testDispatcher) {
         // B7: AddedToFolder is the other save-triggering result whose `folder` field runs
         // through the shell.
         val f = PlacedItem(HomeItem.Folder(ItemId("f"), "", listOf(ck("pa"), ck("pb"))), CellPos(0, 0, 0))
@@ -103,12 +103,12 @@ class MoveItemUseCaseTest {
     }
 
     @Test
-    fun a_failed_persist_propagates_out_of_the_use_case() = runTest(mainDispatcherRule.dispatcher) {
+    fun a_failed_persist_propagates_out_of_the_use_case() = runTest(mainDispatcherRule.testDispatcher) {
         // B1: runLayoutEdit runs the write inside withContext with no runCatching, so a
         // throwing repository surfaces the exception rather than swallowing it and reporting
         // success. Guards against a future runCatching hiding a failed DataStore write.
         val repo = ThrowingHomeLayoutRepository(layoutWithAppAtOrigin())
-        val useCase = MoveItemUseCase(repo, ids, mainDispatcherRule.dispatcher)
+        val useCase = MoveItemUseCase(repo, ids, mainDispatcherRule.testDispatcher)
 
         val thrown = runCatching {
             useCase(ItemId("a"), DropTarget.Cell(CellPos(0, 1, 1))) // a real Moved → the write fires

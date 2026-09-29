@@ -19,7 +19,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.asLiveData
 import app.cash.turbine.test
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.AppInfo
@@ -81,10 +81,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
@@ -96,6 +92,8 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUs
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -103,6 +101,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlin.test.assertIs
 
 /**
  * ⚠️ LEGACY TEST SUITE — DO NOT EXTEND ⚠️
@@ -313,9 +312,9 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            assertEquals(2, state.data.apps.size)
-            assertFalse(state.data.isFallback)
+            assertIs<UiState.Success>(state)
+            assertThat(state.data.apps.size).isEqualTo(2)
+            assertThat(state.data.isFallback).isFalse()
         }
     }
 
@@ -332,9 +331,9 @@ class MonolithicLauncherViewModelTest {
         // Prüfe den State statt Events
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            assertTrue(state.data.isFallback)
-            assertEquals(2, state.data.apps.size)
+            assertIs<UiState.Success>(state)
+            assertThat(state.data.isFallback).isTrue()
+            assertThat(state.data.apps.size).isEqualTo(2)
         }
     }
 
@@ -344,7 +343,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         viewModel.event.test {
             viewModel.onFlingUp()
-            assertTrue(awaitItem() is UiEvent.ShowAppDrawer)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.ShowAppDrawer::class.java)
         }
     }
 
@@ -353,7 +352,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         viewModel.event.test {
             viewModel.onLongPress()
-            assertTrue(awaitItem() is UiEvent.ShowCustomizationOptions)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.ShowCustomizationOptions::class.java)
         }
     }
 
@@ -362,7 +361,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         viewModel.event.test {
             viewModel.onTimeDoubleClick()
-            assertTrue(awaitItem() is UiEvent.OpenClock)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.OpenClock::class.java)
         }
     }
 
@@ -371,7 +370,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         viewModel.event.test {
             viewModel.onDateDoubleClick()
-            assertTrue(awaitItem() is UiEvent.OpenCalendar)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.OpenCalendar::class.java)
         }
     }
 
@@ -380,7 +379,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
         viewModel.event.test {
             viewModel.onBatteryDoubleClick()
-            assertTrue(awaitItem() is UiEvent.OpenBatterySettings)
+            assertThat(awaitItem()).isInstanceOf(UiEvent.OpenBatterySettings::class.java)
         }
     }
 
@@ -395,8 +394,8 @@ class MonolithicLauncherViewModelTest {
             viewModel.onAppClicked(app1)
 
             val launchEvent = awaitItem()
-            assertTrue(launchEvent is UiEvent.LaunchApp)
-            assertEquals(app1, launchEvent.app)
+            assertIs<UiEvent.LaunchApp>(launchEvent)
+            assertThat(launchEvent.app).isEqualTo(app1)
 
             advanceUntilIdle()
         }
@@ -422,7 +421,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
         }
         // Überprüfe den UseCase
         coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
@@ -447,7 +446,7 @@ class MonolithicLauncherViewModelTest {
                 advanceUntilIdle()
 
                 val event = awaitItem()
-                assertTrue(event is UiEvent.ShowToastFromString)
+                assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
             }
             // Überprüfe den UseCase
             coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
@@ -463,7 +462,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
         }
         coVerify { hideAppUseCase.invoke(app1) }
     }
@@ -478,7 +477,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
         }
         coVerify { showAppUseCase.invoke(app1) }
     }
@@ -493,7 +492,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
         }
         coVerify { resetAppUsageUseCase.invoke(app1) }
     }
@@ -517,8 +516,8 @@ class MonolithicLauncherViewModelTest {
         viewModel.updateTimeAndDate()
         advanceUntilIdle()
         val state = viewModel.uiState.value
-        assertTrue(state.timeString.isNotEmpty())
-        assertTrue(state.dateString.isNotEmpty())
+        assertThat(state.timeString.isNotEmpty()).isTrue()
+        assertThat(state.dateString.isNotEmpty()).isTrue()
     }
 
     // ... (alle 'updateBatteryLevel' Tests bleiben exakt gleich) ...
@@ -528,7 +527,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
         viewModel.updateBatteryLevel(75, 100)
         advanceUntilIdle()
-        assertEquals("75%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("75%")
     }
 
     // --- Angepasste Flow-Tests ---
@@ -543,8 +542,8 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.uiColorsState.test {
             val colors = awaitItem()
-            assertEquals(Color.RED, colors.textColor)
-            assertEquals(Color.BLUE, colors.shadowColor)
+            assertThat(colors.textColor).isEqualTo(Color.RED)
+            assertThat(colors.shadowColor).isEqualTo(Color.BLUE)
         }
     }
 
@@ -557,7 +556,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.drawerApps.asFlow().test {
             val apps = awaitItem()
-            assertEquals(2, apps.size)
+            assertThat(apps.size).isEqualTo(2)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -572,7 +571,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.sortOrder.asFlow().test {
             val order = awaitItem()
-            assertEquals(SortOrder.TIME_WEIGHTED_USAGE, order)
+            assertThat(order).isEqualTo(SortOrder.TIME_WEIGHTED_USAGE)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -587,8 +586,8 @@ class MonolithicLauncherViewModelTest {
         viewModel.event.test {
             advanceUntilIdle()
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.error_app_list_not_loaded, event.messageResId)
+            assertIs<UiEvent.ShowToast>(event)
+            assertThat(event.messageResId).isEqualTo(R.string.error_app_list_not_loaded)
         }
     }
 
@@ -604,10 +603,10 @@ class MonolithicLauncherViewModelTest {
                 advanceUntilIdle()
 
                 val launchEvent = awaitItem()
-                assertTrue(launchEvent is UiEvent.LaunchApp, "Expected LaunchApp event first")
+                assertWithMessage("Expected LaunchApp event first").that(launchEvent).isInstanceOf(UiEvent.LaunchApp::class.java)
 
                 val errorEvent = awaitItem()
-                assertTrue(errorEvent is UiEvent.ShowToast, "Expected ShowToast event second")
+                assertWithMessage("Expected ShowToast event second").that(errorEvent).isInstanceOf(UiEvent.ShowToast::class.java)
 
                 ensureAllEventsConsumed()
             }
@@ -624,7 +623,7 @@ class MonolithicLauncherViewModelTest {
             viewModel.onToggleFavorite(app1)
             advanceUntilIdle()
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -639,7 +638,7 @@ class MonolithicLauncherViewModelTest {
             viewModel.onHideApp(app1)
             advanceUntilIdle()
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -657,8 +656,8 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.LaunchApp)
-            assertEquals(app1, event.app)
+            assertIs<UiEvent.LaunchApp>(event)
+            assertThat(event.app).isEqualTo(app1)
         }
         coVerify { handleSwipeActionUseCase.invoke(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT) }
     }
@@ -695,8 +694,8 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.timeBasedEvents.size)
-        assertEquals("Test Meeting", state.timeBasedEvents.first().title)
+        assertThat(state.timeBasedEvents.size).isEqualTo(1)
+        assertThat(state.timeBasedEvents.first().title).isEqualTo("Test Meeting")
     }
 
     @Test
@@ -708,7 +707,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state.timeBasedEvents.isEmpty())
+        assertThat(state.timeBasedEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -725,7 +724,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
             // Optional: Prüfe dass die Message "removed" enthält
         }
         coVerify { toggleFavoriteUseCase.invoke(app1, AppConstants.MAX_FAVORITES_ON_HOME) }
@@ -787,9 +786,9 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(2, state.timeBasedEvents.size)
-        assertEquals(TimeBasedEventType.ALARM, state.timeBasedEvents[0].type)
-        assertEquals(TimeBasedEventType.CALENDAR, state.timeBasedEvents[1].type)
+        assertThat(state.timeBasedEvents.size).isEqualTo(2)
+        assertThat(state.timeBasedEvents[0].type).isEqualTo(TimeBasedEventType.ALARM)
+        assertThat(state.timeBasedEvents[1].type).isEqualTo(TimeBasedEventType.CALENDAR)
     }
 
     @Test
@@ -808,8 +807,8 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.timeBasedEvents.size)
-        assertEquals(TimeBasedEventType.ALARM, state.timeBasedEvents[0].type)
+        assertThat(state.timeBasedEvents.size).isEqualTo(1)
+        assertThat(state.timeBasedEvents[0].type).isEqualTo(TimeBasedEventType.ALARM)
     }
 
     @Test
@@ -822,7 +821,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertTrue(state.timeBasedEvents.isEmpty())
+        assertThat(state.timeBasedEvents.isEmpty()).isTrue()
     }
 
     @Test
@@ -837,7 +836,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -853,7 +852,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -865,7 +864,7 @@ class MonolithicLauncherViewModelTest {
         viewModel.updateBatteryLevelFromIntent(null)
 
         // ViewModel sollte nicht crashen
-        assertNotNull(viewModel)
+        assertThat(viewModel).isNotNull()
     }
 
     @Test
@@ -880,7 +879,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.updateBatteryLevelFromIntent(intent)
 
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
@@ -890,7 +889,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.updateBatteryLevel(-1, 100)
 
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
@@ -900,7 +899,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.updateBatteryLevel(75, 0)
 
-        assertEquals("---%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("---%")
     }
 
     @Test
@@ -915,7 +914,7 @@ class MonolithicLauncherViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -989,13 +988,13 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.favoriteAppsState.test {
             // Initial state
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
 
             // Update to Success
             stateFlow.value = UiState.Success(favoriteApps)
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
-            assertEquals(2, successState.data.apps.size)
+            assertIs<UiState.Success>(successState)
+            assertThat(successState.data.apps.size).isEqualTo(2)
         }
     }
 
@@ -1008,11 +1007,11 @@ class MonolithicLauncherViewModelTest {
 
             viewModel.updateBatteryLevel(50, 100)
             val updated = awaitItem()
-            assertEquals("50%", updated.batteryString)
+            assertThat(updated.batteryString).isEqualTo("50%")
 
             viewModel.updateBatteryLevel(75, 100)
             val updated2 = awaitItem()
-            assertEquals("75%", updated2.batteryString)
+            assertThat(updated2.batteryString).isEqualTo("75%")
         }
     }
 
@@ -1021,13 +1020,13 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         viewModel.appDrawerSearchQuery.test {
-            assertEquals("", awaitItem())
+            assertThat(awaitItem()).isEqualTo("")
 
             viewModel.onAppDrawerSearchQueryChanged("test")
-            assertEquals("test", awaitItem())
+            assertThat(awaitItem()).isEqualTo("test")
 
             viewModel.onAppDrawerSearchQueryChanged("test app")
-            assertEquals("test app", awaitItem())
+            assertThat(awaitItem()).isEqualTo("test app")
         }
     }
 
@@ -1036,13 +1035,13 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         viewModel.appDrawerSearchQuery.test {
-            assertEquals("", awaitItem())
+            assertThat(awaitItem()).isEqualTo("")
 
             viewModel.onAppDrawerSearchQueryChanged("search term")
-            assertEquals("search term", awaitItem())
+            assertThat(awaitItem()).isEqualTo("search term")
 
             viewModel.onAppDrawerClosed()
-            assertEquals("", awaitItem())
+            assertThat(awaitItem()).isEqualTo("")
         }
     }
 
@@ -1057,7 +1056,7 @@ class MonolithicLauncherViewModelTest {
             awaitItem()
 
             viewModel.onAppDrawerSearchQueryChanged("")
-            assertEquals("", awaitItem())
+            assertThat(awaitItem()).isEqualTo("")
         }
     }
 
@@ -1069,10 +1068,10 @@ class MonolithicLauncherViewModelTest {
             awaitItem()
 
             viewModel.onAppDrawerSearchQueryChanged("test@#$%")
-            assertEquals("test@#$%", awaitItem())
+            assertThat(awaitItem()).isEqualTo("test@#$%")
 
             viewModel.onAppDrawerSearchQueryChanged("émojï 🎉")
-            assertEquals("émojï 🎉", awaitItem())
+            assertThat(awaitItem()).isEqualTo("émojï 🎉")
         }
     }
 
@@ -1085,7 +1084,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // Sollte 100% sein
-        assertEquals("100%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("100%")
     }
 
     @Test
@@ -1095,7 +1094,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
         viewModel.updateBatteryLevel(100, 100)
         advanceUntilIdle()
-        assertEquals("100%", viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isEqualTo("100%")
     }
 
     @Test
@@ -1106,7 +1105,7 @@ class MonolithicLauncherViewModelTest {
 
         // Sollte 200% ergeben (mathematisch korrekt, aber unrealistisch)
         // Oder sollte es abgefangen werden? Test zeigt das Verhalten!
-        assertNotNull(viewModel.uiState.value.batteryString)
+        assertThat(viewModel.uiState.value.batteryString).isNotNull()
     }
 
     @Test
@@ -1125,8 +1124,8 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // ViewModel sollte existieren und nicht crashen
-        assertNotNull(viewModel)
-        assertNotNull(viewModel.uiState.value)
+        assertThat(viewModel).isNotNull()
+        assertThat(viewModel.uiState.value).isNotNull()
     }
 
     @Test
@@ -1138,7 +1137,7 @@ class MonolithicLauncherViewModelTest {
             viewModel.onAppClicked(app1)
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.LaunchApp)
+            assertThat(event).isInstanceOf(UiEvent.LaunchApp::class.java)
 
             advanceUntilIdle()
         }
@@ -1177,7 +1176,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
+            assertThat(state).isInstanceOf(UiState.Success::class.java)
         }
     }
 
@@ -1187,11 +1186,11 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         val result = viewModel.isAutoLaunchEnabled()
-        assertTrue(result)
+        assertThat(result).isTrue()
 
         coEvery { getAutoLaunchSettingUseCase.invoke() } returns false
         val result2 = viewModel.isAutoLaunchEnabled()
-        assertFalse(result2)
+        assertThat(result2).isFalse()
     }
 
     @Test
@@ -1200,7 +1199,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         val result = viewModel.hasUsageData("com.test")
-        assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -1209,7 +1208,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         val result = viewModel.hasUsageData(null)
-        assertFalse(result)
+        assertThat(result).isFalse()
     }
 
     @Test
@@ -1218,7 +1217,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         val result = viewModel.isAutoShowKeyboardEnabled()
-        assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -1227,7 +1226,7 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         val result = viewModel.isTextShadowEnabled()
-        assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -1267,8 +1266,8 @@ class MonolithicLauncherViewModelTest {
             viewModel.onAppInfoError()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
-            assertEquals(R.string.error_app_info_open, event.messageResId)
+            assertIs<UiEvent.ShowToast>(event)
+            assertThat(event.messageResId).isEqualTo(R.string.error_app_info_open)
         }
     }
 
@@ -1281,7 +1280,7 @@ class MonolithicLauncherViewModelTest {
             viewModel.onFavoriteAppsError("Custom error message")
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToastFromString)
+            assertThat(event).isInstanceOf(UiEvent.ShowToastFromString::class.java)
             // Note: Can't check message content as it's wrapped in event
         }
     }
@@ -1301,7 +1300,7 @@ class MonolithicLauncherViewModelTest {
 
         // Verify refresh was triggered
         verify(atLeast = 1) { observeTimeBasedEventsUseCase.refresh() }
-        assertNotNull(viewModel.uiState.value.timeString)
+        assertThat(viewModel.uiState.value.timeString).isNotNull()
     }
 
     @Test
@@ -1348,7 +1347,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         val stateBefore = viewModel.uiState.value
-        assertEquals("88%", stateBefore.batteryString)
+        assertThat(stateBefore.batteryString).isEqualTo("88%")
 
         // 3. Act: Refresh aufrufen
         // Das VM fragt jetzt den Context -> bekommt batteryIntent -> liest 88% -> setzt 88%
@@ -1358,8 +1357,8 @@ class MonolithicLauncherViewModelTest {
         val stateAfter = viewModel.uiState.value
 
         // 4. Assert
-        assertEquals("88%", stateAfter.batteryString)
-        assertNotNull(stateAfter.timeString)
+        assertThat(stateAfter.batteryString).isEqualTo("88%")
+        assertThat(stateAfter.timeString).isNotNull()
     }
 
     @Test
@@ -1385,12 +1384,12 @@ class MonolithicLauncherViewModelTest {
         // === ASSERT ===
 
         // 1. Colors
-        assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
+        assertThat(viewModel.uiColorsState.value.textColor).isEqualTo(Color.YELLOW)
 
         // 2. Events
         val currentState = viewModel.uiState.value
-        assertEquals(1, currentState.timeBasedEvents.size)
-        assertEquals("Jubiläum", currentState.timeBasedEvents.first().title)
+        assertThat(currentState.timeBasedEvents.size).isEqualTo(1)
+        assertThat(currentState.timeBasedEvents.first().title).isEqualTo("Jubiläum")
     }
 
     // ========== LAYOUT SETTINGS TESTS ==========
@@ -1401,7 +1400,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.layoutScaleState.test {
-            assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
         }
     }
 
@@ -1412,7 +1411,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.verticalPaddingState.test {
-            assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
         }
     }
 
@@ -1423,7 +1422,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.isFontBoldState.test {
-            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
         }
     }
 
@@ -1435,13 +1434,13 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         viewModel.layoutScaleState.test {
-            assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
 
             scaleFlow.value = 0.5f
-            assertEquals(0.5f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0.5f)
 
             scaleFlow.value = 0.8f
-            assertEquals(0.8f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0.8f)
         }
     }
 
@@ -1453,10 +1452,10 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         viewModel.verticalPaddingState.test {
-            assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
 
             paddingFlow.value = 0.3f
-            assertEquals(0.3f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0.3f)
         }
     }
 
@@ -1468,13 +1467,13 @@ class MonolithicLauncherViewModelTest {
         setupViewModel()
 
         viewModel.isFontBoldState.test {
-            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
 
             boldFlow.value = !AppConstants.DEFAULT_FONT_BOLD
-            assertEquals(!AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+            assertThat(awaitItem()).isEqualTo(!AppConstants.DEFAULT_FONT_BOLD)
 
             boldFlow.value = AppConstants.DEFAULT_FONT_BOLD
-            assertEquals(AppConstants.DEFAULT_FONT_BOLD, awaitItem())
+            assertThat(awaitItem()).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
         }
     }
 
@@ -1498,9 +1497,9 @@ class MonolithicLauncherViewModelTest {
 
         advanceUntilIdle()
 
-        assertEquals(0.7f, viewModel.layoutScaleState.value)
-        assertEquals(0.5f, viewModel.verticalPaddingState.value)
-        assertEquals(!AppConstants.DEFAULT_FONT_BOLD, viewModel.isFontBoldState.value)
+        assertThat(viewModel.layoutScaleState.value).isEqualTo(0.7f)
+        assertThat(viewModel.verticalPaddingState.value).isEqualTo(0.5f)
+        assertThat(viewModel.isFontBoldState.value).isEqualTo(!AppConstants.DEFAULT_FONT_BOLD)
     }
 
     @Test
@@ -1515,8 +1514,8 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         // ViewModel sollte überleben und Default-Wert verwenden
-        assertNotNull(viewModel)
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, viewModel.layoutScaleState.value)
+        assertThat(viewModel).isNotNull()
+        assertThat(viewModel.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
     }
 
     @Test
@@ -1541,8 +1540,8 @@ class MonolithicLauncherViewModelTest {
 
         job.cancel()
 
-        assertTrue(receivedValues.isNotEmpty())
-        assertNotNull(viewModel.layoutScaleState.value)
+        assertThat(receivedValues.isNotEmpty()).isTrue()
+        assertThat(viewModel.layoutScaleState.value).isNotNull()
     }
 
     @Test
@@ -1569,10 +1568,10 @@ class MonolithicLauncherViewModelTest {
 
         advanceUntilIdle()
 
-        assertEquals(0.8f, viewModel.layoutScaleState.value)
-        assertEquals(0.6f, viewModel.verticalPaddingState.value)
-        assertEquals(!AppConstants.DEFAULT_FONT_BOLD, viewModel.isFontBoldState.value)
-        assertEquals(Color.YELLOW, viewModel.uiColorsState.value.textColor)
+        assertThat(viewModel.layoutScaleState.value).isEqualTo(0.8f)
+        assertThat(viewModel.verticalPaddingState.value).isEqualTo(0.6f)
+        assertThat(viewModel.isFontBoldState.value).isEqualTo(!AppConstants.DEFAULT_FONT_BOLD)
+        assertThat(viewModel.uiColorsState.value.textColor).isEqualTo(Color.YELLOW)
     }
 
 // ========== LAYOUT SETTINGS - SETTER TESTS ==========
@@ -1735,7 +1734,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.layoutScaleState.test {
-            assertEquals(customScale, awaitItem())
+            assertThat(awaitItem()).isEqualTo(customScale)
         }
     }
 
@@ -1748,7 +1747,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.verticalPaddingState.test {
-            assertEquals(customPadding, awaitItem())
+            assertThat(awaitItem()).isEqualTo(customPadding)
         }
     }
 
@@ -1760,7 +1759,7 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.contentTopMarginState.test {
-            assertEquals(0f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0f)
         }
     }
 
@@ -1773,10 +1772,10 @@ class MonolithicLauncherViewModelTest {
         advanceUntilIdle()
 
         viewModel.contentTopMarginState.test {
-            assertEquals(0f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0f)
 
             marginFlow.value = 0.5f
-            assertEquals(0.5f, awaitItem())
+            assertThat(awaitItem()).isEqualTo(0.5f)
         }
     }
 
@@ -1849,7 +1848,7 @@ class MonolithicLauncherViewModelTest {
         // FIX: Wir prüfen nur auf Existenz.
         // filter.hasAction() funktioniert in Unit-Tests nicht (gibt immer false),
         // da IntentFilter im Unit-Test nur ein Stub ist.
-        assertNotNull(filter)
+        assertThat(filter).isNotNull()
     }
 
     @Test
@@ -1860,9 +1859,9 @@ class MonolithicLauncherViewModelTest {
 
         // Assert: State sollte sofort gefüllt sein (kein Default "--:--")
         val state = viewModel.uiState.value
-        assertTrue(state.timeString.isNotEmpty())
-        assertTrue(state.timeString != "--:--")
-        assertTrue(state.dateString.isNotEmpty())
+        assertThat(state.timeString.isNotEmpty()).isTrue()
+        assertThat(state.timeString != "--:--").isTrue()
+        assertThat(state.dateString.isNotEmpty()).isTrue()
     }
 
     @Test
@@ -1893,7 +1892,7 @@ class MonolithicLauncherViewModelTest {
         // Da System.currentTimeMillis() im Test extrem schnell ist, ist der String evtl. gleich.
         // Aber wir können sicherstellen, dass kein Crash passiert und der State valide ist.
         // (Für exakte Zeit-Änderungstests bräuchte man einen "TimeProvider" Mock).
-        assertNotNull(viewModel.uiState.value.timeString)
+        assertThat(viewModel.uiState.value.timeString).isNotNull()
     }
 
     @Test
@@ -1907,8 +1906,8 @@ class MonolithicLauncherViewModelTest {
 
         // Assert
         val state = viewModel.uiState.value
-        assertTrue(state.timeString.isNotEmpty())
-        assertTrue(state.dateString.isNotEmpty())
+        assertThat(state.timeString.isNotEmpty()).isTrue()
+        assertThat(state.dateString.isNotEmpty()).isTrue()
     }
 
     @Test

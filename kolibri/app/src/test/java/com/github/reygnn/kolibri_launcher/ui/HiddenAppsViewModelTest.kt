@@ -12,10 +12,11 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.UpdateHiddenAppsUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.ui.hiddenapps.HiddenAppsViewModel
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -28,10 +29,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class HiddenAppsViewModelTest {
@@ -95,10 +92,10 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(3, uiState.selectableApps.size)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected)
+        assertThat(uiState.selectableApps.size).isEqualTo(3)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isFalse()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg3" }!!.isSelected).isFalse()
     }
 
     @Test
@@ -114,7 +111,7 @@ class HiddenAppsViewModelTest {
         // which is never called here.
         viewModel.onAppToggled(app1)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
 
         // Config change (rotation): the Activity re-creates and calls initialize()
         // again on the RETAINED ViewModel. Without the isInitialized guard this
@@ -123,8 +120,8 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg2" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -139,7 +136,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -155,7 +152,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertFalse(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(uiState.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isFalse()
     }
 
     @Test
@@ -170,8 +167,8 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size)
-        assertEquals("App B", uiState.selectableApps[0].appInfo.displayName)
+        assertThat(uiState.selectableApps.size).isEqualTo(1)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App B")
     }
 
     @Test
@@ -195,9 +192,9 @@ class HiddenAppsViewModelTest {
             // The fake's updateComponentVisibilities applies the (hide,show)
             // delta atomically — assert the resulting set instead of mock
             // call args.
-            assertEquals(setOf(app3.componentName), fakeVisibility.hiddenApps)
+            assertThat(fakeVisibility.hiddenApps).isEqualTo(setOf(app3.componentName))
 
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.NavigateUp)
         }
     }
 
@@ -216,7 +213,7 @@ class HiddenAppsViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -238,7 +235,7 @@ class HiddenAppsViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -263,7 +260,7 @@ class HiddenAppsViewModelTest {
             advanceUntilIdle()
 
             val event = awaitItem()
-            assertTrue(event is UiEvent.ShowToast)
+            assertThat(event).isInstanceOf(UiEvent.ShowToast::class.java)
         }
     }
 
@@ -294,9 +291,9 @@ class HiddenAppsViewModelTest {
             // AUDIT-18 F3: surface the failure, THEN navigate up. Previously the
             // save error was completely silent (only NavigateUp).
             val toast = awaitItem()
-            assertTrue(toast is UiEvent.ShowToast)
-            assertEquals(R.string.error_saving_hidden_apps, (toast as UiEvent.ShowToast).messageResId)
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+            assertThat(toast).isInstanceOf(UiEvent.ShowToast::class.java)
+            assertThat((toast as UiEvent.ShowToast).messageResId).isEqualTo(R.string.error_saving_hidden_apps)
+            assertThat(awaitItem()).isEqualTo(UiEvent.NavigateUp)
         }
     }
 
@@ -312,7 +309,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(3, uiState.selectableApps.size)
+        assertThat(uiState.selectableApps.size).isEqualTo(3)
     }
 
     @Test
@@ -327,7 +324,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.isEmpty())
+        assertThat(uiState.selectableApps.isEmpty()).isTrue()
     }
 
     @Test
@@ -342,8 +339,8 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size)
-        assertEquals("App B", uiState.selectableApps[0].appInfo.displayName)
+        assertThat(uiState.selectableApps.size).isEqualTo(1)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App B")
     }
 
     @Test
@@ -360,7 +357,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertNotNull(uiState)
+        assertThat(uiState).isNotNull()
     }
 
     @Test
@@ -380,9 +377,9 @@ class HiddenAppsViewModelTest {
             viewModel.onDoneClicked()
             advanceUntilIdle()
 
-            assertEquals(before, fakeVisibility.hiddenApps)
+            assertThat(fakeVisibility.hiddenApps).isEqualTo(before)
 
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiEvent.NavigateUp)
         }
     }
 
@@ -395,7 +392,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.isEmpty())
+        assertThat(uiState.selectableApps.isEmpty()).isTrue()
     }
 
     @Test
@@ -409,7 +406,7 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertTrue(uiState.selectableApps.all { it.isSelected })
+        assertThat(uiState.selectableApps.all { it.isSelected }).isTrue()
     }
 
     @Test
@@ -426,8 +423,8 @@ class HiddenAppsViewModelTest {
         advanceUntilIdle()
 
         val uiState = viewModel.uiState.value
-        assertEquals(1, uiState.selectableApps.size)
-        assertEquals("App C", uiState.selectableApps[0].appInfo.displayName)
+        assertThat(uiState.selectableApps.size).isEqualTo(1)
+        assertThat(uiState.selectableApps[0].appInfo.displayName).isEqualTo("App C")
     }
 
     @Test
@@ -440,15 +437,15 @@ class HiddenAppsViewModelTest {
 
         viewModel.onAppToggled(app1)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
 
         viewModel.onAppToggled(app1)
         advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isFalse()
 
         viewModel.onAppToggled(app1)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected)
+        assertThat(viewModel.uiState.value.selectableApps.find { it.appInfo.packageName == "pkg1" }!!.isSelected).isTrue()
     }
 
     @Test
@@ -475,9 +472,9 @@ class HiddenAppsViewModelTest {
 
             // AUDIT-18 F3: error toast first, then navigate up despite the error.
             val toast = awaitItem()
-            assertTrue(toast is UiEvent.ShowToast)
-            assertEquals(R.string.error_saving_hidden_apps, (toast as UiEvent.ShowToast).messageResId)
-            assertEquals(UiEvent.NavigateUp, awaitItem())
+            assertThat(toast).isInstanceOf(UiEvent.ShowToast::class.java)
+            assertThat((toast as UiEvent.ShowToast).messageResId).isEqualTo(R.string.error_saving_hidden_apps)
+            assertThat(awaitItem()).isEqualTo(UiEvent.NavigateUp)
         }
     }
 }

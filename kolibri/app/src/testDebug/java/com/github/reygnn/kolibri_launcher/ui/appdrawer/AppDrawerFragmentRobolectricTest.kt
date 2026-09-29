@@ -4,11 +4,10 @@ import android.content.Intent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,10 +47,7 @@ class AppDrawerFragmentRobolectricTest {
                     .add(android.R.id.content, fragment, "test")
                     .commitNow()
 
-                assertNotNull(
-                    "AppDrawerFragment must attach without throwing",
-                    activity.supportFragmentManager.findFragmentByTag("test")
-                )
+                assertWithMessage("AppDrawerFragment must attach without throwing").that(activity.supportFragmentManager.findFragmentByTag("test")).isNotNull()
             }
         }
     }
@@ -83,10 +79,7 @@ class AppDrawerFragmentRobolectricTest {
                     .remove(fragment)
                     .commitNow()
 
-                assertNull(
-                    "AppDrawerFragment must be removed cleanly",
-                    fm.findFragmentByTag("test")
-                )
+                assertWithMessage("AppDrawerFragment must be removed cleanly").that(fm.findFragmentByTag("test")).isNull()
             }
         }
     }
@@ -114,10 +107,7 @@ class AppDrawerFragmentRobolectricTest {
             scenario.recreate()
 
             scenario.onActivity { activity ->
-                assertNotNull(
-                    "AppDrawerFragment must survive recreate",
-                    activity.supportFragmentManager.findFragmentByTag("test")
-                )
+                assertWithMessage("AppDrawerFragment must survive recreate").that(activity.supportFragmentManager.findFragmentByTag("test")).isNotNull()
             }
         }
     }

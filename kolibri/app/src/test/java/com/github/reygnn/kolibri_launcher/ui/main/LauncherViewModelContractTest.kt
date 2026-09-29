@@ -14,6 +14,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.kolibri_launcher.domain.model.HomeSettings
+import com.github.reygnn.launcher.core.testing.recordEmissions
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
@@ -49,13 +50,14 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -65,15 +67,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -281,9 +276,9 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertNotEquals("--:--", state.timeString)
-        assertNotEquals("---", state.dateString)
-        assertTrue(state.timeString.contains(":"))
+        assertThat(state.timeString).isNotEqualTo("--:--")
+        assertThat(state.dateString).isNotEqualTo("---")
+        assertThat(state.timeString.contains(":")).isTrue()
     }
 
     @Test
@@ -294,7 +289,7 @@ class LauncherViewModelContractTest {
         vm.updateBatteryLevel(42, 100)
         advanceUntilIdle()
 
-        assertEquals("42%", vm.uiState.value.batteryString)
+        assertThat(vm.uiState.value.batteryString).isEqualTo("42%")
     }
 
     @Test
@@ -313,7 +308,7 @@ class LauncherViewModelContractTest {
         vm.updateBatteryLevelFromIntent(intent)
         advanceUntilIdle()
 
-        assertEquals("95%", vm.uiState.value.batteryString)
+        assertThat(vm.uiState.value.batteryString).isEqualTo("95%")
     }
 
     @Test
@@ -329,8 +324,8 @@ class LauncherViewModelContractTest {
         timeBasedEventsFlow.value = listOf(event)
         advanceUntilIdle()
 
-        assertEquals(1, vm.uiState.value.timeBasedEvents.size)
-        assertEquals("Meeting", vm.uiState.value.timeBasedEvents.first().title)
+        assertThat(vm.uiState.value.timeBasedEvents.size).isEqualTo(1)
+        assertThat(vm.uiState.value.timeBasedEvents.first().title).isEqualTo("Meeting")
     }
 
     // =====================================================================
@@ -342,15 +337,15 @@ class LauncherViewModelContractTest {
     fun `HomeFragment - favoriteAppsState starts Loading then receives data`() = runTest {
         val vm = createViewModel()
 
-        assertEquals(UiState.Loading, vm.favoriteAppsState.value)
+        assertThat(vm.favoriteAppsState.value).isEqualTo(UiState.Loading)
 
         val apps = listOf(testApp)
         favoriteAppsFlow.value = UiState.Success(FavoriteAppsResult(apps, isFallback = false))
         advanceUntilIdle()
 
         val state = vm.favoriteAppsState.value
-        assertTrue(state is UiState.Success)
-        assertEquals(1, (state as UiState.Success).data.apps.size)
+        assertThat(state).isInstanceOf(UiState.Success::class.java)
+        assertThat((state as UiState.Success).data.apps.size).isEqualTo(1)
     }
 
     // =====================================================================
@@ -364,14 +359,14 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onAppClicked(testApp)
         advanceUntilIdle()
 
         val launchEvent = events.filterIsInstance<UiEvent.LaunchApp>().firstOrNull()
-        assertNotNull(launchEvent)
-        assertEquals(testApp, launchEvent!!.app)
+        assertThat(launchEvent).isNotNull()
+        assertThat(launchEvent!!.app).isEqualTo(testApp)
 
         coVerify { recordAppLaunchUseCase.invoke(testApp) }
         // A launch no longer forces a re-enumeration (REACTIVE_APPLIST_SPEC): the
@@ -391,13 +386,13 @@ class LauncherViewModelContractTest {
         val vm = createViewModel()
 
         vm.appDrawerSearchQuery.test {
-            assertEquals("", awaitItem())
+            assertThat(awaitItem()).isEqualTo("")
 
             vm.onAppDrawerSearchQueryChanged("calc")
-            assertEquals("calc", awaitItem())
+            assertThat(awaitItem()).isEqualTo("calc")
 
             vm.onAppDrawerSearchQueryChanged("calculator")
-            assertEquals("calculator", awaitItem())
+            assertThat(awaitItem()).isEqualTo("calculator")
         }
     }
 
@@ -406,10 +401,10 @@ class LauncherViewModelContractTest {
         val vm = createViewModel()
 
         vm.onAppDrawerSearchQueryChanged("test")
-        assertEquals("test", vm.appDrawerSearchQuery.value)
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("test")
 
         vm.onAppDrawerClosed()
-        assertEquals("", vm.appDrawerSearchQuery.value)
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     @Test
@@ -434,12 +429,12 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onFlingUp()
         advanceUntilIdle()
 
-        assertTrue(events.any { it == UiEvent.ShowAppDrawer })
+        assertThat(events.any { it == UiEvent.ShowAppDrawer }).isTrue()
         job.cancel()
     }
 
@@ -449,12 +444,12 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onLongPress()
         advanceUntilIdle()
 
-        assertTrue(events.any { it == UiEvent.ShowCustomizationOptions })
+        assertThat(events.any { it == UiEvent.ShowCustomizationOptions }).isTrue()
         job.cancel()
     }
 
@@ -467,14 +462,14 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onSwipeFromRightToLeft()
         advanceUntilIdle()
 
         val launchEvent = events.filterIsInstance<UiEvent.LaunchApp>().firstOrNull()
-        assertNotNull(launchEvent)
-        assertEquals(testApp, launchEvent!!.app)
+        assertThat(launchEvent).isNotNull()
+        assertThat(launchEvent!!.app).isEqualTo(testApp)
 
         job.cancel()
     }
@@ -485,16 +480,16 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onTimeDoubleClick()
         vm.onDateDoubleClick()
         vm.onBatteryDoubleClick()
         advanceUntilIdle()
 
-        assertTrue(events.contains(UiEvent.OpenClock))
-        assertTrue(events.contains(UiEvent.OpenCalendar))
-        assertTrue(events.contains(UiEvent.OpenBatterySettings))
+        assertThat(events.contains(UiEvent.OpenClock)).isTrue()
+        assertThat(events.contains(UiEvent.OpenCalendar)).isTrue()
+        assertThat(events.contains(UiEvent.OpenBatterySettings)).isTrue()
 
         job.cancel()
     }
@@ -513,12 +508,12 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onToggleFavorite(testApp)
         advanceUntilIdle()
 
-        assertTrue(events.any { it is UiEvent.ShowToastFromString })
+        assertThat(events.any { it is UiEvent.ShowToastFromString }).isTrue()
         job.cancel()
     }
 
@@ -528,13 +523,13 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onHideApp(testApp)
         advanceUntilIdle()
 
         coVerify { hideAppUseCase.invoke(testApp) }
-        assertTrue(events.any { it is UiEvent.ShowToastFromString })
+        assertThat(events.any { it is UiEvent.ShowToastFromString }).isTrue()
         job.cancel()
     }
 
@@ -544,13 +539,13 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onResetAppUsage(testApp)
         advanceUntilIdle()
 
         coVerify { resetAppUsageUseCase.invoke(testApp) }
-        assertTrue(events.any { it is UiEvent.ShowToastFromString })
+        assertThat(events.any { it is UiEvent.ShowToastFromString }).isTrue()
         job.cancel()
     }
 
@@ -565,10 +560,10 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         // Verify defaults
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, vm.layoutScaleState.value)
-        assertEquals(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR, vm.verticalPaddingState.value)
-        assertEquals(AppConstants.DEFAULT_FONT_BOLD, vm.isFontBoldState.value)
-        assertEquals(0f, vm.contentTopMarginState.value)
+        assertThat(vm.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
+        assertThat(vm.verticalPaddingState.value).isEqualTo(AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
+        assertThat(vm.isFontBoldState.value).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
+        assertThat(vm.contentTopMarginState.value).isEqualTo(0f)
 
         // Simulate settings change from data layer
         layoutScaleFlow.value = 0.8f
@@ -578,10 +573,10 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         // Fragment would see these updates
-        assertEquals(0.8f, vm.layoutScaleState.value)
-        assertEquals(0.5f, vm.verticalPaddingState.value)
-        assertEquals(!AppConstants.DEFAULT_FONT_BOLD, vm.isFontBoldState.value)
-        assertEquals(0.3f, vm.contentTopMarginState.value)
+        assertThat(vm.layoutScaleState.value).isEqualTo(0.8f)
+        assertThat(vm.verticalPaddingState.value).isEqualTo(0.5f)
+        assertThat(vm.isFontBoldState.value).isEqualTo(!AppConstants.DEFAULT_FONT_BOLD)
+        assertThat(vm.contentTopMarginState.value).isEqualTo(0.3f)
     }
 
 
@@ -630,28 +625,28 @@ class LauncherViewModelContractTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertFalse(vm.wallpaperState.value.hasWallpaper)
+        assertThat(vm.wallpaperState.value.hasWallpaper).isFalse()
 
         wallpaperStateFlow.value = WallpaperState.single("file:///test.jpg", scale = 1.5f)
         advanceUntilIdle()
 
-        assertTrue(vm.wallpaperState.value.hasWallpaper)
+        assertThat(vm.wallpaperState.value.hasWallpaper).isTrue()
     }
 
     @Test
     fun `WallpaperFragment - edit mode toggles correctly`() = runTest {
         val vm = createViewModel()
 
-        assertFalse(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isFalse()
 
         vm.onSetWallpaperEditMode(true)
-        assertTrue(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isTrue()
 
         vm.onToggleWallpaperEditMode()
-        assertFalse(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isFalse()
 
         vm.onToggleWallpaperEditMode()
-        assertTrue(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isTrue()
     }
 
     @Test
@@ -676,7 +671,7 @@ class LauncherViewModelContractTest {
         coEvery { getAutoLaunchSettingUseCase() } returns true
         val vm = createViewModel()
 
-        assertTrue(vm.isAutoLaunchEnabled())
+        assertThat(vm.isAutoLaunchEnabled()).isTrue()
     }
 
     @Test
@@ -684,7 +679,7 @@ class LauncherViewModelContractTest {
         coEvery { getAutoShowKeyboardSettingUseCase() } returns true
         val vm = createViewModel()
 
-        assertTrue(vm.isAutoShowKeyboardEnabled())
+        assertThat(vm.isAutoShowKeyboardEnabled()).isTrue()
     }
 
     @Test
@@ -692,7 +687,7 @@ class LauncherViewModelContractTest {
         coEvery { checkAppUsageUseCase(any()) } returns true
         val vm = createViewModel()
 
-        assertTrue(vm.hasUsageData("com.test.app"))
+        assertThat(vm.hasUsageData("com.test.app")).isTrue()
     }
 
     @Test
@@ -700,7 +695,7 @@ class LauncherViewModelContractTest {
         coEvery { getTextShadowEnabledUseCase() } returns true
         val vm = createViewModel()
 
-        assertTrue(vm.isTextShadowEnabled())
+        assertThat(vm.isTextShadowEnabled()).isTrue()
     }
 
     // =====================================================================
@@ -716,7 +711,7 @@ class LauncherViewModelContractTest {
         vm.refreshDynamicUiData()
         advanceUntilIdle()
 
-        assertNotEquals("--:--", vm.uiState.value.timeString)
+        assertThat(vm.uiState.value.timeString).isNotEqualTo("--:--")
         coVerify { observeTimeBasedEventsUseCase.refresh() }
     }
 
@@ -728,7 +723,7 @@ class LauncherViewModelContractTest {
         vm.refreshAllData()
         advanceUntilIdle()
 
-        assertNotEquals("--:--", vm.uiState.value.timeString)
+        assertThat(vm.uiState.value.timeString).isNotEqualTo("--:--")
         coVerify { refreshAppsUseCase.invoke() }
     }
 
@@ -745,15 +740,15 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         val events = mutableListOf<UiEvent>()
-        val job = launch(UnconfinedTestDispatcher()) { vm.event.collect { events.add(it) } }
+        val job = recordEmissions(vm.event, into = events)
 
         vm.onAppClicked(testApp)
         advanceUntilIdle()
 
         // App still launches (event sent before recording)
-        assertTrue(events.any { it is UiEvent.LaunchApp })
+        assertThat(events.any { it is UiEvent.LaunchApp }).isTrue()
         // Error toast shown
-        assertTrue(events.any { it is UiEvent.ShowToast })
+        assertThat(events.any { it is UiEvent.ShowToast }).isTrue()
 
         job.cancel()
     }
@@ -777,9 +772,9 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         // Nothing crashed — VM is still functional
-        assertNotNull(vm.uiState.value)
-        assertEquals("50%", vm.uiState.value.batteryString)
-        assertEquals("", vm.appDrawerSearchQuery.value)
+        assertThat(vm.uiState.value).isNotNull()
+        assertThat(vm.uiState.value.batteryString).isEqualTo("50%")
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     // =====================================================================
@@ -807,11 +802,11 @@ class LauncherViewModelContractTest {
         advanceUntilIdle()
 
         // Fragment would see all of these
-        assertTrue(vm.favoriteAppsState.value is UiState.Success)
-        assertEquals(0.6f, vm.layoutScaleState.value)
-        assertEquals(0xFFFF00, vm.uiColorsState.value.textColor)
-        assertTrue(vm.wallpaperState.value.hasWallpaper)
-        assertEquals(1, vm.uiState.value.timeBasedEvents.size)
-        assertEquals("77%", vm.uiState.value.batteryString)
+        assertThat(vm.favoriteAppsState.value).isInstanceOf(UiState.Success::class.java)
+        assertThat(vm.layoutScaleState.value).isEqualTo(0.6f)
+        assertThat(vm.uiColorsState.value.textColor).isEqualTo(0xFFFF00)
+        assertThat(vm.wallpaperState.value.hasWallpaper).isTrue()
+        assertThat(vm.uiState.value.timeBasedEvents.size).isEqualTo(1)
+        assertThat(vm.uiState.value.batteryString).isEqualTo("77%")
     }
 }

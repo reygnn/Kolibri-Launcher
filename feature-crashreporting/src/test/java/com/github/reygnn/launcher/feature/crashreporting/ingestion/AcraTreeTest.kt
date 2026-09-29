@@ -1,10 +1,9 @@
 package com.github.reygnn.launcher.feature.crashreporting.ingestion
 
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.google.common.truth.Truth.assertThat
 import java.io.IOException
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,12 +40,12 @@ class AcraTreeTest {
 
         Timber.tag(TimberWrapper.SILENT_LOG_TAG).e(IOException("x"), "boom")
 
-        assertEquals(1, delivered.size)
+        assertThat(delivered.size).isEqualTo(1)
         // Per-report carrier (B4): message folds "[E/SILENT_ERROR] <type>: <msg>".
         // Timber appends the throwable's stack trace to the message before
         // calling log(), so assert the prefix rather than an exact match — the
         // exact carrier format is pinned by ReportCarrierTest.
-        assertTrue(delivered.single().message!!.startsWith("[E/SILENT_ERROR] IOException: boom"))
+        assertThat(delivered.single().message!!.startsWith("[E/SILENT_ERROR] IOException: boom")).isTrue()
     }
 
     @Test
@@ -56,8 +55,8 @@ class AcraTreeTest {
 
         Timber.tag(TimberWrapper.ACRA_REPORT_TAG).e(IOException("x"), "infra boom")
 
-        assertEquals(1, delivered.size)
-        assertTrue(delivered.single().message!!.startsWith("[E/ACRA_REPORT] IOException: infra boom"))
+        assertThat(delivered.size).isEqualTo(1)
+        assertThat(delivered.single().message!!.startsWith("[E/ACRA_REPORT] IOException: infra boom")).isTrue()
     }
 
     @Test
@@ -68,8 +67,8 @@ class AcraTreeTest {
         // The gate is intent, not level: a WARN carrying an intent tag delivers.
         Timber.tag(TimberWrapper.ACRA_REPORT_TAG).w(IOException("x"), "warn but intended")
 
-        assertEquals(1, delivered.size)
-        assertTrue(delivered.single().message!!.startsWith("[W/ACRA_REPORT] IOException: warn but intended"))
+        assertThat(delivered.size).isEqualTo(1)
+        assertThat(delivered.single().message!!.startsWith("[W/ACRA_REPORT] IOException: warn but intended")).isTrue()
     }
 
     @Test
@@ -80,7 +79,7 @@ class AcraTreeTest {
         // The §23 regression guard: a plain Timber.e(t) at ERROR must stay local.
         Timber.tag("SomeClass").e(IOException("x"), "plain error")
 
-        assertTrue(delivered.isEmpty())
+        assertThat(delivered.isEmpty()).isTrue()
     }
 
     @Test
@@ -90,7 +89,7 @@ class AcraTreeTest {
 
         Timber.tag(TimberWrapper.SILENT_LOG_TAG).e("no throwable")
 
-        assertTrue(delivered.isEmpty())
+        assertThat(delivered.isEmpty()).isTrue()
     }
 
     @Test
@@ -104,6 +103,6 @@ class AcraTreeTest {
         // Must not throw (C1); the swallow's Log.e runs on the real runtime.
         Timber.tag(TimberWrapper.ACRA_REPORT_TAG).e(IOException("x"), "boom")
 
-        assertEquals(1, delivered)
+        assertThat(delivered).isEqualTo(1)
     }
 }

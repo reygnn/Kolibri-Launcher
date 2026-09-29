@@ -4,10 +4,8 @@ import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperLayer
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.RectF
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -55,7 +53,7 @@ class WallpaperLayerMatrixTest {
             val out = Matrix()
             layer.buildMatrixInto(out)
             val actual = FloatArray(9).also { out.getValues(it) }
-            assertArrayEquals("scale=$scale tx=$tx ty=$ty", expected, actual, 0f)
+            assertWithMessage("scale=$scale tx=$tx ty=$ty").that(actual).usingTolerance(0.0).containsExactly(expected).inOrder()
         }
     }
 
@@ -67,7 +65,7 @@ class WallpaperLayerMatrixTest {
         val out = Matrix().apply { postScale(99f, 99f); postTranslate(500f, 500f) }
         layer.buildMatrixInto(out)
         val actual = FloatArray(9).also { out.getValues(it) }
-        assertArrayEquals(expected, actual, 0f)
+        assertThat(actual).usingTolerance(0.0).containsExactly(expected).inOrder()
     }
 
     @Test
@@ -76,11 +74,11 @@ class WallpaperLayerMatrixTest {
             val layer = layer(scale, tx, ty)
             val expected = layer.getTransformedBounds()!!
             val out = RectF()
-            assertTrue(layer.getTransformedBoundsInto(out, Matrix()))
-            assertEquals("left", expected.left, out.left, 0f)
-            assertEquals("top", expected.top, out.top, 0f)
-            assertEquals("right", expected.right, out.right, 0f)
-            assertEquals("bottom", expected.bottom, out.bottom, 0f)
+            assertThat(layer.getTransformedBoundsInto(out, Matrix())).isTrue()
+            assertWithMessage("left").that(out.left).isWithin(0f).of(expected.left)
+            assertWithMessage("top").that(out.top).isWithin(0f).of(expected.top)
+            assertWithMessage("right").that(out.right).isWithin(0f).of(expected.right)
+            assertWithMessage("bottom").that(out.bottom).isWithin(0f).of(expected.bottom)
         }
     }
 
@@ -88,6 +86,6 @@ class WallpaperLayerMatrixTest {
     fun `getTransformedBoundsInto returns false without a bitmap`() {
         val layer = WallpaperLayer(bitmap = null)
         val out = RectF(1f, 2f, 3f, 4f)
-        assertFalse(layer.getTransformedBoundsInto(out, Matrix()))
+        assertThat(layer.getTransformedBoundsInto(out, Matrix())).isFalse()
     }
 }

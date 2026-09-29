@@ -7,6 +7,8 @@ import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
 import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrDrainer
 import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrException
 import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -17,9 +19,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -70,11 +69,11 @@ class CrashReportingBootstrapProcessGateTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { anrReporter.reportPendingAnrs(any()) }
-        assertEquals(0, treePlants)
-        assertEquals(0, watchdogStarts)
+        assertThat(treePlants).isEqualTo(0)
+        assertThat(watchdogStarts).isEqualTo(0)
         // X2: the sender process must NOT read consent or toggle ACRA.
-        assertEquals(0, consentReads)
-        assertEquals(emptyList<Boolean>(), enableCalls)
+        assertThat(consentReads).isEqualTo(0)
+        assertThat(enableCalls).isEqualTo(emptyList<Boolean>())
     }
 
     @Test
@@ -85,13 +84,13 @@ class CrashReportingBootstrapProcessGateTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { anrReporter.reportPendingAnrs(any()) }
-        assertEquals(1, treePlants)
-        assertEquals(1, watchdogStarts)
+        assertThat(treePlants).isEqualTo(1)
+        assertThat(watchdogStarts).isEqualTo(1)
         // The consent gate now runs in onCreate: read once, and A1 disable-then-
         // enable for a Granted decision. This is the fix's core — it must run here,
         // not attachBaseContext, where applicationContext is null.
-        assertEquals(1, consentReads)
-        assertEquals(listOf(false, true), enableCalls)
+        assertThat(consentReads).isEqualTo(1)
+        assertThat(enableCalls).isEqualTo(listOf(false, true))
     }
 
     @Test
@@ -114,12 +113,9 @@ class CrashReportingBootstrapProcessGateTest {
             // Invoke the captured production lambda with a synthetic post-mortem ANR.
             handlerSlot.captured.invoke(AnrReport(1L, "test anr", 0, "thread dump"))
 
-            assertEquals(1, capturedTags.size)
-            assertEquals(TimberWrapper.ACRA_REPORT_TAG, capturedTags.single().first)
-            assertTrue(
-                "ANR must be delivered as an AnrException",
-                capturedTags.single().second is AnrException,
-            )
+            assertThat(capturedTags.size).isEqualTo(1)
+            assertThat(capturedTags.single().first).isEqualTo(TimberWrapper.ACRA_REPORT_TAG)
+            assertWithMessage("ANR must be delivered as an AnrException").that(capturedTags.single().second is AnrException).isTrue()
         } finally {
             KolibriLog.taggedErrorHandler = { _, _, _ -> }
         }
@@ -136,9 +132,9 @@ class CrashReportingBootstrapProcessGateTest {
             val stall = RuntimeException("main-looper stall")
             CrashReportingBootstrap.deliverWatchdogStall(stall)
 
-            assertEquals(1, capturedTags.size)
-            assertEquals(TimberWrapper.ACRA_REPORT_TAG, capturedTags.single().first)
-            assertSame(stall, capturedTags.single().second)
+            assertThat(capturedTags.size).isEqualTo(1)
+            assertThat(capturedTags.single().first).isEqualTo(TimberWrapper.ACRA_REPORT_TAG)
+            assertThat(capturedTags.single().second).isSameInstanceAs(stall)
         } finally {
             KolibriLog.taggedErrorHandler = { _, _, _ -> }
         }

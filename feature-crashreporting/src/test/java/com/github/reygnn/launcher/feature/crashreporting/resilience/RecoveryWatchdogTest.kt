@@ -1,9 +1,9 @@
 package com.github.reygnn.launcher.feature.crashreporting.resilience
 
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -40,7 +40,7 @@ class RecoveryWatchdogTest {
 
         // Ordering is the invariant: capture:WatchdogStallException must precede
         // kill (C3/X1). A kill-first refactor would break this exact assertion.
-        assertEquals(listOf("capture:WatchdogStallException", "kill"), events)
+        assertThat(events).isEqualTo(listOf("capture:WatchdogStallException", "kill"))
         verify(exactly = 1) { loopGuard.recordKill() }
     }
 
@@ -50,7 +50,7 @@ class RecoveryWatchdogTest {
 
         watchdog().onStallDetected()
 
-        assertEquals(listOf("capture:WatchdogStallException"), events)
+        assertThat(events).isEqualTo(listOf("capture:WatchdogStallException"))
         verify(exactly = 0) { loopGuard.recordKill() }
     }
 
@@ -62,7 +62,7 @@ class RecoveryWatchdogTest {
         // the swallow (ST1 — kill has priority).
         watchdog(capture = { throw RuntimeException("acra is down") }).onStallDetected()
 
-        assertEquals(listOf("kill"), events)
+        assertThat(events).isEqualTo(listOf("kill"))
         verify(exactly = 1) { loopGuard.recordKill() }
     }
 }

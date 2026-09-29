@@ -9,6 +9,8 @@ import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventType
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.launcher.common.data.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -16,9 +18,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -162,10 +161,10 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         val begin = now + 2 * 60 * 60 * 1000L
         val result = query(listOf(timedRow("Standup", begin, begin + 1_800_000)))
 
-        assertEquals(1, result.size)
-        assertEquals("Standup", result[0].title)
-        assertFalse(result[0].isAllDay)
-        assertEquals(TimeBasedEventType.CALENDAR, result[0].type)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("Standup")
+        assertThat(result[0].isAllDay).isFalse()
+        assertThat(result[0].type).isEqualTo(TimeBasedEventType.CALENDAR)
     }
 
     @Test
@@ -174,7 +173,7 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         val begin = now - 3 * 60 * 60 * 1000L
         val result = query(listOf(timedRow("PastMeeting", begin, begin + 1_800_000)))
 
-        assertTrue("past timed event must be dropped, was: $result", result.isEmpty())
+        assertWithMessage("past timed event must be dropped, was: $result").that(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -186,9 +185,9 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         val end = now + 25 * 60 * 1000L
         val result = query(listOf(timedRow("Standup", begin, end)))
 
-        assertEquals(1, result.size)
-        assertEquals("Standup", result[0].title)
-        assertEquals(begin, result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("Standup")
+        assertThat(result[0].triggerTimeMillis).isEqualTo(begin)
     }
 
     @Test
@@ -197,7 +196,7 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         val end = now
         val result = query(listOf(timedRow("JustEnded", now - 60 * 60 * 1000L, end)))
 
-        assertTrue("event ending exactly now must be dropped, was: $result", result.isEmpty())
+        assertWithMessage("event ending exactly now must be dropped, was: $result").that(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -205,8 +204,8 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         val begin = now + 25 * 60 * 60 * 1000L
         val result = query(listOf(timedRow("TomorrowCall", begin, begin + 1_800_000)))
 
-        assertEquals(1, result.size)
-        assertEquals("TomorrowCall", result[0].title)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("TomorrowCall")
     }
 
     @Test
@@ -215,23 +214,20 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         // UTC read dropped this; the fix keeps it and normalises the trigger.
         val result = query(listOf(allDayRow("Holiday", today)))
 
-        assertEquals(1, result.size)
-        assertEquals("Holiday", result[0].title)
-        assertTrue("expected all-day flag", result[0].isAllDay)
-        assertEquals(
-            "all-day trigger must be local midnight of today",
-            localMidnight(today), result[0].triggerTimeMillis
-        )
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("Holiday")
+        assertWithMessage("expected all-day flag").that(result[0].isAllDay).isTrue()
+        assertWithMessage("all-day trigger must be local midnight of today").that(result[0].triggerTimeMillis).isEqualTo(localMidnight(today))
     }
 
     @Test
     fun `all-day event tomorrow is kept, flagged and normalised to local midnight`() = runTest {
         val result = query(listOf(allDayRow("Birthday", tomorrow)))
 
-        assertEquals(1, result.size)
-        assertEquals("Birthday", result[0].title)
-        assertTrue(result[0].isAllDay)
-        assertEquals(localMidnight(tomorrow), result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("Birthday")
+        assertThat(result[0].isAllDay).isTrue()
+        assertThat(result[0].triggerTimeMillis).isEqualTo(localMidnight(tomorrow))
     }
 
     @Test
@@ -257,27 +253,24 @@ class TimeBasedEventsRepositoryImplCalendarTest {
 
         val result = query(listOf(row))
 
-        assertEquals(1, result.size)
-        assertEquals("Alex's Birthday", result[0].title)
-        assertTrue("a birthday is an all-day event", result[0].isAllDay)
-        assertEquals(
-            "the expanded instance must show today, normalised to local midnight",
-            localMidnight(today), result[0].triggerTimeMillis
-        )
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].title).isEqualTo("Alex's Birthday")
+        assertWithMessage("a birthday is an all-day event").that(result[0].isAllDay).isTrue()
+        assertWithMessage("the expanded instance must show today, normalised to local midnight").that(result[0].triggerTimeMillis).isEqualTo(localMidnight(today))
     }
 
     @Test
     fun `all-day event yesterday is dropped`() = runTest {
         val result = query(listOf(allDayRow("PastAllDay", today.minusDays(1))))
 
-        assertTrue("yesterday's all-day event must be dropped, was: $result", result.isEmpty())
+        assertWithMessage("yesterday's all-day event must be dropped, was: $result").that(result.isEmpty()).isTrue()
     }
 
     @Test
     fun `all-day event day after tomorrow is dropped`() = runTest {
         val result = query(listOf(allDayRow("FutureAllDay", today.plusDays(2))))
 
-        assertTrue("out-of-window all-day event must be dropped, was: $result", result.isEmpty())
+        assertWithMessage("out-of-window all-day event must be dropped, was: $result").that(result.isEmpty()).isTrue()
     }
 
     @Test
@@ -294,9 +287,9 @@ class TimeBasedEventsRepositoryImplCalendarTest {
         )
         val result = query(listOf(row))
 
-        assertEquals(1, result.size)
-        assertTrue(result[0].isAllDay)
-        assertEquals(localMidnight(today), result[0].triggerTimeMillis)
+        assertThat(result.size).isEqualTo(1)
+        assertThat(result[0].isAllDay).isTrue()
+        assertThat(result[0].triggerTimeMillis).isEqualTo(localMidnight(today))
     }
 
     @Test
@@ -311,6 +304,6 @@ class TimeBasedEventsRepositoryImplCalendarTest {
 
         val titles = query(rows).map { it.title }.toSet()
 
-        assertEquals(setOf("AllDayToday", "UpcomingTimed", "AllDayTomorrow"), titles)
+        assertThat(titles).isEqualTo(setOf("AllDayToday", "UpcomingTimed", "AllDayTomorrow"))
     }
 }

@@ -11,11 +11,10 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -52,10 +51,10 @@ class WallpaperFlattenerInstrumentedTest {
 
             val composite = flattener.flatten(state, width = 200, height = 400)
 
-            assertNotNull("flatten must produce a composite for a multi-layer state", composite)
-            assertEquals(200, composite!!.width)
-            assertEquals(400, composite.height)
-            assertEquals(Bitmap.Config.ARGB_8888, composite.config)
+            assertWithMessage("flatten must produce a composite for a multi-layer state").that(composite).isNotNull()
+            assertThat(composite!!.width).isEqualTo(200)
+            assertThat(composite.height).isEqualTo(400)
+            assertThat(composite.config).isEqualTo(Bitmap.Config.ARGB_8888)
             composite.recycle()
         } finally {
             f1.delete()
@@ -68,7 +67,7 @@ class WallpaperFlattenerInstrumentedTest {
         // Single-layer wallpapers are already one bitmap — nothing to flatten.
         val state = WallpaperState.single("file:///does/not/matter.png")
         val flattener = WallpaperFlattener(context, Dispatchers.Main, R.style.AppTheme)
-        assertNull(flattener.flatten(state, width = 200, height = 400))
+        assertThat(flattener.flatten(state, width = 200, height = 400)).isNull()
     }
 
     private fun writeTestImage(name: String, color: Int): File {

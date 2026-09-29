@@ -8,18 +8,17 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.content.pm.ShortcutInfo
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class ShortcutRepositoryImplTest {
 
@@ -72,30 +71,30 @@ class ShortcutRepositoryImplTest {
 
         val result = shortcutManager.getShortcutsForPackage("com.test.app")
 
-        assertEquals(2, result.size)
-        assertEquals("id1", result[0].id)
-        assertEquals("id2", result[1].id)
+        assertThat(result.size).isEqualTo(2)
+        assertThat(result[0].id).isEqualTo("id1")
+        assertThat(result[1].id).isEqualTo("id2")
     }
 
     @Test
     fun `getShortcutsForPackage - when SecurityException occurs - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } throws SecurityException("Permission denied!")
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - when other Exception occurs - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } throws RuntimeException("Something went wrong")
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - when system returns null - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } returns null
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -104,24 +103,24 @@ class ShortcutRepositoryImplTest {
     fun `getShortcutsForPackage - when IllegalStateException - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } throws IllegalStateException("LauncherApps not initialized")
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - when IllegalArgumentException - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } throws IllegalArgumentException("Invalid package name")
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - with empty package name - returns empty list`() {
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - with blank package name - returns empty list`() {
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("   ").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("   ").isEmpty()).isTrue()
     }
 
     @Test
@@ -129,14 +128,14 @@ class ShortcutRepositoryImplTest {
         every { context.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
 
         val managerWithNullService = ShortcutRepositoryImpl(context)
-        Assert.assertTrue(managerWithNullService.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(managerWithNullService.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
     fun `getShortcutsForPackage - with malformed package name - handles gracefully`() {
         every { launcherApps.getShortcuts(any(), any()) } returns emptyList()
 
-        assertNotNull(shortcutManager.getShortcutsForPackage("not.a.valid..package...name"))
+        assertThat(shortcutManager.getShortcutsForPackage("not.a.valid..package...name")).isNotNull()
     }
 
     @Test
@@ -148,8 +147,8 @@ class ShortcutRepositoryImplTest {
         val result2 = shortcutManager.getShortcutsForPackage("com.test.app")
         val result3 = shortcutManager.getShortcutsForPackage("com.test.app")
 
-        assertEquals(result1.size, result2.size)
-        assertEquals(result2.size, result3.size)
+        assertThat(result2.size).isEqualTo(result1.size)
+        assertThat(result3.size).isEqualTo(result2.size)
     }
 
     @Test
@@ -157,14 +156,14 @@ class ShortcutRepositoryImplTest {
         val largeShortcutList = (1..100).map { mockk<ShortcutInfo>(relaxed = true) }
         every { launcherApps.getShortcuts(any(), any()) } returns largeShortcutList
 
-        assertEquals(100, shortcutManager.getShortcutsForPackage("com.test.app").size)
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").size).isEqualTo(100)
     }
 
     @Test
     fun `getShortcutsForPackage - when NullPointerException inside API - returns empty list`() {
         every { launcherApps.getShortcuts(any(), any()) } throws NullPointerException("Internal API error")
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
     }
 
     @Test
@@ -174,8 +173,8 @@ class ShortcutRepositoryImplTest {
 
         every { launcherApps.getShortcuts(any(), any()) } returnsMany listOf(shortcuts1, shortcuts2)
 
-        assertEquals(1, shortcutManager.getShortcutsForPackage("com.app1").size)
-        assertEquals(2, shortcutManager.getShortcutsForPackage("com.app2").size)
+        assertThat(shortcutManager.getShortcutsForPackage("com.app1").size).isEqualTo(1)
+        assertThat(shortcutManager.getShortcutsForPackage("com.app2").size).isEqualTo(2)
     }
 
     @Test
@@ -184,15 +183,15 @@ class ShortcutRepositoryImplTest {
 
         every { launcherApps.getShortcuts(any(), any()) } throws SecurityException("First call fails") andThen fakeShortcuts
 
-        Assert.assertTrue(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty())
-        assertEquals(1, shortcutManager.getShortcutsForPackage("com.test.app").size)
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").isEmpty()).isTrue()
+        assertThat(shortcutManager.getShortcutsForPackage("com.test.app").size).isEqualTo(1)
     }
 
     @Test
     fun `getShortcutsForPackage - with special characters in package name - handles correctly`() {
         every { launcherApps.getShortcuts(any(), any()) } returns emptyList()
 
-        assertNotNull(shortcutManager.getShortcutsForPackage("com.test-app_name.special"))
+        assertThat(shortcutManager.getShortcutsForPackage("com.test-app_name.special")).isNotNull()
     }
 
     // ========== DEFAULT LAUNCHER CHECK ==========
@@ -209,7 +208,7 @@ class ShortcutRepositoryImplTest {
 
         val result = shortcutManager.getShortcutsForPackage("com.test.app")
 
-        Assert.assertTrue("Should return empty list when not default launcher", result.isEmpty())
+        assertWithMessage("Should return empty list when not default launcher").that(result.isEmpty()).isTrue()
         verify(exactly = 0) { launcherApps.getShortcuts(any(), any()) }
     }
 

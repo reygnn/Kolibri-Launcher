@@ -2,9 +2,9 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.domain.repository.DefaultAppsRepository
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,7 +28,7 @@ class GetDefaultFavoriteComponentsUseCaseTest {
 
         val result = useCase(listOf("com.phone", "com.browser")).invoke(available)
 
-        assertEquals(listOf(phone.componentName, browser.componentName), result)
+        assertThat(result).isEqualTo(listOf(phone.componentName, browser.componentName))
     }
 
     @Test
@@ -38,7 +38,7 @@ class GetDefaultFavoriteComponentsUseCaseTest {
 
         val result = useCase(listOf("com.phone", "com.sms.not.installed")).invoke(available)
 
-        assertEquals(listOf(phone.componentName), result)
+        assertThat(result).isEqualTo(listOf(phone.componentName))
     }
 
     @Test
@@ -49,7 +49,7 @@ class GetDefaultFavoriteComponentsUseCaseTest {
 
         val result = useCase(listOf("com.multi")).invoke(available)
 
-        assertEquals(listOf(firstEntry.componentName), result)
+        assertThat(result).isEqualTo(listOf(firstEntry.componentName))
     }
 
     @Test
@@ -60,20 +60,20 @@ class GetDefaultFavoriteComponentsUseCaseTest {
 
         val result = useCase(listOf("com.combo", "com.combo")).invoke(available)
 
-        assertEquals(listOf(combo.componentName), result)
+        assertThat(result).isEqualTo(listOf(combo.componentName))
     }
 
     @Test
     fun `empty defaults yields empty result`() = runTest {
         val result = useCase(emptyList()).invoke(listOf(app("com.phone", "Dialer")))
 
-        assertEquals(emptyList<String>(), result)
+        assertThat(result).isEqualTo(emptyList<String>())
     }
 
     @Test
     fun `empty available apps yields empty result`() = runTest {
         val result = useCase(listOf("com.phone")).invoke(emptyList())
 
-        assertEquals(emptyList<String>(), result)
+        assertThat(result).isEqualTo(emptyList<String>())
     }
 }

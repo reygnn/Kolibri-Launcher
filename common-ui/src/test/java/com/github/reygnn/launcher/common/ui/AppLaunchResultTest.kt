@@ -1,7 +1,6 @@
 package com.github.reygnn.launcher.common.ui
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -14,10 +13,10 @@ class AppLaunchResultTest {
 
     @Test
     fun `only ComponentGone triggers a reconcile`() {
-        assertTrue(AppLaunchResult.ComponentGone.shouldReconcile)
+        assertThat(AppLaunchResult.ComponentGone.shouldReconcile).isTrue()
 
-        assertFalse(AppLaunchResult.Launched.shouldReconcile)
-        assertFalse(AppLaunchResult.PermissionDenied.shouldReconcile)
-        assertFalse(AppLaunchResult.Failed(RuntimeException("boom")).shouldReconcile)
+        assertThat(AppLaunchResult.Launched.shouldReconcile).isFalse()
+        assertThat(AppLaunchResult.PermissionDenied.shouldReconcile).isFalse()
+        assertThat(AppLaunchResult.Failed(RuntimeException("boom")).shouldReconcile).isFalse()
     }
 }

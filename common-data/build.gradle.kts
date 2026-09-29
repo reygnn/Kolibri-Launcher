@@ -70,6 +70,7 @@ dependencies {
     // parity guard runs on a real device (the divergence lives in the platform, not
     // mockable). Plain AndroidJUnit4 + ApplicationProvider; no Hilt.
     androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.truth) // A12: Truth is the one assertion library
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core.ktx)

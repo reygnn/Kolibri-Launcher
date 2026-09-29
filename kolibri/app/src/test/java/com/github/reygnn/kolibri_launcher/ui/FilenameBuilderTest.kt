@@ -5,7 +5,7 @@ import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.utcMilli
 import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.withDefaultLocale
 import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.withUtcTimeZone
 import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import java.util.Locale
@@ -26,32 +26,26 @@ class FilenameBuilderTest {
             extension = ".ext",
             clock = { referenceMillis },
         )
-        assertEquals("pre_20240315.ext", builder.build())
+        assertThat(builder.build()).isEqualTo("pre_20240315.ext")
     }
 
     @Test
     fun `forBackup produces documented kolibri_backup name`() = withUtcTimeZone {
         val builder = FilenameBuilder.forBackup(clock = { referenceMillis })
-        assertEquals("kolibri_backup_2024-03-15_103045.zip", builder.build())
+        assertThat(builder.build()).isEqualTo("kolibri_backup_2024-03-15_103045.zip")
     }
 
     @Test
     fun `forUsageExport produces documented kolibri_usage name`() = withUtcTimeZone {
         val builder = FilenameBuilder.forUsageExport(clock = { referenceMillis })
-        assertEquals("kolibri_usage_2024-03-15_103045.json", builder.build())
+        assertThat(builder.build()).isEqualTo("kolibri_usage_2024-03-15_103045.json")
     }
 
     @Test
     fun `filename zero-pads single-digit month day hour minute second`() = withUtcTimeZone {
         val millis = utcMillis(2024, 1, 2, 3, 4, 5)
-        assertEquals(
-            "kolibri_backup_2024-01-02_030405.zip",
-            FilenameBuilder.forBackup(clock = { millis }).build(),
-        )
-        assertEquals(
-            "kolibri_usage_2024-01-02_030405.json",
-            FilenameBuilder.forUsageExport(clock = { millis }).build(),
-        )
+        assertThat(FilenameBuilder.forBackup(clock = { millis }).build()).isEqualTo("kolibri_backup_2024-01-02_030405.zip")
+        assertThat(FilenameBuilder.forUsageExport(clock = { millis }).build()).isEqualTo("kolibri_usage_2024-01-02_030405.json")
     }
 
     @Test
@@ -63,16 +57,10 @@ class FilenameBuilderTest {
         //   th_TH -> would emit a Buddhist year (2024 -> 2567)
         // This exercises the real production path, not an injected locale.
         withDefaultLocale(Locale.forLanguageTag("ar-SA")) {
-            assertEquals(
-                "kolibri_backup_2024-03-15_103045.zip",
-                FilenameBuilder.forBackup(clock = { referenceMillis }).build(),
-            )
+            assertThat(FilenameBuilder.forBackup(clock = { referenceMillis }).build()).isEqualTo("kolibri_backup_2024-03-15_103045.zip")
         }
         withDefaultLocale(Locale.forLanguageTag("th-TH")) {
-            assertEquals(
-                "kolibri_usage_2024-03-15_103045.json",
-                FilenameBuilder.forUsageExport(clock = { referenceMillis }).build(),
-            )
+            assertThat(FilenameBuilder.forUsageExport(clock = { referenceMillis }).build()).isEqualTo("kolibri_usage_2024-03-15_103045.json")
         }
     }
 
@@ -85,7 +73,7 @@ class FilenameBuilderTest {
         current = utcMillis(2025, 6, 15, 12, 34, 56)
         val second = builder.build()
 
-        assertEquals("kolibri_backup_2024-01-01_000000.zip", first)
-        assertEquals("kolibri_backup_2025-06-15_123456.zip", second)
+        assertThat(first).isEqualTo("kolibri_backup_2024-01-01_000000.zip")
+        assertThat(second).isEqualTo("kolibri_backup_2025-06-15_123456.zip")
     }
 }

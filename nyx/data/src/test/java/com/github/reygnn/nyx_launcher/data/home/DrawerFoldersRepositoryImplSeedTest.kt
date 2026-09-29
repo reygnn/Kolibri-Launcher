@@ -8,7 +8,7 @@ import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -31,7 +31,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     private fun newRepo() = DrawerFoldersRepositoryImpl(FakeDataStore(), DrawerFoldersSerializer())
 
     @Test
-    fun seeds_the_folder_on_a_fresh_store() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_the_folder_on_a_fresh_store() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialFolders { listOf(googleFolder(GMAIL, MAPS)) }
@@ -43,7 +43,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun drops_a_folder_below_the_two_member_invariant() = runTest(mainDispatcherRule.dispatcher) {
+    fun drops_a_folder_below_the_two_member_invariant() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
 
         val seeded = repo.seedInitialFolders { listOf(googleFolder(GMAIL)) }
@@ -53,7 +53,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun seeds_only_once() = runTest(mainDispatcherRule.dispatcher) {
+    fun seeds_only_once() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         assertThat(repo.seedInitialFolders { listOf(googleFolder(GMAIL, MAPS)) }).isTrue()
 
@@ -66,7 +66,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun does_not_seed_when_folders_already_exist() = runTest(mainDispatcherRule.dispatcher) {
+    fun does_not_seed_when_folders_already_exist() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         repo.update { DrawerFolders(listOf(googleFolder(GMAIL, MAPS))) }
 
@@ -79,7 +79,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun does_not_resolve_on_a_returning_install() = runTest(mainDispatcherRule.dispatcher) {
+    fun does_not_resolve_on_a_returning_install() = runTest(mainDispatcherRule.testDispatcher) {
         val repo = newRepo()
         assertThat(repo.seedInitialFolders { listOf(googleFolder(GMAIL, MAPS)) }).isTrue()
 
@@ -91,7 +91,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun update_propagates_read_failure_and_does_not_write() = runTest(mainDispatcherRule.dispatcher) {
+    fun update_propagates_read_failure_and_does_not_write() = runTest(mainDispatcherRule.testDispatcher) {
         // The RMW read is fail-CLOSED: an IOException propagates and the write never runs, so a
         // transient store failure can't wipe existing folders. (A fail-open revert would read
         // EMPTY, not throw, and proceed to write.)
@@ -117,7 +117,7 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     @Test
-    fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.dispatcher) {
+    fun seed_is_skipped_when_the_store_read_throws() = runTest(mainDispatcherRule.testDispatcher) {
         // Contained fail-closed: an IOException on the seed read is caught → no seed, no crash.
         val throwing = object : DataStore<Preferences> {
             override val data: Flow<Preferences> = flow { throw IOException("boom") }

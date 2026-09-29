@@ -4,7 +4,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditState
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperEditTransition
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,7 +39,7 @@ class WallpaperEditTransitionTest {
             overlayVisible = true,
             rootLayoutAlpha = 0.7f,
         )
-        assertEquals(expected, WallpaperEditTransition.targetState(WallpaperEditTransition.Enter))
+        assertThat(WallpaperEditTransition.targetState(WallpaperEditTransition.Enter)).isEqualTo(expected)
     }
 
     @Test
@@ -53,7 +53,7 @@ class WallpaperEditTransitionTest {
             overlayVisible = false,
             rootLayoutAlpha = 1.0f,
         )
-        assertEquals(expected, WallpaperEditTransition.targetState(WallpaperEditTransition.Exit))
+        assertThat(WallpaperEditTransition.targetState(WallpaperEditTransition.Exit)).isEqualTo(expected)
     }
 
     // ------------------------------------------------------------------------
@@ -62,7 +62,7 @@ class WallpaperEditTransitionTest {
 
     @Test
     fun `forMode maps true to Enter and false to Exit`() {
-        assertEquals(WallpaperEditTransition.Enter, WallpaperEditTransition.forMode(true))
-        assertEquals(WallpaperEditTransition.Exit, WallpaperEditTransition.forMode(false))
+        assertThat(WallpaperEditTransition.forMode(true)).isEqualTo(WallpaperEditTransition.Enter)
+        assertThat(WallpaperEditTransition.forMode(false)).isEqualTo(WallpaperEditTransition.Exit)
     }
 }

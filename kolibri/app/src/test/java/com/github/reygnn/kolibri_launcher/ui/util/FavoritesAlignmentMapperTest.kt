@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui.util
 
 import android.view.Gravity
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -19,8 +19,8 @@ class FavoritesAlignmentMapperTest {
 
     @Test
     fun `each alignment maps to its exact horizontal gravity`() {
-        assertEquals(Gravity.START, FavoritesAlignment.START.toHorizontalGravity())
-        assertEquals(Gravity.CENTER_HORIZONTAL, FavoritesAlignment.CENTER.toHorizontalGravity())
-        assertEquals(Gravity.END, FavoritesAlignment.END.toHorizontalGravity())
+        assertThat(FavoritesAlignment.START.toHorizontalGravity()).isEqualTo(Gravity.START)
+        assertThat(FavoritesAlignment.CENTER.toHorizontalGravity()).isEqualTo(Gravity.CENTER_HORIZONTAL)
+        assertThat(FavoritesAlignment.END.toHorizontalGravity()).isEqualTo(Gravity.END)
     }
 }

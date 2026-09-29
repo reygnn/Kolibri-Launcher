@@ -1,9 +1,8 @@
 package com.github.reygnn.launcher.feature.crashreporting.resilience
 
+import com.google.common.truth.Truth.assertThat
 import java.io.File
 import org.junit.After
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -32,7 +31,7 @@ class LoopGuardTest {
 
     @Test
     fun `fresh guard does not suppress`() {
-        assertFalse(guard().shouldSuppressKill())
+        assertThat(guard().shouldSuppressKill()).isFalse()
     }
 
     @Test
@@ -41,7 +40,7 @@ class LoopGuardTest {
         g.recordKill(); clock += 1_000
         g.recordKill()
 
-        assertFalse(g.shouldSuppressKill())
+        assertThat(g.shouldSuppressKill()).isFalse()
     }
 
     @Test
@@ -49,7 +48,7 @@ class LoopGuardTest {
         val g = guard(maxKills = 3)
         repeat(3) { g.recordKill(); clock += 1_000 }
 
-        assertTrue(g.shouldSuppressKill())
+        assertThat(g.shouldSuppressKill()).isTrue()
     }
 
     @Test
@@ -58,7 +57,7 @@ class LoopGuardTest {
         repeat(3) { g.recordKill() }
         clock += 60_001 // advance past the window
 
-        assertFalse(g.shouldSuppressKill())
+        assertThat(g.shouldSuppressKill()).isFalse()
     }
 
     @Test
@@ -69,7 +68,7 @@ class LoopGuardTest {
         LoopGuard(store, maxKills = 3, now = { clock }).recordKill(); clock += 1_000
         LoopGuard(store, maxKills = 3, now = { clock }).recordKill()
 
-        assertTrue(LoopGuard(store, maxKills = 3, now = { clock }).shouldSuppressKill())
+        assertThat(LoopGuard(store, maxKills = 3, now = { clock }).shouldSuppressKill()).isTrue()
     }
 
     @Test
@@ -78,7 +77,7 @@ class LoopGuardTest {
         repeat(10) { g.recordKill(); clock += 1_000 }
 
         // Ring keeps maxKills+1 = 4 lines at most.
-        assertTrue(store.readLines().filter { it.isNotBlank() }.size <= 4)
+        assertThat(store.readLines().filter { it.isNotBlank() }.size <= 4).isTrue()
     }
 
     // ---------- swallow on the kill path (load-bearing: a rethrow kills the
@@ -91,7 +90,7 @@ class LoopGuardTest {
         try {
             // read fails -> swallow -> empty -> not suppressed (kill fires), per
             // the guard's "read failure reads as no recent kills" contract.
-            assertFalse(LoopGuard(dir, maxKills = 1, now = { clock }).shouldSuppressKill())
+            assertThat(LoopGuard(dir, maxKills = 1, now = { clock }).shouldSuppressKill()).isFalse()
         } finally {
             dir.delete()
         }

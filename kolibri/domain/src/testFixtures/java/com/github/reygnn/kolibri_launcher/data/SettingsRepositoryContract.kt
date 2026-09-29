@@ -8,15 +8,13 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -67,72 +65,55 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `fresh repository emits default sortOrder`() = runTest {
         val repo = createRepository()
-        assertEquals(SettingsDefaults.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
+        assertThat(repo.sortOrderFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_SORT_ORDER)
     }
 
     @Test
     fun `fresh repository emits default textColor`() = runTest {
         val repo = createRepository()
-        assertEquals(AppConstants.DEFAULT_TEXT_COLOR, repo.textColorFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
     }
 
     @Test
     fun `fresh repository emits default layoutScale`() = runTest {
         val repo = createRepository()
-        assertEquals(
-            AppConstants.DEFAULT_LAYOUT_SCALE,
-            repo.layoutScaleStateFlow.first(),
-            0.0001f
-        )
+        assertThat(repo.layoutScaleStateFlow.first()).isWithin(0.0001f).of(AppConstants.DEFAULT_LAYOUT_SCALE)
     }
 
     @Test
     fun `fresh repository emits default wallpaperScrimAlpha`() = runTest {
         val repo = createRepository()
-        assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
-            repo.wallpaperScrimAlphaStateFlow.first(),
-            0.0001f
-        )
+        assertThat(repo.wallpaperScrimAlphaStateFlow.first()).isWithin(0.0001f).of(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
     }
 
     @Test
     fun `fresh repository has onboarding not completed`() = runTest {
         val repo = createRepository()
-        assertFalse(repo.onboardingCompletedFlow.first())
+        assertThat(repo.onboardingCompletedFlow.first()).isFalse()
     }
 
     @Test
     fun `fresh repository emits default rotationLocked`() = runTest {
         val repo = createRepository()
-        assertEquals(AppConstants.DEFAULT_ROTATION_LOCKED, repo.rotationLockedFlow.first())
+        assertThat(repo.rotationLockedFlow.first()).isEqualTo(AppConstants.DEFAULT_ROTATION_LOCKED)
     }
 
     @Test
     fun `fresh repository emits default favoritesAlignment`() = runTest {
         val repo = createRepository()
-        assertEquals(
-            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
-            repo.favoritesAlignmentFlow.first(),
-        )
+        assertThat(repo.favoritesAlignmentFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 
     @Test
     fun `fresh repository emits default wallpaperSurfaceMode`() = runTest {
         val repo = createRepository()
-        assertEquals(
-            SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE,
-            repo.wallpaperSurfaceModeFlow.first(),
-        )
+        assertThat(repo.wallpaperSurfaceModeFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE)
     }
 
     @Test
     fun `fresh repository emits default wallpaperBackdrop`() = runTest {
         val repo = createRepository()
-        assertEquals(
-            SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP,
-            repo.wallpaperBackdropFlow.first(),
-        )
+        assertThat(repo.wallpaperBackdropFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
     }
 
     // ---------- Roundtrip: Set -> Flow reflects change ----------
@@ -143,16 +124,16 @@ abstract class SettingsRepositoryContract {
         // Neue Wert muss != Default sein, damit der Test aussagekräftig bleibt.
         val newValue = SortOrder.entries.first { it != SettingsDefaults.DEFAULT_SORT_ORDER }
         repo.setSortOrder(newValue)
-        assertEquals(newValue, repo.sortOrderFlow.first())
+        assertThat(repo.sortOrderFlow.first()).isEqualTo(newValue)
     }
 
     @Test
     fun `setTextColor reflects in flow`() = runTest {
         val repo = createRepository()
         val newColor = 0x11223344.toInt()
-        assertNotEquals(AppConstants.DEFAULT_TEXT_COLOR, newColor)
+        assertThat(newColor).isNotEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
         repo.setTextColor(newColor)
-        assertEquals(newColor, repo.textColorFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(newColor)
     }
 
     @Test
@@ -160,7 +141,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         val newScale = AppConstants.DEFAULT_LAYOUT_SCALE + 0.25f
         repo.setLayoutScale(newScale)
-        assertEquals(newScale, repo.layoutScaleStateFlow.first(), 0.0001f)
+        assertThat(repo.layoutScaleStateFlow.first()).isWithin(0.0001f).of(newScale)
     }
 
     @Test
@@ -168,7 +149,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         val newAlpha = AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA + 0.25f
         repo.setWallpaperScrimAlpha(newAlpha)
-        assertEquals(newAlpha, repo.wallpaperScrimAlphaStateFlow.first(), 0.0001f)
+        assertThat(repo.wallpaperScrimAlphaStateFlow.first()).isWithin(0.0001f).of(newAlpha)
     }
 
     @Test
@@ -176,7 +157,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         val flipped = !AppConstants.DEFAULT_ROTATION_LOCKED
         repo.setRotationLocked(flipped)
-        assertEquals(flipped, repo.rotationLockedFlow.first())
+        assertThat(repo.rotationLockedFlow.first()).isEqualTo(flipped)
     }
 
     @Test
@@ -185,7 +166,7 @@ abstract class SettingsRepositoryContract {
         val newValue = FavoritesAlignment.entries
             .first { it != SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT }
         repo.setFavoritesAlignment(newValue)
-        assertEquals(newValue, repo.favoritesAlignmentFlow.first())
+        assertThat(repo.favoritesAlignmentFlow.first()).isEqualTo(newValue)
     }
 
     @Test
@@ -194,7 +175,7 @@ abstract class SettingsRepositoryContract {
         val newValue = WallpaperSurfaceMode.entries
             .first { it != SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE }
         repo.setWallpaperSurfaceMode(newValue)
-        assertEquals(newValue, repo.wallpaperSurfaceModeFlow.first())
+        assertThat(repo.wallpaperSurfaceModeFlow.first()).isEqualTo(newValue)
     }
 
     @Test
@@ -203,7 +184,7 @@ abstract class SettingsRepositoryContract {
         val newValue = WallpaperBackdrop.entries
             .first { it != SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP }
         repo.setWallpaperBackdrop(newValue)
-        assertEquals(newValue, repo.wallpaperBackdropFlow.first())
+        assertThat(repo.wallpaperBackdropFlow.first()).isEqualTo(newValue)
     }
 
     @Test
@@ -211,7 +192,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         repo.setTextColor(0x11111111.toInt())
         repo.setTextColor(0x22222222.toInt())
-        assertEquals(0x22222222.toInt(), repo.textColorFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(0x22222222.toInt())
     }
 
     // ---------- onboardingCompleted: einseitig ----------
@@ -220,7 +201,7 @@ abstract class SettingsRepositoryContract {
     fun `setOnboardingCompleted marks onboarding as completed`() = runTest {
         val repo = createRepository()
         repo.setOnboardingCompleted()
-        assertTrue(repo.onboardingCompletedFlow.first())
+        assertThat(repo.onboardingCompletedFlow.first()).isTrue()
     }
 
     @Test
@@ -228,7 +209,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         repo.setOnboardingCompleted()
         repo.setOnboardingCompleted()
-        assertTrue(repo.onboardingCompletedFlow.first())
+        assertThat(repo.onboardingCompletedFlow.first()).isTrue()
     }
 
     // ---------- purgeRepository ----------
@@ -243,18 +224,10 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(AppConstants.DEFAULT_TEXT_COLOR, repo.textColorFlow.first())
-        assertEquals(
-            AppConstants.DEFAULT_LAYOUT_SCALE,
-            repo.layoutScaleStateFlow.first(),
-            0.0001f
-        )
-        assertEquals(
-            AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA,
-            repo.wallpaperScrimAlphaStateFlow.first(),
-            0.0001f
-        )
-        assertEquals(AppConstants.DEFAULT_FONT_BOLD, repo.isFontBoldStateFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
+        assertThat(repo.layoutScaleStateFlow.first()).isWithin(0.0001f).of(AppConstants.DEFAULT_LAYOUT_SCALE)
+        assertThat(repo.wallpaperScrimAlphaStateFlow.first()).isWithin(0.0001f).of(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+        assertThat(repo.isFontBoldStateFlow.first()).isEqualTo(AppConstants.DEFAULT_FONT_BOLD)
     }
 
     @Test
@@ -264,10 +237,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(
-            AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD,
-            repo.autoShowKeyboardFlow.first()
-        )
+        assertThat(repo.autoShowKeyboardFlow.first()).isEqualTo(AppConstants.DEFAULT_AUTO_SHOW_KEYBOARD)
     }
 
     @Test
@@ -279,7 +249,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(SettingsDefaults.DEFAULT_SORT_ORDER, repo.sortOrderFlow.first())
+        assertThat(repo.sortOrderFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_SORT_ORDER)
     }
 
     @Test
@@ -291,10 +261,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(
-            SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE,
-            repo.wallpaperSurfaceModeFlow.first()
-        )
+        assertThat(repo.wallpaperSurfaceModeFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE)
     }
 
     @Test
@@ -306,10 +273,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(
-            SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP,
-            repo.wallpaperBackdropFlow.first()
-        )
+        assertThat(repo.wallpaperBackdropFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
     }
 
     @Test
@@ -321,10 +285,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertEquals(
-            SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT,
-            repo.favoritesAlignmentFlow.first(),
-        )
+        assertThat(repo.favoritesAlignmentFlow.first()).isEqualTo(SettingsDefaults.DEFAULT_FAVORITES_ALIGNMENT)
     }
 
     /**
@@ -339,10 +300,7 @@ abstract class SettingsRepositoryContract {
 
         repo.purgeRepository()
 
-        assertTrue(
-            "Onboarding-Status muss `purgeRepository` überleben",
-            repo.onboardingCompletedFlow.first()
-        )
+        assertWithMessage("Onboarding-Status muss `purgeRepository` überleben").that(repo.onboardingCompletedFlow.first()).isTrue()
     }
 
     @Test
@@ -350,7 +308,7 @@ abstract class SettingsRepositoryContract {
         val repo = createRepository()
         // Onboarding wurde nie abgeschlossen.
         repo.purgeRepository()
-        assertFalse(repo.onboardingCompletedFlow.first())
+        assertThat(repo.onboardingCompletedFlow.first()).isFalse()
     }
 
     @Test
@@ -359,7 +317,7 @@ abstract class SettingsRepositoryContract {
         repo.purgeRepository()
         // Keine Assertion nötig — es darf nur nicht werfen und die Defaults
         // müssen danach weiterhin gelten.
-        assertEquals(AppConstants.DEFAULT_TEXT_COLOR, repo.textColorFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
     }
 
     @Test
@@ -369,6 +327,6 @@ abstract class SettingsRepositoryContract {
         repo.purgeRepository()
         repo.setTextColor(0xBBBBBBBB.toInt())
         repo.purgeRepository()
-        assertEquals(AppConstants.DEFAULT_TEXT_COLOR, repo.textColorFlow.first())
+        assertThat(repo.textColorFlow.first()).isEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
     }
 }

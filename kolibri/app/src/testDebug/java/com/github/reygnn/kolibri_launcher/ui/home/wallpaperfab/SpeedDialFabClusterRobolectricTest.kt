@@ -12,12 +12,11 @@ import android.widget.FrameLayout
 import androidx.test.core.app.ActivityScenario
 import com.github.reygnn.kolibri_launcher.HiltTestActivity
 import com.github.reygnn.kolibri_launcher.R
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,11 +56,8 @@ class SpeedDialFabClusterRobolectricTest {
                 val fabSave = cluster.findViewById<View>(R.id.fabSave)
                 fabSave.performClick()
 
-                assertTrue(
-                    "performClick must dispatch to saveTapListener — " +
-                        "this is the path TalkBack / Switch Access take.",
-                    invocations == 1,
-                )
+                assertWithMessage("performClick must dispatch to saveTapListener — " +
+                        "this is the path TalkBack / Switch Access take.").that(invocations == 1).isTrue()
             }
         }
     }
@@ -82,11 +78,8 @@ class SpeedDialFabClusterRobolectricTest {
                 // Late re-binding (e.g. controller swap) must keep the
                 // single OnClickListener wired and route to the most
                 // recent saveTapListener.
-                assertTrue(
-                    "Replacing setOnSaveClicked must route subsequent " +
-                        "performClick()s to the new listener.",
-                    firstCalls == 0 && secondCalls == 1,
-                )
+                assertWithMessage("Replacing setOnSaveClicked must route subsequent " +
+                        "performClick()s to the new listener.").that(firstCalls == 0 && secondCalls == 1).isTrue()
             }
         }
     }
@@ -151,8 +144,8 @@ class SpeedDialFabClusterRobolectricTest {
                 // Center at parentW/2 = 500, cluster width = 200,
                 // top-left = 400. Same for Y.
                 val expected = (PARENT_SIZE - CLUSTER_SIZE) / 2f
-                assertEquals(expected, cluster.x, 1f)
-                assertEquals(expected, cluster.y, 1f)
+                assertThat(cluster.x).isWithin(1f).of(expected)
+                assertThat(cluster.y).isWithin(1f).of(expected)
             }
         }
     }
@@ -172,7 +165,7 @@ class SpeedDialFabClusterRobolectricTest {
 
                 // Sanity: deferred apply set x to the centered value.
                 val centered = (PARENT_SIZE - CLUSTER_SIZE) / 2f
-                assertEquals(centered, cluster.x, 1f)
+                assertThat(cluster.x).isWithin(1f).of(centered)
 
                 // Simulate a layout-pass that moves the cluster's slot
                 // (corners differ from old) — this is what rotation /
@@ -188,13 +181,8 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE - 1,
                 )
 
-                assertEquals(
-                    "Layout-pass with different corners must re-apply",
-                    centered,
-                    cluster.x,
-                    1f,
-                )
-                assertEquals(centered, cluster.y, 1f)
+                assertWithMessage("Layout-pass with different corners must re-apply").that(cluster.x).isWithin(1f).of(centered)
+                assertThat(cluster.y).isWithin(1f).of(centered)
             }
         }
     }
@@ -248,20 +236,12 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                 )
 
-                assertTrue(
-                    "Counter listener must have fired — otherwise the " +
+                assertWithMessage("Counter listener must have fired — otherwise the " +
                         "diff-guard inside the cluster's listener was " +
                         "never reached, and the assertion below would " +
-                        "pass for the wrong reason.",
-                    listenerInvocations.get() > 0,
-                )
-                assertEquals(
-                    "Diff-guard must short-circuit on identical corners " +
-                        "and leave the scribbled x untouched.",
-                    42f,
-                    cluster.x,
-                    0.01f,
-                )
+                        "pass for the wrong reason.").that(listenerInvocations.get() > 0).isTrue()
+                assertWithMessage("Diff-guard must short-circuit on identical corners " +
+                        "and leave the scribbled x untouched.").that(cluster.x).isWithin(0.01f).of(42f)
             }
         }
     }
@@ -279,7 +259,7 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE,
                 )
                 val centered = (PARENT_SIZE - CLUSTER_SIZE) / 2f
-                assertEquals(centered, cluster.x, 1f)
+                assertThat(cluster.x).isWithin(1f).of(centered)
 
                 // Drive the actual touch state machine: this is the
                 // path that contains the `lastXFraction = xFrac`
@@ -298,12 +278,8 @@ class SpeedDialFabClusterRobolectricTest {
                 // ACTION_UP wrote the new fraction synchronously. The
                 // drag clamps against parentSize - clusterSize = 800.
                 val draggedX = cluster.x
-                assertNotEquals(
-                    "Drag must have moved the cluster off centre — " +
-                        "otherwise the rest of this test is meaningless.",
-                    centered,
-                    draggedX,
-                )
+                assertWithMessage("Drag must have moved the cluster off centre — " +
+                        "otherwise the rest of this test is meaningless.").that(draggedX).isNotEqualTo(centered)
 
                 // External relayout with shifted corners forces the
                 // OnLayoutChangeListener to fire — applyPositionImmediate
@@ -317,13 +293,8 @@ class SpeedDialFabClusterRobolectricTest {
                     PARENT_SIZE - 1,
                 )
 
-                assertEquals(
-                    "Cache must reflect the drag end-point, not the " +
-                        "pre-drag fraction.",
-                    draggedX,
-                    cluster.x,
-                    1f,
-                )
+                assertWithMessage("Cache must reflect the drag end-point, not the " +
+                        "pre-drag fraction.").that(cluster.x).isWithin(1f).of(draggedX)
             }
         }
     }

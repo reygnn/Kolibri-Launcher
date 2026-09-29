@@ -3,14 +3,13 @@ package com.github.reygnn.kolibri_launcher.domain.usecase
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherShortcut
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLaunchException
 import com.github.reygnn.kolibri_launcher.domain.service.ShortcutLauncherService
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.just
 import io.mockk.runs
 import io.mockk.verify
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -56,7 +55,7 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Success)
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Success::class.java)
         verify(exactly = 1) { shortcutLauncherService.startShortcut(shortcutInfo) }
     }
 
@@ -78,11 +77,8 @@ class LaunchShortcutUseCaseTest {
     fun `execute with null shortcut returns ShortcutNull error`() {
         val result = useCase.execute(null)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
-        assertEquals(
-            LaunchShortcutUseCase.Error.ShortcutNull,
-            (result as LaunchShortcutUseCase.Result.Failure).error
-        )
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
+        assertThat((result as LaunchShortcutUseCase.Result.Failure).error).isEqualTo(LaunchShortcutUseCase.Error.ShortcutNull)
     }
 
     @Test
@@ -103,11 +99,8 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
-        assertEquals(
-            LaunchShortcutUseCase.Error.ServiceUnavailable,
-            (result as LaunchShortcutUseCase.Result.Failure).error
-        )
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
+        assertThat((result as LaunchShortcutUseCase.Result.Failure).error).isEqualTo(LaunchShortcutUseCase.Error.ServiceUnavailable)
     }
 
     @Test
@@ -141,10 +134,10 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
         val failure = result as LaunchShortcutUseCase.Result.Failure
-        assertTrue(failure.error is LaunchShortcutUseCase.Error.LaunchFailed)
-        assertEquals(exception, (failure.error as LaunchShortcutUseCase.Error.LaunchFailed).cause)
+        assertThat(failure.error).isInstanceOf(LaunchShortcutUseCase.Error.LaunchFailed::class.java)
+        assertThat((failure.error as LaunchShortcutUseCase.Error.LaunchFailed).cause).isEqualTo(exception)
     }
 
     @Test
@@ -158,7 +151,7 @@ class LaunchShortcutUseCaseTest {
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
         val launchError = failure.error as LaunchShortcutUseCase.Error.LaunchFailed
-        assertEquals(rootCause, launchError.cause.cause)
+        assertThat(launchError.cause.cause).isEqualTo(rootCause)
     }
 
     // ===========================================
@@ -173,10 +166,10 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
         val failure = result as LaunchShortcutUseCase.Result.Failure
-        assertTrue(failure.error is LaunchShortcutUseCase.Error.Unknown)
-        assertEquals(exception, (failure.error as LaunchShortcutUseCase.Error.Unknown).cause)
+        assertThat(failure.error).isInstanceOf(LaunchShortcutUseCase.Error.Unknown::class.java)
+        assertThat((failure.error as LaunchShortcutUseCase.Error.Unknown).cause).isEqualTo(exception)
     }
 
     @Test
@@ -187,8 +180,8 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
-        assertTrue((result as LaunchShortcutUseCase.Result.Failure).error is LaunchShortcutUseCase.Error.Unknown)
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
+        assertThat((result as LaunchShortcutUseCase.Result.Failure).error).isInstanceOf(LaunchShortcutUseCase.Error.Unknown::class.java)
     }
 
     @Test
@@ -200,8 +193,8 @@ class LaunchShortcutUseCaseTest {
         val result = useCase.execute(shortcutInfo)
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
-        assertTrue(failure.error is LaunchShortcutUseCase.Error.Unknown)
-        assertEquals(exception, (failure.error as LaunchShortcutUseCase.Error.Unknown).cause)
+        assertThat(failure.error).isInstanceOf(LaunchShortcutUseCase.Error.Unknown::class.java)
+        assertThat((failure.error as LaunchShortcutUseCase.Error.Unknown).cause).isEqualTo(exception)
     }
 
     // ===========================================
@@ -213,7 +206,7 @@ class LaunchShortcutUseCaseTest {
         val result = useCase.execute(null)
 
         val failure = result as LaunchShortcutUseCase.Result.Failure
-        assertEquals(LaunchShortcutUseCase.Error.ShortcutNull, failure.error)
+        assertThat(failure.error).isEqualTo(LaunchShortcutUseCase.Error.ShortcutNull)
         verify(exactly = 0) { shortcutLauncherService.isAvailable() }
     }
 
@@ -239,7 +232,7 @@ class LaunchShortcutUseCaseTest {
         val result1 = useCase.execute(shortcutInfo)
         val result2 = useCase.execute(shortcutInfo)
 
-        assertTrue(result1 === result2)
+        assertThat(result1 === result2).isTrue()
     }
 
     @Test
@@ -253,7 +246,7 @@ class LaunchShortcutUseCaseTest {
 
         errors.forEach { error ->
             val failure = LaunchShortcutUseCase.Result.Failure(error)
-            assertEquals(error, failure.error)
+            assertThat(failure.error).isEqualTo(error)
         }
     }
 
@@ -268,8 +261,8 @@ class LaunchShortcutUseCaseTest {
 
         val result = useCase.execute(shortcutInfo)
 
-        assertTrue(result is LaunchShortcutUseCase.Result.Failure)
-        assertTrue((result as LaunchShortcutUseCase.Result.Failure).error is LaunchShortcutUseCase.Error.LaunchFailed)
+        assertThat(result).isInstanceOf(LaunchShortcutUseCase.Result.Failure::class.java)
+        assertThat((result as LaunchShortcutUseCase.Result.Failure).error).isInstanceOf(LaunchShortcutUseCase.Error.LaunchFailed::class.java)
     }
 
     @Test
@@ -281,9 +274,9 @@ class LaunchShortcutUseCaseTest {
         val result2 = useCase.execute(shortcutInfo)
         val result3 = useCase.execute(shortcutInfo)
 
-        assertTrue(result1 is LaunchShortcutUseCase.Result.Success)
-        assertTrue(result2 is LaunchShortcutUseCase.Result.Success)
-        assertTrue(result3 is LaunchShortcutUseCase.Result.Success)
+        assertThat(result1).isInstanceOf(LaunchShortcutUseCase.Result.Success::class.java)
+        assertThat(result2).isInstanceOf(LaunchShortcutUseCase.Result.Success::class.java)
+        assertThat(result3).isInstanceOf(LaunchShortcutUseCase.Result.Success::class.java)
         verify(exactly = 3) { shortcutLauncherService.startShortcut(shortcutInfo) }
     }
 }

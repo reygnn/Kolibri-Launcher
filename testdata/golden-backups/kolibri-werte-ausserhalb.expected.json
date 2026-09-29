@@ -1,0 +1,139 @@
+{
+  "case": "kolibri-werte-ausserhalb",
+  "backup": "kolibri-werte-ausserhalb.zip",
+  "importer": "kolibri",
+  "pins": [
+    "B11"
+  ],
+  "writtenBy": {
+    "app": "kolibri",
+    "appVersion": "1.0.0-rc3",
+    "format": "legacy-zip (backup.json + wallpapers/)"
+  },
+  "importOptions": "all",
+  "installed": "every component referenced by the backup",
+  "targetBefore": {
+    "favoritesAlignment": "CENTER"
+  },
+  "expected": {
+    "favorites": [
+      "com.example.app01/com.example.app01.MainActivity",
+      "com.example.app02/com.example.app02.MainActivity",
+      "com.example.app03/com.example.app03.MainActivity",
+      "com.example.app04/com.example.app04.MainActivity",
+      "com.example.app05/com.example.app05.MainActivity",
+      "com.example.app06/com.example.app06.MainActivity",
+      "com.example.app07/com.example.app07.MainActivity"
+    ],
+    "favoritesOrder": [
+      "com.example.app01/com.example.app01.MainActivity",
+      "com.example.app06/com.example.app06.MainActivity",
+      "com.example.app07/com.example.app07.MainActivity",
+      "com.example.app02/com.example.app02.MainActivity",
+      "com.example.app05/com.example.app05.MainActivity",
+      "com.example.app04/com.example.app04.MainActivity",
+      "com.example.app03/com.example.app03.MainActivity"
+    ],
+    "hiddenComponents": [
+      "com.example.app01/com.example.app01.MainActivity",
+      "com.example.app02/com.example.app02.MainActivity",
+      "com.example.app03/com.example.app03.MainActivity",
+      "com.example.app04/com.example.app04.MainActivity",
+      "com.example.app05/com.example.app05.MainActivity",
+      "com.example.app06/com.example.app06.MainActivity",
+      "com.example.app08/com.example.app08.MainActivity",
+      "com.example.app09/com.example.app09.MainActivity",
+      "com.example.app10/com.example.app10.MainActivity",
+      "com.example.app11/com.example.app11.MainActivity",
+      "com.example.app12/com.example.app12.MainActivity",
+      "com.example.app13/com.example.app13.MainActivity",
+      "com.example.app14/com.example.app14.MainActivity",
+      "com.example.app15/com.example.app15.MainActivity",
+      "com.example.app16/com.example.app16.MainActivity",
+      "com.example.app17/com.example.app17.MainActivity",
+      "com.example.app18/com.example.app18.MainActivity",
+      "com.example.app19/com.example.app19.MainActivity",
+      "com.example.app20/com.example.app20.MainActivity",
+      "com.example.app21/com.example.app21.MainActivity"
+    ],
+    "customAppNames": {
+      "com.example.app03": "Name 01",
+      "com.example.app24": "Name 02",
+      "com.example.app25": "Name 03",
+      "com.example.app26": "Name 04",
+      "com.example.app27": "Name 05",
+      "com.example.app28": "Name 06",
+      "com.example.app02": "Name 07",
+      "com.example.app04": "Name 08",
+      "com.example.app07": "Name 09",
+      "com.example.app06": "Name 10"
+    },
+    "swipe": {
+      "leftToRight": "com.example.app22/com.example.app22.MainActivity",
+      "rightToLeft": "com.example.app23/com.example.app23.MainActivity"
+    },
+    "settings": {
+      "textColor": 0,
+      "textShadowEnabled": true,
+      "layoutScale": 2.0,
+      "wallpaperScrimAlpha": 0.5,
+      "verticalPaddingScale": 0.0,
+      "isFontBold": true,
+      "contentTopMarginScale": 2.0,
+      "favoritesAlignment": "CENTER",
+      "wallpaperSurfaceMode": "AUTO",
+      "wallpaperBackdrop": "SYSTEM_WALLPAPER",
+      "showCalendarEvent": true,
+      "showAlarm": true,
+      "autoShowKeyboard": false,
+      "autoLaunchApp": true,
+      "sortOrder": "TIME_WEIGHTED_USAGE",
+      "rotationLocked": true
+    },
+    "wallpaper": {
+      "layers": [
+        {
+          "id": "layer_1785905498933_0",
+          "blobSha256": "54d117e7527ce6e9cdb5eef811f977a34d5434f7a0702b9a4a68a0d84482f431",
+          "scale": 1.5340909,
+          "translateX": 0.0,
+          "translateY": 58.363647,
+          "captureSampleSize": null
+        },
+        {
+          "id": "layer_1785905498933_1",
+          "blobSha256": "d31af5f1c2d0abbb76103dc22e2ad954e7ca204123b2751cb75a55cf8bdfe020",
+          "scale": 0.6181267,
+          "translateX": 683.3811,
+          "translateY": 124.92447,
+          "captureSampleSize": null
+        },
+        {
+          "id": "layer_1785924514757_2",
+          "blobSha256": "ad447237db83204c82fe8c7ceeec8f64e6dbe7026f9679e1ef22ab48bcb5a770",
+          "scale": 0.31998774,
+          "translateX": 763.3353,
+          "translateY": 1964.0098,
+          "captureSampleSize": null
+        },
+        {
+          "id": "layer_1785925103746_3",
+          "blobSha256": "9718e45ce2ad34c622b6098020d64f39205da36e563b10eb2d660c8af2e04c0b",
+          "scale": 1.3003093,
+          "translateX": -45.172623,
+          "translateY": 2035.0669,
+          "captureSampleSize": null
+        }
+      ]
+    },
+    "importResult": {
+      "type": "Success",
+      "missingApps": [],
+      "droppedWallpaperLayers": 0
+    }
+  },
+  "notes": [
+    "Floats are clamped to the AppConstants ranges.",
+    "Unknown enum name keeps the target's current value (today's skip-on-unknown)."
+  ]
+}

@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.home.TopMarginCalculator
-import org.junit.Assert.*
+import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +29,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = 2000
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     @Test
@@ -40,7 +40,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 16 + (2000 * 0.30 * 1.0) = 16 + 600 = 616
-        assertEquals(616, result)
+        assertThat(result).isEqualTo(616)
     }
 
     @Test
@@ -51,7 +51,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 16 + (2000 * 0.30 * 0.5) = 16 + 300 = 316
-        assertEquals(316, result)
+        assertThat(result).isEqualTo(316)
     }
 
     @Test
@@ -62,7 +62,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 16 + (2000 * 0.30 * 0.25) = 16 + 150 = 166
-        assertEquals(166, result)
+        assertThat(result).isEqualTo(166)
     }
 
     // ========== CUSTOM FRACTION TESTS ==========
@@ -76,7 +76,7 @@ class TopMarginCalculatorTest {
             maxAdditionalFraction = 0.5f
         )
         // 16 + (2000 * 0.50 * 1.0) = 16 + 1000 = 1016
-        assertEquals(1016, result)
+        assertThat(result).isEqualTo(1016)
     }
 
     @Test
@@ -88,7 +88,7 @@ class TopMarginCalculatorTest {
             maxAdditionalFraction = 0.1f
         )
         // 16 + (2000 * 0.10 * 1.0) = 16 + 200 = 216
-        assertEquals(216, result)
+        assertThat(result).isEqualTo(216)
     }
 
     @Test
@@ -99,7 +99,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000,
             maxAdditionalFraction = 0f
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     // ========== DEFENSIVE: SCALE OUT OF BOUNDS ==========
@@ -111,7 +111,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = 2000
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     @Test
@@ -128,7 +128,7 @@ class TopMarginCalculatorTest {
         // Erwartung: Es wird trotzdem nur mit maxScale gerechnet
         val expectedAddition = (2000 * TopMarginCalculator.DEFAULT_MAX_ADDITIONAL_FRACTION * maxScale).toInt()
 
-        assertEquals(16 + expectedAddition, result)
+        assertThat(result).isEqualTo(16 + expectedAddition)
     }
 
     @Test
@@ -138,7 +138,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = 2000
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     // ========== DEFENSIVE: NEGATIVE BASE MARGIN ==========
@@ -150,7 +150,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = -50,
             screenHeightPx = 2000
         )
-        assertEquals(0, result)
+        assertThat(result).isEqualTo(0)
     }
 
     @Test
@@ -161,7 +161,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 0 + 600 = 600
-        assertEquals(600, result)
+        assertThat(result).isEqualTo(600)
     }
 
     // ========== DEFENSIVE: INVALID SCREEN HEIGHT ==========
@@ -173,7 +173,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = 0
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     @Test
@@ -183,7 +183,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = -500
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     // ========== DEFENSIVE: FRACTION OUT OF BOUNDS ==========
@@ -196,7 +196,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000,
             maxAdditionalFraction = -0.5f
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     @Test
@@ -208,7 +208,7 @@ class TopMarginCalculatorTest {
             maxAdditionalFraction = 2f
         )
         // 16 + (2000 * 1.0 * 1.0) = 2016
-        assertEquals(2016, result)
+        assertThat(result).isEqualTo(2016)
     }
 
     // ========== EDGE CASES ==========
@@ -220,7 +220,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 0,
             screenHeightPx = 0
         )
-        assertEquals(0, result)
+        assertThat(result).isEqualTo(0)
     }
 
     @Test
@@ -230,7 +230,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 100,
             screenHeightPx = 0
         )
-        assertEquals(100, result)
+        assertThat(result).isEqualTo(100)
     }
 
     @Test
@@ -241,7 +241,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 16 + (2000 * 0.30 * 0.33) = 16 + 198 = 214
-        assertEquals(214, result)
+        assertThat(result).isEqualTo(214)
     }
 
     @Test
@@ -252,7 +252,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // 16 + (600 * 0.001) = 16 + 0.6 = 16
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     // ========== REAL-WORLD SCENARIOS ==========
@@ -265,7 +265,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 1920
         )
         // 16 + (1920 * 0.30 * 0.5) = 16 + 288 = 304
-        assertEquals(304, result)
+        assertThat(result).isEqualTo(304)
     }
 
     @Test
@@ -276,7 +276,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2400
         )
         // 16 + (2400 * 0.30 * 0.5) = 16 + 360 = 376
-        assertEquals(376, result)
+        assertThat(result).isEqualTo(376)
     }
 
     @Test
@@ -287,7 +287,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 1200
         )
         // 24 + (1200 * 0.30 * 0.5) = 24 + 180 = 204
-        assertEquals(204, result)
+        assertThat(result).isEqualTo(204)
     }
 
     @Test
@@ -297,7 +297,7 @@ class TopMarginCalculatorTest {
             baseMarginPx = 16,
             screenHeightPx = 2000
         )
-        assertEquals(16, result)
+        assertThat(result).isEqualTo(16)
     }
 
     @Test
@@ -308,7 +308,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = 2000
         )
         // Apps werden 30% der Bildschirmhöhe nach unten geschoben
-        assertEquals(616, result)
+        assertThat(result).isEqualTo(616)
     }
 
     // ========== PARANOID TESTS ==========
@@ -321,7 +321,7 @@ class TopMarginCalculatorTest {
             screenHeightPx = -2000,
             maxAdditionalFraction = -0.5f
         )
-        assertEquals(0, result)
+        assertThat(result).isEqualTo(0)
     }
 
     @Test
@@ -333,7 +333,7 @@ class TopMarginCalculatorTest {
             maxAdditionalFraction = 0.001f
         )
         // Sollte nicht überlaufen dank Float-Berechnung
-        assertTrue(result > 16)
+        assertThat(result > 16).isTrue()
     }
 
     @Test
@@ -344,7 +344,7 @@ class TopMarginCalculatorTest {
                 baseMarginPx = 16,
                 screenHeightPx = 2000
             )
-            assertEquals(316, result)
+            assertThat(result).isEqualTo(316)
         }
     }
 }

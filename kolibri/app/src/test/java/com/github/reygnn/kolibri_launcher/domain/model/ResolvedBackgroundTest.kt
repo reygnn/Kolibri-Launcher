@@ -1,7 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain.model
 
 import com.github.reygnn.launcher.core.ColorMath
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
@@ -15,33 +15,33 @@ class ResolvedBackgroundTest {
     @Test
     fun `SolidColor on pure white returns black foreground`() {
         val bg = ResolvedBackground.SolidColor(ColorMath.WHITE)
-        assertEquals(ColorMath.BLACK, bg.foregroundColor())
+        assertThat(bg.foregroundColor()).isEqualTo(ColorMath.BLACK)
     }
 
     @Test
     fun `SolidColor on pure black returns white foreground`() {
         val bg = ResolvedBackground.SolidColor(ColorMath.BLACK)
-        assertEquals(ColorMath.WHITE, bg.foregroundColor())
+        assertThat(bg.foregroundColor()).isEqualTo(ColorMath.WHITE)
     }
 
     @Test
     fun `SolidColor exposes its colour verbatim`() {
         val argb = ColorMath.argb(0xFF, 0x12, 0x34, 0x56)
         val bg = ResolvedBackground.SolidColor(argb)
-        assertEquals(argb, bg.color)
+        assertThat(bg.color).isEqualTo(argb)
     }
 
     @Test
     fun `WallpaperSample mirrors dominantColor through color`() {
         val argb = ColorMath.argb(0xFF, 0xAB, 0xCD, 0xEF)
         val bg = ResolvedBackground.WallpaperSample(dominantColor = argb)
-        assertEquals(argb, bg.color)
+        assertThat(bg.color).isEqualTo(argb)
     }
 
     @Test
     fun `WallpaperSample on pure white returns black foreground`() {
         val bg = ResolvedBackground.WallpaperSample(dominantColor = ColorMath.WHITE)
-        assertEquals(ColorMath.BLACK, bg.foregroundColor())
+        assertThat(bg.foregroundColor()).isEqualTo(ColorMath.BLACK)
     }
 
     @Test
@@ -53,8 +53,8 @@ class ResolvedBackgroundTest {
         // threshold and assert both sides switch.
         val justBelow = grayWithLuminance(0.49)
         val justAbove = grayWithLuminance(0.51)
-        assertEquals(ColorMath.WHITE, ResolvedBackground.SolidColor(justBelow).foregroundColor())
-        assertEquals(ColorMath.BLACK, ResolvedBackground.SolidColor(justAbove).foregroundColor())
+        assertThat(ResolvedBackground.SolidColor(justBelow).foregroundColor()).isEqualTo(ColorMath.WHITE)
+        assertThat(ResolvedBackground.SolidColor(justAbove).foregroundColor()).isEqualTo(ColorMath.BLACK)
     }
 
     /**

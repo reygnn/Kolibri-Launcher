@@ -3,6 +3,7 @@ package com.github.reygnn.kolibri_launcher.domain
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoShowKeyboardSettingUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -13,8 +14,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 class GetAutoShowKeyboardSettingUseCaseTest {
@@ -42,7 +41,7 @@ class GetAutoShowKeyboardSettingUseCaseTest {
         val result = useCase()
 
         // Assert
-        assertTrue(result)
+        assertThat(result).isTrue()
     }
 
     @Test
@@ -56,6 +55,6 @@ class GetAutoShowKeyboardSettingUseCaseTest {
         val result = useCase()
 
         // Assert
-        assertFalse(result)
+        assertThat(result).isFalse()
     }
 }

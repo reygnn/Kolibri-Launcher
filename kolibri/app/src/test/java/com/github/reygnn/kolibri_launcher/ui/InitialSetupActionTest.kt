@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.ui
 
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.main.InitialSetupAction
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,12 +23,12 @@ class InitialSetupActionTest {
     @Test
     fun `decide returns LaunchOnboarding when onboarding has not been completed`() {
         val result = InitialSetupAction.decide(onboardingCompleted = false)
-        assertEquals(InitialSetupAction.LaunchOnboarding, result)
+        assertThat(result).isEqualTo(InitialSetupAction.LaunchOnboarding)
     }
 
     @Test
     fun `decide returns InitializeImmediately when onboarding already completed`() {
         val result = InitialSetupAction.decide(onboardingCompleted = true)
-        assertEquals(InitialSetupAction.InitializeImmediately, result)
+        assertThat(result).isEqualTo(InitialSetupAction.InitializeImmediately)
     }
 }

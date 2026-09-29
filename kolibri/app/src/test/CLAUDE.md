@@ -11,11 +11,13 @@ Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 ## Stack im Kurzformat
 
 - Kotlin Android Launcher, Hilt-basierte DI
-- Unit-Tests: JUnit4, MockK, kotlinx-coroutines-test, Turbine
+- Unit-Tests: JUnit4 (Runner/Annotationen), Truth (Assertions), MockK, kotlinx-coroutines-test, Turbine
 - Einige Tests brauchen Robolectric (alles was `android.net.Uri` berührt)
 - Test-Konventionen zementiert in
   `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`
-- Rules für Tests: `MainDispatcherRule`, `TimberRule` (beide in `rule/`)
+- Rules für Tests: `MainDispatcherRule` (eine für das ganze Monorepo, `com.github.reygnn.launcher.core.testing`, aus `testFixtures(project(":core"))`; einziger Accessor `testDispatcher`), `TimberRule` (in `rule/`)
+- Assertions: **nur Truth** (`assertThat`, `assertWithMessage`); zwei Ausnahmen, beide Kotlin-native typisierte Assertions, die Truth nicht kann: `kotlin.test.assertFailsWith` (Exceptions) und `kotlin.test.assertIs` (Typprüfung mit Smart-Cast, statt `assertTrue(x is T)`). Kein JUnit-`Assert`, keine anderen `kotlin.test`-Assertions, kein `@Test(expected = …)`. Detektor A12 (`tools/check-test-assertions.awk`); der Altbestand steht in `tools/test-assertions-allowlist.txt` — eine Ratsche: Zeilen nur löschen (nach Migration), nie hinzufügen.
+- Dispatcher: Detektor A7 (`tools/check-test-dispatcher.awk`) erzwingt `TESTING_CONVENTIONS.kt` wörtlich (eine Rule, Ausnahmen 1–3). Flows beobachten: `recordEmissions(flow, into = liste)` aus den `:core`-Testfixtures, wenn die Gesamtheit der Emissions geprüft wird; Turbine, wenn Emissions einzeln nacheinander erwartet werden (§5/§6). Nie einen eigenen `launch(UnconfinedTestDispatcher())`-Collector. Beide A-Detektoren laufen über `tools/check-test-conventions.sh` in den Orchestratoren beider Apps, für App- und geteilte Module.
 
 Das Projekt hat eine bewusste Trennung zwischen:
 

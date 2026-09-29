@@ -11,16 +11,15 @@ import com.github.reygnn.kolibri_launcher.domain.repository.ShortcutRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.AppContextMenuAction
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -103,12 +102,12 @@ class BuildAppContextMenuUseCaseTest {
             )
 
             // No shortcuts → no separator. Non-system app → uninstall is last.
-            assertEquals(5, result.size)
-            assertEquals(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE, launcherAction(result[0]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_RENAME_APP, launcherAction(result[1]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, launcherAction(result[2]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_APP_INFO, launcherAction(result[3]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_UNINSTALL, launcherAction(result[4]).id)
+            assertThat(result.size).isEqualTo(5)
+            assertThat(launcherAction(result[0]).id).isEqualTo(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE)
+            assertThat(launcherAction(result[1]).id).isEqualTo(AppContextMenuAction.ACTION_ID_RENAME_APP)
+            assertThat(launcherAction(result[2]).id).isEqualTo(AppContextMenuAction.ACTION_ID_HIDE_APP)
+            assertThat(launcherAction(result[3]).id).isEqualTo(AppContextMenuAction.ACTION_ID_APP_INFO)
+            assertThat(launcherAction(result[4]).id).isEqualTo(AppContextMenuAction.ACTION_ID_UNINSTALL)
         }
 
     // ------------------------------------------------------------------
@@ -124,11 +123,11 @@ class BuildAppContextMenuUseCaseTest {
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
 
-            assertEquals(AppContextMenuAction.Shortcut(s1), result[0])
-            assertEquals(AppContextMenuAction.Shortcut(s2), result[1])
-            assertEquals(AppContextMenuAction.Separator, result[2])
+            assertThat(result[0]).isEqualTo(AppContextMenuAction.Shortcut(s1))
+            assertThat(result[1]).isEqualTo(AppContextMenuAction.Shortcut(s2))
+            assertThat(result[2]).isEqualTo(AppContextMenuAction.Separator)
             // Then favorite, rename, hide, app-info, uninstall — total 8.
-            assertEquals(8, result.size)
+            assertThat(result.size).isEqualTo(8)
         }
 
     @Test
@@ -136,7 +135,7 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
 
-            assertTrue(result.none { it is AppContextMenuAction.Separator })
+            assertThat(result.none { it is AppContextMenuAction.Separator }).isTrue()
         }
 
     // ------------------------------------------------------------------
@@ -153,7 +152,7 @@ class BuildAppContextMenuUseCaseTest {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
-            assertEquals(LauncherActionLabel.RemoveFromFavorites, toggleFavorite.label)
+            assertThat(toggleFavorite.label).isEqualTo(LauncherActionLabel.RemoveFromFavorites)
         }
 
     @Test
@@ -164,7 +163,7 @@ class BuildAppContextMenuUseCaseTest {
                 it is AppContextMenuAction.LauncherAction &&
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
-            assertEquals(LauncherActionLabel.AddToFavorites, toggleFavorite.label)
+            assertThat(toggleFavorite.label).isEqualTo(LauncherActionLabel.AddToFavorites)
         }
 
     // ------------------------------------------------------------------
@@ -177,25 +176,21 @@ class BuildAppContextMenuUseCaseTest {
             fakeCustomNames.setCustomNameForPackage(app.packageName, "MyCam")
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
-            assertTrue(
-                result.any {
+            assertThat(result.any {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESTORE_NAME &&
                         it.label == LauncherActionLabel.RestoreOriginalName
-                },
-            )
+                }).isTrue()
         }
 
     @Test
     fun `restore-original-name action is absent when no custom name is set`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
-            assertTrue(
-                result.none {
+            assertThat(result.none {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESTORE_NAME
-                },
-            )
+                }).isTrue()
         }
 
     // ------------------------------------------------------------------
@@ -213,8 +208,8 @@ class BuildAppContextMenuUseCaseTest {
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
-            assertEquals(AppContextMenuAction.ACTION_ID_UNHIDE_APP, hideAction.id)
-            assertEquals(LauncherActionLabel.UnhideAppInDrawer, hideAction.label)
+            assertThat(hideAction.id).isEqualTo(AppContextMenuAction.ACTION_ID_UNHIDE_APP)
+            assertThat(hideAction.label).isEqualTo(LauncherActionLabel.UnhideAppInDrawer)
         }
 
     @Test
@@ -226,8 +221,8 @@ class BuildAppContextMenuUseCaseTest {
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
-            assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, hideAction.id)
-            assertEquals(LauncherActionLabel.HideAppFromDrawer, hideAction.label)
+            assertThat(hideAction.id).isEqualTo(AppContextMenuAction.ACTION_ID_HIDE_APP)
+            assertThat(hideAction.label).isEqualTo(LauncherActionLabel.HideAppFromDrawer)
         }
 
     // ------------------------------------------------------------------
@@ -238,36 +233,30 @@ class BuildAppContextMenuUseCaseTest {
     fun `reset-usage action is present in app drawer when usage data exists`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true, isSystemApp = false)
-            assertTrue(
-                result.any {
+            assertThat(result.any {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESET_USAGE
-                },
-            )
+                }).isTrue()
         }
 
     @Test
     fun `reset-usage action is absent in app drawer when no usage data`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = false, isSystemApp = false)
-            assertTrue(
-                result.none {
+            assertThat(result.none {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESET_USAGE
-                },
-            )
+                }).isTrue()
         }
 
     @Test
     fun `reset-usage action is absent on home screen even with usage data`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = true, isSystemApp = false)
-            assertTrue(
-                result.none {
+            assertThat(result.none {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESET_USAGE
-                },
-            )
+                }).isTrue()
         }
 
     // ------------------------------------------------------------------
@@ -281,9 +270,9 @@ class BuildAppContextMenuUseCaseTest {
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
             // No shortcuts, no separator, but the rest is present.
-            assertTrue(result.none { it is AppContextMenuAction.Shortcut })
-            assertTrue(result.none { it is AppContextMenuAction.Separator })
-            assertEquals(5, result.size)
+            assertThat(result.none { it is AppContextMenuAction.Shortcut }).isTrue()
+            assertThat(result.none { it is AppContextMenuAction.Separator }).isTrue()
+            assertThat(result.size).isEqualTo(5)
         }
 
     @Test
@@ -300,7 +289,7 @@ class BuildAppContextMenuUseCaseTest {
                     it.id == AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE
             } as AppContextMenuAction.LauncherAction
             // Fallback is `false` → "add_to_favorites".
-            assertEquals(LauncherActionLabel.AddToFavorites, toggleFavorite.label)
+            assertThat(toggleFavorite.label).isEqualTo(LauncherActionLabel.AddToFavorites)
         }
 
     @Test
@@ -312,12 +301,10 @@ class BuildAppContextMenuUseCaseTest {
             useCase = newUseCase(customNamesRepo = brokenCustomNames)
 
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
-            assertTrue(
-                result.none {
+            assertThat(result.none {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_RESTORE_NAME
-                },
-            )
+                }).isTrue()
         }
 
     @Test
@@ -334,8 +321,8 @@ class BuildAppContextMenuUseCaseTest {
                     (it.id == AppContextMenuAction.ACTION_ID_HIDE_APP ||
                         it.id == AppContextMenuAction.ACTION_ID_UNHIDE_APP)
             } as AppContextMenuAction.LauncherAction
-            assertEquals(AppContextMenuAction.ACTION_ID_HIDE_APP, hideAction.id)
-            assertEquals(LauncherActionLabel.HideAppFromDrawer, hideAction.label)
+            assertThat(hideAction.id).isEqualTo(AppContextMenuAction.ACTION_ID_HIDE_APP)
+            assertThat(hideAction.label).isEqualTo(LauncherActionLabel.HideAppFromDrawer)
         }
 
     // ------------------------------------------------------------------
@@ -353,16 +340,16 @@ class BuildAppContextMenuUseCaseTest {
 
             val result = useCase(app, MenuContext.APP_DRAWER, hasUsageData = true, isSystemApp = false)
 
-            assertEquals(9, result.size)
-            assertEquals(AppContextMenuAction.Shortcut(s1), result[0])
-            assertEquals(AppContextMenuAction.Separator, result[1])
-            assertEquals(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE, launcherAction(result[2]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_RESTORE_NAME, launcherAction(result[3]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_RENAME_APP, launcherAction(result[4]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_UNHIDE_APP, launcherAction(result[5]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_RESET_USAGE, launcherAction(result[6]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_APP_INFO, launcherAction(result[7]).id)
-            assertEquals(AppContextMenuAction.ACTION_ID_UNINSTALL, launcherAction(result[8]).id)
+            assertThat(result.size).isEqualTo(9)
+            assertThat(result[0]).isEqualTo(AppContextMenuAction.Shortcut(s1))
+            assertThat(result[1]).isEqualTo(AppContextMenuAction.Separator)
+            assertThat(launcherAction(result[2]).id).isEqualTo(AppContextMenuAction.ACTION_ID_TOGGLE_FAVORITE)
+            assertThat(launcherAction(result[3]).id).isEqualTo(AppContextMenuAction.ACTION_ID_RESTORE_NAME)
+            assertThat(launcherAction(result[4]).id).isEqualTo(AppContextMenuAction.ACTION_ID_RENAME_APP)
+            assertThat(launcherAction(result[5]).id).isEqualTo(AppContextMenuAction.ACTION_ID_UNHIDE_APP)
+            assertThat(launcherAction(result[6]).id).isEqualTo(AppContextMenuAction.ACTION_ID_RESET_USAGE)
+            assertThat(launcherAction(result[7]).id).isEqualTo(AppContextMenuAction.ACTION_ID_APP_INFO)
+            assertThat(launcherAction(result[8]).id).isEqualTo(AppContextMenuAction.ACTION_ID_UNINSTALL)
         }
 
     // ------------------------------------------------------------------
@@ -374,14 +361,8 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = false)
 
-            assertEquals(
-                AppContextMenuAction.ACTION_ID_UNINSTALL,
-                launcherAction(result.last()).id,
-            )
-            assertEquals(
-                LauncherActionLabel.Uninstall,
-                launcherAction(result.last()).label,
-            )
+            assertThat(launcherAction(result.last()).id).isEqualTo(AppContextMenuAction.ACTION_ID_UNINSTALL)
+            assertThat(launcherAction(result.last()).label).isEqualTo(LauncherActionLabel.Uninstall)
         }
 
     @Test
@@ -389,11 +370,9 @@ class BuildAppContextMenuUseCaseTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val result = useCase(app, MenuContext.HOME_SCREEN, hasUsageData = false, isSystemApp = true)
 
-            assertTrue(
-                result.none {
+            assertThat(result.none {
                     it is AppContextMenuAction.LauncherAction &&
                         it.id == AppContextMenuAction.ACTION_ID_UNINSTALL
-                },
-            )
+                }).isTrue()
         }
 }

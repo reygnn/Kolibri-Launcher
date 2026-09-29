@@ -12,6 +12,7 @@ import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.kolibri_launcher.domain.model.LuminanceClassification
 import com.github.reygnn.launcher.core.AppInfo
+import com.github.reygnn.launcher.core.testing.recordEmissions
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ResolveWallpaperSurfaceUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
@@ -47,12 +48,13 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
 import com.github.reygnn.launcher.core.AppUpdateSignal
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
+import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -62,14 +64,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -279,8 +275,8 @@ class LauncherViewModelTest {
 
         val state = vm.uiState.value
 
-        assertNotEquals("--:--", state.timeString)
-        assertNotEquals("---", state.dateString)
+        assertThat(state.timeString).isNotEqualTo("--:--")
+        assertThat(state.dateString).isNotEqualTo("---")
     }
 
     // ===========================================
@@ -295,7 +291,7 @@ class LauncherViewModelTest {
         vm.refreshTimeNow()
         advanceUntilIdle()
 
-        assertNotEquals("--:--", vm.uiState.value.timeString)
+        assertThat(vm.uiState.value.timeString).isNotEqualTo("--:--")
     }
 
     @Test
@@ -306,7 +302,7 @@ class LauncherViewModelTest {
         vm.updateBatteryLevel(85, 100)
         advanceUntilIdle()
 
-        assertEquals("85%", vm.uiState.value.batteryString)
+        assertThat(vm.uiState.value.batteryString).isEqualTo("85%")
     }
 
     @Test
@@ -326,7 +322,7 @@ class LauncherViewModelTest {
         vm.updateBatteryLevelFromIntent(intent)
         advanceUntilIdle()
 
-        assertEquals("60%", vm.uiState.value.batteryString)
+        assertThat(vm.uiState.value.batteryString).isEqualTo("60%")
     }
 
     // ===========================================
@@ -339,14 +335,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onAppClicked(testApp)
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it is UiEvent.LaunchApp })
+        assertThat(collectedEvents.any { it is UiEvent.LaunchApp }).isTrue()
         collectorJob.cancel()
     }
 
@@ -390,7 +384,7 @@ class LauncherViewModelTest {
 
         vm.onAppDrawerSearchQueryChanged("test query")
 
-        assertEquals("test query", vm.appDrawerSearchQuery.value)
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("test query")
     }
 
     @Test
@@ -401,14 +395,14 @@ class LauncherViewModelTest {
         vm.onAppDrawerSearchQueryChanged("test")
         vm.onAppDrawerClosed()
 
-        assertEquals("", vm.appDrawerSearchQuery.value)
+        assertThat(vm.appDrawerSearchQuery.value).isEqualTo("")
     }
 
     @Test
     fun `favoriteAppsState is initially Loading`() = runTest {
         val vm = createViewModel()
 
-        assertEquals(UiState.Loading, vm.favoriteAppsState.value)
+        assertThat(vm.favoriteAppsState.value).isEqualTo(UiState.Loading)
     }
 
     @Test
@@ -418,7 +412,7 @@ class LauncherViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertTrue(vm.isAutoLaunchEnabled())
+        assertThat(vm.isAutoLaunchEnabled()).isTrue()
     }
 
     @Test
@@ -428,7 +422,7 @@ class LauncherViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertTrue(vm.hasUsageData("com.test.app"))
+        assertThat(vm.hasUsageData("com.test.app")).isTrue()
     }
 
     // ===========================================
@@ -441,14 +435,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onFlingUp()
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it == UiEvent.ShowAppDrawer })
+        assertThat(collectedEvents.any { it == UiEvent.ShowAppDrawer }).isTrue()
         collectorJob.cancel()
     }
 
@@ -458,14 +450,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onLongPress()
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it == UiEvent.ShowCustomizationOptions })
+        assertThat(collectedEvents.any { it == UiEvent.ShowCustomizationOptions }).isTrue()
         collectorJob.cancel()
     }
 
@@ -475,14 +465,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onTimeDoubleClick()
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it == UiEvent.OpenClock })
+        assertThat(collectedEvents.any { it == UiEvent.OpenClock }).isTrue()
         collectorJob.cancel()
     }
 
@@ -492,14 +480,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onDateDoubleClick()
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it == UiEvent.OpenCalendar })
+        assertThat(collectedEvents.any { it == UiEvent.OpenCalendar }).isTrue()
         collectorJob.cancel()
     }
 
@@ -509,14 +495,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val collectedEvents = mutableListOf<UiEvent>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.event.collect { collectedEvents.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.event, into = collectedEvents)
 
         vm.onBatteryDoubleClick()
         advanceUntilIdle()
 
-        assertTrue(collectedEvents.any { it == UiEvent.OpenBatterySettings })
+        assertThat(collectedEvents.any { it == UiEvent.OpenBatterySettings }).isTrue()
         collectorJob.cancel()
     }
 
@@ -554,7 +538,7 @@ class LauncherViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertTrue(vm.isTextShadowEnabled())
+        assertThat(vm.isTextShadowEnabled()).isTrue()
     }
 
     // ===========================================
@@ -566,7 +550,7 @@ class LauncherViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertEquals(AppConstants.DEFAULT_LAYOUT_SCALE, vm.layoutScaleState.value)
+        assertThat(vm.layoutScaleState.value).isEqualTo(AppConstants.DEFAULT_LAYOUT_SCALE)
     }
 
     @Test
@@ -626,14 +610,14 @@ class LauncherViewModelTest {
     fun `wallpaperState starts with NONE`() = runTest {
         val vm = createViewModel()
 
-        assertEquals(WallpaperState.NONE, vm.wallpaperState.value)
+        assertThat(vm.wallpaperState.value).isEqualTo(WallpaperState.NONE)
     }
 
     @Test
     fun `isWallpaperEditMode starts false`() = runTest {
         val vm = createViewModel()
 
-        assertFalse(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
@@ -643,7 +627,7 @@ class LauncherViewModelTest {
 
         vm.onSetWallpaperEditMode(true)
 
-        assertTrue(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isTrue()
     }
 
     @Test
@@ -651,13 +635,13 @@ class LauncherViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        assertFalse(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isFalse()
 
         vm.onToggleWallpaperEditMode()
-        assertTrue(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isTrue()
 
         vm.onToggleWallpaperEditMode()
-        assertFalse(vm.isWallpaperEditMode.value)
+        assertThat(vm.isWallpaperEditMode.value).isFalse()
     }
 
     @Test
@@ -679,14 +663,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val offers = mutableListOf<Float>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.offerScrimResetEvents.collect { offers.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.offerScrimResetEvents, into = offers)
 
         vm.onClearWallpaper()
         advanceUntilIdle()
 
-        assertEquals(listOf(0.25f), offers)
+        assertThat(offers).isEqualTo(listOf(0.25f))
         collectorJob.cancel()
     }
 
@@ -697,14 +679,12 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         val offers = mutableListOf<Float>()
-        val collectorJob = launch(UnconfinedTestDispatcher()) {
-            vm.offerScrimResetEvents.collect { offers.add(it) }
-        }
+        val collectorJob = recordEmissions(vm.offerScrimResetEvents, into = offers)
 
         vm.onClearWallpaper()
         advanceUntilIdle()
 
-        assertTrue(offers.isEmpty())
+        assertThat(offers.isEmpty()).isTrue()
         collectorJob.cancel()
     }
 
@@ -738,7 +718,7 @@ class LauncherViewModelTest {
         vm.refreshDynamicUiData()
         advanceUntilIdle()
 
-        assertNotEquals("--:--", vm.uiState.value.timeString)
+        assertThat(vm.uiState.value.timeString).isNotEqualTo("--:--")
         coVerify { observeTimeBasedEventsUseCase.refresh() }
     }
 
@@ -750,7 +730,7 @@ class LauncherViewModelTest {
         vm.refreshAllData()
         advanceUntilIdle()
 
-        assertNotEquals("--:--", vm.uiState.value.timeString)
+        assertThat(vm.uiState.value.timeString).isNotEqualTo("--:--")
         coVerify { refreshAppsUseCase.invoke() }
     }
 
@@ -774,6 +754,6 @@ class LauncherViewModelTest {
         vm.isWallpaperEditMode.value
         vm.appDrawerSearchQuery.value
 
-        assertTrue(true)
+        assertThat(true).isTrue()
     }
 }

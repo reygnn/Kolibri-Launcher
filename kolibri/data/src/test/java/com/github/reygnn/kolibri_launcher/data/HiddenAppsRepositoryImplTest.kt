@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import app.cash.turbine.test
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.google.common.truth.Truth.assertThat
 import io.mockk.MockKAnnotations
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -17,7 +18,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -55,7 +55,7 @@ class HiddenAppsRepositoryImplTest {
             preferencesOf(hiddenComponentsKey to setOf("com.hidden.app/ComponentA"))
         )
 
-        Assert.assertTrue(hiddenAppsManager.isComponentHidden("com.hidden.app/ComponentA"))
+        assertThat(hiddenAppsManager.isComponentHidden("com.hidden.app/ComponentA")).isTrue()
     }
 
     @Test
@@ -64,7 +64,7 @@ class HiddenAppsRepositoryImplTest {
             preferencesOf(hiddenComponentsKey to setOf("com.another.app/ComponentB"))
         )
 
-        Assert.assertFalse(hiddenAppsManager.isComponentHidden("com.visible.app/ComponentC"))
+        assertThat(hiddenAppsManager.isComponentHidden("com.visible.app/ComponentC")).isFalse()
     }
 
     @Test
@@ -75,8 +75,8 @@ class HiddenAppsRepositoryImplTest {
 
         val result = hiddenAppsManager.hideComponent("com.new.to.hide/ComponentE")
 
-        Assert.assertTrue(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(result).isTrue()
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
@@ -87,8 +87,8 @@ class HiddenAppsRepositoryImplTest {
 
         val result = hiddenAppsManager.showComponent("com.to.show/ComponentG")
 
-        Assert.assertTrue(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(result).isTrue()
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     // ========== NEW CRASH-RESISTANCE TESTS ==========
@@ -97,7 +97,7 @@ class HiddenAppsRepositoryImplTest {
     fun `isComponentHidden - when DataStore fails with IOException - returns false`() = runTest {
         fakeDataStore.makeReadFail()
 
-        Assert.assertFalse(hiddenAppsManager.isComponentHidden("com.test.app/Component"))
+        assertThat(hiddenAppsManager.isComponentHidden("com.test.app/Component")).isFalse()
     }
 
     @Test
@@ -107,7 +107,7 @@ class HiddenAppsRepositoryImplTest {
         every { brokenStore.data } returns flow { throw RuntimeException("Corrupted data") }
         val manager = HiddenAppsRepositoryImpl(brokenStore)
 
-        Assert.assertFalse(manager.isComponentHidden("com.test.app/Component"))
+        assertThat(manager.isComponentHidden("com.test.app/Component")).isFalse()
     }
 
     @Test
@@ -127,15 +127,15 @@ class HiddenAppsRepositoryImplTest {
 
         val result = hiddenAppsManager.hideComponent("com.test.app/Component")
 
-        Assert.assertFalse(result)
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(result).isFalse()
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
     fun `hideComponent - when DataStore edit fails with RuntimeException - returns false`() = runTest {
         fakeDataStore.makeEditFail()
 
-        Assert.assertFalse(hiddenAppsManager.hideComponent("com.test.app/Component"))
+        assertThat(hiddenAppsManager.hideComponent("com.test.app/Component")).isFalse()
     }
 
     @Test
@@ -154,7 +154,7 @@ class HiddenAppsRepositoryImplTest {
         )
         fakeDataStore.makeEditFail()
 
-        Assert.assertFalse(hiddenAppsManager.showComponent("com.test.app/Component"))
+        assertThat(hiddenAppsManager.showComponent("com.test.app/Component")).isFalse()
     }
 
     @Test
@@ -171,37 +171,37 @@ class HiddenAppsRepositoryImplTest {
 
     @Test
     fun `hideComponent - with null componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.hideComponent(null))
+        assertThat(hiddenAppsManager.hideComponent(null)).isFalse()
     }
 
     @Test
     fun `hideComponent - with blank componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.hideComponent("   "))
+        assertThat(hiddenAppsManager.hideComponent("   ")).isFalse()
     }
 
     @Test
     fun `hideComponent - with malformed componentName - still attempts to hide`() = runTest {
-        Assert.assertTrue(hiddenAppsManager.hideComponent("invalid_format_no_slash"))
+        assertThat(hiddenAppsManager.hideComponent("invalid_format_no_slash")).isTrue()
     }
 
     @Test
     fun `showComponent - with null componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.showComponent(null))
+        assertThat(hiddenAppsManager.showComponent(null)).isFalse()
     }
 
     @Test
     fun `showComponent - with blank componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.showComponent(""))
+        assertThat(hiddenAppsManager.showComponent("")).isFalse()
     }
 
     @Test
     fun `isComponentHidden - with null componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.isComponentHidden(null))
+        assertThat(hiddenAppsManager.isComponentHidden(null)).isFalse()
     }
 
     @Test
     fun `isComponentHidden - with blank componentName - returns false`() = runTest {
-        Assert.assertFalse(hiddenAppsManager.isComponentHidden("  "))
+        assertThat(hiddenAppsManager.isComponentHidden("  ")).isFalse()
     }
 
     // ========== IDEMPOTENCY ==========
@@ -219,16 +219,16 @@ class HiddenAppsRepositoryImplTest {
 
         val result = hiddenAppsManager.hideComponent("com.test.app/Component")
 
-        Assert.assertTrue(result)
-        Assert.assertTrue(hiddenAppsManager.isComponentHidden("com.test.app/Component"))
+        assertThat(result).isTrue()
+        assertThat(hiddenAppsManager.isComponentHidden("com.test.app/Component")).isTrue()
     }
 
     @Test
     fun `showComponent - when component not hidden - returns true and stays visible (idempotent)`() = runTest {
         val result = hiddenAppsManager.showComponent("com.test.app/Component")
 
-        Assert.assertTrue(result)
-        Assert.assertFalse(hiddenAppsManager.isComponentHidden("com.test.app/Component"))
+        assertThat(result).isTrue()
+        assertThat(hiddenAppsManager.isComponentHidden("com.test.app/Component")).isFalse()
     }
 
     // ========== MISSING TESTS (Purge & Batch Update) ==========
@@ -241,14 +241,14 @@ class HiddenAppsRepositoryImplTest {
 
         hiddenAppsManager.updateComponentVisibilities(setOf("com.new.hide/C"), setOf("com.to.show/B"))
 
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
     fun `purgeRepository - clears hidden components`() = runTest {
         hiddenAppsManager.purgeRepository()
 
-        Assert.assertTrue(fakeDataStore.updateDataCallCount > 0)
+        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
     }
 
     @Test
@@ -258,7 +258,7 @@ class HiddenAppsRepositoryImplTest {
         // Should not crash
         hiddenAppsManager.purgeRepository()
 
-        Assert.assertEquals(1, fakeDataStore.updateDataCallCount)
+        assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
     }
 
     // ========== AUDIT-14 V2: distinctUntilChanged regression ==========
@@ -272,7 +272,7 @@ class HiddenAppsRepositoryImplTest {
         fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.a/A")))
 
         hiddenAppsManager.hiddenAppsFlow.test {
-            Assert.assertEquals(setOf("com.a/A"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(setOf("com.a/A"))
 
             val usageKey = longPreferencesKey("usage_count_com.other/App")
             fakeDataStore.updateData { prefs ->
@@ -289,7 +289,7 @@ class HiddenAppsRepositoryImplTest {
         fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.a/A")))
 
         hiddenAppsManager.hiddenAppsFlow.test {
-            Assert.assertEquals(setOf("com.a/A"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(setOf("com.a/A"))
 
             fakeDataStore.updateData { prefs ->
                 prefs.toMutablePreferences().apply {
@@ -297,7 +297,7 @@ class HiddenAppsRepositoryImplTest {
                 }
             }
 
-            Assert.assertEquals(setOf("com.a/A", "com.b/B"), awaitItem())
+            assertThat(awaitItem()).isEqualTo(setOf("com.a/A", "com.b/B"))
         }
     }
 }

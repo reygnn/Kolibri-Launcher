@@ -4,9 +4,8 @@ import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.backup.CheckboxSpec
 import com.github.reygnn.kolibri_launcher.ui.backup.ImportOptionsUiState
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Rule
 import org.junit.Test
 
@@ -55,8 +54,8 @@ class ImportOptionsUiStateTest {
 
     @Test
     fun `visibleIf sets both visible and checked to the same value`() {
-        assertEquals(CheckboxSpec(visible = true, checked = true), CheckboxSpec.visibleIf(true))
-        assertEquals(CheckboxSpec(visible = false, checked = false), CheckboxSpec.visibleIf(false))
+        assertThat(CheckboxSpec.visibleIf(true)).isEqualTo(CheckboxSpec(visible = true, checked = true))
+        assertThat(CheckboxSpec.visibleIf(false)).isEqualTo(CheckboxSpec(visible = false, checked = false))
     }
 
     // ========== TIMESTAMP ==========
@@ -64,19 +63,19 @@ class ImportOptionsUiStateTest {
     @Test
     fun `dateHasTimestamp is true when timestamp is positive`() {
         val state = ImportOptionsUiState.from(fullPreview())
-        assertTrue(state.dateHasTimestamp)
+        assertThat(state.dateHasTimestamp).isTrue()
     }
 
     @Test
     fun `dateHasTimestamp is false when timestamp is zero`() {
         val state = ImportOptionsUiState.from(emptyPreview())
-        assertFalse(state.dateHasTimestamp)
+        assertThat(state.dateHasTimestamp).isFalse()
     }
 
     @Test
     fun `dateHasTimestamp is false when timestamp is negative (defensive)`() {
         val state = ImportOptionsUiState.from(fullPreview().copy(timestamp = -1L))
-        assertFalse(state.dateHasTimestamp)
+        assertThat(state.dateHasTimestamp).isFalse()
     }
 
     // ========== COUNT-BASED OPTIONS ==========
@@ -84,33 +83,33 @@ class ImportOptionsUiStateTest {
     @Test
     fun `favorites visible when count is greater than zero`() {
         val state = ImportOptionsUiState.from(fullPreview().copy(favoriteCount = 1))
-        assertTrue(state.favorites.visible)
-        assertTrue(state.favorites.checked)
+        assertThat(state.favorites.visible).isTrue()
+        assertThat(state.favorites.checked).isTrue()
     }
 
     @Test
     fun `favorites hidden when count is zero`() {
         val state = ImportOptionsUiState.from(fullPreview().copy(favoriteCount = 0))
-        assertFalse(state.favorites.visible)
-        assertFalse(state.favorites.checked)
+        assertThat(state.favorites.visible).isFalse()
+        assertThat(state.favorites.checked).isFalse()
     }
 
     @Test
     fun `order follows orderCount`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(orderCount = 1)).order.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(orderCount = 0)).order.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(orderCount = 1)).order.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(orderCount = 0)).order.visible).isFalse()
     }
 
     @Test
     fun `hiddenApps follows hiddenCount`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hiddenCount = 1)).hiddenApps.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hiddenCount = 0)).hiddenApps.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hiddenCount = 1)).hiddenApps.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hiddenCount = 0)).hiddenApps.visible).isFalse()
     }
 
     @Test
     fun `customNames follows customNamesCount`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(customNamesCount = 1)).customNames.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(customNamesCount = 0)).customNames.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(customNamesCount = 1)).customNames.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(customNamesCount = 0)).customNames.visible).isFalse()
     }
 
     // ========== SWIPE ACTIONS - combined logic ==========
@@ -120,8 +119,8 @@ class ImportOptionsUiStateTest {
         val state = ImportOptionsUiState.from(
             fullPreview().copy(hasSwipeLeft = false, hasSwipeRight = false),
         )
-        assertEquals(0, state.swipeActionCount)
-        assertFalse(state.swipeActions.visible)
+        assertThat(state.swipeActionCount).isEqualTo(0)
+        assertThat(state.swipeActions.visible).isFalse()
     }
 
     @Test
@@ -129,8 +128,8 @@ class ImportOptionsUiStateTest {
         val state = ImportOptionsUiState.from(
             fullPreview().copy(hasSwipeLeft = true, hasSwipeRight = false),
         )
-        assertEquals(1, state.swipeActionCount)
-        assertTrue(state.swipeActions.visible)
+        assertThat(state.swipeActionCount).isEqualTo(1)
+        assertThat(state.swipeActions.visible).isTrue()
     }
 
     @Test
@@ -138,8 +137,8 @@ class ImportOptionsUiStateTest {
         val state = ImportOptionsUiState.from(
             fullPreview().copy(hasSwipeLeft = false, hasSwipeRight = true),
         )
-        assertEquals(1, state.swipeActionCount)
-        assertTrue(state.swipeActions.visible)
+        assertThat(state.swipeActionCount).isEqualTo(1)
+        assertThat(state.swipeActions.visible).isTrue()
     }
 
     @Test
@@ -147,40 +146,40 @@ class ImportOptionsUiStateTest {
         val state = ImportOptionsUiState.from(
             fullPreview().copy(hasSwipeLeft = true, hasSwipeRight = true),
         )
-        assertEquals(2, state.swipeActionCount)
-        assertTrue(state.swipeActions.visible)
+        assertThat(state.swipeActionCount).isEqualTo(2)
+        assertThat(state.swipeActions.visible).isTrue()
     }
 
     // ========== BOOLEAN-BASED OPTIONS ==========
 
     @Test
     fun `themeSettings follows hasThemeSettings`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasThemeSettings = true)).themeSettings.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasThemeSettings = false)).themeSettings.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasThemeSettings = true)).themeSettings.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasThemeSettings = false)).themeSettings.visible).isFalse()
     }
 
     @Test
     fun `wallpaper follows hasWallpaper (independent of theme)`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = true)).wallpaper.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = false)).wallpaper.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = true)).wallpaper.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasWallpaper = false)).wallpaper.visible).isFalse()
     }
 
     @Test
     fun `timeBasedEvents follows hasTimeBasedEvents`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = true)).timeBasedEvents.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = false)).timeBasedEvents.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = true)).timeBasedEvents.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasTimeBasedEvents = false)).timeBasedEvents.visible).isFalse()
     }
 
     @Test
     fun `qualityOfLife follows hasQualityOfLife`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasQualityOfLife = true)).qualityOfLife.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasQualityOfLife = false)).qualityOfLife.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasQualityOfLife = true)).qualityOfLife.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasQualityOfLife = false)).qualityOfLife.visible).isFalse()
     }
 
     @Test
     fun `powerUserSettings follows hasPowerUserSettings`() {
-        assertTrue(ImportOptionsUiState.from(fullPreview().copy(hasPowerUserSettings = true)).powerUserSettings.visible)
-        assertFalse(ImportOptionsUiState.from(fullPreview().copy(hasPowerUserSettings = false)).powerUserSettings.visible)
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasPowerUserSettings = true)).powerUserSettings.visible).isTrue()
+        assertThat(ImportOptionsUiState.from(fullPreview().copy(hasPowerUserSettings = false)).powerUserSettings.visible).isFalse()
     }
 
     // ========== GLOBAL SWEEP ==========
@@ -188,29 +187,29 @@ class ImportOptionsUiStateTest {
     @Test
     fun `empty preview disables all options`() {
         val state = ImportOptionsUiState.from(emptyPreview())
-        assertFalse(state.favorites.visible)
-        assertFalse(state.order.visible)
-        assertFalse(state.hiddenApps.visible)
-        assertFalse(state.customNames.visible)
-        assertFalse(state.swipeActions.visible)
-        assertFalse(state.themeSettings.visible)
-        assertFalse(state.timeBasedEvents.visible)
-        assertFalse(state.qualityOfLife.visible)
-        assertFalse(state.powerUserSettings.visible)
+        assertThat(state.favorites.visible).isFalse()
+        assertThat(state.order.visible).isFalse()
+        assertThat(state.hiddenApps.visible).isFalse()
+        assertThat(state.customNames.visible).isFalse()
+        assertThat(state.swipeActions.visible).isFalse()
+        assertThat(state.themeSettings.visible).isFalse()
+        assertThat(state.timeBasedEvents.visible).isFalse()
+        assertThat(state.qualityOfLife.visible).isFalse()
+        assertThat(state.powerUserSettings.visible).isFalse()
     }
 
     @Test
     fun `full preview enables all options`() {
         val state = ImportOptionsUiState.from(fullPreview())
-        assertTrue(state.favorites.visible)
-        assertTrue(state.order.visible)
-        assertTrue(state.hiddenApps.visible)
-        assertTrue(state.customNames.visible)
-        assertTrue(state.swipeActions.visible)
-        assertTrue(state.themeSettings.visible)
-        assertTrue(state.timeBasedEvents.visible)
-        assertTrue(state.qualityOfLife.visible)
-        assertTrue(state.powerUserSettings.visible)
+        assertThat(state.favorites.visible).isTrue()
+        assertThat(state.order.visible).isTrue()
+        assertThat(state.hiddenApps.visible).isTrue()
+        assertThat(state.customNames.visible).isTrue()
+        assertThat(state.swipeActions.visible).isTrue()
+        assertThat(state.themeSettings.visible).isTrue()
+        assertThat(state.timeBasedEvents.visible).isTrue()
+        assertThat(state.qualityOfLife.visible).isTrue()
+        assertThat(state.powerUserSettings.visible).isTrue()
     }
 
     @Test
@@ -228,7 +227,7 @@ class ImportOptionsUiStateTest {
             "qualityOfLife" to state.qualityOfLife,
             "powerUserSettings" to state.powerUserSettings,
         ).forEach { (name, spec) ->
-            assertEquals("visible != checked for $name: $spec", spec.visible, spec.checked)
+            assertWithMessage("visible != checked for $name: $spec").that(spec.checked).isEqualTo(spec.visible)
         }
     }
 }

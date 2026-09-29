@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.preferencesOf
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.launcher.core.crashreporting.consent.ConsentDecision
+import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlin.test.assertFailsWith
@@ -12,7 +13,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
@@ -32,33 +32,33 @@ class ConsentBootstrapTest {
     fun `GRANTED token maps to Granted`() = runTest {
         store.setInitialData(preferencesOf(ConsentBootstrap.CONSENT_DECISION_KEY to ConsentBootstrap.VALUE_GRANTED))
 
-        assertEquals(ConsentDecision.Granted, ConsentBootstrap.readDecision(store))
+        assertThat(ConsentBootstrap.readDecision(store)).isEqualTo(ConsentDecision.Granted)
     }
 
     @Test
     fun `DENIED token maps to Denied`() = runTest {
         store.setInitialData(preferencesOf(ConsentBootstrap.CONSENT_DECISION_KEY to ConsentBootstrap.VALUE_DENIED))
 
-        assertEquals(ConsentDecision.Denied, ConsentBootstrap.readDecision(store))
+        assertThat(ConsentBootstrap.readDecision(store)).isEqualTo(ConsentDecision.Denied)
     }
 
     @Test
     fun `an absent key maps to NeverAsked`() = runTest {
-        assertEquals(ConsentDecision.NeverAsked, ConsentBootstrap.readDecision(store))
+        assertThat(ConsentBootstrap.readDecision(store)).isEqualTo(ConsentDecision.NeverAsked)
     }
 
     @Test
     fun `an unknown token maps to NeverAsked (fail-closed, not Unavailable at R1)`() = runTest {
         store.setInitialData(preferencesOf(ConsentBootstrap.CONSENT_DECISION_KEY to "BOGUS"))
 
-        assertEquals(ConsentDecision.NeverAsked, ConsentBootstrap.readDecision(store))
+        assertThat(ConsentBootstrap.readDecision(store)).isEqualTo(ConsentDecision.NeverAsked)
     }
 
     @Test
     fun `a read failure maps to NeverAsked (fail-closed)`() = runTest {
         store.makeReadFail()
 
-        assertEquals(ConsentDecision.NeverAsked, ConsentBootstrap.readDecision(store))
+        assertThat(ConsentBootstrap.readDecision(store)).isEqualTo(ConsentDecision.NeverAsked)
     }
 
     @Test

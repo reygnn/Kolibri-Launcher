@@ -2,9 +2,7 @@ package com.github.reygnn.kolibri_launcher.domain.model
 
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.support.FormattingTestSupport.withDefaultLocale
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import java.util.Locale
 
@@ -25,44 +23,44 @@ class AppInfoSearchTest {
 
     @Test
     fun `blank query returns the receiver unchanged`() {
-        assertSame(apps, apps.filterByName(""))
-        assertSame(apps, apps.filterByName("   "))
+        assertThat(apps.filterByName("")).isSameInstanceAs(apps)
+        assertThat(apps.filterByName("   ")).isSameInstanceAs(apps)
     }
 
     @Test
     fun `matches displayName case-insensitively`() {
-        assertEquals(listOf(camera), apps.filterByName("cam"))
-        assertEquals(listOf(camera), apps.filterByName("CAMERA"))
+        assertThat(apps.filterByName("cam")).isEqualTo(listOf(camera))
+        assertThat(apps.filterByName("CAMERA")).isEqualTo(listOf(camera))
     }
 
     @Test
     fun `matches a shared prefix across multiple apps`() {
-        assertEquals(listOf(camera, calendar), apps.filterByName("ca"))
+        assertThat(apps.filterByName("ca")).isEqualTo(listOf(camera, calendar))
     }
 
     @Test
     fun `no match returns an empty list`() {
-        assertTrue(apps.filterByName("zzz").isEmpty())
+        assertThat(apps.filterByName("zzz").isEmpty()).isTrue()
     }
 
     @Test
     fun `without includeOriginalName the originalName is not matched`() {
         // "Phone" is renamedPhone's originalName; displayName is "Dialer".
-        assertTrue(apps.filterByName("phone").isEmpty())
+        assertThat(apps.filterByName("phone").isEmpty()).isTrue()
     }
 
     @Test
     fun `with includeOriginalName the originalName is matched for custom-named apps`() {
-        assertEquals(listOf(renamedPhone), apps.filterByName("phone", includeOriginalName = true))
+        assertThat(apps.filterByName("phone", includeOriginalName = true)).isEqualTo(listOf(renamedPhone))
         // displayName still matches too.
-        assertEquals(listOf(renamedPhone), apps.filterByName("dialer", includeOriginalName = true))
+        assertThat(apps.filterByName("dialer", includeOriginalName = true)).isEqualTo(listOf(renamedPhone))
     }
 
     @Test
     fun `includeOriginalName does not duplicate an app that matches both names`() {
         // "a" is in displayName (Camera/Calendar/Dialer) — the OR must not emit twice.
         val result = apps.filterByName("a", includeOriginalName = true)
-        assertEquals(result.distinct(), result)
+        assertThat(result).isEqualTo(result.distinct())
     }
 
     @Test
@@ -76,10 +74,10 @@ class AppInfoSearchTest {
         withDefaultLocale(Locale.forLanguageTag("tr-TR")) {
             val instagram = app("Instagram")
             val apps = listOf(instagram)
-            assertEquals(listOf(instagram), apps.filterByName("instagram"))
-            assertEquals(listOf(instagram), apps.filterByName("INSTAGRAM"))
+            assertThat(apps.filterByName("instagram")).isEqualTo(listOf(instagram))
+            assertThat(apps.filterByName("INSTAGRAM")).isEqualTo(listOf(instagram))
             // An uppercase-I query must fold to the same key as the app name.
-            assertEquals(listOf(instagram), apps.filterByName("I"))
+            assertThat(apps.filterByName("I")).isEqualTo(listOf(instagram))
         }
     }
 }

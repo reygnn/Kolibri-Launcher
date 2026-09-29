@@ -1,6 +1,6 @@
 package com.github.reygnn.launcher.feature.crashreporting.resilience
 
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,8 +27,8 @@ class UncaughtCrashHandlerTest {
     fun `delegates to the default handler then backstop-kills`() {
         handler().uncaughtException(Thread.currentThread(), RuntimeException("boom"))
 
-        assertEquals(1, delegated)
-        assertEquals(1, kills)
+        assertThat(delegated).isEqualTo(1)
+        assertThat(kills).isEqualTo(1)
     }
 
     @Test
@@ -44,15 +44,15 @@ class UncaughtCrashHandlerTest {
             killSwitch = { events += "kill" },
         ).uncaughtException(Thread.currentThread(), RuntimeException("boom"))
 
-        assertEquals(listOf("delegate", "kill"), events)
+        assertThat(events).isEqualTo(listOf("delegate", "kill"))
     }
 
     @Test
     fun `an OutOfMemoryError still delegates and backstop-kills`() {
         handler().uncaughtException(Thread.currentThread(), OutOfMemoryError("oom"))
 
-        assertEquals(1, delegated)
-        assertEquals(1, kills)
+        assertThat(delegated).isEqualTo(1)
+        assertThat(kills).isEqualTo(1)
     }
 
     @Test
@@ -62,13 +62,13 @@ class UncaughtCrashHandlerTest {
         // Must not propagate; the backstop kill is still reached.
         handler(throwingDefault).uncaughtException(Thread.currentThread(), RuntimeException("boom"))
 
-        assertEquals(1, kills)
+        assertThat(kills).isEqualTo(1)
     }
 
     @Test
     fun `a null default handler still backstop-kills`() {
         handler(default = null).uncaughtException(Thread.currentThread(), RuntimeException("boom"))
 
-        assertEquals(1, kills)
+        assertThat(kills).isEqualTo(1)
     }
 }

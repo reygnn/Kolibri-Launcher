@@ -2,12 +2,9 @@ package com.github.reygnn.launcher.core
 
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.BuildConfig
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Assume
 import org.junit.Before
 import org.junit.Test
@@ -83,12 +80,12 @@ class TimberWrapperTest {
     fun `silentError(message) logs to SILENT_ERROR tag with ERROR priority`() {
         TimberWrapper.preventCrashForTesting.set(true) // suppress DEBUG-throw
         TimberWrapper.silentError("oops")
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
-        assertEquals("oops", entry.message)
-        assertNull(entry.throwable)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.SILENT_LOG_TAG)
+        assertThat(entry.message).isEqualTo("oops")
+        assertThat(entry.throwable).isNull()
     }
 
     @Test
@@ -96,17 +93,14 @@ class TimberWrapperTest {
         TimberWrapper.preventCrashForTesting.set(true)
         val cause = IllegalStateException("boom")
         TimberWrapper.silentError(cause, "context")
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.SILENT_LOG_TAG)
         // Timber 5.x appends "\n<stackTrace>" when both message and throwable
         // are given — assert prefix, not equality.
-        assertTrue(
-            "Expected message to start with 'context', was '${entry.message}'",
-            entry.message.startsWith("context"),
-        )
-        assertSame(cause, entry.throwable)
+        assertWithMessage("Expected message to start with 'context', was '${entry.message}'").that(entry.message.startsWith("context")).isTrue()
+        assertThat(entry.throwable).isSameInstanceAs(cause)
     }
 
     @Test
@@ -114,14 +108,14 @@ class TimberWrapperTest {
         TimberWrapper.preventCrashForTesting.set(true)
         val cause = IllegalStateException("boom")
         TimberWrapper.silentError(cause)
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
         // Don't pin the message format — Timber synthesizes one from the
         // stack trace when no explicit message is given. The contract is
         // that tag and throwable both arrive at the tree.
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
-        assertSame(cause, entry.throwable)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.SILENT_LOG_TAG)
+        assertThat(entry.throwable).isSameInstanceAs(cause)
     }
 
     // ------------------------------------------------------------------
@@ -132,15 +126,12 @@ class TimberWrapperTest {
     fun `reportToAcra logs to ACRA_REPORT tag with throwable at ERROR priority`() {
         val cause = IllegalStateException("infra boom")
         TimberWrapper.reportToAcra(cause, "wiring failed")
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.ACRA_REPORT_TAG, entry.tag)
-        assertTrue(
-            "Expected message to start with 'wiring failed', was '${entry.message}'",
-            entry.message.startsWith("wiring failed"),
-        )
-        assertSame(cause, entry.throwable)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.ACRA_REPORT_TAG)
+        assertWithMessage("Expected message to start with 'wiring failed', was '${entry.message}'").that(entry.message.startsWith("wiring failed")).isTrue()
+        assertThat(entry.throwable).isSameInstanceAs(cause)
     }
 
     @Test
@@ -150,7 +141,7 @@ class TimberWrapperTest {
         // is the crash-infra report path that must not re-enter the safety net it
         // guards. Reaching the assertion without an exception IS the contract.
         TimberWrapper.reportToAcra(IllegalStateException("x"), "no debug throw")
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
     }
 
     // ------------------------------------------------------------------
@@ -163,10 +154,10 @@ class TimberWrapperTest {
         TimberWrapper.preventCrashForTesting.set(false)
         try {
             TimberWrapper.silentError("debug-throw")
-            fail("Expected RuntimeException, but silentError returned normally")
+            throw AssertionError("Expected RuntimeException, but silentError returned normally")
         } catch (e: RuntimeException) {
-            assertEquals("SILENT_ERROR caught: debug-throw", e.message)
-            assertNull(e.cause)
+            assertThat(e.message).isEqualTo("SILENT_ERROR caught: debug-throw")
+            assertThat(e.cause).isNull()
         }
     }
 
@@ -177,10 +168,10 @@ class TimberWrapperTest {
         val cause = IllegalArgumentException("inner")
         try {
             TimberWrapper.silentError(cause, "outer")
-            fail("Expected RuntimeException")
+            throw AssertionError("Expected RuntimeException")
         } catch (e: RuntimeException) {
-            assertEquals("SILENT_ERROR caught: outer", e.message)
-            assertSame(cause, e.cause)
+            assertThat(e.message).isEqualTo("SILENT_ERROR caught: outer")
+            assertThat(e.cause).isSameInstanceAs(cause)
         }
     }
 
@@ -191,10 +182,10 @@ class TimberWrapperTest {
         val cause = IllegalStateException("explicit-msg")
         try {
             TimberWrapper.silentError(cause)
-            fail("Expected RuntimeException")
+            throw AssertionError("Expected RuntimeException")
         } catch (e: RuntimeException) {
-            assertEquals("SILENT_ERROR caught: explicit-msg", e.message)
-            assertSame(cause, e.cause)
+            assertThat(e.message).isEqualTo("SILENT_ERROR caught: explicit-msg")
+            assertThat(e.cause).isSameInstanceAs(cause)
         }
     }
 
@@ -223,13 +214,13 @@ class TimberWrapperTest {
         TimberWrapper.preventCrashForTesting.set(true)
         try {
             TimberWrapper.silentDeath("dying")
-            fail("Expected RuntimeException")
+            throw AssertionError("Expected RuntimeException")
         } catch (e: RuntimeException) {
-            assertEquals("SILENT_DEATH: dying", e.message)
+            assertThat(e.message).isEqualTo("SILENT_DEATH: dying")
             // The message-only overload synthesizes a carrier so the FATAL death
             // reaches ACRA (a null throwable would be dropped by AcraTree's gate).
             // That carrier is passed through die()'s cause, so it surfaces here too.
-            assertEquals("dying", e.cause?.message)
+            assertThat(e.cause?.message).isEqualTo("dying")
         }
     }
 
@@ -239,10 +230,10 @@ class TimberWrapperTest {
         val cause = IllegalStateException("simulated-fatal")
         try {
             TimberWrapper.silentDeath(cause, "fatal")
-            fail("Expected RuntimeException")
+            throw AssertionError("Expected RuntimeException")
         } catch (e: RuntimeException) {
-            assertEquals("SILENT_DEATH: fatal", e.message)
-            assertSame(cause, e.cause)
+            assertThat(e.message).isEqualTo("SILENT_DEATH: fatal")
+            assertThat(e.cause).isSameInstanceAs(cause)
         }
     }
 
@@ -258,17 +249,14 @@ class TimberWrapperTest {
         } catch (expected: RuntimeException) {
             // expected — we want to inspect the log written before the throw
         }
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.SILENT_LOG_TAG)
         // The message-only overload now carries a synthesized throwable so the
         // FATAL reaches ACRA; Timber appends its stack trace, so assert the prefix.
-        assertTrue(
-            "Expected message to start with 'FATAL: foo', was '${entry.message}'",
-            entry.message.startsWith("FATAL: foo"),
-        )
-        assertEquals("foo", entry.throwable?.message)
+        assertWithMessage("Expected message to start with 'FATAL: foo', was '${entry.message}'").that(entry.message.startsWith("FATAL: foo")).isTrue()
+        assertThat(entry.throwable?.message).isEqualTo("foo")
     }
 
     @Test
@@ -280,15 +268,12 @@ class TimberWrapperTest {
         } catch (expected: RuntimeException) {
             // expected
         }
-        assertEquals(1, capturedLogs.size)
+        assertThat(capturedLogs.size).isEqualTo(1)
         val entry = capturedLogs[0]
-        assertEquals(Log.ERROR, entry.priority)
-        assertEquals(TimberWrapper.SILENT_LOG_TAG, entry.tag)
+        assertThat(entry.priority).isEqualTo(Log.ERROR)
+        assertThat(entry.tag).isEqualTo(TimberWrapper.SILENT_LOG_TAG)
         // Timber appends the stack trace; check the human-readable prefix.
-        assertTrue(
-            "Expected message to start with 'FATAL: lying-state', was '${entry.message}'",
-            entry.message.startsWith("FATAL: lying-state"),
-        )
-        assertSame(cause, entry.throwable)
+        assertWithMessage("Expected message to start with 'FATAL: lying-state', was '${entry.message}'").that(entry.message.startsWith("FATAL: lying-state")).isTrue()
+        assertThat(entry.throwable).isSameInstanceAs(cause)
     }
 }

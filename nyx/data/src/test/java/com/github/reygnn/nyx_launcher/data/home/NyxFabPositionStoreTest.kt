@@ -4,7 +4,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
-import com.github.reygnn.nyx_launcher.testing.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -22,14 +22,14 @@ class NyxFabPositionStoreTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun unset_yields_default() = runTest(mainDispatcherRule.dispatcher) {
+    fun unset_yields_default() = runTest(mainDispatcherRule.testDispatcher) {
         val store = NyxFabPositionStore(FakeDataStore())
 
         assertThat(store.fabPositionFlow.first()).isEqualTo(FabPosition.DEFAULT)
     }
 
     @Test
-    fun saved_position_is_read_back() = runTest(mainDispatcherRule.dispatcher) {
+    fun saved_position_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
         val store = NyxFabPositionStore(FakeDataStore())
 
         store.saveFabPosition(FabPosition(xFraction = 0.1f, yFraction = 0.2f))
@@ -38,7 +38,7 @@ class NyxFabPositionStoreTest {
     }
 
     @Test
-    fun only_x_present_still_yields_default() = runTest(mainDispatcherRule.dispatcher) {
+    fun only_x_present_still_yields_default() = runTest(mainDispatcherRule.testDispatcher) {
         val dataStore = FakeDataStore()
         dataStore.edit { it[floatPreferencesKey("wallpaper_edit_fab_x_fraction")] = 0.3f }
         val store = NyxFabPositionStore(dataStore)
@@ -47,7 +47,7 @@ class NyxFabPositionStoreTest {
     }
 
     @Test
-    fun only_y_present_still_yields_default() = runTest(mainDispatcherRule.dispatcher) {
+    fun only_y_present_still_yields_default() = runTest(mainDispatcherRule.testDispatcher) {
         val dataStore = FakeDataStore()
         dataStore.edit { it[floatPreferencesKey("wallpaper_edit_fab_y_fraction")] = 0.6f }
         val store = NyxFabPositionStore(dataStore)

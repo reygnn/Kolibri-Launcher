@@ -6,8 +6,8 @@ import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.DrawerEntry
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderId
 import com.github.reygnn.nyx_launcher.home.model.LauncherApp
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 
 /**
@@ -61,9 +61,9 @@ class DrawerEntryDiffTest {
 
         val rec = diff(old, new)
 
-        assertEquals(listOf(1 to 1), rec.removed) // exactly the filtered row is removed
-        assertTrue("survivors must not rebind", rec.changed.isEmpty())
-        assertTrue(rec.inserted.isEmpty())
+        assertThat(rec.removed).isEqualTo(listOf(1 to 1)) // exactly the filtered row is removed
+        assertWithMessage("survivors must not rebind").that(rec.changed.isEmpty()).isTrue()
+        assertThat(rec.inserted.isEmpty()).isTrue()
     }
 
     @Test
@@ -73,9 +73,9 @@ class DrawerEntryDiffTest {
 
         val rec = diff(old, new)
 
-        assertEquals(listOf(0 to 1), rec.changed)
-        assertTrue(rec.removed.isEmpty())
-        assertTrue(rec.inserted.isEmpty())
+        assertThat(rec.changed).isEqualTo(listOf(0 to 1))
+        assertThat(rec.removed.isEmpty()).isTrue()
+        assertThat(rec.inserted.isEmpty()).isTrue()
     }
 
     @Test
@@ -85,8 +85,8 @@ class DrawerEntryDiffTest {
 
         val rec = diff(old, new)
 
-        assertEquals(listOf(0 to 1), rec.changed)
-        assertTrue(rec.removed.isEmpty() && rec.inserted.isEmpty())
+        assertThat(rec.changed).isEqualTo(listOf(0 to 1))
+        assertThat(rec.removed.isEmpty() && rec.inserted.isEmpty()).isTrue()
     }
 
     @Test
@@ -96,9 +96,9 @@ class DrawerEntryDiffTest {
 
         val rec = diff(old, new)
 
-        assertTrue("a reorder must produce a move", rec.moved.isNotEmpty())
-        assertTrue("moved rows keep their decoded icon (no rebind)", rec.changed.isEmpty())
-        assertTrue(rec.inserted.isEmpty() && rec.removed.isEmpty())
+        assertWithMessage("a reorder must produce a move").that(rec.moved.isNotEmpty()).isTrue()
+        assertWithMessage("moved rows keep their decoded icon (no rebind)").that(rec.changed.isEmpty()).isTrue()
+        assertThat(rec.inserted.isEmpty() && rec.removed.isEmpty()).isTrue()
     }
 
     @Test
@@ -109,8 +109,8 @@ class DrawerEntryDiffTest {
         val rec = diff(old, new)
 
         // Cross-type: the folder is removed and the app inserted — never a content change.
-        assertTrue("cross-type rows must never be a content change", rec.changed.isEmpty())
-        assertEquals(1, rec.removed.sumOf { it.second })
-        assertEquals(1, rec.inserted.sumOf { it.second })
+        assertWithMessage("cross-type rows must never be a content change").that(rec.changed.isEmpty()).isTrue()
+        assertThat(rec.removed.sumOf { it.second }).isEqualTo(1)
+        assertThat(rec.inserted.sumOf { it.second }).isEqualTo(1)
     }
 }

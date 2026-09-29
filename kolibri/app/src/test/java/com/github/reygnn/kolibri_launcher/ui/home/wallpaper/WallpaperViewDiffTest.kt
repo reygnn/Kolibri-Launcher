@@ -6,9 +6,9 @@ import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewDiff
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import kotlin.test.assertIs
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -75,14 +75,14 @@ class WallpaperViewDiffTest {
             current = snapshot(isMulti = true, ids = listOf("L1")),
             target = WallpaperState.NONE
         )
-        assertEquals(RebuildPlan.HideAll, plan)
+        assertThat(plan).isEqualTo(RebuildPlan.HideAll)
     }
 
     @Test
     fun `multi-layer state with no images yields HideAll`() {
         val target = multiLayer(layer("L1", imageUri = null))
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
-        assertEquals(RebuildPlan.HideAll, plan)
+        assertThat(plan).isEqualTo(RebuildPlan.HideAll)
     }
 
     // ===========================================
@@ -94,9 +94,9 @@ class WallpaperViewDiffTest {
         val target = WallpaperState.single(uri("/data/s.jpg"))
         val plan = WallpaperViewDiff.diff(snapshot(), target)
 
-        assertTrue(plan is RebuildPlan.SwitchToSingleLayer)
+        assertIs<RebuildPlan.SwitchToSingleLayer>(plan)
         plan as RebuildPlan.SwitchToSingleLayer
-        assertNull(plan.transform)
+        assertThat(plan.transform).isNull()
     }
 
     @Test
@@ -109,12 +109,9 @@ class WallpaperViewDiffTest {
         )
         val plan = WallpaperViewDiff.diff(snapshot(), target)
 
-        assertTrue(plan is RebuildPlan.SwitchToSingleLayer)
+        assertIs<RebuildPlan.SwitchToSingleLayer>(plan)
         plan as RebuildPlan.SwitchToSingleLayer
-        assertEquals(
-            LayerPropertyUpdate.Transform(2.5f, -100f, 50f),
-            plan.transform
-        )
+        assertThat(plan.transform).isEqualTo(LayerPropertyUpdate.Transform(2.5f, -100f, 50f))
     }
 
     // ===========================================
@@ -126,9 +123,9 @@ class WallpaperViewDiffTest {
         val target = multiLayer(layer("L1"), layer("L2"))
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList(), isMulti = false), target)
 
-        assertTrue(plan is RebuildPlan.FullRebuild)
+        assertIs<RebuildPlan.FullRebuild>(plan)
         plan as RebuildPlan.FullRebuild
-        assertEquals(listOf("L1", "L2"), plan.layers.map { it.id })
+        assertThat(plan.layers.map { it.id }).isEqualTo(listOf("L1", "L2"))
     }
 
     @Test
@@ -140,7 +137,7 @@ class WallpaperViewDiffTest {
             current = snapshot(isMulti = false, ids = emptyList()),
             target = target
         )
-        assertTrue(plan is RebuildPlan.FullRebuild)
+        assertThat(plan).isInstanceOf(RebuildPlan.FullRebuild::class.java)
     }
 
     @Test
@@ -150,7 +147,7 @@ class WallpaperViewDiffTest {
             current = snapshot(ids = listOf("L1", "L2")),
             target = target
         )
-        assertTrue(plan is RebuildPlan.FullRebuild)
+        assertThat(plan).isInstanceOf(RebuildPlan.FullRebuild::class.java)
     }
 
     @Test
@@ -167,10 +164,7 @@ class WallpaperViewDiffTest {
 
         val plan = WallpaperViewDiff.diff(current, target)
 
-        assertTrue(
-            "identity mismatch with same count must still trigger rebuild",
-            plan is RebuildPlan.FullRebuild
-        )
+        assertWithMessage("identity mismatch with same count must still trigger rebuild").that(plan).isInstanceOf(RebuildPlan.FullRebuild::class.java)
     }
 
     @Test
@@ -183,7 +177,7 @@ class WallpaperViewDiffTest {
 
         val plan = WallpaperViewDiff.diff(current, target)
 
-        assertTrue(plan is RebuildPlan.FullRebuild)
+        assertThat(plan).isInstanceOf(RebuildPlan.FullRebuild::class.java)
     }
 
     @Test
@@ -194,7 +188,7 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(current, target)
 
         plan as RebuildPlan.FullRebuild
-        assertEquals("L3", plan.restoreActiveLayerId)
+        assertThat(plan.restoreActiveLayerId).isEqualTo("L3")
     }
 
     @Test
@@ -206,10 +200,7 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(current, target)
 
         plan as RebuildPlan.FullRebuild
-        assertNull(
-            "active layer id must be dropped when it no longer exists in target",
-            plan.restoreActiveLayerId
-        )
+        assertWithMessage("active layer id must be dropped when it no longer exists in target").that(plan.restoreActiveLayerId).isNull()
     }
 
     @Test
@@ -223,10 +214,10 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
         plan as RebuildPlan.FullRebuild
-        assertEquals(2, plan.layers.size)
+        assertThat(plan.layers.size).isEqualTo(2)
         val spec = plan.layers[0]
-        assertEquals("L1", spec.id)
-        assertEquals(false, spec.centerCrop) // isTransformed → don't center-crop
+        assertThat(spec.id).isEqualTo("L1")
+        assertThat(spec.centerCrop).isEqualTo(false) // isTransformed → don't center-crop
     }
 
     @Test
@@ -240,7 +231,7 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
         plan as RebuildPlan.FullRebuild
-        assertEquals(true, plan.layers[0].centerCrop)
+        assertThat(plan.layers[0].centerCrop).isEqualTo(true)
     }
 
     @Test
@@ -253,11 +244,7 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList()), target)
 
         plan as RebuildPlan.FullRebuild
-        assertEquals(
-            "layers without imageUri must not appear in load specs",
-            listOf("L1", "L3"),
-            plan.layers.map { it.id }
-        )
+        assertWithMessage("layers without imageUri must not appear in load specs").that(plan.layers.map { it.id }).isEqualTo(listOf("L1", "L3"))
     }
 
     // ===========================================
@@ -271,10 +258,7 @@ class WallpaperViewDiffTest {
 
         val plan = WallpaperViewDiff.diff(current, target)
 
-        assertTrue(
-            "same identities must NOT trigger a rebuild — just update properties",
-            plan is RebuildPlan.UpdatePropertiesOnly
-        )
+        assertWithMessage("same identities must NOT trigger a rebuild — just update properties").that(plan).isInstanceOf(RebuildPlan.UpdatePropertiesOnly::class.java)
     }
 
     @Test
@@ -288,17 +272,14 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(current, target)
 
         plan as RebuildPlan.UpdatePropertiesOnly
-        assertEquals(2, plan.updates.size)
+        assertThat(plan.updates.size).isEqualTo(2)
 
         val u0 = plan.updates[0]
-        assertEquals(0, u0.layerIndex)
-        assertEquals(
-            LayerPropertyUpdate.Transform(2f, 10f, 20f),
-            u0.transform
-        )
+        assertThat(u0.layerIndex).isEqualTo(0)
+        assertThat(u0.transform).isEqualTo(LayerPropertyUpdate.Transform(2f, 10f, 20f))
 
         val u1 = plan.updates[1]
-        assertNull("untransformed layer → null transform (will center-crop)", u1.transform)
+        assertWithMessage("untransformed layer → null transform (will center-crop)").that(u1.transform).isNull()
     }
 
     @Test
@@ -322,17 +303,14 @@ class WallpaperViewDiffTest {
 
         val plan = WallpaperViewDiff.diff(current, target)
 
-        assertTrue(
-            "image-less layers are invisible to the diff; matching ids → UpdatePropertiesOnly",
-            plan is RebuildPlan.UpdatePropertiesOnly
-        )
+        assertIs<RebuildPlan.UpdatePropertiesOnly>(plan, "image-less layers are invisible to the diff; matching ids → UpdatePropertiesOnly")
 
         plan as RebuildPlan.UpdatePropertiesOnly
         // The updates should only reference the view indices that
         // actually exist (0 and 1), not 0/1/2.
-        assertEquals(2, plan.updates.size)
-        assertEquals(0, plan.updates[0].layerIndex)
-        assertEquals(1, plan.updates[1].layerIndex)
+        assertThat(plan.updates.size).isEqualTo(2)
+        assertThat(plan.updates[0].layerIndex).isEqualTo(0)
+        assertThat(plan.updates[1].layerIndex).isEqualTo(1)
     }
 
     // ===========================================
@@ -346,7 +324,7 @@ class WallpaperViewDiffTest {
 
         val plan = WallpaperViewDiff.diff(current, target)
 
-        assertTrue(plan is RebuildPlan.SwitchToSingleLayer)
+        assertThat(plan).isInstanceOf(RebuildPlan.SwitchToSingleLayer::class.java)
     }
 
     @Test
@@ -355,6 +333,6 @@ class WallpaperViewDiffTest {
             current = snapshot(isMulti = false),
             target = WallpaperState.NONE
         )
-        assertEquals(RebuildPlan.HideAll, plan)
+        assertThat(plan).isEqualTo(RebuildPlan.HideAll)
     }
 }

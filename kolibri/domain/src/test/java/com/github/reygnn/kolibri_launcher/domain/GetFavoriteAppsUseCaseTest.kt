@@ -11,9 +11,11 @@ import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.service.ComponentLabelResolver
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFavoriteAppsUseCase
-import com.github.reygnn.kolibri_launcher.rule.MainDispatcherRule
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
+import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.MockKAnnotations
 import io.mockk.coEvery
 import io.mockk.every
@@ -26,10 +28,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 @ExperimentalCoroutinesApi
 class GetFavoriteAppsUseCaseTest {
@@ -113,13 +112,13 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertEquals(2, result.apps.size)
-            assertEquals("App C", result.apps[0].displayName)
-            assertEquals("App A", result.apps[1].displayName)
-            assertFalse(result.isFallback)
+            assertThat(result.apps.size).isEqualTo(2)
+            assertThat(result.apps[0].displayName).isEqualTo("App C")
+            assertThat(result.apps[1].displayName).isEqualTo("App A")
+            assertThat(result.isFallback).isFalse()
         }
     }
 
@@ -133,23 +132,23 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
             val expectedFallbackSize = AppConstants.MAX_FAVORITES_ON_HOME.coerceAtMostSafe(allApps.size)
 
-            assertEquals(expectedFallbackSize, result.apps.size)
-            assertEquals("App A", result.apps[0].displayName)
-            assertEquals("App B", result.apps[1].displayName)
-            assertEquals("App C", result.apps[2].displayName)
-            assertTrue(result.isFallback, "Should be a fallback")
+            assertThat(result.apps.size).isEqualTo(expectedFallbackSize)
+            assertThat(result.apps[0].displayName).isEqualTo("App A")
+            assertThat(result.apps[1].displayName).isEqualTo("App B")
+            assertThat(result.apps[2].displayName).isEqualTo("App C")
+            assertWithMessage("Should be a fallback").that(result.isFallback).isTrue()
         }
     }
 
     @Test
     fun `favoriteApps emits Loading and does not proceed when raw app list is empty`() = runTest {
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
             expectNoEvents()
         }
     }
@@ -167,12 +166,12 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertEquals(2, result.apps.size)
-            assertEquals("App A", result.apps[0].displayName)
-            assertEquals("App C", result.apps[1].displayName)
+            assertThat(result.apps.size).isEqualTo(2)
+            assertThat(result.apps[0].displayName).isEqualTo("App A")
+            assertThat(result.apps[1].displayName).isEqualTo("App C")
         }
     }
 
@@ -187,11 +186,11 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertEquals(1, result.apps.size)
-            assertEquals("App B", result.apps[0].displayName)
+            assertThat(result.apps.size).isEqualTo(1)
+            assertThat(result.apps[0].displayName).isEqualTo("App B")
         }
     }
 
@@ -216,11 +215,11 @@ class GetFavoriteAppsUseCaseTest {
 
         crashingUseCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertTrue(result.isFallback, "Should be fallback since favorites crashed")
-            assertTrue(result.apps.isNotEmpty(), "Should have fallback apps")
+            assertWithMessage("Should be fallback since favorites crashed").that(result.isFallback).isTrue()
+            assertWithMessage("Should have fallback apps").that(result.apps.isNotEmpty()).isTrue()
         }
     }
 
@@ -248,11 +247,11 @@ class GetFavoriteAppsUseCaseTest {
 
         crashingUseCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertNotNull(result.apps)
-            assertEquals(1, result.apps.size)
+            assertThat(result.apps).isNotNull()
+            assertThat(result.apps.size).isEqualTo(1)
         }
     }
 
@@ -268,12 +267,12 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertTrue(result.isFallback)
-            assertEquals(1, result.apps.size)
-            assertEquals("App B", result.apps[0].displayName)
+            assertThat(result.isFallback).isTrue()
+            assertThat(result.apps.size).isEqualTo(1)
+            assertThat(result.apps[0].displayName).isEqualTo("App B")
         }
     }
 
@@ -290,10 +289,10 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertEquals(2, result.apps.size)
+            assertThat(result.apps.size).isEqualTo(2)
         }
     }
 
@@ -312,10 +311,10 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
+            assertThat(result.apps.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
         }
     }
 
@@ -329,7 +328,7 @@ class GetFavoriteAppsUseCaseTest {
         }
 
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
 
             rawAppsFlow.value = allApps
             awaitItem()
@@ -337,18 +336,18 @@ class GetFavoriteAppsUseCaseTest {
             favoritesFlow.value = setOf(app1.componentName, "com.uninstalled/App", app2.componentName)
 
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
             // Two present + one missing = three entries (the missing one is kept).
-            assertEquals(3, result.apps.size)
-            assertFalse(result.isFallback)
+            assertThat(result.apps.size).isEqualTo(3)
+            assertThat(result.isFallback).isFalse()
             // The missing favorite is flagged and carries its componentName.
-            assertEquals(setOf("com.uninstalled/App"), result.missingComponents)
-            assertTrue(result.apps.any { it.componentName == "com.uninstalled/App" })
+            assertThat(result.missingComponents).isEqualTo(setOf("com.uninstalled/App"))
+            assertThat(result.apps.any { it.componentName == "com.uninstalled/App" }).isTrue()
             // Its best-effort label is the package name (no custom name, app gone).
             val missingEntry = result.apps.first { it.componentName == "com.uninstalled/App" }
-            assertEquals("com.uninstalled", missingEntry.displayName)
+            assertThat(missingEntry.displayName).isEqualTo("com.uninstalled")
         }
     }
 
@@ -359,22 +358,22 @@ class GetFavoriteAppsUseCaseTest {
         }
 
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
 
             rawAppsFlow.value = allApps
             val initial = awaitItem()
-            assertTrue(initial is UiState.Success)
-            assertEquals(3, initial.data.apps.size)
+            assertIs<UiState.Success>(initial)
+            assertThat(initial.data.apps.size).isEqualTo(3)
 
             favoritesFlow.value = setOf(app1.componentName)
             val first = awaitItem()
-            assertTrue(first is UiState.Success)
-            assertEquals(1, first.data.apps.size)
+            assertIs<UiState.Success>(first)
+            assertThat(first.data.apps.size).isEqualTo(1)
 
             favoritesFlow.value = setOf(app1.componentName, app2.componentName)
             val second = awaitItem()
-            assertTrue(second is UiState.Success)
-            assertEquals(2, second.data.apps.size)
+            assertIs<UiState.Success>(second)
+            assertThat(second.data.apps.size).isEqualTo(2)
         }
     }
 
@@ -387,11 +386,11 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
+            assertIs<UiState.Success>(provisional)
             val result = provisional.data
-            assertFalse(result.isFallback)
-            assertTrue(result.apps.any { it.componentName == app1.componentName })
-            assertEquals(setOf(app1.componentName), result.missingComponents)
+            assertThat(result.isFallback).isFalse()
+            assertThat(result.apps.any { it.componentName == app1.componentName }).isTrue()
+            assertThat(result.missingComponents).isEqualTo(setOf(app1.componentName))
             expectNoEvents()
         }
     }
@@ -407,17 +406,17 @@ class GetFavoriteAppsUseCaseTest {
         coEvery { favoritesOrderRepository.sortFavoriteComponents(any(), any()) } returns emptyList()
 
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
 
             favoritesFlow.value = emptySet()
             rawAppsFlow.value = manyApps
 
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
 
             val result = successState.data
-            assertTrue(result.isFallback)
-            assertEquals(AppConstants.MAX_FAVORITES_ON_HOME, result.apps.size)
+            assertThat(result.isFallback).isTrue()
+            assertThat(result.apps.size).isEqualTo(AppConstants.MAX_FAVORITES_ON_HOME)
         }
     }
 
@@ -442,15 +441,15 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
-            assertFalse(provisional.data.isFallback)
-            assertEquals(listOf("Config", "App C"), provisional.data.apps.map { it.displayName })
+            assertIs<UiState.Success>(provisional)
+            assertThat(provisional.data.isFallback).isFalse()
+            assertThat(provisional.data.apps.map { it.displayName }).isEqualTo(listOf("Config", "App C"))
             // originalName is the TRUE live label, so a reset-rename clears the
             // override instead of persisting a spurious custom name.
-            assertEquals("Settings", provisional.data.apps[0].originalName)
+            assertThat(provisional.data.apps[0].originalName).isEqualTo("Settings")
             // componentName round-trips so DiffUtil identity matches the authoritative
             // entry that later replaces this provisional one in place.
-            assertEquals(app1.componentName, provisional.data.apps[0].componentName)
+            assertThat(provisional.data.apps[0].componentName).isEqualTo(app1.componentName)
             expectNoEvents()
         }
     }
@@ -468,16 +467,16 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
-            assertEquals(listOf("Old A"), provisional.data.apps.map { it.displayName })
+            assertIs<UiState.Success>(provisional)
+            assertThat(provisional.data.apps.map { it.displayName }).isEqualTo(listOf("Old A"))
 
             rawAppsFlow.value = allApps
 
             val authoritative = awaitItem()
-            assertTrue(authoritative is UiState.Success)
+            assertIs<UiState.Success>(authoritative)
             // Real label from the enumeration replaces the provisional one in place.
-            assertEquals(listOf("App A"), authoritative.data.apps.map { it.displayName })
-            assertFalse(authoritative.data.isFallback)
+            assertThat(authoritative.data.apps.map { it.displayName }).isEqualTo(listOf("App A"))
+            assertThat(authoritative.data.isFallback).isFalse()
         }
     }
 
@@ -495,18 +494,15 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
+            assertIs<UiState.Success>(provisional)
             val result = provisional.data
-            assertFalse(result.isFallback)
+            assertThat(result.isFallback).isFalse()
             // Both are in the paint: the resolvable one AND the missing one (kept, not dropped).
-            assertEquals(
-                setOf(app1.componentName, "com.dead/Gone"),
-                result.apps.map { it.componentName }.toSet(),
-            )
+            assertThat(result.apps.map { it.componentName }.toSet()).isEqualTo(setOf(app1.componentName, "com.dead/Gone"))
             // Only the unresolvable one is flagged missing; its best-effort label is the package.
-            assertEquals(setOf("com.dead/Gone"), result.missingComponents)
+            assertThat(result.missingComponents).isEqualTo(setOf("com.dead/Gone"))
             val missingEntry = result.apps.first { it.componentName == "com.dead/Gone" }
-            assertEquals("com.dead", missingEntry.displayName)
+            assertThat(missingEntry.displayName).isEqualTo("com.dead")
             expectNoEvents()
         }
     }
@@ -526,8 +522,8 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
-            assertEquals(listOf("App C", "App A"), provisional.data.apps.map { it.displayName })
+            assertIs<UiState.Success>(provisional)
+            assertThat(provisional.data.apps.map { it.displayName }).isEqualTo(listOf("App C", "App A"))
         }
     }
 
@@ -547,8 +543,8 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val provisional = awaitItem()
-            assertTrue(provisional is UiState.Success)
-            assertEquals(limit, provisional.data.apps.size)
+            assertIs<UiState.Success>(provisional)
+            assertThat(provisional.data.apps.size).isEqualTo(limit)
         }
     }
 
@@ -577,15 +573,12 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
             val result = successState.data
 
-            assertFalse(result.isFallback, "A hidden favorite must stay pinned, not fall back")
-            assertEquals(2, result.apps.size)
-            assertEquals(
-                setOf(app1.componentName, app2.componentName),
-                result.apps.map { it.componentName }.toSet(),
-            )
+            assertWithMessage("A hidden favorite must stay pinned, not fall back").that(result.isFallback).isFalse()
+            assertThat(result.apps.size).isEqualTo(2)
+            assertThat(result.apps.map { it.componentName }.toSet()).isEqualTo(setOf(app1.componentName, app2.componentName))
         }
     }
 
@@ -602,14 +595,11 @@ class GetFavoriteAppsUseCaseTest {
 
         useCase.favoriteApps.test {
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
             val result = successState.data
 
-            assertFalse(result.isFallback)
-            assertEquals(
-                setOf(app1.componentName, app2.componentName),
-                result.apps.map { it.componentName }.toSet(),
-            )
+            assertThat(result.isFallback).isFalse()
+            assertThat(result.apps.map { it.componentName }.toSet()).isEqualTo(setOf(app1.componentName, app2.componentName))
         }
     }
 
@@ -625,25 +615,19 @@ class GetFavoriteAppsUseCaseTest {
         }
 
         useCase.favoriteApps.test {
-            assertEquals(UiState.Loading, awaitItem())
+            assertThat(awaitItem()).isEqualTo(UiState.Loading)
 
             favoritesFlow.value = setOf("com.gone.one/Main", "com.gone.two/Main")
             rawAppsFlow.value = allApps
 
             val successState = awaitItem()
-            assertTrue(successState is UiState.Success)
+            assertIs<UiState.Success>(successState)
             val result = successState.data
 
-            assertFalse(result.isFallback)
-            assertEquals(
-                setOf("com.gone.one/Main", "com.gone.two/Main"),
-                result.apps.map { it.componentName }.toSet(),
-            )
+            assertThat(result.isFallback).isFalse()
+            assertThat(result.apps.map { it.componentName }.toSet()).isEqualTo(setOf("com.gone.one/Main", "com.gone.two/Main"))
             // Both are flagged missing.
-            assertEquals(
-                setOf("com.gone.one/Main", "com.gone.two/Main"),
-                result.missingComponents,
-            )
+            assertThat(result.missingComponents).isEqualTo(setOf("com.gone.one/Main", "com.gone.two/Main"))
         }
     }
 }

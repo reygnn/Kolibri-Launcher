@@ -33,8 +33,8 @@
 # state below is a smell regardless, and the fix (reorder) is mechanical and safe.
 #
 # Used by:
-#   - tools/check-conventions.sh (kolibri) / nyx/tools/check-conventions.sh
-#     as a positive-list gate (initorder_files) — a regression lock on reviewed
+#   - tools/check-conventions.sh (one orchestrator, --app kolibri|nyx)
+#     as a positive-list gate (INITORDER_FILES in tools/conventions/<app>.conf) — a regression lock on reviewed
 #     files.
 #   - tools/scan-init-order-launch.sh — report-only global discovery.
 #   - tools/check-init-order-launch-test.sh — regression test on fixtures.

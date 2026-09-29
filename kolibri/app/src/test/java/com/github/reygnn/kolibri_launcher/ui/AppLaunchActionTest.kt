@@ -3,7 +3,7 @@ package com.github.reygnn.kolibri_launcher.ui
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.main.AppLaunchAction
-import org.junit.Assert.assertEquals
+import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,7 +39,7 @@ class AppLaunchActionTest {
             drawerDestinationId = drawerId,
             app = sampleApp,
         )
-        assertEquals(AppLaunchAction.PopThenLaunch(sampleApp), result)
+        assertThat(result).isEqualTo(AppLaunchAction.PopThenLaunch(sampleApp))
     }
 
     @Test
@@ -49,7 +49,7 @@ class AppLaunchActionTest {
             drawerDestinationId = drawerId,
             app = sampleApp,
         )
-        assertEquals(AppLaunchAction.JustLaunch(sampleApp), result)
+        assertThat(result).isEqualTo(AppLaunchAction.JustLaunch(sampleApp))
     }
 
     @Test
@@ -60,7 +60,7 @@ class AppLaunchActionTest {
             drawerDestinationId = drawerId,
             app = sampleApp,
         )
-        assertEquals(AppLaunchAction.JustLaunch(sampleApp), result)
+        assertThat(result).isEqualTo(AppLaunchAction.JustLaunch(sampleApp))
     }
 
     @Test
@@ -78,7 +78,7 @@ class AppLaunchActionTest {
             drawerDestinationId = drawerId,
             app = sampleApp,
         )
-        assertEquals(sampleApp, popResult.app)
-        assertEquals(sampleApp, justResult.app)
+        assertThat(popResult.app).isEqualTo(sampleApp)
+        assertThat(justResult.app).isEqualTo(sampleApp)
     }
 }

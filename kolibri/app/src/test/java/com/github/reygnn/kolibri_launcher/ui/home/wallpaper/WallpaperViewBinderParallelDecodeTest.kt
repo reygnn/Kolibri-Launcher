@@ -8,11 +8,11 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,11 +89,7 @@ class WallpaperViewBinderParallelDecodeTest {
         // == cap, not <= cap: a <= bound passes vacuously for a fully-serialized
         // (broken) impl whose max would be 1. Only == pins the liveness property that
         // the semaphore actually lets `cap` through.
-        assertEquals(
-            "the semaphore must let exactly `cap` decodes run concurrently",
-            cap,
-            maxObserved,
-        )
+        assertWithMessage("the semaphore must let exactly `cap` decodes run concurrently").that(maxObserved).isEqualTo(cap)
 
         // Teardown hygiene: release the gate and drain, or runTest throws
         // UncompletedCoroutinesError for the still-suspended bind child.
@@ -135,10 +131,6 @@ class WallpaperViewBinderParallelDecodeTest {
         job.join()
 
         val idsInView = (0 until view.layerCount).map { view.getLayer(it)?.id }
-        assertEquals(
-            "z-order must follow plan order, not decode-completion order",
-            listOf("L0", "L1", "L2"),
-            idsInView,
-        )
+        assertWithMessage("z-order must follow plan order, not decode-completion order").that(idsInView).isEqualTo(listOf("L0", "L1", "L2"))
     }
 }
