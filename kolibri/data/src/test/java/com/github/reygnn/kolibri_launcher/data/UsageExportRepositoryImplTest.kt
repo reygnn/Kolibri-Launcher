@@ -548,7 +548,7 @@ class UsageExportRepositoryImplTest {
     @Test
     fun `importFromJson - with malformed JSON - returns InvalidFormat`() = runTest {
         val result = appUsageExportManager.importFromJson("{{{{", false)
-        assertThat(result is UsageImportResult.InvalidFormat || result).isInstanceOf(UsageImportResult.Error::class.java)
+        assertThat(result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error).isTrue()
     }
 
     @Test
@@ -722,7 +722,7 @@ class UsageExportRepositoryImplTest {
         fakeDataStore.makeEditFail()
         val json = """{ "version": "1.0.0", "usage_data": { "com.test": [123] } }"""
         val result = appUsageExportManager.importFromJson(json, false)
-        assertThat(result is UsageImportResult.Error || result).isInstanceOf(UsageImportResult.InvalidFormat::class.java)
+        assertThat(result is UsageImportResult.Error || result is UsageImportResult.InvalidFormat).isTrue()
     }
 
     // ========== ROUNDTRIP TESTS ==========

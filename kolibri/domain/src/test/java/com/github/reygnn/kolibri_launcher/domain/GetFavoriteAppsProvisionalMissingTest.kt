@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain
 
 import app.cash.turbine.test
+import com.github.reygnn.kolibri_launcher.domain.model.FavoriteAppsResult
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsStateRepository
 import com.github.reygnn.kolibri_launcher.domain.model.UiState
@@ -69,7 +70,7 @@ class GetFavoriteAppsProvisionalMissingTest {
 
         useCase(resolver).favoriteApps.test {
             val state = awaitItem()
-            assertIs<UiState.Success>(state, "expected a provisional Success, not Loading")
+            assertIs<UiState.Success<FavoriteAppsResult>>(state, "expected a provisional Success, not Loading")
             val result = state.data
 
             // The gone favorite SURVIVES the provisional paint (not dropped) …

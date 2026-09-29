@@ -52,7 +52,7 @@ class UsageExportRepositoryImplXenomorphSpec {
 
         // Der Validator sollte hier entweder false zurückgeben oder Exception fangen
         // Wichtig ist: KEIN CRASH der JVM.
-        assertWithMessage("Should reject deeply nested JSON without crashing").that(result is UsageImportResult.InvalidFormat || result).isInstanceOf(UsageImportResult.Error::class.java)
+        assertWithMessage("Should reject deeply nested JSON without crashing").that(result is UsageImportResult.InvalidFormat || result is UsageImportResult.Error).isTrue()
     }
 
     @Test

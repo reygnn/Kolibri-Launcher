@@ -312,7 +312,7 @@ class MonolithicLauncherViewModelTest {
 
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
-            assertIs<UiState.Success>(state)
+            assertIs<UiState.Success<FavoriteAppsResult>>(state)
             assertThat(state.data.apps.size).isEqualTo(2)
             assertThat(state.data.isFallback).isFalse()
         }
@@ -331,7 +331,7 @@ class MonolithicLauncherViewModelTest {
         // Prüfe den State statt Events
         viewModel.favoriteAppsState.test {
             val state = awaitItem()
-            assertIs<UiState.Success>(state)
+            assertIs<UiState.Success<FavoriteAppsResult>>(state)
             assertThat(state.data.isFallback).isTrue()
             assertThat(state.data.apps.size).isEqualTo(2)
         }
@@ -993,7 +993,7 @@ class MonolithicLauncherViewModelTest {
             // Update to Success
             stateFlow.value = UiState.Success(favoriteApps)
             val successState = awaitItem()
-            assertIs<UiState.Success>(successState)
+            assertIs<UiState.Success<FavoriteAppsResult>>(successState)
             assertThat(successState.data.apps.size).isEqualTo(2)
         }
     }

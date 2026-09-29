@@ -94,7 +94,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
 
             rawAppsFlow.value = testApps
 
@@ -175,7 +175,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             rawAppsFlow.value = largeAppList
             val result = awaitItem()
             assertThat(result.size).isEqualTo(1000)
@@ -194,7 +194,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
 
             // Rapid updates
             rawAppsFlow.value = listOf(app1)
@@ -223,7 +223,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             val duplicates = listOf(app1, app1, app2)
             rawAppsFlow.value = duplicates
             val result = awaitItem()
@@ -243,7 +243,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             rawAppsFlow.value = testApps
             val result = awaitItem()
             assertThat(result.size).isEqualTo(2)
@@ -262,10 +262,10 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
 
             viewModel.installedApps.test {
-                assertThat(awaitItem()).isEqualTo(emptyList())
+                assertThat(awaitItem()).isEmpty()
                 rawAppsFlow.value = testApps
                 // Both subscribers should receive the update
                 val result1 = awaitItem()
@@ -297,9 +297,9 @@ class SettingsViewModelTest {
             )
 
             viewModel1.installedApps.test {
-                assertThat(awaitItem()).isEqualTo(emptyList())
+                assertThat(awaitItem()).isEmpty()
                 viewModel2.installedApps.test {
-                    assertThat(awaitItem()).isEqualTo(emptyList())
+                    assertThat(awaitItem()).isEmpty()
                     rawAppsFlow.value = testApps
                     assertThat(awaitItem().size).isEqualTo(2)
                 }
@@ -371,7 +371,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             rawAppsFlow.value = specialApps
             val result = awaitItem()
             assertThat(result.size).isEqualTo(3)
@@ -391,7 +391,7 @@ class SettingsViewModelTest {
         )
 
         viewModel.installedApps.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             val largeList = (1..100).map { AppInfo("App $it", "App $it", "com.$it", "class$it") }
             rawAppsFlow.value = largeList
             assertThat(awaitItem().size).isEqualTo(100)

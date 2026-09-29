@@ -68,7 +68,7 @@ class GetInstalledAppsUseCaseTest {
             flowOf(AppLoad.Failed(RuntimeException("boom")))
 
         useCase.unsortedInstalledAppsFlow.test {
-            assertThat(awaitItem()).isEqualTo(emptyList())
+            assertThat(awaitItem()).isEmpty()
             awaitComplete()
         }
     }
