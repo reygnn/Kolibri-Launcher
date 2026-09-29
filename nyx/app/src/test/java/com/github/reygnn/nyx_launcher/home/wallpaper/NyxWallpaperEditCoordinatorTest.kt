@@ -132,6 +132,26 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
+    fun `a second enter during a live session does not clobber the rollback snapshot`() = runTest(mainDispatcherRule.dispatcher) {
+        // §Audit-3 A3-10: re-entering mid-session used to re-snapshot the EDITED state and clear
+        // the pending lists, so Cancel kept the added layer and leaked its file.
+        coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_re")
+        val c = coordinator()
+        advanceUntilIdle()
+
+        c.onEnterEditMode()
+        c.onAddLayer(uri("content://pick/re"))
+        advanceUntilIdle()
+        c.onEnterEditMode() // re-entry: must be a no-op
+        c.onCancelEditMode()
+        advanceUntilIdle()
+
+        assertThat(c.isEditMode.value).isFalse()
+        assertThat(repoState.value.layerCount).isEqualTo(0) // reverted to the pre-session state
+        verify { fileManager.deleteFile("file:///internal/wp_re") } // the added file is cleaned up
+    }
+
+    @Test
     fun `remove outside edit deletes the file immediately`() = runTest(mainDispatcherRule.dispatcher) {
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_x")
         val c = coordinator()

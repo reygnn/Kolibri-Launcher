@@ -122,6 +122,11 @@ class NyxWallpaperEditCoordinator(
     // ---- session lifecycle ----
 
     fun onEnterEditMode() {
+        // Re-entry guard (§Audit-3 A3-10): a second enter during a live session would overwrite
+        // the rollback snapshot with the already-edited state and drop the pending file lists,
+        // so Cancel would neither revert nor clean up. Practically unreachable (the entry sheet
+        // is covered while the edit overlay is up) — this keeps it structural.
+        if (_isEditMode.value) return
         editSnapshot = _wallpaperState.value
         pendingRemovalsOnCommit.clear()
         pendingRemovalsOnCancel.clear()
