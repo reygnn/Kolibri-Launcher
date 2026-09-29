@@ -262,6 +262,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // DefaultLauncherHelper (fail-closed, catches internally); the
         // Preference writes here can't throw. An outer catch would be dead.
         updateDefaultLauncherStatus()
+        // Re-check READ_CALENDAR: it can be revoked outside the app while the toggle stays on.
+        updateCalendarSummary()
     }
 
     private fun setupPreferenceListeners() {
@@ -749,6 +751,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                         settingsRepository.showCalendarEventFlow.collect { isEnabled ->
                             if (!isAdded || isDetached) return@collect
                             calendarSwitchPreference?.isChecked = isEnabled
+                            updateCalendarSummary()
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -940,6 +943,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    /**
+     * Reflect a READ_CALENDAR revoked outside the app in the calendar toggle summary while it is
+     * on (Nyx §Audit-3 A3-07 port). The stored preference is kept, so re-granting in system
+     * settings brings events back without re-toggling; rendering is fail-closed meanwhile
+     * (TimeBasedEventsRepositoryImpl returns no calendar events without the permission).
+     */
+    private fun updateCalendarSummary() {
+        if (!isAdded) return
+        val pref = calendarSwitchPreference ?: return
+        pref.summary = if (pref.isChecked && !hasCalendarPermission()) {
+            getString(R.string.show_calendar_event_no_access_summary)
+        } else {
+            getString(R.string.show_calendar_event_summary)
+        }
+    }
+
+    private fun hasCalendarPermission(): Boolean =
+        ContextCompat.checkSelfPermission(requireContext(), CALENDAR_PERMISSION) ==
+            PackageManager.PERMISSION_GRANTED
+
     // Die Berechtigungs-Logik
     // (Diese Funktion war bereits vorhanden und funktioniert jetzt)
     private fun handleCalendarPermissionRequest() {
@@ -947,10 +970,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         try {
             when {
-                ContextCompat.checkSelfPermission(
-                    requireContext(),
-                    CALENDAR_PERMISSION
-                ) == PackageManager.PERMISSION_GRANTED -> {
+                hasCalendarPermission() -> {
                     // Berechtigung bereits vorhanden.
                     viewLifecycleOwner.lifecycleScope.launch {
                         settingsRepository.setShowCalendarEvent(true)
