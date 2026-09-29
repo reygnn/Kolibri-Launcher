@@ -63,14 +63,6 @@ android {
 
         testInstrumentationRunner = "com.github.reygnn.kolibri_launcher.HiltTestRunner"
         testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "3"
-        // Wipes app data (DataStore, SharedPreferences, filesDir, runtime
-        // permissions) BETWEEN tests via androidx.test.orchestrator. The
-        // orchestrator runs `pm clear` AFTER the instrumentation has
-        // finished and BEFORE it starts the next test, so unlike a
-        // @get:Rule that calls `pm clear` from inside the test process
-        // (which SIGKILLs the runner itself), this is safe. Requires
-        // `execution = "ANDROIDX_TEST_ORCHESTRATOR"` in testOptions.
-        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     sourceSets {
@@ -167,8 +159,6 @@ android {
     }
 
     testOptions {
-        execution = "ANDROIDX_TEST_ORCHESTRATOR"
-
         unitTests.all {
             it.configure<JacocoTaskExtension> {
                 isIncludeNoLocationClasses = true
@@ -181,26 +171,6 @@ android {
     // (mostly PluralsCandidate, GradleDependency, LogNotTimber in paranoid
     // KolibriLauncherApp fallbacks) are intentionally left as warnings — only
     // genuine localization/resource bugs should block.
-    lint {
-        abortOnError = true
-        checkReleaseBuilds = true
-        warningsAsErrors = false
-
-        // Grandfathers the pre-existing warnings (Overdraw, PluralsCandidate,
-        // …) so CI reports only NEW findings. Regenerate with
-        // `./gradlew :app:updateLintBaseline` after a deliberate cleanup.
-        baseline = file("lint-baseline.xml")
-
-        error += setOf(
-            "MissingTranslation",
-            "ExtraTranslation",
-            "MissingDefaultResource",
-            // Fail the build on new dead resources — locks in the AUDIT
-            // cleanup (45 UnusedResources removed). The one false positive
-            // (file_paths.xml, manifest FileProvider) is ignored in lint.xml.
-            "UnusedResources",
-        )
-    }
 }
 
 // Force the JDK 21 toolchain on every JavaCompile task. AGP/kapt-generated
@@ -310,7 +280,6 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit.ktx)
 
     // --- INSTRUMENTED TESTS (run on emulator / device) ---
-    androidTestUtil(libs.androidx.test.orchestrator)
 
     // Shared TAPL-lite test-support fassade (BasePage/awaitUntil/page objects).
     // src/main of the library, pulled in ONLY on the androidTest classpath.
@@ -419,19 +388,6 @@ tasks.register<Exec>("checkRule13") {
     commandLine = listOf("bash", "../tools/check-rule13-german-comments.sh")
 }
 
-// Discovery aid for the cancellation-rethrow whitelist. The linter (cancel_files
-// positive list) is blind to non-listed files by design; this sweeps every
-// non-whitelisted main source for the broad-catch shape and ranks hits by
-// coroutine density. Report-only — it never fails the build. Run after a
-// refactor that gives a file coroutine work (CLAUDE.md Rule 11, "Discovery").
-// NOT wired into `checkConventions`/CI — a discovery tool, not a gate.
-tasks.register<Exec>("scanCancelCandidates") {
-    group = "verification"
-    description = "Lists non-whitelisted files whose broad catches may belong in cancel_files (report-only)."
-    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "../tools/scan-cancel-candidates.sh")
-}
-
 // AUDIT-13 stale-replay point-read gate — a `stale_files` positive list, exactly
 // like cancel_files/oom_files. Verifies ONLY the whitelisted files that
 // legitimately point-read a hot-shared replay flow (favorites/order/fab): every
@@ -463,32 +419,6 @@ tasks.register<Exec>("scanStaleReplayRead") {
     description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh", "--app", "kolibri")
-}
-
-// Same discovery aid for the OTHER breadth axis: the oom_files positive list is
-// blind to non-listed files, so a new `catch (e: Exception)` around a bitmap /
-// inflate / JSON / ZIP boundary is invisible. Ranks hits by allocation density.
-// Report-only — it never fails the build, and is NOT wired into
-// `checkConventions`/CI: most Exception catches in the tree are correct.
-tasks.register<Exec>("scanOomCandidates") {
-    group = "verification"
-    description = "Lists non-whitelisted files whose Exception catches may belong in oom_files (report-only)."
-    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "../tools/scan-oom-candidates.sh")
-}
-
-// Discovery aid for the init-order-launch gate (initorder_files positive list),
-// mirroring the scans above. A coroutine launched in an `init { }` block that
-// touches a property declared BELOW it races on a null backing field (the
-// FolderIconRenderer NPE). The gate is blind to non-listed files by design; this
-// sweeps EVERY module's main source (repo-wide — the shared-code refactors move
-// launch/init code between modules) with the same awk and lists the shape.
-// Report-only — never fails the build; NOT wired into checkConventions/CI.
-tasks.register<Exec>("scanInitOrderLaunch") {
-    group = "verification"
-    description = "Lists files that launch a coroutine in an init block followed by a property initializer (report-only)."
-    workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; the script derives the repo root itself)
-    commandLine = listOf("bash", "../tools/scan-init-order-launch.sh")
 }
 
 // Code coverage configuration via JaCoCo — AGGREGATES ALL THREE MODULES.

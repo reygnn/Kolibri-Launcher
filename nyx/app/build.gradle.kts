@@ -38,7 +38,6 @@ android {
         buildConfigField("String", "ACRA_PASSWORD", "\"${secretsProperties.getProperty("acra.password", "")}\"")
 
         testInstrumentationRunner = "com.github.reygnn.nyx_launcher.HiltTestRunner"
-        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     // Dev-command visibility: always on in debug; in release only for a personal
@@ -127,7 +126,6 @@ dependencies {
     androidTestImplementation(libs.androidx.fragment.testing)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
-    androidTestUtil(libs.androidx.test.orchestrator)
     androidTestImplementation(libs.truth)
     // Shared TAPL-lite test-support facade (BasePage / awaitUntil / drag / probe).
     androidTestImplementation(project(":common-testing-android"))
