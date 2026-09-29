@@ -473,7 +473,7 @@ tasks.register<Exec>("checkStaleReplayRead") {
     group = "verification"
     description = "Verifies hot-flow point-reads in the stale_files whitelist carry a marker (AUDIT-13)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "../tools/check-stale-replay-read.sh")
+    commandLine = listOf("bash", "../tools/check-stale-replay-read.sh", "--app", "kolibri")
 }
 
 // Discovery half of the stale-replay axis, mirroring scanCancelCandidates /
@@ -487,7 +487,7 @@ tasks.register<Exec>("scanStaleReplayRead") {
     group = "verification"
     description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
-    commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh")
+    commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh", "--app", "kolibri")
 }
 
 // Same discovery aid for the OTHER breadth axis: the oom_files positive list is

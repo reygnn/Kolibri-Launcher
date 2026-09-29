@@ -40,9 +40,24 @@
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# stale-replay is a Kolibri-only check; sweep the kolibri modules explicitly even
-# though this detector now lives in the neutral tools/.
-repo_root="$(cd "$script_dir/../kolibri" && pwd)"
+app="kolibri"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --app) app="${2:-}"; shift 2 ;;
+    *) echo "ERROR: unknown argument: $1 (usage: --app kolibri|nyx)" >&2; exit 2 ;;
+  esac
+done
+# Lists live with every other positive list in tools/conventions/<app>.conf (A3):
+# STALE_HOT_FLOWS / STALE_FILES. Same gate for both apps.
+MONO="$(cd "$script_dir/.." && pwd)"
+conf="$script_dir/conventions/$app.conf"
+[ -f "$conf" ] || { echo "ERROR: no config for app '$app' ($conf)" >&2; exit 2; }
+declare -A CHECK=()
+# shellcheck source=/dev/null
+source "$conf"
+repo_root="$APP_DIR"
+hot_flows=("${STALE_HOT_FLOWS[@]}")
+stale_files=("${STALE_FILES[@]}")
 gate="$script_dir/check-stale-replay-read.sh"
 awkf="$script_dir/check-stale-replay-read.awk"
 
@@ -53,15 +68,10 @@ for f in "$gate" "$awkf"; do
   fi
 done
 
-# Whitelisted basenames + the hot-flow names — parsed live from the gate so this
-# tool can never drift from the enforced list.
-mapfile -t whitelisted < <(
-  sed -n '/^stale_files=(/,/^)/p' "$gate" | grep -oE '[A-Za-z0-9_]+\.kt' | sort -u
-)
-hot_alt="$(
-  sed -n '/^hot_flows=(/,/^)/p' "$gate" \
-    | grep -oE '[A-Za-z0-9_]+' | grep -vxF 'hot_flows' | paste -sd'|' -
-)"
+# Whitelisted basenames + the hot-flow names — the SAME config the gate reads,
+# so this tool can never drift from the enforced list.
+mapfile -t whitelisted < <(for f in "${stale_files[@]}"; do basename "$f"; done | sort -u)
+hot_alt="$(IFS='|'; echo "${hot_flows[*]}")"
 
 is_whitelisted() {
   local base="$1" w

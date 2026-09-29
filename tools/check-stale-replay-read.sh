@@ -25,17 +25,31 @@
 # ranks the hits. Triage a scan hit into either a `getXSnapshot()` fix or a
 # `stale-replay ok` marker + an entry here.
 #
-# Run via `./gradlew checkStaleReplayRead` (also runs as a dependsOn of
+# Run via `./gradlew :kolibri:app:checkStaleReplayRead` / `:nyx:app:checkStaleReplayRead` (also runs as a dependsOn of
 # checkConventions). Exit 1 on an unmarked hit in a listed file, 0 when clean.
 # Set STALE_REPLAY_REPORT_ONLY=1 to never fail (discovery mode).
 # =============================================================================
 set -uo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# stale-replay is a Kolibri-only check (nyx skips it); its stale_files paths are
-# Kolibri sources, so repo_root targets the kolibri module explicitly even though
-# this detector now lives in the neutral tools/.
-repo_root="$(cd "$script_dir/../kolibri" && pwd)"
+app="kolibri"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --app) app="${2:-}"; shift 2 ;;
+    *) echo "ERROR: unknown argument: $1 (usage: --app kolibri|nyx)" >&2; exit 2 ;;
+  esac
+done
+# Lists live with every other positive list in tools/conventions/<app>.conf (A3):
+# STALE_HOT_FLOWS / STALE_FILES. Same gate for both apps.
+MONO="$(cd "$script_dir/.." && pwd)"
+conf="$script_dir/conventions/$app.conf"
+[ -f "$conf" ] || { echo "ERROR: no config for app '$app' ($conf)" >&2; exit 2; }
+declare -A CHECK=()
+# shellcheck source=/dev/null
+source "$conf"
+repo_root="$APP_DIR"
+hot_flows=("${STALE_HOT_FLOWS[@]}")
+stale_files=("${STALE_FILES[@]}")
 awkf="$script_dir/check-stale-replay-read.awk"
 
 [ -f "$awkf" ] || { echo "ERROR: detector not found: $awkf" >&2; exit 2; }
@@ -58,21 +72,13 @@ awkf="$script_dir/check-stale-replay-read.awk"
 # share. A construction-shape check ("shareIn(replay>=1) in a DataStore repo")
 # would be a separate gate — see DATASTORE_READ_SPEC §8.
 #
-# NOTE: keep the `(` and `)` on their own lines even while empty — the report-only
-# companion scan-stale-replay-candidates.sh extracts this block with
-# `sed '/^hot_flows=(/,/^)/p'`, which needs a `^)` terminator line.
-hot_flows=(
-)
 
 # -----------------------------------------------------------------------------
 # WHITELIST — files that legitimately point-read a hot flow. EMPTY as of commit 3
 # (see above): the three former point-readers
 # (FavoritesRepositoryImpl.isFavoriteComponent, ToggleFavoriteUseCase,
 # BackupDataAssembler) now read cold flows, so their `stale-replay ok` markers
-# were removed in the same commit. (Kept `(`/`)` on their own lines — see the
-# hot_flows note above about the sed-based companion extraction.)
-stale_files=(
-)
+# were removed in the same commit.
 
 hot_alt="$(IFS='|'; echo "${hot_flows[*]}")"
 

@@ -27,29 +27,26 @@ into Nyx — extend the shared source.
   A parity gate fails the build (exit 2) when a detector is added without a decision
   for both apps, or a SKIP carries no reason.
 
-### Checks Nyx runs (and the ones it deliberately skips)
+### Checks Nyx runs (and the ones still skipped)
 
-Runs (product-neutral or Nyx already follows it): Rule 9 (Timber intent tag),
-Rule 12 (`Timber.Forest`), Toast routing (`showToastSafe`), `Flow.catch`
-rethrow, unbuffered `MutableSharedFlow`, `registerForActivityResult` placement,
-RecyclerView adapter null-out, localization parity, contract-test triple
-(Rule 2), plus the opt-in positive lists (Rule 11 annotation, cancellation
-rethrow, Exception breadth — empty for now, grow as files are reviewed; the
-`MainActivity` `runCatching` sites are the first review candidate).
+The single source of truth is `tools/conventions/nyx.conf`: one decision per
+registered check — `RUN`, `TASK` (own Gradle task, rides along with
+`checkConventions`) or `"SKIP: reason"`. Every SKIP names the spec step that turns
+it into RUN; the parity gate fails the build if a check is left undecided.
 
-Deliberately **skipped** (Kolibri-specific — would only mis-fire on Nyx), with
-the reason encoded in the orchestrator header:
-
-- **`Manager`-naming in `data/`** — Nyx uses `*Manager` names on purpose for its
-  own `nyx/data/` classes (`NyxBackupManager`, `NyxResetManager`). This is the
-  one naming delta from Kolibri; don't "fix" it to `*RepositoryImpl`.
-  (`WallpaperFileManager` also carries the name but lives in the shared
-  `:common-data`, not `nyx/data/`, and Kolibri already exempts it as a
-  file-helper — so it is neither Nyx-owned nor in this detector's scope.)
-- **`purgeRepository()` completeness** — Nyx has no `purgeRepository()`.
-- **Settings-store keep-list (`OwnsSettingsStoreKeys` / `@IntoSet`)** — hangs on
-  Kolibri's storage-cleanup feature, which Nyx does not have.
-- **stale-replay hot-flow point-read** — deferred (no Nyx whitelist yet).
+- **RUN**: Rule 9, Rule 12, Toast routing, Flow.catch rethrow, unbuffered
+  `MutableSharedFlow`, `registerForActivityResult` placement, adapter null-out,
+  localization parity, contract triple (Rule 2), the positive lists (Rule 11,
+  cancellation rethrow, Exception breadth, init-order), A7/A12 test conventions,
+  A8 mirror comments (ratchet), A11 `WhileSubscribed` literals.
+- **TASK**: Rule 13 (`checkRule13`), stale-replay gate (`checkStaleReplayRead`,
+  dormant: Nyx's repositories are cold flows; the UI StateFlows read via `.value`
+  are collected under `repeatOnLifecycle(STARTED)` in the same component).
+- **SKIP until the named phase** (SPEC_NYX_REWRITE):
+  - `Manager`-naming in `data/` — `NyxBackupManager` / `NyxResetManager` disappear
+    in Phase 2b; then RUN. Do not add new `*Manager` classes.
+  - `purgeRepository()` completeness — Nyx stores become `Purgeable` in Phase 2b.
+  - Settings-store keep-list — Nyx gets storage cleanup in Phase 4b (E5b).
 
 ---
 

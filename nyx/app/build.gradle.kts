@@ -202,17 +202,39 @@ tasks.configureEach {
     if (name == "assembleRelease" || name == "bundleRelease") finalizedBy("uploadProguardMapping")
 }
 
-// --- Convention linters (reuse Kolibri's battle-tested detectors) ---
-// Nyx does not re-implement the checks: the detector logic lives once in
-// tools/*.awk (+ the two generalized *.sh). This orchestrator runs those
-// detectors over Nyx's own sources, with Nyx's own scan roots / positive lists,
-// and only the checks that apply to Nyx. The per-check triage (what runs, what is
-// deliberately skipped and why) is documented at the top of the script.
+// --- Convention linters: ONE orchestrator for both apps (SPEC_NYX_REWRITE A3) ---
+// tools/check-conventions.sh --app nyx; nyx/tools/check-conventions.sh is a one-line
+// wrapper. Nyx's scan roots, positive lists and per-check decisions (RUN / TASK /
+// "SKIP: reason") are data in tools/conventions/nyx.conf; a parity gate fails the
+// build when a detector exists without a decision for both apps.
 tasks.register<Exec>("checkConventions") {
     group = "verification"
-    description = "Runs the project-convention linter (reuses Kolibri's detectors)."
-    workingDir = projectDir.parentFile // = nyx/ (scripts live in nyx/tools)
+    description = "Runs the project-convention linter (one orchestrator for both apps)."
+    workingDir = projectDir.parentFile // = nyx/
     commandLine = listOf("bash", "tools/check-conventions.sh")
+    // The stale-replay gate is decided TASK in nyx.conf: it runs as its own task
+    // and rides along here, exactly like Kolibri.
+    dependsOn("checkStaleReplayRead")
+}
+
+// Stale-replay point-read gate (AUDIT-13 class) — the same gate as Kolibri's, fed
+// by STALE_HOT_FLOWS / STALE_FILES in tools/conventions/nyx.conf. Dormant today
+// (both lists empty: Nyx's repositories are cold flows), kept so a re-introduced
+// hot, replay-caching flow is caught the same way in both apps.
+tasks.register<Exec>("checkStaleReplayRead") {
+    group = "verification"
+    description = "Verifies hot-flow point-reads in the stale-replay whitelist carry a marker (AUDIT-13)."
+    workingDir = projectDir.parentFile // = nyx/
+    commandLine = listOf("bash", "../tools/check-stale-replay-read.sh", "--app", "nyx")
+}
+
+// Discovery half, report-only (never fails): unmarked hot-flow point-reads in files
+// NOT on the whitelist. Run via `./gradlew :nyx:app:scanStaleReplayRead`.
+tasks.register<Exec>("scanStaleReplayRead") {
+    group = "verification"
+    description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
+    workingDir = projectDir.parentFile // = nyx/
+    commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh", "--app", "nyx")
 }
 
 // Rule 13 — git-diff-aware German-comment linter. Reuses Kolibri's script + awk
