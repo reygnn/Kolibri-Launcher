@@ -13,9 +13,11 @@ The product-neutral rules and their enforcement live once in the monorepo root
 `../CLAUDE.md` (loaded automatically alongside this file). Do not copy a rule's text
 or a detector into Nyx — extend the shared source.
 
-- **Test conventions in depth**: `kolibri/app/src/test/CLAUDE.md` +
-  `kolibri/app/src/test/.../TESTING_CONVENTIONS.kt` — valid for every module, Nyx
-  included (they still sit under Kolibri's path; the path is historical, not a scope).
+- **Test conventions in depth**: `TESTING_CONVENTIONS.kt` in the `:core` test fixtures
+  (`core/src/testFixtures/.../core/testing/`, next to `MainDispatcherRule` and
+  `recordEmissions`) — valid for every module, Nyx included. The longer prose
+  reference `kolibri/app/src/test/CLAUDE.md` still sits under Kolibri's path; its
+  path is historical, not a scope.
 - **Enforcement**: `./gradlew :nyx:app:checkConventions` and
   `:nyx:app:checkRule13`. There is **one orchestrator for both apps**,
   `tools/check-conventions.sh --app nyx` (SPEC_NYX_REWRITE A3); `nyx/tools/check-conventions.sh`

@@ -96,7 +96,7 @@ class AppUsageRepositoryImplTest {
         assertThat(sortedApps[0].displayName).isEqualTo("App A") // very recent
         assertThat(sortedApps[1].displayName).isEqualTo("App B") // recent
         assertThat(sortedApps[2].displayName).isEqualTo("App C") // old
-        assertThat(sortedApps[3].displayName).isEqualTo("App D") // ungenutzt
+        assertThat(sortedApps[3].displayName).isEqualTo("App D") // unused
     }
 
     @Test
@@ -491,7 +491,7 @@ class AppUsageRepositoryImplTest {
             AppInfo("Other", "Other", "com.other", "other")
         )
 
-        appUsageManager.recordPackageLaunch("com.other") // nur 1x
+        appUsageManager.recordPackageLaunch("com.other") // only once
 
         val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
         assertThat(sorted[0].displayName).isEqualTo("Test") // more launches = higher score

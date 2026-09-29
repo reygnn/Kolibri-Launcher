@@ -2,7 +2,7 @@
 
 Orientierungshilfe für zukünftige Sessions, die sich mit den Unit-Tests
 dieses Projekts beschäftigen. Nicht als technisches Handbuch gedacht —
-dafür gibt es `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`,
+dafür gibt es `core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt` (im Monorepo-Root, gilt für alle Module),
 und dort steht alles Konkrete. Diese Datei beantwortet die _Meta_-Fragen:
 Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 
@@ -14,7 +14,7 @@ Was existiert? Warum? Was ist bewusst weggelassen? Wo fange ich an?
 - Unit-Tests: JUnit4 (Runner/Annotationen), Truth (Assertions), MockK, kotlinx-coroutines-test, Turbine
 - Einige Tests brauchen Robolectric (alles was `android.net.Uri` berührt)
 - Test-Konventionen zementiert in
-  `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`
+  `core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt` (im Monorepo-Root, gilt für alle Module)
 - Rules für Tests: `MainDispatcherRule` (eine für das ganze Monorepo, `com.github.reygnn.launcher.core.testing`, aus `testFixtures(project(":core"))`; einziger Accessor `testDispatcher`), `TimberRule` (in `rule/`)
 - Assertions: **nur Truth** (`assertThat`, `assertWithMessage`); zwei Ausnahmen, beide Kotlin-native typisierte Assertions, die Truth nicht kann: `kotlin.test.assertFailsWith` (Exceptions) und `kotlin.test.assertIs` (Typprüfung mit Smart-Cast, statt `assertTrue(x is T)`). Kein JUnit-`Assert`, keine anderen `kotlin.test`-Assertions, kein `@Test(expected = …)`. Detektor A12 (`tools/check-test-assertions.awk`); der Altbestand steht in `tools/test-assertions-allowlist.txt` — eine Ratsche: Zeilen nur löschen (nach Migration), nie hinzufügen.
 - Dispatcher: Detektor A7 (`tools/check-test-dispatcher.awk`) erzwingt `TESTING_CONVENTIONS.kt` wörtlich (eine Rule, Ausnahmen 1–3). Flows beobachten: `recordEmissions(flow, into = liste)` aus den `:core`-Testfixtures, wenn die Gesamtheit der Emissions geprüft wird; Turbine, wenn Emissions einzeln nacheinander erwartet werden (§5/§6). Nie einen eigenen `launch(UnconfinedTestDispatcher())`-Collector. Beide A-Detektoren laufen über `tools/check-test-conventions.sh` in den Orchestratoren beider Apps, für App- und geteilte Module.
@@ -153,7 +153,7 @@ in den Contract. Fake anpassen, dann rot→grün.
 
 ### Reihenfolge beim Einlesen
 
-1. **Zuerst** `java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
+1. **Zuerst** `core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt` (im Monorepo-Root, gilt für alle Module).
    Das ist die technische Referenz. Coroutine-Konventionen, MockK-/MockK-
    Naming, Contract-Test-Muster, MutableSharedFlow-Traps, plus seit
    2026-05-01 die Robolectric+Hilt-Activity/Fragment-Test-Sektion. Ist

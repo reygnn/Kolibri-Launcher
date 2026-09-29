@@ -7,7 +7,8 @@ which Claude Code loads automatically alongside this file. Keep them there: a ru
 written twice drifts (SPEC_NYX_REWRITE A4).
 
 For deep test conventions, see `app/src/test/CLAUDE.md` and
-`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`.
+`../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt`
+(shared by all modules since SPEC_NYX_REWRITE 1a).
 
 ---
 

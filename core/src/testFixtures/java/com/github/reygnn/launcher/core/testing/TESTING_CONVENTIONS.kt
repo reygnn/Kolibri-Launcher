@@ -1,5 +1,4 @@
-package com.github.reygnn.kolibri_launcher
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+package com.github.reygnn.launcher.core.testing
 
 /**
  * ============================================================================
@@ -541,7 +540,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  * ROBOLECTRIC APPLICATION CONFIG — TWO-LAYER STRATEGY
  * ============================================================================
  *
- * Reference: `app/src/test/resources/robolectric.properties`
+ * Reference: `<module>/src/test/resources/robolectric.properties`
  *
  * THE PROBLEM (also documented in TODO.md §6)
  * --------------------------------------------
@@ -578,7 +577,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  *
  *   1. Per-test `@Config(application = ...)` — highest priority, overrides
  *      everything below.
- *   2. `app/src/test/resources/robolectric.properties` `application=...` —
+ *   2. `<module>/src/test/resources/robolectric.properties` `application=...` —
  *      project-wide default for the test source set.
  *   3. AndroidManifest.xml `android:name` — fallback (would load
  *      KolibriLauncherApp; we never want this in tests).
@@ -712,7 +711,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  * - For Robolectric tests that do NOT need Hilt (e.g. plain Repository
  *   / WallpaperFileManager / Wallpaper-Uri tests), do NOT set
  *   `@Config(application = ...)`. The project-wide default in
- *   `app/src/test/resources/robolectric.properties` resolves to
+ *   `<module>/src/test/resources/robolectric.properties` resolves to
  *   `android.app.Application`, which is correct for those tests. Only
  *   `@HiltAndroidTest` classes need the override. See the previous
  *   section ("ROBOLECTRIC APPLICATION CONFIG") for the rationale.
@@ -734,7 +733,7 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
  *           FakeXyzRepository()
  *   }
  *
- * Place test modules under `app/src/test/.../testmodule/` or alongside
+ * Place test modules under `<module>/src/test/.../testmodule/` or alongside
  * the test that uses them. Don't add @TestInstallIn modules
  * preemptively — only when a real dependency demonstrably blocks a test.
  *

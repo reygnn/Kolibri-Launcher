@@ -186,7 +186,7 @@ caught this way.
 
 Detailed conventions live in
 [`app/src/test/CLAUDE.md`](app/src/test/CLAUDE.md) and
-[`TESTING_CONVENTIONS.kt`](app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt);
+[`TESTING_CONVENTIONS.kt`](../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt);
 instrumented-test specifics in
 [`INSTRUMENTED_TESTING_NOTES.kt`](app/src/androidTest/java/com/github/reygnn/kolibri_launcher/INSTRUMENTED_TESTING_NOTES.kt).
 

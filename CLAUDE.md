@@ -10,7 +10,8 @@ rules here so they are written once — a rule that exists twice is a drift clas
 > commands, module layout, versioning, known-issue docs): `kolibri/CLAUDE.md`,
 > `nyx/CLAUDE.md`. Test conventions in depth: `kolibri/app/src/test/CLAUDE.md` and
 > `TESTING_CONVENTIONS.kt` (valid for all modules). The enforced subset of all of
-> this: see "Enforcement" below.
+> this: see "Enforcement" below. `TESTING_CONVENTIONS.kt` lives in the `:core` test
+> fixtures (`core/src/testFixtures/.../core/testing/`), next to `MainDispatcherRule`.
 
 Examples inside the rules name Kolibri classes where Kolibri was the first to hit a
 problem; the rule itself applies to both apps and the shared modules.
