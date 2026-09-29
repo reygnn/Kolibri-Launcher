@@ -303,10 +303,30 @@ class BackupRepositoryImpl @Inject constructor(
      * 2. Saves images to internal storage via [WallpaperFileManager]
      * 3. Resolves `imageFileName` references to internal URIs
      * 4. Performs the standard import path
+     *
+     * Every extracted image the restored wallpaper does not claim is deleted afterwards, on
+     * every path (aborted extraction, invalid/unsupported backup, failed import, dropped layer,
+     * cancellation), so an import never leaves orphans in internal storage until the next
+     * cold-start gcOrphans sweep (port of nyx §Audit-3 A3-05).
      */
     private suspend fun importFromZip(uri: Uri, options: ImportOptions): ImportResult {
-        var jsonString: String? = null
         val extractedImages = mutableMapOf<String, String>() // zipEntryName → internal URI string
+        // Claimed by the wallpaper restore BEFORE it saves (see restoreWallpaperFromBackup).
+        val claimedImages = HashSet<String>()
+        return try {
+            extractAndImportZip(uri, options, extractedImages, claimedImages)
+        } finally {
+            (extractedImages.values - claimedImages).forEach { wallpaperFileManager.deleteFile(it) }
+        }
+    }
+
+    private suspend fun extractAndImportZip(
+        uri: Uri,
+        options: ImportOptions,
+        extractedImages: MutableMap<String, String>,
+        claimedImages: MutableSet<String>,
+    ): ImportResult {
+        var jsonString: String? = null
         var imageEntryCount = 0
 
         // 1. Extract ZIP
@@ -327,7 +347,9 @@ class BackupRepositoryImpl @Inject constructor(
                             entry.name == "backup.json" -> {
                                 jsonString = zipIn.readBytes().toString(Charsets.UTF_8)
                             }
-                            entry.name.startsWith("wallpapers/") && !entry.isDirectory -> {
+                            // Extract only when the wallpaper is actually being restored — else
+                            // nothing would ever reference the blobs (nyx parity).
+                            options.importWallpaper && entry.name.startsWith("wallpapers/") && !entry.isDirectory -> {
                                 // Reject an archive spamming the wallpaper dir before it can.
                                 if (++imageEntryCount > MAX_IMAGE_ENTRIES) {
                                     return ImportResult.Error("Backup archive has too many images")
@@ -380,8 +402,14 @@ class BackupRepositoryImpl @Inject constructor(
 
         // 4. Standard import
         Timber.i("ZIP import: ${extractedImages.size} images extracted, starting import")
+        // Per-import restorer so the claimed set stays local to THIS import (the class is a
+        // @Singleton; a shared field would race between overlapping imports).
+        val zipWallpaperRestorer = object : WallpaperRestorer {
+            override suspend fun restoreFromBackup(settings: LauncherSettings) =
+                restoreWallpaperFromBackup(settings, onClaim = claimedImages::addAll)
+        }
         return try {
-            assembler.performImport(resolvedBackup, options, wallpaperRestorer)
+            assembler.performImport(resolvedBackup, options, zipWallpaperRestorer)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -422,17 +450,29 @@ class BackupRepositoryImpl @Inject constructor(
     // WALLPAPER RESTORE (file-system side; called by Assembler)
     // ===========================================
 
-    /** @return number of wallpaper layers that could not be restored (0 = clean). */
-    private suspend fun restoreWallpaperFromBackup(settings: LauncherSettings): Int {
+    /**
+     * @param onClaim receives the internal image URIs of the state about to be saved, BEFORE the
+     *   save is attempted: DataStore can commit the write and the call still end in a
+     *   CancellationException, so claiming afterwards could let the ZIP import delete files the
+     *   persisted state already references. Failing safe leaves at most an orphan for gcOrphans.
+     * @return number of wallpaper layers that could not be restored (0 = clean).
+     */
+    private suspend fun restoreWallpaperFromBackup(
+        settings: LauncherSettings,
+        onClaim: (Collection<String>) -> Unit = {},
+    ): Int {
         return if (settings.wallpaperLayers.isNotEmpty()) {
-            importMultiLayerWallpaper(settings.wallpaperLayers)
+            importMultiLayerWallpaper(settings.wallpaperLayers, onClaim)
         } else {
-            importSingleLayerWallpaper(settings)
+            importSingleLayerWallpaper(settings, onClaim)
         }
     }
 
     /** @return number of layers that were present but could not be restored. */
-    private suspend fun importMultiLayerWallpaper(layerBackups: List<WallpaperLayerBackup>): Int {
+    private suspend fun importMultiLayerWallpaper(
+        layerBackups: List<WallpaperLayerBackup>,
+        onClaim: (Collection<String>) -> Unit,
+    ): Int {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
 
         for ((index, layerBackup) in layerBackups.withIndex()) {
@@ -481,6 +521,7 @@ class BackupRepositoryImpl @Inject constructor(
 
         if (validLayerStates.isNotEmpty()) {
             val wallpaperState = WallpaperState.multiLayer(validLayerStates)
+            onClaim(validLayerStates.mapNotNull { it.imageUri })
             assembler.saveWallpaperStateForRestore(wallpaperState)
             Timber.i("Imported ${validLayerStates.size}/${layerBackups.size} wallpaper layers")
         } else {
@@ -504,7 +545,10 @@ class BackupRepositoryImpl @Inject constructor(
      *
      * @return 1 if a wallpaper was present but could not be restored, else 0.
      */
-    private suspend fun importSingleLayerWallpaper(settings: LauncherSettings): Int {
+    private suspend fun importSingleLayerWallpaper(
+        settings: LauncherSettings,
+        onClaim: (Collection<String>) -> Unit,
+    ): Int {
         val wallpaperUri = settings.wallpaperUri
         if (wallpaperUri.isNullOrBlank()) return 0
 
@@ -527,6 +571,7 @@ class BackupRepositoryImpl @Inject constructor(
                         translateX = settings.wallpaperTranslateX ?: 0.0f,
                         translateY = settings.wallpaperTranslateY ?: 0.0f,
                     )
+                    onClaim(listOf(internalUri.toString()))
                     assembler.saveWallpaperStateForRestore(wallpaperState)
                     Timber.i("Imported wallpaper settings (legacy flat single-layer backup)")
                     return 0
