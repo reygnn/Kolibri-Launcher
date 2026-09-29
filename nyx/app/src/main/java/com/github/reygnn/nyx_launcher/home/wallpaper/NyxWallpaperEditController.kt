@@ -134,6 +134,7 @@ class NyxWallpaperEditController(
                 }
             }
         } catch (e: Throwable) {
+            // no suspension point — synchronous view/overlay work on the main thread.
             // Orchestration boundary for edit-mode entry/exit (mirrors Kolibri).
             TimberWrapper.silentError(e, "Error updating wallpaper edit mode")
         }

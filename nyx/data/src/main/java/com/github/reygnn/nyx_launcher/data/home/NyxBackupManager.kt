@@ -246,6 +246,7 @@ class NyxBackupManager @Inject constructor(
     private suspend fun applyPrefs(prefs: NyxBackupPrefs?) {
         prefs ?: return
         // Prefer the tri-state field; fall back to the legacy boolean for old backups.
+        // no suspension point — enum parse of a backup string.
         val importedStyle = prefs.iconStyle?.let { runCatching { IconStyle.valueOf(it) }.getOrNull() }
             ?: prefs.monochromeIcons?.let { if (it) IconStyle.MONOCHROME else IconStyle.COLOR }
         importedStyle?.let { preferences.setIconStyle(it) }
@@ -299,6 +300,7 @@ class NyxBackupManager @Inject constructor(
     }
 
     private inline fun <reified E : Enum<E>> String.toEnumOrNull(): E? =
+        // no suspension point — enum parse of a backup string.
         runCatching { enumValueOf<E>(this) }.getOrNull()
 
     private companion object {

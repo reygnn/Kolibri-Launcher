@@ -12,6 +12,7 @@ class HomeLayoutSerializer @Inject constructor() : LayoutSerializer {
     override fun serialize(layout: HomeLayout): String = JSON.encodeToString(layout.toDto())
 
     override fun deserialize(raw: String): HomeLayout? =
+        // no suspension point — synchronous JSON decode of a stored string.
         runCatching { JSON.decodeFromString<HomeLayoutDto>(raw).toDomain() }.getOrNull()
 
     private companion object {

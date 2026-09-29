@@ -8,6 +8,7 @@ import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.home.model.IconRef
 import com.github.reygnn.nyx_launcher.home.model.ItemId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -27,7 +28,13 @@ fun ImageView.loadIconGated(
 ) {
     setImageDrawable(null)
     scope.launch {
-        val bitmap = runCatching { produce() }.getOrNull() ?: return@launch
+        val bitmap = try {
+            produce()
+        } catch (e: CancellationException) {
+            throw e // rebind/recycle cancelled this load
+        } catch (e: Throwable) {
+            null
+        } ?: return@launch
         if (currentToken() == tokenAtBind) setImageBitmap(bitmap)
     }
 }

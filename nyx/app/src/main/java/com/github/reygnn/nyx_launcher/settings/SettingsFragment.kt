@@ -41,6 +41,7 @@ import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -112,6 +113,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         iconStylePref = findPreference<ListPreference>("icon_style")?.apply {
             isPersistent = false // DataStore is the source of truth, not SharedPreferences
             setOnPreferenceChangeListener { _, newValue ->
+                // no suspension point — enum parse of a preference string.
                 val style = runCatching { IconStyle.valueOf(newValue as String) }.getOrDefault(IconStyle.COLOR)
                 lifecycleScope.launch { preferences.setIconStyle(style) }
                 true
@@ -299,7 +301,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Open the SAF stream off the main thread (a DocumentsProvider binder IPC
         // can block); the manager also hops to IO for the ZIP transfer.
         val resolver = requireContext().contentResolver
-        val ok = runCatching {
+        val ok = try {
             withContext(Dispatchers.IO) {
                 // CreateDocument made this target just for us: on any failure delete it, so no
                 // truncated, unimportable .zip is left behind (§Audit-3 A3-06).
@@ -312,18 +314,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
                     discard = { DocumentsContract.deleteDocument(resolver, uri) },
                 )
             }
-        }.getOrDefault(false)
+        } catch (e: CancellationException) {
+            throw e // fragment gone mid-export: no toast on a dead fragment (B12)
+        } catch (e: Throwable) {
+            false // unchanged outcome: any failure means "export failed"
+        }
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
     }
 
     private fun doImport(uri: Uri) = lifecycleScope.launch {
-        val result = runCatching {
+        val result = try {
             withContext(Dispatchers.IO) {
                 requireContext().contentResolver.openInputStream(uri)?.use { inp ->
                     backupManager.import(inp, NyxBackupOptions())
                 }
             }
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e // fragment gone mid-import: no toast / requireActivity() on a dead fragment (B12)
+        } catch (e: Throwable) {
+            null // unchanged outcome: any failure means "import failed"
+        }
         when (result) {
             ImportResult.Success -> {
                 toast(getString(R.string.backup_import_done))
@@ -479,6 +489,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun openNotificationAccessSettings() {
         // startActivity can throw ActivityNotFoundException on OEMs without this screen;
         // the preceding toast already told the user what to do.
+        // no suspension point — startActivity is synchronous; a missing settings screen must not crash.
         runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
     }
 

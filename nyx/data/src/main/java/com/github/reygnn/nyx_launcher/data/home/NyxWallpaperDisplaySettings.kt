@@ -64,4 +64,5 @@ class NyxWallpaperDisplaySettings @Inject constructor(
 }
 
 private inline fun <reified E : Enum<E>> String?.toEnumOr(default: E): E =
+    // no suspension point — enum parse of a stored string.
     if (this == null) default else runCatching { enumValueOf<E>(this) }.getOrDefault(default)

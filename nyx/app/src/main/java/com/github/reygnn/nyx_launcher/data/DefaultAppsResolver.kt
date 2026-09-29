@@ -25,6 +25,7 @@ class DefaultAppsResolver @Inject constructor(
 ) {
     fun resolveDockApps(): List<ComponentKey> {
         val packages = listOfNotNull(
+            // no suspension point — synchronous system-service lookups (this and the next line).
             runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull(),
             runCatching { Telephony.Sms.getDefaultSmsPackage(context) }.getOrNull(),
             // Default email app via the standard app-category selector (OEM-neutral,
@@ -44,6 +45,7 @@ class DefaultAppsResolver @Inject constructor(
      */
     fun resolveGridApps(): List<ComponentKey> = listOfNotNull(launcherKeyFor(PLAY_STORE_PACKAGE))
 
+    // no suspension point — synchronous PackageManager query.
     private fun defaultPackageFor(intent: Intent): String? = runCatching {
         context.packageManager.resolveActivity(intent, 0)
             ?.activityInfo?.packageName
@@ -53,6 +55,7 @@ class DefaultAppsResolver @Inject constructor(
 
     private fun launcherKeyFor(packageName: String?): ComponentKey? {
         packageName ?: return null
+        // no suspension point — synchronous PackageManager query.
         return runCatching {
             context.packageManager.getLaunchIntentForPackage(packageName)?.component
                 ?.let { ComponentKey(it.packageName, it.className) }

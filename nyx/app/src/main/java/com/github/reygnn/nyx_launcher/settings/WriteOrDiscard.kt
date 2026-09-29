@@ -18,6 +18,7 @@ internal suspend fun writeOrDiscard(write: suspend () -> Boolean, discard: () ->
         return ok
     } finally {
         if (!ok) {
+            // no suspension point — discard is a plain, non-suspend lambda.
             runCatching(discard).onFailure { TimberWrapper.silentError(it, "Could not discard failed export target") }
         }
     }

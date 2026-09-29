@@ -183,6 +183,7 @@ class PackageEventCoordinator @Inject constructor(
             // so nyx and kolibri can't drift).
             PackageUpdateReceiver.register(context)
         } catch (e: Throwable) {
+            // no suspension point — synchronous receiver registration.
             TimberWrapper.silentError(e, "PackageEventCoordinator: could not register PackageUpdateReceiver")
         }
     }

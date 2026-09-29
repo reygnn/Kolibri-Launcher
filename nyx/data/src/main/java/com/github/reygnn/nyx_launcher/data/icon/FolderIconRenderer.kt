@@ -8,6 +8,7 @@ import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.nyx_launcher.home.model.IconRef
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -101,7 +102,13 @@ class FolderIconRenderer @Inject constructor(
         val cell = (sizePx - pad * 3) / 2 // 2 cells + 3 paddings span the size
         var complete = true
         members.take(4).forEachIndexed { index, key ->
-            val bitmap = runCatching { iconLoader.bitmap(IconRef.System(key), cell) }.getOrNull()
+            val bitmap = try {
+                iconLoader.bitmap(IconRef.System(key), cell)
+            } catch (e: CancellationException) {
+                throw e // a cancelled render must stop, not compose a partial folder icon
+            } catch (e: Throwable) {
+                null // transient load failure (incl. OOM) → blank quadrant, not cached
+            }
             if (bitmap == null) {
                 complete = false // transient load failure → leave this quadrant blank, don't cache
                 return@forEachIndexed

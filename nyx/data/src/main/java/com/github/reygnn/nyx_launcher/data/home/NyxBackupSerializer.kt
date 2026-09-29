@@ -15,6 +15,7 @@ class NyxBackupSerializer @Inject constructor() {
     fun serialize(backup: NyxBackup): String = JSON.encodeToString(backup)
 
     fun deserialize(raw: String): NyxBackup? =
+        // no suspension point — synchronous JSON decode of a stored string.
         runCatching { JSON.decodeFromString<NyxBackup>(raw) }.getOrNull()
 
     private companion object {

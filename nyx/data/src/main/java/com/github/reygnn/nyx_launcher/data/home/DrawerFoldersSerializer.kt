@@ -17,6 +17,7 @@ class DrawerFoldersSerializer @Inject constructor() {
     fun serialize(folders: DrawerFolders): String = JSON.encodeToString(folders.toDto())
 
     fun deserialize(raw: String): DrawerFolders? =
+        // no suspension point — synchronous JSON decode of a stored string.
         runCatching { JSON.decodeFromString<DrawerFoldersDto>(raw).toDomain() }.getOrNull()
 
     private companion object {

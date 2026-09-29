@@ -15,6 +15,7 @@ class HiddenAppsSerializer @Inject constructor() {
     fun serialize(hidden: Set<ComponentKey>): String = JSON.encodeToString(hidden.toHiddenDto())
 
     fun deserialize(raw: String): Set<ComponentKey>? =
+        // no suspension point — synchronous JSON decode of a stored string.
         runCatching { JSON.decodeFromString<HiddenAppsDto>(raw).toDomain() }.getOrNull()
 
     private companion object {

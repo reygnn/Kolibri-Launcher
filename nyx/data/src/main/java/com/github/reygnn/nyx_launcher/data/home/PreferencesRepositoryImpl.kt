@@ -25,6 +25,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.readFlowFailOpen("Error reading iconStyle") { prefs ->
             // Prefer the tri-state key; migrate legacy boolean (monochrome_icons == true
             // → MONOCHROME) so existing users keep their setting. Unknown/absent → COLOR.
+            // no suspension point — enum parse of a stored string.
             prefs[ICON_STYLE]?.let { runCatching { IconStyle.valueOf(it) }.getOrNull() }
                 ?: if (prefs[MONOCHROME] == true) IconStyle.MONOCHROME else IconStyle.COLOR
         }
