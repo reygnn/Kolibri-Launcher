@@ -93,9 +93,9 @@ class AppUsageRepositoryImplTest {
         val sortedApps = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
 
         // Assert
-        assertThat(sortedApps[0].displayName).isEqualTo("App A") // sehr kürzlich
-        assertThat(sortedApps[1].displayName).isEqualTo("App B") // kürzlich
-        assertThat(sortedApps[2].displayName).isEqualTo("App C") // alt
+        assertThat(sortedApps[0].displayName).isEqualTo("App A") // very recent
+        assertThat(sortedApps[1].displayName).isEqualTo("App B") // recent
+        assertThat(sortedApps[2].displayName).isEqualTo("App C") // old
         assertThat(sortedApps[3].displayName).isEqualTo("App D") // ungenutzt
     }
 
@@ -494,7 +494,7 @@ class AppUsageRepositoryImplTest {
         appUsageManager.recordPackageLaunch("com.other") // nur 1x
 
         val sorted = appUsageManager.sortAppsByTimeWeightedUsage(apps, appUsageManager.usageSnapshotFlow.first())
-        assertThat(sorted[0].displayName).isEqualTo("Test") // Mehr Starts = höherer Score
+        assertThat(sorted[0].displayName).isEqualTo("Test") // more launches = higher score
     }
 
     // ========== NEW TESTS: LIMITS & CLEANUP ==========

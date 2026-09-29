@@ -385,7 +385,7 @@ class FavoritesRepositoryImplTest {
         assertThat(saved?.size).isEqualTo(2)
         assertThat(saved?.contains("com.new/AppB") == true).isTrue()
         assertThat(saved?.contains("com.new/AppC") == true).isTrue()
-        assertThat(saved?.contains("com.old/AppA") == true).isFalse() // Alt überschrieben
+        assertThat(saved?.contains("com.old/AppA") == true).isFalse() // old entry overwritten
     }
 
     @Test
