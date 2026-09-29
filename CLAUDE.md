@@ -369,11 +369,15 @@ carries names only so it cannot drift against the catalog.
     **Annotation-discipline linter (positive list).** `./gradlew
     checkConventions` enforces the marker phrase on broad catches
     (`Throwable` / `Exception`) in files that opted in to the
-    convention. Today the whitelist is MainActivity,
+    convention. Kolibri's whitelist is MainActivity,
     WallpaperEditController, and HomeFragment — the last added in the
     AUDIT-12 rollout once its catches were reviewed under the same lens
     (fitting, since HomeFragment is the four-category reference file
-    itself).
+    itself). Nyx's (SPEC_NYX_REWRITE 1a-14) is every file that survives the
+    rewrite and has a broad catch — MainActivity, SettingsFragment,
+    PackageEventCoordinator, ReconcileHomeLayoutUseCase,
+    NyxNotificationListenerService, IconBinding, FolderIconRenderer; the
+    authoritative lists are `RULE11_FILES` in `tools/conventions/<app>.conf`.
     Accepted markers within ±5 lines of the catch (symmetric window):
     `[Cc]atch[a-z]* kept` (covers "Catch kept", "Inner catch kept",
     "Triple-catch kept", "Outer Catchall kept") or

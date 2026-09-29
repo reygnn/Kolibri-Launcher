@@ -107,6 +107,7 @@ class FolderIconRenderer @Inject constructor(
             } catch (e: CancellationException) {
                 throw e // a cancelled render must stop, not compose a partial folder icon
             } catch (e: Throwable) {
+                // Catch kept — expected error at the icon-load boundary (incl. OOM).
                 null // transient load failure (incl. OOM) → blank quadrant, not cached
             }
             if (bitmap == null) {

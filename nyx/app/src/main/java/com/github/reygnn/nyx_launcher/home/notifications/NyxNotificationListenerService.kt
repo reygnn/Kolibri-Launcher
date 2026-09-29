@@ -48,6 +48,7 @@ class NyxNotificationListenerService : NotificationListenerService() {
             val active = activeNotifications?.map { it.toSummary(ranking) }.orEmpty()
             store.update(NotificationDotPolicy.dotPackages(active))
         } catch (e: Throwable) {
+            // Catch kept — system binder race on connect/disconnect (expected, reportToAcra).
             TimberWrapper.reportToAcra(e, "Failed to refresh notification dots")
         }
     }

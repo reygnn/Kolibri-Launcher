@@ -268,6 +268,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
+                        // Catch kept — expected error at the decode boundary (I/O, OOM); cancellation rethrown above.
                         TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
                         null
                     }
@@ -616,6 +617,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // Catch kept — collector safety net for the home screen (the layer boundary Rule 11 defers to).
                 TimberWrapper.silentError(e, "Home collector failed")
             }
         }
@@ -647,6 +649,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // Catch kept — expected error at the render boundary (bitmap / I/O); cancellation rethrown above.
                 TimberWrapper.silentError(e, "Error rendering wallpaper")
             }
         }

@@ -317,6 +317,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         } catch (e: CancellationException) {
             throw e // fragment gone mid-export: no toast on a dead fragment (B12)
         } catch (e: Throwable) {
+            // Catch kept — SAF/backup I/O boundary; the outcome is reported as a toast.
             false // unchanged outcome: any failure means "export failed"
         }
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
@@ -332,6 +333,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         } catch (e: CancellationException) {
             throw e // fragment gone mid-import: no toast / requireActivity() on a dead fragment (B12)
         } catch (e: Throwable) {
+            // Catch kept — SAF/backup I/O boundary; the outcome is reported as a toast.
             null // unchanged outcome: any failure means "import failed"
         }
         when (result) {

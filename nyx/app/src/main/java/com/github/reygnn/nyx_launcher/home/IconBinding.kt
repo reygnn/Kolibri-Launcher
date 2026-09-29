@@ -33,6 +33,7 @@ fun ImageView.loadIconGated(
         } catch (e: CancellationException) {
             throw e // rebind/recycle cancelled this load
         } catch (e: Throwable) {
+            // Catch kept — expected error at the icon-load boundary (incl. OOM).
             null
         } ?: return@launch
         if (currentToken() == tokenAtBind) setImageBitmap(bitmap)

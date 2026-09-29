@@ -57,6 +57,7 @@ class ReconcileHomeLayoutUseCase @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            // Catch kept — store I/O, fail-closed and reported as a value (RHL-INV-1).
             // Fail-closed store I/O (RHL-INV-1), reported as a VALUE not a throw: the
             // atomic RMW reads the raw DataStore and propagates an IOException on a
             // transient error; this skips the pass with zero mutation rather than

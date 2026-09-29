@@ -121,6 +121,7 @@ class PackageEventCoordinator @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
+                    // Catch kept — keeps the reconcile loop alive across transient DataStore I/O.
                     TimberWrapper.silentError(e, "PackageEventCoordinator: reconcile failed, skipping")
                 }
             }
@@ -157,6 +158,7 @@ class PackageEventCoordinator @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
+                    // Catch kept — keeps package-event handling alive across system/store errors.
                     TimberWrapper.silentError(e, "PackageEventCoordinator: package-event handling failed")
                 }
             }
@@ -183,6 +185,7 @@ class PackageEventCoordinator @Inject constructor(
             // so nyx and kolibri can't drift).
             PackageUpdateReceiver.register(context)
         } catch (e: Throwable) {
+            // Catch kept — system API boundary (receiver registration).
             // no suspension point — synchronous receiver registration.
             TimberWrapper.silentError(e, "PackageEventCoordinator: could not register PackageUpdateReceiver")
         }
