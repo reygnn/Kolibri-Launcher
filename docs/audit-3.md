@@ -42,6 +42,20 @@ sound. No high-severity defect; no data loss anywhere.
 | A3-10 | **low** | Wallpaper `onEnterEditMode` has no re-entry guard (second entry corrupts the rollback snapshot). Practically blocked (sheet unreachable while overlay up). | CONFIRMED (blocked) |
 | A3-11 | **info** | Usage-sort tie-break nondeterministic for identically-named apps; clock minute-tick + notification-dot recompute run backgrounded (cheap). | CONFIRMED (not bugs) |
 
+## Resolution log (2026-09-29)
+
+A3-01..A3-04 are fixed and merged to `main`. A post-merge regression pass over the
+A3-01..03 fixes (all callers read, full `:nyx:domain`/`:nyx:data`/`:nyx:app` suites +
+`checkConventions`/`checkRule13` green) found no regression. A3-05..A3-11 are still open
+as listed under **Recommended priority** (opportunistic / accept / no action).
+
+| ID | Disposition | Commit(s) |
+|----|-------------|-----------|
+| A3-01 | **Fixed** — `sanitize` commits a folder's claim only once it survives (≥ 2 members); a dropped folder claims nothing. Sole caller: backup restore. | `192aafa` |
+| A3-02 | **Fixed** — `onCommitEditMode` bumps `editRollbackGeneration`, so an add whose copy is still in flight at Save discards its copied file. Deliberate semantic: a Save pressed before a large pick finishes copying drops that layer (commit persists exactly the previewed state). | `efe06b0` |
+| A3-03 | **Fixed** — `.onCompletion { styleReady.complete(Unit) }` on the style collector: a dead collector degrades to the COLOR seed instead of hanging `bitmap()`. Normal path unchanged. | `a8717d2` |
+| A3-04 | **Fixed (live-reconcile chosen over accept)** — an open drawer-folder overlay reconciles against `installedKeys` with the projection's rule (`drawerFolderLiveMembers`): uninstalled members drop out (not greyed), reinstall restores them, < 2 live closes the overlay; a tap on a stale, already-dissolved drawer tile refreshes the drawer instead of opening. Persisted membership untouched. | `ee4d37a` |
+
 ## Actionable findings (detail)
 
 ### A3-01 — `DrawerFoldersTransition.sanitize` claims before dropping · CONFIRMED (low-med)
@@ -150,4 +164,4 @@ usage cap/validity-filter/scoring, factory-reset UI refresh, dev-command/ACRA ga
 6. **A3-09/10/11** — latent/blocked/info; no action (A3-09's `ACTION_UP` fragility is worth a
    one-line comment at most).
 
-_No code was changed by this audit; fixes are a separate decision._
+_No code was changed by this audit itself; fixes are tracked in the Resolution log above._

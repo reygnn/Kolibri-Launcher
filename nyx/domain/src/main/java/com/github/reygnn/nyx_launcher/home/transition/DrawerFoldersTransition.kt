@@ -26,8 +26,9 @@ object DrawerFoldersTransition {
      * Structural repair of a persisted [DrawerFolders] blob (e.g. a restored backup, which is
      * not validated on the way in). Enforces the membership invariants a hand-crafted or
      * cross-device blob may violate: members are de-duplicated in order, an app ends up in at
-     * most ONE folder (first folder wins, DFOLD-INV-3), and any folder left with fewer than two
-     * members is dropped (DFOLD-INV-1). Idempotent. Mirrors the read-time projection so a
+     * most ONE folder (the first SURVIVING folder wins, DFOLD-INV-3 — a dropped folder claims
+     * nothing, §Audit-3 A3-01), and any folder left with fewer than two members is dropped
+     * (DFOLD-INV-1). Idempotent. Mirrors the read-time projection so a
      * restored blob is well-formed at rest, not only once `GetDrawerContentUseCase` reconciles
      * it for display (§Audit-2 N10).
      */
