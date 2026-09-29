@@ -281,14 +281,20 @@ class AppDrawerFragment : Fragment(R.layout.fragment_app_drawer) {
      * Disarm drag-to-dismiss before the hide slide, so a fresh pull cannot cancel
      * the host's hide animation. Driven by MainActivity.hideDrawer().
      *
-     * Also clears the search so the next open starts on the folder view and its
-     * tracker treats the first (blank) emission as a replay, not a keystroke.
+     * Also clears the search so the next open starts on the folder view.
+     *
+     * The query tracker is deliberately NOT reset here (Kolibri parity; reset only in
+     * onDestroyView): the drawer is a visibility-toggled overlay, so its collector stays
+     * subscribed and a hide with a blank query produces no further emission. A reset would
+     * leave the tracker unseeded, so the first keystroke of the next open would count as a
+     * replay and never auto-launch (§Audit-3 A3-08). Without it, the blank emission caused by
+     * clearing a non-blank query is a "change" whose blank render never auto-launches, and a
+     * later STARTED replay of "" equals the tracked value — so no spurious launch either way.
      */
     fun onDrawerHidden() {
         (view as? GestureFrameLayout)?.dragTarget = null
         searchBox?.let { if (it.text.isNotEmpty()) it.text = null }
         hideKeyboard()
-        searchQueryChangeTracker.reset()
         // Reveal mode is transient: a fresh open always starts on the normal (hidden-filtered) view.
         viewModel.setShowHidden(false)
     }
