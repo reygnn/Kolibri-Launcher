@@ -2,23 +2,20 @@
 
 Project conventions for **Nyx** (grid/dock launcher with an app drawer, home
 edit + drag engine, and a wallpaper edit session). Loaded automatically when
-working under `nyx/`. Stack baseline / git / release / test *philosophy* come
-from the global `~/.claude/CLAUDE.md`; this file carries only Nyx specifics and
-the delta against the family rules.
+working under `nyx/`. The monorepo-wide rules come from the root `../CLAUDE.md`; this file carries
+only Nyx specifics.
 
 ---
 
-## Shared rules — Nyx reuses Kolibri's, it does not fork them
+## Shared rules — one set for both apps
 
-The **battle-tested conventions and their enforcement live once in Kolibri** and
-Nyx reuses them wherever they apply. Do not copy a rule's text or a detector
-into Nyx — extend the shared source.
+The product-neutral rules and their enforcement live once in the monorepo root
+`../CLAUDE.md` (loaded automatically alongside this file). Do not copy a rule's text
+or a detector into Nyx — extend the shared source.
 
-- **Rule reference**: `kolibri/CLAUDE.md` (project rules) and
-  `kolibri/app/src/test/CLAUDE.md` + `kolibri/app/src/test/.../TESTING_CONVENTIONS.kt`
-  (test conventions) are the canonical statements. They are Kolibri-path-scoped,
-  so they are the *reference* for Nyx, not auto-loaded here — read them when a
-  rule question comes up.
+- **Test conventions in depth**: `kolibri/app/src/test/CLAUDE.md` +
+  `kolibri/app/src/test/.../TESTING_CONVENTIONS.kt` — valid for every module, Nyx
+  included (they still sit under Kolibri's path; the path is historical, not a scope).
 - **Enforcement**: `./gradlew :nyx:app:checkConventions` and
   `:nyx:app:checkRule13`. There is **one orchestrator for both apps**,
   `tools/check-conventions.sh --app nyx` (SPEC_NYX_REWRITE A3); `nyx/tools/check-conventions.sh`

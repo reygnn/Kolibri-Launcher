@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  * needs no override at all. (Kolibri keeps its own richer `UiEvent`-aware base for
  * now; this is the neutral one nyx adopts.)
  *
- * Catches at real boundaries only (Kolibri CLAUDE.md Rule 11): the collectors and
+ * Catches at real boundaries only (root CLAUDE.md Rule 11): the collectors and
  * their handlers wrap external work; every broad `catch (Throwable)` sits behind a
  * `catch (CancellationException) { throw e }` arm so normal coroutine cancellation
  * (STARTED-scope teardown on stop/rotate) always propagates.

@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * through [KolibriLog] (not `timber.log.Timber` directly), the same
  * convention :domain follows, so this module stays free of the Timber AAR.
  *
- * Catches at real boundaries only (per Kolibri CLAUDE.md Rule 11):
+ * Catches at real boundaries only (per root CLAUDE.md Rule 11):
  * - `launchSafe` and `executeSafe` wrap caller-supplied blocks (EXTERNAL).
  * - `sendEvent` wraps `Channel.send` (suspend boundary).
  * - `coroutineExceptionHandler` is the last-resort backstop for coroutines
