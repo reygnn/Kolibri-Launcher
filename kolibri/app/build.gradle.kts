@@ -12,13 +12,14 @@ import java.util.Properties
  * ⚠️ Ignoring these markers causes build failures! ⚠️
  *
  * minSdk=36 (Android 16); compileSdk=targetSdk=37 (Android 17, lifted
- * 2026-07-18 for core-ktx 1.19.0 — see gradle/libs.versions.toml).
+ * 2026-07-18 for core-ktx 1.19.0 — see gradle/libs.versions.toml). They live ONCE
+ * in build-logic (LauncherBuild) for every module of both apps, not here.
  * These values are DELIBERATE — do NOT change without explicit instruction!
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 plugins {
-    alias(libs.plugins.android.application)
+    id("launcher.android.application") // SDKs, Java/Kotlin 21, unit tests, BuildConfig (build-logic)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     id("jacoco")
@@ -31,7 +32,6 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher"
-    compileSdk = 37 // DO NOT CHANGE !!!
 
     val secretsPropertiesFile = rootProject.file("secrets.properties")
     val secretsProperties = Properties()
@@ -41,8 +41,6 @@ android {
 
     defaultConfig {
         applicationId = "com.github.reygnn.kolibri_launcher"
-        minSdk = 36 // DO NOT CHANGE !!!
-        targetSdk = 37 // DO NOT CHANGE !!!
         versionCode = 241
         versionName = "1.0.0-rc3"
 
@@ -157,19 +155,6 @@ android {
 
     buildFeatures {
         viewBinding = true
-        buildConfig = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
     }
 
     // Configures the JDK used by the Java toolchain. AGP picks this up for
@@ -183,14 +168,6 @@ android {
 
     testOptions {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
-
-        unitTests {
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-            all {
-                it.jvmArgs("-XX:+EnableDynamicAgentLoading")
-            }
-        }
 
         unitTests.all {
             it.configure<JacocoTaskExtension> {
@@ -248,7 +225,6 @@ dependencies {
     // directly into LauncherViewModel/WallpaperDelegate, so :app needs :common-data
     // on its own classpath (kolibri:data depends on it via non-transitive implementation).
     implementation(project(":common-data"))
-
 
     // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
     // Fake*Repository, Contract abstract classes). See `java-test-fixtures`
@@ -332,7 +308,6 @@ dependencies {
     // AndroidX Test (for Robolectric-based Activity/Fragment tests).
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
-
 
     // --- INSTRUMENTED TESTS (run on emulator / device) ---
     androidTestUtil(libs.androidx.test.orchestrator)
@@ -608,7 +583,6 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         )
     )
 }
-
 
 // app/build.gradle.kts
 

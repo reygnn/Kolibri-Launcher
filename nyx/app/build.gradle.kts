@@ -10,7 +10,7 @@ import java.util.Properties
  * omitted here for brevity (rule 8 still applies — ACRA is opt-in).
  */
 plugins {
-    alias(libs.plugins.android.application)
+    id("launcher.android.application") // SDKs, Java/Kotlin 21, unit tests, BuildConfig (build-logic)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
@@ -19,7 +19,6 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.nyx_launcher"
-    compileSdk = 37
 
     // ACRA endpoint from the shared root secrets.properties (gitignored), same as
     // Kolibri. Fed into :feature-crashreporting via AcraConfig at runtime.
@@ -31,8 +30,6 @@ android {
 
     defaultConfig {
         applicationId = "com.github.reygnn.nyx_launcher"
-        minSdk = 36
-        targetSdk = 37
         versionCode = 12
         versionName = "0.2.2"
 
@@ -43,8 +40,6 @@ android {
         testInstrumentationRunner = "com.github.reygnn.nyx_launcher.HiltTestRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
-
-    buildFeatures { buildConfig = true }
 
     // Dev-command visibility: always on in debug; in release only for a personal
     // build (`-PdevCommands` or the `-PdailyDriver` master flag). Public release = off.
@@ -66,25 +61,6 @@ android {
                 "proguard-rules.pro",
             )
             buildConfigField("boolean", "SHOW_DEV_COMMANDS", devCommandsInRelease.toString())
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
         }
     }
 }
