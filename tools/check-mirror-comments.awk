@@ -4,7 +4,7 @@
 # Prints every COMMENT line (//, /* */, KDoc) that claims a hand-kept copy of the
 # other app: one of "mirror"/"parity"/"port of" AND one of "kolibri"/"nyx" on the
 # same line (case-insensitive). Output: path<TAB>trimmed-line<TAB>line-number.
-# The ratchet (allowlist, stale entries) lives in check-mirror-comments.sh.
+# The ratchet (allowlist, stale entries) is the generic tools/check-ratchet.sh.
 # A8 measures comments, not copies: removing a comment without replacing the copy
 # fools it — the allowlist rule in the spec covers that.
 # =============================================================================

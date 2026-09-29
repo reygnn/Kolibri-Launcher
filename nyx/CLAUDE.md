@@ -38,7 +38,8 @@ it into RUN; the parity gate fails the build if a check is left undecided.
   `MutableSharedFlow`, `registerForActivityResult` placement, adapter null-out,
   localization parity, contract triple (Rule 2), the positive lists (Rule 11,
   cancellation rethrow, Exception breadth, init-order), A7/A12 test conventions,
-  A8 mirror comments (ratchet), A11 `WhileSubscribed` literals.
+  A8 mirror comments (ratchet), A11 `WhileSubscribed` literals, A13 hard-coded
+  dispatchers (ratchet; inject `@IoDispatcher` / `@DefaultDispatcher` / `@MainDispatcher`).
 - **TASK**: Rule 13 (`checkRule13`), stale-replay gate (`checkStaleReplayRead`,
   dormant: Nyx's repositories are cold flows; the UI StateFlows read via `.value`
   are collected under `repeatOnLifecycle(STARTED)` in the same component).

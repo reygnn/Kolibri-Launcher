@@ -44,7 +44,7 @@ conf="$det/conventions/$app.conf"
 # ── Registry: check id → detector files it owns (order = report order) ───────
 CHECK_IDS=(rule9 rule12 toast naming rule11 cancel initorder flowcatch sharedflow
            purge arresult adapter oom parity triple keeplist whilesub mirror
-           testconv stalereplay rule13)
+           harddisp testconv stalereplay rule13)
 declare -A OWNS=(
   [rule9]="check-intent-gate.awk"
   [rule11]="check-rule11-annotation.awk"
@@ -60,7 +60,8 @@ declare -A OWNS=(
   [triple]="check-contract-triple.sh"
   [keeplist]="check-settings-keys-registered.awk"
   [whilesub]="check-whilesubscribed-literal.awk"
-  [mirror]="check-mirror-comments.sh check-mirror-comments.awk"
+  [mirror]="check-mirror-comments.awk check-ratchet.sh"
+  [harddisp]="check-hardcoded-dispatchers.awk check-ratchet.sh"
   [testconv]="check-test-conventions.sh check-test-dispatcher.awk check-test-assertions.awk"
   [stalereplay]="check-stale-replay-read.awk check-stale-replay-read.sh"
   [rule13]="check-rule13-german-comments.awk check-rule13-german-comments.sh"
@@ -251,13 +252,22 @@ run whilesub && awk_over_find "$det/check-whilesubscribed-literal.awk" \
   "A11 — number literal in WhileSubscribed( (use AppConstants.FLOW_SHARING_TIMEOUT_MS)" \
   "${GLOBAL_ROOTS[@]}" -name '*.kt'
 
-# A8 — mirror comments ratchet (tools/mirror-allowlist.txt).
-if run mirror; then
-  [ -x "$det/check-mirror-comments.sh" ] || { echo "ERROR: tools/check-mirror-comments.sh missing or not executable" >&2; exit 2; }
-  out=$("$det/check-mirror-comments.sh" "${GLOBAL_ROOTS[@]}"); rc=$?
+# Shrink-only ratchets (tools/check-ratchet.sh): findings beyond the allowlisted count
+# fail, allowlisted entries that disappeared are reported as stale.
+ratchet() { # detector.awk allowlist title
+  [ -x "$det/check-ratchet.sh" ] || { echo "ERROR: tools/check-ratchet.sh missing or not executable" >&2; exit 2; }
+  local out rc
+  out=$("$det/check-ratchet.sh" "$1" "$2" "$3" "${GLOBAL_ROOTS[@]}"); rc=$?
   [ "$rc" -eq 2 ] && exit 2
   if [ -n "$out" ]; then echo "$out"; violations=$((violations + $(printf '%s\n' "$out" | grep -c '^═══'))); fi
-fi
+  return 0
+}
+# A8 — mirror comments (tools/mirror-allowlist.txt).
+run mirror && ratchet "$det/check-mirror-comments.awk" "$det/mirror-allowlist.txt" \
+  "A8 — new mirror comment (a hand-kept copy of the other app): replace the copy with the shared implementation instead"
+# A13 — hard-coded dispatchers (tools/dispatcher-allowlist.txt).
+run harddisp && ratchet "$det/check-hardcoded-dispatchers.awk" "$det/dispatcher-allowlist.txt" \
+  "A13 — hard-coded dispatcher: inject @IoDispatcher / @DefaultDispatcher / @MainDispatcher (:core) instead"
 
 # A7 + A12 — test conventions (own modules + all shared modules).
 if run testconv; then
