@@ -20,32 +20,11 @@
 // target app is auto-built as the app's `benchmark` build type).
 
 plugins {
-    alias(libs.plugins.android.test)
+    id("launcher.android.test") // SDKs, Java/Kotlin 21, JUnit runner (build-logic)
 }
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher.macrobenchmark"
-    compileSdk = 37 // matches :app — DO NOT CHANGE independently
-
-    defaultConfig {
-        minSdk = 36 // :app's minSdk; the target device is always >= this
-        targetSdk = 37
-        // Plain JUnit runner — the benchmark self-instruments the separate
-        // target-app process; it needs neither Hilt nor the app's HiltTestRunner.
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
 
     buildTypes {
         // The app has no dedicated `benchmark` build type; matchingFallbacks

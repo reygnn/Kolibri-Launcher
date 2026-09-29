@@ -21,33 +21,12 @@
 //  reconciled over the R8 mapping by the plugin.)
 
 plugins {
-    alias(libs.plugins.android.test)
+    id("launcher.android.test") // SDKs, Java/Kotlin 21, JUnit runner (build-logic)
     alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher.baselineprofile"
-    compileSdk = 37 // matches :app — DO NOT CHANGE independently
-
-    defaultConfig {
-        minSdk = 36 // :app's minSdk; the target device is always >= this
-        targetSdk = 37
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    // Mirror :macrobenchmark's toolchain verbatim — this is the exact Kotlin /
-    // JDK-21 configuration that works for a com.android.test module in this repo.
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
 
     targetProjectPath = ":kolibri:app"
 

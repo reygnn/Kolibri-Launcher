@@ -22,5 +22,9 @@ gradlePlugin {
             id = "launcher.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
         }
+        register("androidTest") {
+            id = "launcher.android.test"
+            implementationClass = "AndroidTestConventionPlugin"
+        }
     }
 }
