@@ -69,7 +69,7 @@ dependencies {
     // package/class are asserted) — the un-mockable Android type the shared
     // AppLauncher builds for startMainActivity.
     testImplementation(libs.robolectric)
-    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
 }
 
 // `material` MUST resolve before `appcompat` (appcompat drags an older

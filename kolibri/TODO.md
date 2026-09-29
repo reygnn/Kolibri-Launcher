@@ -59,7 +59,7 @@ Reihenfolge zum Einlesen, damit du nicht alles selbst neu herleitest:
    Pflicht vor irgendeinem Code-Touch.
 2. **`app/src/test/CLAUDE.md`** — Test-Reference. Was existiert,
    warum, was bewusst weggelassen ist, wo anzufangen.
-3. **`app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`** —
+3. **`../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt`** —
    technische Test-Konventionen (Coroutines, MockK, Time-PIN, Robolectric).
 4. **Diesen Audit-Snapshot unten** — aktueller Score 9.5 (post-androidTest-
    Bring-up 2026-05-06), Baseline-Vergleich, alle drei großen Brocken
@@ -463,7 +463,7 @@ Insgesamt **229 Catches in 25 Sweep-PRs** entfernt.
 
 Nach dem Robolectric+Hilt-Test-Pilot (siehe [TESTING_CONVENTIONS.kt
 → ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS]
-(app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt))
+(../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt))
 war für UI-Files endlich ein Test-Backstop möglich. Damit konnte die
 Activity/Fragment-Surface gesweept werden:
 
@@ -1024,7 +1024,8 @@ zur Domain-Test-Infrastruktur).
   kotlin-test-junit, hilt-core). `:app/build.gradle.kts` zieht
   `testImplementation(testFixtures(project(":domain")))`.
 - **`:domain/src/testFixtures/`** enthält:
-  - `rule/TimberRule`, `rule/MainDispatcherRule`
+  - `rule/TimberRule` (die `MainDispatcherRule` liegt seit SPEC_NYX_REWRITE 1a einmal für alle
+    Module in den `:core`-Testfixtures, `core.testing`)
   - 14 Fake-Repositories (`FakeFavoritesRepository`, `FakeSettingsRepository`,
     …, `ReactiveFakeInstalledAppsRepository`)
   - 14 abstrakte Contract-Klassen (`FavoritesRepositoryContract`,

@@ -146,6 +146,6 @@ dependencies {
     // Shared test fixtures from :domain (TimberRule, MainDispatcherRule,
     // Fake*Repository, Contract abstract classes).
     testImplementation(testFixtures(project(":kolibri:domain")))
-    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRuleBase
+    testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
 }
 

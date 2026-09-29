@@ -254,7 +254,7 @@ dependencies {
     // Fake*Repository, Contract abstract classes). See `java-test-fixtures`
     // block in domain/build.gradle.kts. Brocken B.
     testImplementation(testFixtures(project(":kolibri:domain")))
-    // Shared MainDispatcherRuleBase (base of the MainDispatcherRule subclass).
+    // Shared :core test fixtures (the one MainDispatcherRule, recordEmissions).
     // androidTest deliberately omitted: its only MainDispatcherRule mention is a
     // comment in INSTRUMENTED_TESTING_NOTES.kt (the rule deadlocks a real Main).
     testImplementation(testFixtures(project(":core")))

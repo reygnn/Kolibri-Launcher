@@ -11,9 +11,9 @@ plugins {
     kotlin("jvm")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    // Publishes the shared MainDispatcherRuleBase test fixture so all modules
-    // consume one copy of the TestWatcher plumbing (same JVM-testFixtures pattern
-    // as :domain). Each module keeps a tiny subclass picking its own dispatcher.
+    // Publishes the shared test fixtures (core.testing: the ONE MainDispatcherRule,
+    // recordEmissions, TESTING_CONVENTIONS.kt) so every module consumes one copy —
+    // no per-module subclass, no per-module dispatcher choice (SPEC_NYX_REWRITE 1a).
     `java-test-fixtures`
 }
 
@@ -38,9 +38,9 @@ dependencies {
     testImplementation(libs.truth) // A12: Truth is the one assertion library
     testImplementation(libs.kotlinx.coroutines.test)
 
-    // Shared test fixtures: MainDispatcherRuleBase (JUnit TestWatcher + swaps
-    // Dispatchers.Main for a TestDispatcher). Each module's tiny MainDispatcherRule
-    // subclass consumes it via `testFixtures(project(":core"))`.
+    // Shared test fixtures: MainDispatcherRule (JUnit TestWatcher, swaps
+    // Dispatchers.Main for one StandardTestDispatcher) and recordEmissions; every
+    // module consumes them via `testFixtures(project(":core"))`.
     testFixturesImplementation(libs.junit)
     testFixturesImplementation(libs.truth) // contracts assert with Truth (A12)
     testFixturesImplementation(libs.kotlinx.coroutines.test)

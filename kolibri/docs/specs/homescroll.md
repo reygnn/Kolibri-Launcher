@@ -1174,7 +1174,7 @@ Convention docs:
 
 - `CLAUDE.md` Rule 10 (testable logic outside Android-runtime
   classes) and the `androidTest/` policy.
-- `app/src/test/java/com/github/reygnn/kolibri_launcher/TESTING_CONVENTIONS.kt`,
+- `../../../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt`,
   particularly the "ROBOLECTRIC + HILT — ACTIVITY / FRAGMENT TESTS"
   section. The `HomeGestureLayoutTest` is instrumented (not
   Robolectric) because of the touch-pipeline reasons in §4.1, but
