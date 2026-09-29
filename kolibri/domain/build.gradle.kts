@@ -21,7 +21,7 @@
  * glue runs in `:app`, where the `hilt-android` plugin IS applied.
  */
 plugins {
-    kotlin("jvm")
+    id("launcher.jvm.library") // Kotlin JVM + toolchain/target 21 (build-logic)
     alias(libs.plugins.ksp)
     `java-test-fixtures`
     alias(libs.plugins.kotlin.serialization)
@@ -36,27 +36,6 @@ plugins {
     // the same asymmetry that kept it out of the CI test step. :app's
     // aggregating `jacocoTestReport` consumes the exec file.
     id("jacoco")
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
-
-kotlin {
-    jvmToolchain(21)
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    javaCompiler.set(
-        javaToolchains.compilerFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
-    )
 }
 
 // JMH run configuration. Pins the harness version to the catalog and emits a

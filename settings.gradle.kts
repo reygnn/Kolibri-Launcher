@@ -1,4 +1,6 @@
 pluginManagement {
+    // Convention plugins (launcher.*) — SPEC_NYX_REWRITE Phase 1b.
+    includeBuild("build-logic")
     repositories {
         google {
             content {

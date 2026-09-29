@@ -142,6 +142,9 @@ profileinstaller = "1.4.1"  # androidx.profileinstaller — installs the baked b
 
 
 [libraries]
+# Gradle plugin artifacts for build-logic/ (compileOnly — see build-logic/convention/build.gradle.kts).
+android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }  # Nyx-only
 # UI & Material
 material = { module = "com.google.android.material:material", version.ref = "material" }

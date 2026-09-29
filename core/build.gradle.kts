@@ -5,10 +5,11 @@
 // domain models, directly or via AppConstants) — moving them would cycle.
 // Package stays com.github.reygnn.kolibri_launcher.core for now (Phase 1a is the
 // physical extraction; the neutral com.github.reygnn.launcher.* rename is 1b).
-// Build note: kotlin-serialization is the carrier that makes kotlin("jvm") apply
-// under AGP 9 built-in Kotlin (same as :domain); no comments inside plugins {}.
+// Build note: kotlin-serialization is the carrier that puts the Kotlin Gradle plugin on
+// this module's classpath under AGP 9 built-in Kotlin; launcher.jvm.library then applies
+// org.jetbrains.kotlin.jvm from it (same in both :domain modules). Keep the alias.
 plugins {
-    kotlin("jvm")
+    id("launcher.jvm.library") // Kotlin JVM + toolchain/target 21 (build-logic)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     // Publishes the shared test fixtures (core.testing: the ONE MainDispatcherRule,
@@ -17,14 +18,10 @@ plugins {
     `java-test-fixtures`
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
     // Serialization runtime for the shared @Serializable backup models
-    // (WallpaperLayerBackup); the plugin was already applied as the kotlin("jvm")
+    // (WallpaperLayerBackup); the plugin is already applied as the Kotlin-plugin
     // carrier — this adds the actual Json/@JsonNames runtime.
     implementation(libs.kotlinx.serialization.json)
 

@@ -13,22 +13,11 @@
  * hilt-core is the JVM-only (JAR) artifact. Aggregation runs in :app.
  */
 plugins {
-    kotlin("jvm")                              // version from AGP 9 built-in Kotlin
+    id("launcher.jvm.library")                 // Kotlin JVM + toolchain/target 21 (build-logic)
     alias(libs.plugins.ksp)
     `java-test-fixtures`                       // Contract abstract classes + Fakes
     alias(libs.plugins.kotlin.serialization)   // @Serializable DTOs live in :data,
     // but value objects that need it may compile here; keep the plugin available.
-}
-
-java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
-}
-
-kotlin {
-    jvmToolchain(21)
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
 }
 
 dependencies {
