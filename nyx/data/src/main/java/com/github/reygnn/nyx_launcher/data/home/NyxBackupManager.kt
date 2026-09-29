@@ -133,8 +133,8 @@ class NyxBackupManager @Inject constructor(
     suspend fun import(inp: InputStream, options: NyxBackupOptions): ImportResult =
         withContext(ioDispatcher) {
             val extracted = HashMap<String, String>() // entryName -> internal uri
-            // Extracted blobs the restored wallpaper state now references (set only after its save
-            // succeeded). Every other extracted blob is deleted in `finally` (§Audit-3 A3-05).
+            // Extracted blobs the restored wallpaper state references, claimed BEFORE its save is
+            // attempted. Every other extracted blob is deleted in `finally` (§Audit-3 A3-05).
             var adopted: Set<String> = emptySet()
             try {
                 // Extract: manifest + each blob (copied to internal storage now, so
@@ -189,7 +189,18 @@ class NyxBackupManager @Inject constructor(
                 // leaves the existing (most valuable) home layout intact rather than
                 // half-replaced — it is a single write and the least likely to fail.
                 if (options.importSettings) applyPrefs(backup.prefs)
-                if (options.importWallpaper) adopted = restoreWallpaper(backup.wallpaperLayers, extracted)
+                if (options.importWallpaper) {
+                    restoredWallpaperState(backup.wallpaperLayers, extracted)?.let { state ->
+                        // Claim the blobs BEFORE saving, never after: DataStore can commit the write
+                        // and the call still end in a CancellationException (the import runs in the
+                        // settings screen's lifecycleScope). Claiming afterwards would let `finally`
+                        // delete files the persisted state already points at — a broken wallpaper.
+                        // Failing safe keeps them; a save that truly didn't land leaves at most an
+                        // orphan for the startup sweep.
+                        adopted = state.layers.mapNotNullTo(HashSet()) { it.imageUri }
+                        wallpaperRepository.saveWallpaperState(state)
+                    }
+                }
                 if (options.importLayout) {
                     // Drawer folders are structural organisation too — restore them under the
                     // layout toggle. A replace (return the restored value), mirroring the home
@@ -252,15 +263,12 @@ class NyxBackupManager @Inject constructor(
     }
 
     /**
-     * Restores the wallpaper layers from [extracted] blobs and returns the extracted URIs the
-     * saved state now references (empty when nothing was saved) — the caller deletes the rest.
+     * The wallpaper state to restore from [layers] + their [extracted] blobs, or null to keep the
+     * current wallpaper. The caller claims its blob URIs and saves it.
      */
-    private suspend fun restoreWallpaper(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>): Set<String> {
+    private fun restoredWallpaperState(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>): WallpaperState? {
         // Replace semantics: a backup with no wallpaper clears the current one.
-        if (layers.isEmpty()) {
-            wallpaperRepository.saveWallpaperState(WallpaperState.NONE)
-            return emptySet()
-        }
+        if (layers.isEmpty()) return WallpaperState.NONE
         // Rebind each blob-backed layer to its freshly-extracted internal URI. A
         // blob-backed layer whose blob is missing/failed is DROPPED (its source
         // file:// path is dead on the restore target) — all-or-nothing per layer.
@@ -279,9 +287,7 @@ class NyxBackupManager @Inject constructor(
         }
         // Only overwrite when at least one layer survived; if every blob failed
         // (corrupt backup) keep the current wallpaper rather than wiping it.
-        if (restored.isEmpty()) return emptySet()
-        wallpaperRepository.saveWallpaperState(WallpaperState.multiLayer(restored))
-        return restored.mapNotNullTo(HashSet()) { it.imageUri }
+        return if (restored.isEmpty()) null else WallpaperState.multiLayer(restored)
     }
 
     /** file:// internal image → its [File], or null (skip non-file / missing). */

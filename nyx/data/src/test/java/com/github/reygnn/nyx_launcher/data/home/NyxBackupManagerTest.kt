@@ -437,16 +437,21 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_deletes_extracted_blobs_when_the_wallpaper_save_fails() = runTest(mainDispatcherRule.dispatcher) {
+    fun import_keeps_claimed_blobs_when_the_wallpaper_save_is_interrupted() = runTest(mainDispatcherRule.dispatcher) {
+        // The blobs are claimed BEFORE the save: DataStore can commit the write and the call still
+        // end in a CancellationException (import runs in the settings screen's lifecycleScope).
+        // Deleting then would break the persisted wallpaper, so an interrupted save keeps them
+        // (at worst an orphan for the startup sweep).
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
-        coEvery { wallpaperRepository.saveWallpaperState(any()) } throws java.io.IOException("disk full")
+        coEvery { wallpaperRepository.saveWallpaperState(any()) } throws kotlinx.coroutines.CancellationException("left settings")
         val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
 
-        manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+        runCatching {
+            manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+        }
 
-        val extractedUri = uri.toString()
-        verify { fileManager.deleteFile(extractedUri) } // never referenced by a persisted state
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
     }
 
     @Test
