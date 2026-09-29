@@ -22,7 +22,6 @@ plugins {
     id("launcher.android.application") // SDKs, Java/Kotlin 21, unit tests, BuildConfig (build-logic)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
-    id("jacoco")
     alias(libs.plugins.kotlin.serialization)
     // Consumes the :baselineprofile producer and bakes its generated profile
     // into the release build. Adds internal nonMinifiedRelease/benchmarkRelease
@@ -155,15 +154,6 @@ android {
     java {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(21))
-        }
-    }
-
-    testOptions {
-        unitTests.all {
-            it.configure<JacocoTaskExtension> {
-                isIncludeNoLocationClasses = true
-                excludes = listOf("jdk.internal.*")
-            }
         }
     }
 
@@ -419,99 +409,6 @@ tasks.register<Exec>("scanStaleReplayRead") {
     description = "Lists non-whitelisted files with an unmarked hot-flow point-read (report-only)."
     workingDir = projectDir.parentFile // = kolibri/ (scripts live in kolibri/tools; monorepo rootDir is the repo root)
     commandLine = listOf("bash", "../tools/scan-stale-replay-candidates.sh", "--app", "kolibri")
-}
-
-// Code coverage configuration via JaCoCo — AGGREGATES ALL THREE MODULES.
-//
-// This task used to cover :app alone: the jacoco plugin was applied only here,
-// and the source/class/exec wiring pointed exclusively at this module. So the
-// reported number described 1208 of the suite's 2432 tests, while :data (859)
-// and :domain (365) — the repository implementations and the entire use-case
-// layer — were absent from it. Not under-reported: absent, which is worse,
-// because an uncovered domain class looked identical to a nonexistent one.
-//
-// :data and :domain now apply the jacoco plugin too (see their build scripts)
-// and this report unions all three. Note the task-name asymmetry: the Android
-// modules produce `testDebugUnitTest.exec`, the pure-JVM :domain produces
-// `test.exec` — the same variant asymmetry that had kept :domain out of the CI
-// test step.
-//
-// Cross-project wiring uses absolute task paths and `project(...).projectDir`
-// rather than task references, so it needs no `evaluationDependsOn` and cannot
-// break on project-evaluation order.
-tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest", ":data:testDebugUnitTest", ":domain:test")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
-
-    val fileFilter = listOf(
-        "**/R.class",
-        "**/R$*.class",
-        "**/BuildConfig.*",
-        "**/Manifest*.*",
-        "**/*Test*.*",
-        "android/**/*.*",
-        "**/databinding/**",
-        "**/di/**",
-        "**/*_Factory.*",
-        "**/*_MembersInjector.*",
-        "**/*Module.*",
-        "**/*Module$*.*",
-        "**/*_Impl.*",
-        "**/*_HiltComponents*.*"
-    )
-
-    val dataDir = project(":kolibri:data").projectDir
-    val domainDir = project(":kolibri:domain").projectDir
-
-    // Class output locations. The Android modules land under AGP 9's built-in
-    // Kotlin compiler path; the pure-JVM :domain uses the standard Gradle one.
-    //
-    // The `tmp/kotlin-classes/debug` path this used to name is the layout of
-    // the EXTERNAL org.jetbrains.kotlin.android plugin, which this project
-    // dropped for AGP built-in Kotlin. Nothing failed at the time: JacocoReport
-    // over a nonexistent directory produces an empty report and exits 0, so the
-    // coverage number silently became meaningless instead of going red. Hence
-    // the guard below — a path that stops resolving must fail loudly.
-    val classDirPaths = listOf(
-        "${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes",
-        "$dataDir/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes",
-        "$domainDir/build/classes/kotlin/main",
-    )
-    val classTrees = classDirPaths.map { fileTree(it).matching { exclude(fileFilter) } }
-
-    // Fail loudly if a class output path stops resolving (AGP layout change,
-    // module rename). Without this the report just shrinks in silence, which is
-    // exactly how the :app half went uncovered unnoticed.
-    doFirst {
-        val empty = classDirPaths.filter { fileTree(it).files.none { f -> f.extension == "class" } }
-        require(empty.isEmpty()) {
-            "jacocoTestReport: no .class files under ${empty.joinToString()} — " +
-                "the class output layout changed; fix classDirPaths in app/build.gradle.kts " +
-                "instead of shipping an empty coverage report."
-        }
-    }
-
-    val sourceDirs = listOf(
-        "${project.projectDir}/src/main/java",
-        "$dataDir/src/main/java",
-        "$domainDir/src/main/java",
-    )
-
-    // testFixtures/ is deliberately NOT a source dir: the contract abstracts
-    // living there are test scaffolding, not production code under test.
-    sourceDirectories.setFrom(files(sourceDirs))
-    classDirectories.setFrom(files(classTrees))
-    executionData.setFrom(
-        files(
-            "${layout.buildDirectory.get()}/jacoco/testDebugUnitTest.exec",
-            "$dataDir/build/jacoco/testDebugUnitTest.exec",
-            "$domainDir/build/jacoco/test.exec",
-        )
-    )
 }
 
 // app/build.gradle.kts

@@ -17,9 +17,10 @@ import org.gradle.kotlin.dsl.register
  *  - strict lint with a per-module baseline (`lint-baseline.xml` next to the build file;
  *    regenerate with `./gradlew :<app>:app:updateLintBaseline` after a deliberate cleanup);
  *  - the report-only discovery tasks (the scripts sweep the whole monorepo).
+ *  - coverage: `jacocoTestReport` over the app's app/data/domain modules (Coverage.kt).
  * The module keeps what is its own: namespace, applicationId, version, test runner and
- * its arguments, view binding, dependencies. Still to come: coverage (1b-4b-2) and the
- * release/R8 rules (1b-4c, SPEC_NYX_REWRITE D1 end form).
+ * its arguments, view binding, dependencies. Still to come: the release/R8 rules
+ * (1b-4c, SPEC_NYX_REWRITE D1 end form).
  */
 class AndroidApplicationConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -67,6 +68,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             }
             dependencies.add("androidTestUtil", libs.findLibrary("androidx-test-orchestrator").get())
             configureKotlinAndroid()
+            configureAppCoverage()
             registerDiscoveryTasks()
         }
     }

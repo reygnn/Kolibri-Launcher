@@ -18,6 +18,8 @@ plugins {
     `java-test-fixtures`                       // Contract abstract classes + Fakes
     alias(libs.plugins.kotlin.serialization)   // @Serializable DTOs live in :data,
     // but value objects that need it may compile here; keep the plugin available.
+    // Writes build/jacoco/test.exec for :nyx:app's aggregating jacocoTestReport.
+    id("jacoco")
 }
 
 dependencies {

@@ -11,6 +11,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
+    // Writes build/jacoco/testDebugUnitTest.exec for :nyx:app's aggregating jacocoTestReport.
+    id("jacoco")
 }
 
 android {
