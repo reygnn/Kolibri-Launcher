@@ -105,6 +105,33 @@ class DragLayerTest {
     }
 
     @Test
+    fun disabling_gestures_mid_drag_cancels_the_drag_instead_of_stranding_it() {
+        // §Audit-3 A3-09: with gestures off the drag branch is bypassed, so the UP that would end
+        // the drag never reaches the controller. The setter must end it (cancel, no drop).
+        val dragLayer = DragLayer(context)
+        val zone = FakeZone(Rect(0, 0, 500, 500))
+        dragLayer.dragController.addDropZone(zone)
+        dragLayer.startDrag(payload, laidOutSource())
+
+        dragLayer.gesturesEnabled = false
+
+        assertThat(dragLayer.dragController.isDragging).isFalse()
+        assertThat(zone.drop).isEqualTo(0)
+    }
+
+    @Test
+    fun disabling_gestures_disarms_a_pending_long_press() {
+        val dragLayer = DragLayer(context)
+        dragLayer.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, 0f, 0f))
+        dragLayer.armDrag(payload, laidOutSource())
+        assertThat(dragLayer.isDragArmed).isTrue()
+
+        dragLayer.gesturesEnabled = false
+
+        assertThat(dragLayer.isDragArmed).isFalse()
+    }
+
+    @Test
     fun idle_delegates_to_the_gesture_core_and_never_engages_the_controller() {
         val dragLayer = DragLayer(context)
         var swipedUp = false

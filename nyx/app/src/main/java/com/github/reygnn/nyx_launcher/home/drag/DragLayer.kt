@@ -91,8 +91,21 @@ class DragLayer @JvmOverloads constructor(
      * wallpaper edit mode so pinch/pan reaches the wallpaper view instead of being
      * detected + consumed by the gesture core (guarding only the callback bodies
      * isn't enough — the core still intercepts the stream).
+     *
+     * Disabling also ends a live drag (cancel, no drop) and disarms a pending long-press:
+     * with gestures off the drag branch below is bypassed, so the UP/CANCEL that would end
+     * them would never reach the controller and the engine would stay stuck in `isDragging`
+     * (§Audit-3 A3-09). Unreachable today (only edit mode flips it, never mid-drag), but
+     * this keeps the invariant structural instead of relying on that.
      */
     var gesturesEnabled: Boolean = true
+        set(value) {
+            if (!value) {
+                dragController.onCancel() // no-op when not dragging
+                disarm()
+            }
+            field = value
+        }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         lastX = ev.x
@@ -105,6 +118,9 @@ class DragLayer @JvmOverloads constructor(
                     val i = ev.findPointerIndex(activePointerId)
                     if (i >= 0) dragController.onMove(ev.getX(i).toInt(), ev.getY(i).toInt())
                 }
+                // Index 0 is the dragging finger by invariant: ACTION_UP only fires for the LAST
+                // pointer, and had the dragging finger lifted earlier its POINTER_UP would already
+                // have dropped (ending the drag), so any pointer still here is the active one.
                 MotionEvent.ACTION_UP -> dragController.onDrop(ev.x.toInt(), ev.y.toInt())
                 // The dragging finger lifted while others remain down → settle the drop at
                 // its last position; a secondary finger lifting is ignored (drag continues).
