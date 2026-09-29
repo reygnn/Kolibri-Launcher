@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home
 
+import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.nyx_launcher.data.DefaultAppsResolver
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolderIdFactory
@@ -7,7 +8,7 @@ import com.github.reygnn.nyx_launcher.home.model.DrawerVendorGrouping
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -30,16 +31,17 @@ class FirstRunSeeder @Inject constructor(
     private val defaultAppsResolver: DefaultAppsResolver,
     private val getDrawerApps: GetDrawerAppsUseCase,
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) {
     /** Seed dock defaults + Play Store on the grid. Returns true only if it wrote. */
     suspend fun seedHomeLayout(): Boolean = homeLayoutRepository.seedInitialLayout(
-        resolveDockApps = { withContext(Dispatchers.Default) { defaultAppsResolver.resolveDockApps() } },
-        resolveGridApps = { withContext(Dispatchers.Default) { defaultAppsResolver.resolveGridApps() } },
+        resolveDockApps = { withContext(defaultDispatcher) { defaultAppsResolver.resolveDockApps() } },
+        resolveGridApps = { withContext(defaultDispatcher) { defaultAppsResolver.resolveGridApps() } },
     )
 
     /** Seed a single "Google" drawer folder from the installed Google apps (≥ 2 needed). */
     suspend fun seedDrawerFolders(): Boolean = drawerFoldersRepository.seedInitialFolders {
-        withContext(Dispatchers.Default) {
+        withContext(defaultDispatcher) {
             val google = DrawerVendorGrouping.groups(getDrawerApps())
                 .firstOrNull { it.label == GOOGLE_LABEL } ?: return@withContext emptyList()
             listOf(DrawerFolder(drawerFolderIdFactory.next(), title = GOOGLE_LABEL, members = google.keys))

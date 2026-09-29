@@ -47,6 +47,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.github.reygnn.launcher.core.DefaultDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.PackageEventCoordinator
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
@@ -104,8 +107,8 @@ import com.github.reygnn.nyx_launcher.home.model.firstFreeCell
 import com.github.reygnn.nyx_launcher.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,6 +134,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
 
     override val viewModel: HomeViewModel by viewModels()
 
+    // Dispatchers are injected (Rule: no hard-coded Dispatchers.*), so tests can pass the one
+    // test dispatcher. `@field:` puts the qualifier on the Java field, where Dagger reads it.
+    @Inject @field:IoDispatcher lateinit var ioDispatcher: CoroutineDispatcher
+    @Inject @field:DefaultDispatcher lateinit var defaultDispatcher: CoroutineDispatcher
+    @Inject @field:MainDispatcher lateinit var mainDispatcher: CoroutineDispatcher
     @Inject lateinit var iconLoader: IconLoader
     @Inject lateinit var appLauncher: AppLauncher
     @Inject lateinit var folderRenderer: FolderIconRenderer
@@ -247,7 +255,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 // during the IO hop (wallpaper removed mid-flight), putIfCurrent drops
                 // the result instead of stranding it in the app-scoped cache.
                 val generation = wallpaperLayerCache.generation()
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     // BitmapLoader contract: return null on failure, let only cancellation
                     // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
                     // openInputStream can throw FileNotFoundException/SecurityException and
@@ -373,7 +381,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             context = this,
             observeTimeBasedEventsUseCase = observeTimeBasedEventsUseCase,
             scope = lifecycleScope,
-            mainDispatcher = Dispatchers.Main,
+            mainDispatcher = mainDispatcher,
         )
 
         // Edge-to-edge: inset the home content past the status/nav bars. The
@@ -436,7 +444,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             fileManager = wallpaperFileManager,
             displaySettings = wallpaperDisplaySettings,
             scope = lifecycleScope,
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = ioDispatcher,
         )
         wallpaperEditCoordinator.start()
 
@@ -1555,7 +1563,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // or already replaced by another item's menu (stale generation).
         pkg ?: return
         lifecycleScope.launch {
-            val shortcuts = withContext(Dispatchers.Default) { appShortcuts(pkg) }
+            val shortcuts = withContext(defaultDispatcher) { appShortcuts(pkg) }
             if (generation != contextMenuGeneration || !contextMenuOverlay.isVisible || shortcuts.isEmpty()) return@launch
             val header = shortcuts.map(::makeMenuRow) + makeMenuDivider()
             header.forEachIndexed { i, view -> contextMenuCard.addView(view, i) }
