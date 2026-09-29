@@ -2,9 +2,11 @@
 # =============================================================================
 # Shared test-convention checks (A7, A12) — called by BOTH app orchestrators
 # =============================================================================
-# Usage: check-test-conventions.sh <module-dir>...
+# Usage: check-test-conventions.sh <module-dir>... [--test-support <module-dir>...]
 #   Scans every *.kt under <module-dir>/src/<set>/ except src/main (test,
-#   testDebug, testFixtures, androidTest). Prints one "═══ title ═══" block per
+#   testDebug, testFixtures, androidTest). Modules after --test-support are
+#   test-support LIBRARIES (e.g. :common-testing-android): their src/main is test
+#   code too and is scanned as well. Prints one "═══ title ═══" block per
 #   violated rule; the caller counts the blocks. Exit 0 = ran (with or without
 #   findings), 2 = environment problem.
 #
@@ -24,10 +26,20 @@ for f in "$a7" "$a12" "$allow"; do
 done
 [ "$#" -gt 0 ] || { echo "ERROR: no module dirs given" >&2; exit 2; }
 
-files=$(for m in "$@"; do
-  [ -d "$m/src" ] || continue
-  find "$m/src" -mindepth 1 -maxdepth 1 -type d ! -name main -exec find {} -name '*.kt' \;
-done | sort -u)
+modules=(); support=(); mode=modules
+for a in "$@"; do
+  if [ "$a" = "--test-support" ]; then mode=support; continue; fi
+  if [ "$mode" = support ]; then support+=("$a"); else modules+=("$a"); fi
+done
+set -- "${modules[@]}" "${support[@]}"   # stale-entry scoping below covers both
+
+files=$({ for m in "${modules[@]}"; do
+    [ -d "$m/src" ] || continue
+    find "$m/src" -mindepth 1 -maxdepth 1 -type d ! -name main -exec find {} -name '*.kt' \;
+  done
+  for m in "${support[@]}"; do
+    [ -d "$m/src" ] && find "$m/src" -name '*.kt'
+  done; } | sort -u)
 
 rel() { local p; p="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; echo "${p#"$mono"/}"; }
 

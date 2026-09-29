@@ -67,7 +67,12 @@ declare -A OWNS=(
   [rule13]="check-rule13-german-comments.awk check-rule13-german-comments.sh"
 )
 
-SHARED_MODULES=("$MONO/core" "$MONO/common-ui" "$MONO/common-data" "$MONO/feature-crashreporting")
+SHARED_MODULES=("$MONO/core" "$MONO/common-ui" "$MONO/common-data" "$MONO/feature-crashreporting"
+                "$MONO/common-testing-android")
+# Test-support libraries: their src/main IS test code, so the test-convention gates
+# (A7, A12) scan it too. Every module in settings.gradle.kts must be in one of the
+# lists or an app's own modules — see the module-coverage guard below.
+TEST_SUPPORT_MODULES=("$MONO/common-testing-android")
 SHARED_MAIN_ROOTS=(); for m in "${SHARED_MODULES[@]}"; do SHARED_MAIN_ROOTS+=("$m/src/main/java"); done
 
 # shellcheck source=/dev/null
@@ -98,6 +103,20 @@ done
 for id in "${CHECK_IDS[@]}"; do for b in ${OWNS[$id]:-}; do
   [ -f "$det/$b" ] || gate+="registry: check '$id' claims missing detector tools/$b"$'\n'
 done; done
+# Module coverage: every module in settings.gradle.kts is scanned by some list — a
+# shared module by SHARED_MODULES, this app's modules by APP_TEST_MODULES /
+# APP_TEST_SUPPORT_MODULES. (The other app's modules are that app's run.) A module
+# nobody lists is invisible to every gate — that is how :common-testing-android was
+# missed until 1a-15.
+covered=" "; for m in "${SHARED_MODULES[@]}" "${APP_TEST_MODULES[@]}" "${APP_TEST_SUPPORT_MODULES[@]}"; do covered+="${m#"$MONO"/} "; done
+app_rel="${APP_DIR#"$MONO"/}"
+while IFS= read -r mod; do
+  [ -n "$mod" ] || continue
+  case "$mod" in
+    kolibri/*|nyx/*) case "$mod" in "$app_rel"/*) ;; *) continue ;; esac ;;
+  esac
+  case "$covered" in *" $mod "*) ;; *) gate+="settings.gradle.kts: module '$mod' is not covered by any gate — add it to SHARED_MODULES (tools/check-conventions.sh) or to APP_TEST_MODULES / APP_TEST_SUPPORT_MODULES ($app.conf)"$'\n' ;; esac
+done < <(grep -oE 'include\("[^"]+"\)' "$MONO/settings.gradle.kts" | sed -E 's/include\(":(.*)"\)/\1/; s#:#/#g')
 if [ -n "$gate" ]; then
   echo "ERROR: convention parity gate failed:" >&2; printf '%s' "$gate" >&2; exit 2
 fi
@@ -272,7 +291,8 @@ run harddisp && ratchet "$det/check-hardcoded-dispatchers.awk" "$det/dispatcher-
 # A7 + A12 — test conventions (own modules + all shared modules).
 if run testconv; then
   [ -x "$det/check-test-conventions.sh" ] || { echo "ERROR: tools/check-test-conventions.sh missing or not executable" >&2; exit 2; }
-  out=$("$det/check-test-conventions.sh" "${APP_TEST_MODULES[@]}" "${SHARED_MODULES[@]}"); rc=$?
+  out=$("$det/check-test-conventions.sh" "${APP_TEST_MODULES[@]}" "${SHARED_MODULES[@]}" \
+          --test-support "${TEST_SUPPORT_MODULES[@]}" "${APP_TEST_SUPPORT_MODULES[@]}"); rc=$?
   [ "$rc" -eq 2 ] && exit 2
   if [ -n "$out" ]; then echo "$out"; violations=$((violations + $(printf '%s\n' "$out" | grep -c '^═══'))); fi
 fi

@@ -828,7 +828,11 @@ scan roots, positive lists, and one decision per registered check — `RUN`, `TA
 Gradle task) or `"SKIP: reason"`. A **parity gate** exits 2 when a check has no decision
 for an app, a SKIP has no reason, or a detector exists that no registered check claims.
 Global checks scan the app's modules **and** every shared module, so a shared file is
-enforced by both apps.
+enforced by both apps. The parity gate also requires **every module in
+`settings.gradle.kts`** to be covered — shared modules in `SHARED_MODULES`, an app's
+own in its `APP_TEST_MODULES` / `APP_TEST_SUPPORT_MODULES` (test-support modules such
+as `:common-testing-android` or the benchmark harnesses have test code in `src/main`,
+which the test gates A7/A12 scan too). A new module nobody lists fails the build.
 
 Gates added by SPEC_NYX_REWRITE on top of the numbered rules:
 
