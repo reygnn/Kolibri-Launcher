@@ -1,0 +1,58 @@
+# A8 mirror-comment ratchet (SPEC_NYX_REWRITE). One line per known hand-kept copy:
+# <path relative to repo root><TAB><comment line as written>. Remove a line only together
+# with replacing the copy by the shared implementation; never add one. Empty = A8 done (R11).
+common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseActivity.kt	* redundant; the two-tag asymmetry mirrors Kolibri's BaseActivity).
+core/src/main/java/com/github/reygnn/launcher/core/SyncInstalledAppsToHolder.kt	* each case does mirrors the historical kolibri pump exactly:
+core/src/main/java/com/github/reygnn/launcher/core/wallpaper/WallpaperDisplaySettings.kt	* Member names mirror Kolibri's existing SettingsRepository members so call sites
+kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt	* container's own background (§25 P5, nyx-parity — the former separate
+kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt	// Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS. (Drawer-open
+kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	* cold-start gcOrphans sweep (port of nyx §Audit-3 A3-05).
+kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	// bounded. Shared CappedInputStream, mirroring nyx's backup import (§Audit-2 N5).
+kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	// nothing would ever reference the blobs (nyx parity).
+kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetFavoriteAppsUseCase.kt	// ~150 ms later (parity with nyx tiles). The former "ghost-free" omission is
+kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/ObserveInstalledAppsUseCase.kt	* [SyncInstalledAppsToHolder] (`:core`), used verbatim by nyx too — parity by
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/InstalledAppsHolderPump.kt	* Reporting + resilience (kolibri parity, plus a nyx-specific restart):
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/PackageEventCoordinator.kt	* bus→trigger step mirrors Kolibri's `AppManagementDelegate` collector, minus
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/PackageEventCoordinator.kt	// still propagates. Mirrors the house idiom (LaunchSafe, NyxResetManager).
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/di/AppLauncherModule.kt	* Own module (mirrors Kolibri's `AppLauncherModule`) so an instrumented test can replace just
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/di/AppLauncherModule.kt	* `startActivity(Intent(ACTION_MAIN/LAUNCHER))` — parity with Kolibri / Launcher3.
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeContextMenu.kt	* `contextMenuItemFor`. Mirrors Kolibri's `AppContextMenuAction` pattern (a
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeGridCellDiff.kt	* adapter (Rule 10, mirroring [com.github.reygnn.nyx_launcher.home.drawer.DrawerEntryDiff])
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeViewModel.kt	* Read fresh at decision time (mirrors kolibri's `isAutoLaunchEnabled`) rather than
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	* First-launch ACRA consent (all builds), mirroring Kolibri: show the shared dialog
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	* Toggle the two subtle indicators next to the clock (mirrors Kolibri): the
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	/** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// (mirrors Kolibri's loadBitmapFromUri).
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// Intent construction mirrors Kolibri's app-info action (Uri.fromParts +
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// can never run two concurrent binds that would duplicate layers (mirrors Kolibri).
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// instead of dropping it (parity with Kolibri; overlay visibility is not
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// settings (mirrors Kolibri's intents). Double-tap, not single: a single tap on
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// startActivity — Kolibri / Launcher3 parity, work-profile-capable. The shared launch
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/NyxCustomizationDialog.kt	* The live-preview customization sheet (mirrors Kolibri's colour/layout dialogs):
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/NyxCustomizationDialog.kt	// spot the user wants to see (Kolibri parity).
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drawer/AppDrawerFragment.kt	* Search (DRAWER_FOLDERS_SPEC §10 D-3, mirrors Kolibri): a non-blank query
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drawer/AppDrawerFragment.kt	* The query tracker is deliberately NOT reset here (Kolibri parity; reset only in
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drawer/AppDrawerFragment.kt	* `viewLifecycleOwner`-scoped place to collect their flows. Mirrors Kolibri's
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	* (mirrors Kolibri's HomeFragment.updateWallpaper edit-mode refresh). No-op
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	* Owns Nyx's wallpaper-edit-mode UI surface — a faithful port of Kolibri's
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	// Orchestration boundary for edit-mode entry/exit (mirrors Kolibri).
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditCoordinator.kt	* (ClockDelegate pattern), a faithful port of Kolibri's WallpaperDelegate edit
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* (mirrors Kolibri's SettingsFragment). Preferences are NOT auto-persisted to
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* ACRA dev commands (mirrors Kolibri's), gated by BuildConfig.SHOW_DEV_COMMANDS
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* Crash-report consent (Settings entry, mirrors Kolibri): the shared [ConsentDialog]
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* Factory reset (mirrors Kolibri): confirm, then wipe all state. The positive
+nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	// Dismiss any still-tracked dialog before showing a new one (mirrors Kolibri):
+nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/di/UsageDataStore.kt	* (mirrors kolibri's AUDIT-19 F1 split).
+nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxBackupManager.kt	// Cap the whole compressed archive (kolibri parity, shared MAX_BACKUP_SIZE_BYTES):
+nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxBackupManager.kt	// Mirror into the legacy flag so an older Nyx can still restore this backup.
+nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxResetManager.kt	* Nyx's factory reset (mirrors Kolibri's, adapted to Nyx's much smaller surface).
+nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	* startup sweep (mirroring Kolibri's WallpaperDelegate) to catch any file stranded
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/model/DrawerAppSearch.kt	* PURE LOGIC — the drawer-search decision engine (mirrors kolibri's
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/model/LauncherAppSearch.kt	* Mirrors kolibri's `List<AppInfo>.filterByName`: the single pure home for the
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/repository/AppUsageRepository.kt	* order loose apps by "most used" (mirrors kolibri's AppUsageRepository, over Nyx's
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/repository/HomeLayoutRepository.kt	* parameter (mirrors the big Kolibri's DATASTORE_READ_SPEC posture). The layout
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/repository/PreferencesRepository.kt	* first) instead of alphabetically (mirrors kolibri's TIME_WEIGHTED_USAGE). Toggled from
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/repository/PreferencesRepository.kt	* immediately (DRAWER_FOLDERS_SPEC §10 D-3, mirrors kolibri's auto-launch).
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/usecase/GetDrawerContentUseCase.kt	* usage mode (mirrors kolibri): in alphabetical mode a per-launch usage tick must not
+nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/usecase/RecordAppLaunchUseCase.kt	* Record that an app was launched, so the drawer's usage sort can rank it (mirrors kolibri's

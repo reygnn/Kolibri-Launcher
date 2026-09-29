@@ -43,8 +43,8 @@ conf="$det/conventions/$app.conf"
 
 # ── Registry: check id → detector files it owns (order = report order) ───────
 CHECK_IDS=(rule9 rule12 toast naming rule11 cancel initorder flowcatch sharedflow
-           purge arresult adapter oom parity triple keeplist testconv
-           stalereplay rule13)
+           purge arresult adapter oom parity triple keeplist whilesub mirror
+           testconv stalereplay rule13)
 declare -A OWNS=(
   [rule9]="check-intent-gate.awk"
   [rule11]="check-rule11-annotation.awk"
@@ -59,6 +59,8 @@ declare -A OWNS=(
   [parity]="check-strings-parity.awk"
   [triple]="check-contract-triple.sh"
   [keeplist]="check-settings-keys-registered.awk"
+  [whilesub]="check-whilesubscribed-literal.awk"
+  [mirror]="check-mirror-comments.sh check-mirror-comments.awk"
   [testconv]="check-test-conventions.sh check-test-dispatcher.awk check-test-assertions.awk"
   [stalereplay]="check-stale-replay-read.awk check-stale-replay-read.sh"
   [rule13]="check-rule13-german-comments.awk check-rule13-german-comments.sh"
@@ -242,6 +244,19 @@ if run keeplist; then
     printf '%s\n' "$owner_classes" | grep -qx "$c" || bh="${bh}${c}: @IntoSet-bound into the keep-list but does not implement OwnsSettingsStoreKeys (stale/incorrect binding?)"$'\n'
   done <<< "$bound_owners"
   [ -n "$bh" ] && report "Settings-store keep-list — owner/@IntoSet binding parity broken (every OwnsSettingsStoreKeys owner needs exactly one @IntoSet binding, or the runtime Set silently misses it and its keys are deleted)" "${bh%$'\n'}"
+fi
+
+# A11 — no number literal in WhileSubscribed( (one sharing timeout constant).
+run whilesub && awk_over_find "$det/check-whilesubscribed-literal.awk" \
+  "A11 — number literal in WhileSubscribed( (use AppConstants.FLOW_SHARING_TIMEOUT_MS)" \
+  "${GLOBAL_ROOTS[@]}" -name '*.kt'
+
+# A8 — mirror comments ratchet (tools/mirror-allowlist.txt).
+if run mirror; then
+  [ -x "$det/check-mirror-comments.sh" ] || { echo "ERROR: tools/check-mirror-comments.sh missing or not executable" >&2; exit 2; }
+  out=$("$det/check-mirror-comments.sh" "${GLOBAL_ROOTS[@]}"); rc=$?
+  [ "$rc" -eq 2 ] && exit 2
+  if [ -n "$out" ]; then echo "$out"; violations=$((violations + $(printf '%s\n' "$out" | grep -c '^═══'))); fi
 fi
 
 # A7 + A12 — test conventions (own modules + all shared modules).

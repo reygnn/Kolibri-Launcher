@@ -83,7 +83,7 @@ class HomeViewModel @Inject constructor(
 ) : BaseViewModel<Nothing>(mainDispatcher) {
 
     val layout: StateFlow<HomeLayout?> = observeHomeLayout()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS), null)
 
     /**
      * The set of currently-installed component keys, for flagging "missing" home tiles
@@ -100,7 +100,7 @@ class HomeViewModel @Inject constructor(
      */
     val installedKeys: StateFlow<Set<ComponentKey>> = installedAppsStateRepository.rawAppsFlow
         .map { apps -> apps.mapTo(HashSet()) { it.key } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS), emptySet())
 
     /**
      * Packages that should show a notification dot RIGHT NOW, gated by the user toggle:
@@ -112,7 +112,7 @@ class HomeViewModel @Inject constructor(
         notificationPresenceStore.packages,
         preferences.notificationDots(),
     ) { packages, enabled -> if (enabled) packages else emptySet() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS), emptySet())
 
     /**
      * User setting: auto-launch the single search match (DRAWER_FOLDERS_SPEC §10 D-3).
@@ -201,7 +201,7 @@ class HomeViewModel @Inject constructor(
      */
     val drawerContent: StateFlow<List<DrawerEntry>> =
         getDrawerContent(drawerApps, showHidden, usageSortEnabled)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(AppConstants.FLOW_SHARING_TIMEOUT_MS), emptyList())
 
     private var refreshJob: Job? = null
 
