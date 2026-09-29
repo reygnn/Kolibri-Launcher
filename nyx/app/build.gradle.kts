@@ -1,13 +1,12 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 /*
  * :app — Android application. Hosts @HiltAndroidApp, the launcher Activity,
  * the home-grid / drawer / folder / dock UI (RecyclerView adapters + the
  * stale-binding guard, ICL-INV-9), Navigation, and the aggregating Hilt glue.
  *
- * ACRA / keystore / secrets wiring is carried over from Kolibri-Launcher and
- * omitted here for brevity (rule 8 still applies — ACRA is opt-in).
+ * Shared app setup (SDKs, lint, test orchestrator, coverage, R8 rules, the ACRA
+ * BuildConfig fields from the root secrets.properties) comes from build-logic
+ * (launcher.android.application) — the same for both apps. Rule 8 still applies:
+ * ACRA is opt-in.
  */
 plugins {
     id("launcher.android.application") // SDKs, Java/Kotlin 21, unit tests, BuildConfig (build-logic)
@@ -20,22 +19,10 @@ plugins {
 android {
     namespace = "com.github.reygnn.nyx_launcher"
 
-    // ACRA endpoint from the shared root secrets.properties (gitignored), same as
-    // Kolibri. Fed into :feature-crashreporting via AcraConfig at runtime.
-    val secretsPropertiesFile = rootProject.file("secrets.properties")
-    val secretsProperties = Properties()
-    if (secretsPropertiesFile.exists()) {
-        secretsProperties.load(FileInputStream(secretsPropertiesFile))
-    }
-
     defaultConfig {
         applicationId = "com.github.reygnn.nyx_launcher"
         versionCode = 12
         versionName = "0.2.2"
-
-        buildConfigField("String", "ACRA_URL", "\"${secretsProperties.getProperty("acra.url", "")}\"")
-        buildConfigField("String", "ACRA_LOGIN", "\"${secretsProperties.getProperty("acra.login", "")}\"")
-        buildConfigField("String", "ACRA_PASSWORD", "\"${secretsProperties.getProperty("acra.password", "")}\"")
 
         testInstrumentationRunner = "com.github.reygnn.nyx_launcher.HiltTestRunner"
     }

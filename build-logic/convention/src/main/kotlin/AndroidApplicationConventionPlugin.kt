@@ -4,6 +4,7 @@ import org.gradle.api.Project
 import org.gradle.api.tasks.Exec
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.register
+import java.util.Properties
 
 /**
  * `launcher.android.application` — the two app modules (:kolibri:app, :nyx:app).
@@ -17,6 +18,8 @@ import org.gradle.kotlin.dsl.register
  *  - strict lint with a per-module baseline (`lint-baseline.xml` next to the build file;
  *    regenerate with `./gradlew :<app>:app:updateLintBaseline` after a deliberate cleanup);
  *  - the report-only discovery tasks (the scripts sweep the whole monorepo).
+ *  - the ACRA endpoint as BuildConfig fields (ACRA_URL / _LOGIN / _PASSWORD) from the
+ *    monorepo-root `secrets.properties` (gitignored; empty strings when absent);
  *  - coverage: `jacocoTestReport` over the app's app/data/domain modules (Coverage.kt);
  *  - R8 inputs: optimize defaults + the module's proguard-rules.pro + rules generated
  *    from the namespace (ReleaseRules.kt, SPEC_NYX_REWRITE D1 end form).
@@ -47,6 +50,11 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 }
                 defaultConfig {
                     testInstrumentationRunnerArguments["clearPackageData"] = "true"
+                    // ACRA endpoint, fed into :feature-crashreporting via AcraConfig at runtime.
+                    val acra = acraSecrets()
+                    for ((field, key) in ACRA_FIELDS) {
+                        buildConfigField("String", field, "\"${acra.getProperty(key, "")}\"")
+                    }
                 }
                 testOptions {
                     execution = "ANDROIDX_TEST_ORCHESTRATOR"
@@ -98,4 +106,17 @@ private fun Project.registerDiscoveryTasks() {
             commandLine("bash", script(file))
         }
     }
+}
+
+/** BuildConfig field → key in the root `secrets.properties`. */
+private val ACRA_FIELDS = listOf(
+    "ACRA_URL" to "acra.url",
+    "ACRA_LOGIN" to "acra.login",
+    "ACRA_PASSWORD" to "acra.password",
+)
+
+/** The shared root `secrets.properties` (gitignored); empty when the file is absent. */
+private fun Project.acraSecrets(): Properties = Properties().apply {
+    val file = rootProject.file("secrets.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }

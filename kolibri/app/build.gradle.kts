@@ -1,6 +1,3 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 /*
  * ═══════════════════════════════════════════════════════════════════════════
  * IMPORTANT FOR AI ASSISTANTS (Gemini, Claude, etc.):
@@ -32,33 +29,10 @@ plugins {
 android {
     namespace = "com.github.reygnn.kolibri_launcher"
 
-    val secretsPropertiesFile = rootProject.file("secrets.properties")
-    val secretsProperties = Properties()
-    if (secretsPropertiesFile.exists()) {
-        secretsProperties.load(FileInputStream(secretsPropertiesFile))
-    }
-
     defaultConfig {
         applicationId = "com.github.reygnn.kolibri_launcher"
         versionCode = 241
         versionName = "1.0.0-rc3"
-
-        // BuildConfig-Felder erstellen
-        buildConfigField(
-            "String",
-            "ACRA_URL",
-            "\"${secretsProperties.getProperty("acra.url", "")}\""
-        )
-        buildConfigField(
-            "String",
-            "ACRA_LOGIN",
-            "\"${secretsProperties.getProperty("acra.login", "")}\""
-        )
-        buildConfigField(
-            "String",
-            "ACRA_PASSWORD",
-            "\"${secretsProperties.getProperty("acra.password", "")}\""
-        )
 
         testInstrumentationRunner = "com.github.reygnn.kolibri_launcher.HiltTestRunner"
         testInstrumentationRunnerArguments["numFlakyTestAttempts"] = "1"
