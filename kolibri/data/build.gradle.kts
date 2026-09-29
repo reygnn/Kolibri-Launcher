@@ -25,7 +25,7 @@
  * (`@Named("appVersionName")`) rather than duplicated as a `buildConfigField`.
  */
 plugins {
-    alias(libs.plugins.android.library)
+    id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
@@ -37,44 +37,10 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.kolibri_launcher.data"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 36
-    }
 
     @Suppress("UnstableApiUsage")
     testFixtures {
         enable = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
-
-    java {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
-    }
-
-    testOptions {
-        unitTests {
-            // Robolectric needs Android resources on the test classpath; the
-            // BackupRepositoryImpl* / WallpaperRepositoryImpl* tests run with
-            // @RunWith(RobolectricTestRunner::class). Mirrors the same flags
-            // in :app/build.gradle.kts.
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-        }
     }
 }
 

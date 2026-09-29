@@ -7,7 +7,7 @@
  * the :domain data classes stay annotation-free.
  */
 plugins {
-    alias(libs.plugins.android.library)
+    id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.serialization)
@@ -15,35 +15,9 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.nyx_launcher.data"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 36
-    }
 
     @Suppress("UnstableApiUsage")
     testFixtures { enable = true }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        }
-    }
-
-    testOptions {
-        unitTests {
-            // Robolectric for the IconRasterizer / disk-cache / DataStore-blob
-            // tests (ICON_LOADER_SPEC §9.2). Mirror of the :app flags.
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-        }
-    }
 }
 
 dependencies {

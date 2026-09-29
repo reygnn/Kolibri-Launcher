@@ -5,35 +5,11 @@
 // shared dispatchTouchEvent gesture stack (GestureDispatchCore + analyzer +
 // GestureFrameLayout) lives in the `gesture` package, consumed by both apps.
 plugins {
-    alias(libs.plugins.android.library)
+    id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
 }
 
 android {
     namespace = "com.github.reygnn.launcher.common.ui"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 36
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-    }
-
-    testOptions {
-        // JVM unit tests here mock Context and touch android.* stubs (e.g.
-        // DateFormat.is24HourFormat in ClockDelegateTest); return defaults instead
-        // of throwing "not mocked".
-        unitTests.isReturnDefaultValues = true
-        // Robolectric (AppLauncherImplTest) needs the merged manifest/resources to
-        // materialise real android.* types (e.g. ComponentName).
-        unitTests.isIncludeAndroidResources = true
-    }
 }
 
 dependencies {

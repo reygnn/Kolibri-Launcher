@@ -11,25 +11,11 @@
 // currentResumed) and BasePage. The concrete page objects stay per-app
 // (kolibri Home != nyx Home) — see the tapl package in each :app.
 plugins {
-    alias(libs.plugins.android.library)
+    id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
 }
 
 android {
     namespace = "com.github.reygnn.launcher.testing"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 36
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-    }
 }
 
 dependencies {

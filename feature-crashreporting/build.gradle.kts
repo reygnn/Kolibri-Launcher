@@ -7,34 +7,13 @@
 // AnrReporter stays per-app (settings-store watermark + @IntoSet keep-list) and
 // implements this module's AnrDrainer; each app supplies AcraConfig + drainer.
 plugins {
-    alias(libs.plugins.android.library)
+    id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.github.reygnn.launcher.feature.crashreporting"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 36
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    kotlin {
-        jvmToolchain(21)
-    }
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-        }
-    }
 }
 
 dependencies {
