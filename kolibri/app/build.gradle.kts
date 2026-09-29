@@ -104,10 +104,6 @@ android {
             // Dev commands + cache-diagnostic toasts always present in a debug build.
             buildConfigField("boolean", "SHOW_DEV_COMMANDS", "true")
             buildConfigField("boolean", "SHOW_CACHE_TOASTS", "true")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
         release {
             isMinifyEnabled = true
@@ -115,10 +111,6 @@ android {
             isDebuggable = false
             buildConfigField("boolean", "SHOW_DEV_COMMANDS", devCommandsInRelease.toString())
             buildConfigField("boolean", "SHOW_CACHE_TOASTS", cacheToastsInRelease.toString())
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
             ndk {
                 debugSymbolLevel = "FULL"
             }

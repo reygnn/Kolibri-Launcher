@@ -14,6 +14,10 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.launcher.feature.crashreporting"
+    defaultConfig {
+        // ACRA keep rules travel with the library into every app (D1 end form).
+        consumerProguardFiles("consumer-rules.pro")
+    }
 }
 
 dependencies {
