@@ -44,10 +44,10 @@ sound. No high-severity defect; no data loss anywhere.
 
 ## Resolution log (2026-09-29)
 
-A3-01..A3-04 are fixed and merged to `main`. A post-merge regression pass over the
-A3-01..03 fixes (all callers read, full `:nyx:domain`/`:nyx:data`/`:nyx:app` suites +
-`checkConventions`/`checkRule13` green) found no regression. A3-05..A3-11 are still open
-as listed under **Recommended priority** (opportunistic / accept / no action).
+Every finding is addressed: A3-01..A3-10 fixed, A3-11 no action (info, not a bug). A
+post-merge regression pass over the A3-01..03 fixes (all callers read, full
+`:nyx:domain`/`:nyx:data`/`:nyx:app` suites + `checkConventions`/`checkRule13` green) found
+no regression.
 
 | ID | Disposition | Commit(s) |
 |----|-------------|-----------|
@@ -55,6 +55,13 @@ as listed under **Recommended priority** (opportunistic / accept / no action).
 | A3-02 | **Fixed** — `onCommitEditMode` bumps `editRollbackGeneration`, so an add whose copy is still in flight at Save discards its copied file. Deliberate semantic: a Save pressed before a large pick finishes copying drops that layer (commit persists exactly the previewed state). | `efe06b0` |
 | A3-03 | **Fixed** — `.onCompletion { styleReady.complete(Unit) }` on the style collector: a dead collector degrades to the COLOR seed instead of hanging `bitmap()`. Normal path unchanged. | `a8717d2` |
 | A3-04 | **Fixed (live-reconcile chosen over accept)** — an open drawer-folder overlay reconciles against `installedKeys` with the projection's rule (`drawerFolderLiveMembers`): uninstalled members drop out (not greyed), reinstall restores them, < 2 live closes the overlay; a tap on a stale, already-dissolved drawer tile refreshes the drawer instead of opening. Persisted membership untouched. | `ee4d37a` |
+| A3-05 | **Fixed** — import deletes every extracted blob the saved wallpaper state does not reference, on all paths (`finally`); blobs of a wallpaper already saved survive a later failure. The startup orphan sweep stays as the backstop. | `97cec3a` |
+| A3-06 | **Fixed** — `writeOrDiscard`: a failed/thrown/cancelled export deletes its `CreateDocument` target (`DocumentsContract.deleteDocument`); a discard failure is logged, never masks the result. | `ec005de` |
+| A3-07 | **Fixed (summary, not auto-off)** — mirrors notification dots: the calendar toggle's summary shows "access not granted" when READ_CALENDAR is missing (re-checked on resume + pref change). The pref is kept, so a re-grant restores events without re-toggling. | `7905739` |
+| A3-08 | **Fixed** — the drawer no longer resets `SearchQueryChangeTracker` on hide (Kolibri parity; reset only in `onDestroyView`), so the first keystroke after reopen may auto-launch. No new test: fragment-level (overlay lifecycle); the tracker contract is covered in `:common-ui`. | `ced6510` |
+| A3-09 | **Fixed (structural) / no action** — disabling `gesturesEnabled` now cancels a live drag and disarms a pending long-press; the `ACTION_UP` index-0 invariant is commented. No action: the DOWN-less residual-pointer hand-off (`:common-ui`) and the unrecycled drag bitmap (GC'd). | `a0d9436` |
+| A3-10 | **Fixed** — `onEnterEditMode` re-entry guard (no-op while a session is live). | `237d750` |
+| A3-11 | **No action** — info only (nondeterministic usage tie-break for identical names; cheap backgrounded recompute). | — |
 
 ## Actionable findings (detail)
 
