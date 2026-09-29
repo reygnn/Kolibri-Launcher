@@ -19,8 +19,8 @@ import kotlinx.coroutines.CoroutineScope
  *  set; empty means "not loaded" → flag nothing, per [LazySlotMembership]) renders greyed
  *  with a placeholder and, on tap, calls [onMissingApp] to offer removal from the folder —
  *  the folder-internal analog of a greyed top-level tile. Drawer folders leave [installed]
- *  empty (their members are already reconciled against the live app set), so nothing greys
- *  there. */
+ *  empty, so nothing greys there: the caller drops an uninstalled member instead and
+ *  re-[submit]s the live members (drawerFolderLiveMembers, §Audit-3 A3-04). */
 class FolderMemberAdapter(
     private val iconLoader: IconLoader,
     private val scope: CoroutineScope,
@@ -36,9 +36,9 @@ class FolderMemberAdapter(
 
     fun submit(newMembers: List<ComponentKey>) {
         // Value-equal short-circuit, mirroring DockAdapter.submit: skip the full rebind (which
-        // re-decodes every member icon) when the members are unchanged. Harmless today (a fresh
-        // adapter per folder-open), but keeps the invariant if submit is ever wired to a reactive
-        // members flow (§Audit-2 N11). Live greying / style go through updateInstalled / refreshIcons.
+        // re-decodes every member icon) when the members are unchanged. Load-bearing for drawer
+        // folders, which re-submit their live members on every layout/installed-set emission
+        // (§Audit-2 N11, §Audit-3 A3-04). Live greying / style go through updateInstalled / refreshIcons.
         if (members == newMembers) return
         members = newMembers
         notifyDataSetChanged()
@@ -70,8 +70,8 @@ class FolderMemberAdapter(
     /**
      * Update the installed-key set live so an OPEN overlay reflects a member being uninstalled
      * (greys, offers removal) or reinstalled (un-greys) — instead of snapshotting [installed]
-     * at open. Value-equal guard skips the rebind when nothing changed. Drawer folders pass an
-     * empty set (pre-reconciled), so they never call this.
+     * at open. Value-equal guard skips the rebind when nothing changed. Home folders only: drawer
+     * folders keep an empty set and re-[submit] their live members instead.
      */
     fun updateInstalled(newInstalled: Set<ComponentKey>) {
         if (installed == newInstalled) return

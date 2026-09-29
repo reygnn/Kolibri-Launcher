@@ -218,6 +218,10 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // folderOverlayController.isVisible at each use; replaced on every open.
     private var openFolderMemberAdapter: FolderMemberAdapter? = null
     private var openFolderTitle: String = ""
+    // Membership of the open DRAWER folder (incl. optimistic bulk-adds), before the live
+    // installed-set reconcile (drawerFolderLiveMembers). Only meaningful while the overlay is
+    // visible with openFolderId == null; reset on every folder open.
+    private var openDrawerFolderMembers: List<ComponentKey> = emptyList()
 
     // In-DragLayer long-press context menu (Launcher3-style).
     private lateinit var contextMenuOverlay: View
@@ -493,11 +497,17 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     combine(viewModel.layout, viewModel.installedKeys) { layout, _ -> layout }
                         .collect { layout ->
                             renderLayout(layout)
-                            // An open home-folder overlay greys/un-greys a member live when its
-                            // app is uninstalled/reinstalled (drawer folders are pre-reconciled
-                            // with an empty installed set → openFolderId is null there).
-                            if (folderOverlayController.isVisible && openFolderId != null) {
-                                openFolderMemberAdapter?.updateInstalled(viewModel.installedKeys.value)
+                            // An open folder overlay tracks uninstall/reinstall live: a home
+                            // folder greys/un-greys the member (dead reference); a drawer folder
+                            // (openFolderId == null) drops/restores it like the drawer projection
+                            // does, closing once it would dissolve (§Audit-3 A3-04).
+                            if (folderOverlayController.isVisible) {
+                                val installed = viewModel.installedKeys.value
+                                if (openFolderId != null) {
+                                    openFolderMemberAdapter?.updateInstalled(installed)
+                                } else {
+                                    reconcileOpenDrawerFolder(installed)
+                                }
                             }
                         }
                 }
@@ -1225,12 +1235,21 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     }
 
     override fun openDrawerFolder(folder: DrawerEntry.Folder) {
+        // The tile comes from drawerContent, whose app list is only re-queried on drawer open,
+        // so a member may have been uninstalled since. If fewer than two are still live, the
+        // folder has already dissolved — don't open it; refresh so the stale tile corrects.
+        val live = drawerFolderLiveMembers(folder.members, viewModel.installedKeys.value)
+        if (live == null) {
+            viewModel.refreshDrawer()
+            return
+        }
         // A drawer folder, not a home folder — keep the home onClose path inactive.
         openFolderId = null
         // Latest known membership: the bulk-add path updates it optimistically so the overlay
         // can stay open to add several makers in a row without a reopen. The drawer tile behind
-        // refreshes reactively from drawerContent regardless.
-        var members = folder.members
+        // refreshes reactively from drawerContent regardless. The overlay shows it reconciled
+        // against the live installed set (reconcileOpenDrawerFolder).
+        openDrawerFolderMembers = folder.members
         val adapter = FolderMemberAdapter(
             iconLoader = iconLoader,
             scope = lifecycleScope,
@@ -1243,16 +1262,16 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 viewModel.extractFromDrawerFolder(folder.id, key)
                 folderOverlayController.close()
             },
-        ).also { it.submit(members); it.submitNotificationDots(viewModel.notificationDots.value) }
+        ).also { it.submit(live); it.submitNotificationDots(viewModel.notificationDots.value) }
         openFolderMemberAdapter = adapter
         folderOverlayController.open(
             initialTitle = folder.title,
             titleEditable = true,
             memberAdapter = adapter,
             onAddApps = {
-                showAddByMakerDialog(folder.id, members) { added ->
-                    members = members + added
-                    adapter.submit(members)
+                showAddByMakerDialog(folder.id, openDrawerFolderMembers) { added ->
+                    openDrawerFolderMembers = openDrawerFolderMembers + added
+                    reconcileOpenDrawerFolder(viewModel.installedKeys.value)
                 }
             },
             onClose = {
@@ -1260,6 +1279,17 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 if (newTitle != folder.title) viewModel.renameDrawerFolder(folder.id, newTitle)
             },
         )
+    }
+
+    /**
+     * Re-apply the live [installed] set to the open drawer-folder overlay: submit the surviving
+     * members (value-equal no-op when unchanged), or close the overlay once fewer than two are
+     * live — the drawer projection has dissolved the folder by then (§Audit-3 A3-04).
+     */
+    private fun reconcileOpenDrawerFolder(installed: Set<ComponentKey>) {
+        if (!folderOverlayController.isVisible || openFolderId != null) return
+        val live = drawerFolderLiveMembers(openDrawerFolderMembers, installed)
+        if (live == null) closeFolderOverlay() else openFolderMemberAdapter?.submit(live)
     }
 
     /**
@@ -1425,6 +1455,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
 
         openFolderId = folderId
         openFolderTitle = folder.title
+        openDrawerFolderMembers = emptyList()
         val adapter = FolderMemberAdapter(
             iconLoader = iconLoader,
             scope = lifecycleScope,
