@@ -44,14 +44,6 @@ android {
     }
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    javaCompiler.set(
-        javaToolchains.compilerFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
-    )
-}
-
 dependencies {
     implementation(project(":kolibri:domain"))
     // Shared home-info calendar/alarm reader (HIE Phase B); bound to the :core

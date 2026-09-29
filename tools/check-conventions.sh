@@ -44,7 +44,7 @@ conf="$det/conventions/$app.conf"
 # ── Registry: check id → detector files it owns (order = report order) ───────
 CHECK_IDS=(rule9 rule12 toast naming rule11 cancel initorder flowcatch sharedflow
            purge arresult adapter oom parity triple keeplist whilesub mirror
-           harddisp testconv stalereplay rule13)
+           harddisp buildparity testconv stalereplay rule13)
 declare -A OWNS=(
   [rule9]="check-intent-gate.awk"
   [rule11]="check-rule11-annotation.awk"
@@ -62,6 +62,7 @@ declare -A OWNS=(
   [whilesub]="check-whilesubscribed-literal.awk"
   [mirror]="check-mirror-comments.awk check-ratchet.sh"
   [harddisp]="check-hardcoded-dispatchers.awk check-ratchet.sh"
+  [buildparity]="check-build-parity.awk"
   [testconv]="check-test-conventions.sh check-test-dispatcher.awk check-test-assertions.awk"
   [stalereplay]="check-stale-replay-read.awk check-stale-replay-read.sh"
   [rule13]="check-rule13-german-comments.awk check-rule13-german-comments.sh"
@@ -287,6 +288,17 @@ run mirror && ratchet "$det/check-mirror-comments.awk" "$det/mirror-allowlist.tx
 # A13 — hard-coded dispatchers (tools/dispatcher-allowlist.txt).
 run harddisp && ratchet "$det/check-hardcoded-dispatchers.awk" "$det/dispatcher-allowlist.txt" \
   "A13 — hard-coded dispatcher: inject @IoDispatcher / @DefaultDispatcher / @MainDispatcher (:core) instead"
+
+# A10 — build parity: module build scripts leave build-wide values to build-logic and
+# apply a launcher.* convention plugin (shared modules + this app's modules).
+if run buildparity; then
+  need "$det/check-build-parity.awk"; bp=""
+  for m in "${SHARED_MODULES[@]}" "${APP_TEST_MODULES[@]}" "${APP_TEST_SUPPORT_MODULES[@]}"; do
+    f="$m/build.gradle.kts"; [ -f "$f" ] || { bp="${bp}${f#"$MONO"/}:1: A10 module has no build.gradle.kts"$'\n'; continue; }
+    h=$(awk -f "$det/check-build-parity.awk" "$f"); [ -n "$h" ] && bp="${bp}${h#"$MONO"/}"$'\n'
+  done
+  [ -n "$bp" ] && report "A10 — build-wide values belong to build-logic (launcher.* convention plugins), not to a module" "${bp%$'\n'}"
+fi
 
 # A7 + A12 — test conventions (own modules + all shared modules).
 if run testconv; then

@@ -840,6 +840,10 @@ Gates added by SPEC_NYX_REWRITE on top of the numbered rules:
 - **A12** Truth is the one assertion library; exceptions `kotlin.test.assertFailsWith`
   and `kotlin.test.assertIs` (the latter only where a later line needs the smart cast).
 - **A11** no number literal in `WhileSubscribed(` — `AppConstants.FLOW_SHARING_TIMEOUT_MS`.
+- **A10** build parity: module build scripts set no SDK levels, Java/Kotlin versions or
+  toolchains, `lint {}`, `testOptions {}`, unit-test flags or `proguardFiles`, and apply
+  no base Android/Kotlin plugin directly — every module applies a `launcher.*` convention
+  plugin from `build-logic/`, where those values live once (`LauncherBuild`).
 - **A8** no new "mirrors/parity/port of Kolibri|Nyx" comment (a hand-kept copy of the
   other app); **A13** no new hard-coded `Dispatchers.*` in production code. Both are
   counting, shrink-only ratchets over `tools/mirror-allowlist.txt` /
@@ -847,7 +851,8 @@ Gates added by SPEC_NYX_REWRITE on top of the numbered rules:
   never add one.
 
 Detector self-tests (manual rerun, not CI): `tools/check-conventions-test.sh`,
-`tools/check-test-conventions-test.sh`, `tools/check-ratchet-gates-test.sh` and the
+`tools/check-test-conventions-test.sh`, `tools/check-ratchet-gates-test.sh`,
+`tools/check-build-parity-test.sh` and the
 per-detector `tools/check-*-test.sh`.
 
 ---

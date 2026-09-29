@@ -42,8 +42,12 @@ scope.launch(Dispatchers.Main.immediate) { }                            // 3 fla
 val b = withContext(ioDispatcher) { }                                   // 5 ok
 val c = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default) // 6 flag
 val d = MyDispatchers.IO                                                // 7 ok (other name)
+// a path like domain/core/* inside a line comment opens no block        // 8 ok
+val e = withContext(Dispatchers.IO) { }                                 // 9 flag
+/** One-line KDoc — its second star must not hide the next line. */     // 10 ok
+val f = withContext(Dispatchers.Default) { }                            // 11 flag
 KT
-check "A13 core" "$(awk -f "$d/check-hardcoded-dispatchers.awk" "$tmp/A13.kt" | col3)" "2 3 6"
+check "A13 core" "$(awk -f "$d/check-hardcoded-dispatchers.awk" "$tmp/A13.kt" | col3)" "2 3 6 9 11"
 mkdir -p "$tmp/p"; printf 'fun provideIo() = Dispatchers.IO\n' > "$tmp/p/DispatcherModule.kt"
 check "A13 provider exempt" "$(awk -f "$d/check-hardcoded-dispatchers.awk" "$tmp/p/DispatcherModule.kt" | wc -l | tr -d ' ')" "0"
 

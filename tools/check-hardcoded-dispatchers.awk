@@ -12,8 +12,12 @@ isprovider { next }
 {
   orig = $0; line = $0
   if (inblock) { if (line ~ /\*\//) { sub(/^.*\*\//, "", line); inblock = 0 } else next }
-  if (line ~ /\/\*/ && line !~ /\*\//) { sub(/\/\*.*/, "", line); inblock = 1 }
-  sub(/\/\/.*/, "", line)
+  sub(/\/\/.*/, "", line)             # line comments first: a "/*" inside one opens no block
+  while (match(line, /\/\*/)) {       # block comments: drop closed ones, open the rest
+    rest = substr(line, RSTART + 2)
+    if (match(rest, /\*\//)) { line = substr(line, 1, index(line, "/*") - 1) substr(rest, RSTART + 2) }
+    else { line = substr(line, 1, index(line, "/*") - 1); inblock = 1; break }
+  }
   if (line ~ /^[ \t]*\*/) next
   if (line ~ /(^|[^A-Za-z0-9_])Dispatchers\.(IO|Default|Main|Unconfined)([^A-Za-z0-9_]|$)/) {
     t = orig; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t); gsub(/\t/, " ", t)

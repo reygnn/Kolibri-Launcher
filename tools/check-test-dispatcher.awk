@@ -19,12 +19,12 @@ FNR == 1 { inblock = 0; isrule = (FILENAME ~ /\/MainDispatcherRule\.kt$/); isrec
 {
   orig = $0; line = $0
   if (inblock) { if (line ~ /\*\//) { sub(/^.*\*\//, "", line); inblock = 0 } else next }
+  sub(/\/\/.*/, "", line)             # line comments first: a "/*" inside one opens no block
   while (match(line, /\/\*/)) {
     rest = substr(line, RSTART + 2)
     if (match(rest, /\*\//)) { line = substr(line, 1, index(line, "/*") - 1) substr(rest, RSTART + 2) }
     else { line = substr(line, 1, index(line, "/*") - 1); inblock = 1; break }
   }
-  sub(/\/\/.*/, "", line)
   if (line ~ /^[ \t]*\*/) next
 
   if (!isrule) {
