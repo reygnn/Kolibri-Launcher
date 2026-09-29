@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import android.os.Bundle
@@ -297,11 +298,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun doExport(uri: Uri) = lifecycleScope.launch {
         // Open the SAF stream off the main thread (a DocumentsProvider binder IPC
         // can block); the manager also hops to IO for the ZIP transfer.
+        val resolver = requireContext().contentResolver
         val ok = runCatching {
             withContext(Dispatchers.IO) {
-                requireContext().contentResolver.openOutputStream(uri)?.use { out ->
-                    backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
-                } ?: false
+                // CreateDocument made this target just for us: on any failure delete it, so no
+                // truncated, unimportable .zip is left behind (§Audit-3 A3-06).
+                writeOrDiscard(
+                    write = {
+                        resolver.openOutputStream(uri)?.use { out ->
+                            backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
+                        } ?: false
+                    },
+                    discard = { DocumentsContract.deleteDocument(resolver, uri) },
+                )
             }
         }.getOrDefault(false)
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
