@@ -91,6 +91,7 @@
     <string name="customize_all_settings">All settings</string>
     <string name="show_calendar_event_title">Show calendar events</string>
     <string name="show_calendar_event_summary">Show the next calendar event on the home screen</string>
+    <string name="show_calendar_event_no_access_summary">Calendar access not granted — events won\'t show</string>
     <string name="show_alarm_title">Show next alarm</string>
     <string name="show_alarm_summary">Show the next alarm on the home screen</string>
     <string name="calendar_permission_title">Calendar access</string>

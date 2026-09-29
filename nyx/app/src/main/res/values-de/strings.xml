@@ -86,6 +86,7 @@
     <string name="customize_all_settings">Alle Einstellungen</string>
     <string name="show_calendar_event_title">Kalender-Termine anzeigen</string>
     <string name="show_calendar_event_summary">Nächsten Kalendertermin auf dem Startbildschirm anzeigen</string>
+    <string name="show_calendar_event_no_access_summary">Kalenderzugriff nicht erteilt — Termine erscheinen nicht</string>
     <string name="show_alarm_title">Nächsten Wecker anzeigen</string>
     <string name="show_alarm_summary">Nächsten Wecker auf dem Startbildschirm anzeigen</string>
     <string name="calendar_permission_title">Kalenderzugriff</string>

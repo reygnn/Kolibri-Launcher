@@ -236,6 +236,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 launch {
                     preferences.showCalendarEventFlow.collect { enabled ->
                         if (calendarSwitch?.isChecked != enabled) calendarSwitch?.isChecked = enabled
+                        updateCalendarSummary()
                     }
                 }
             }
@@ -250,8 +251,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
      */
     private fun handleCalendarPermissionRequest() {
         when {
-            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) ==
-                PackageManager.PERMISSION_GRANTED -> {
+            hasCalendarPermission() -> {
                 lifecycleScope.launch { preferences.setShowCalendarEvent(true) }
             }
             shouldShowRequestPermissionRationale(Manifest.permission.READ_CALENDAR) -> {
@@ -439,6 +439,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Re-check access on return from the system settings screen (or a later revoke)
         // so the toggle summary reflects reality instead of silently misleading.
         updateNotificationDotsSummary()
+        updateCalendarSummary()
     }
 
     /** Reflect the notification-access state in the dots toggle summary when it's on. */
@@ -450,6 +451,24 @@ class SettingsFragment : PreferenceFragmentCompat() {
             getString(R.string.notification_dots_summary)
         }
     }
+
+    /**
+     * Reflect a READ_CALENDAR revoked outside Nyx in the calendar toggle summary when it's on
+     * (§Audit-3 A3-07). Mirrors the dots toggle: the stored preference is kept, so re-granting in
+     * system settings brings events back without re-toggling; rendering is fail-closed meanwhile.
+     */
+    private fun updateCalendarSummary() {
+        val sw = calendarSwitch ?: return
+        sw.summary = if (sw.isChecked && !hasCalendarPermission()) {
+            getString(R.string.show_calendar_event_no_access_summary)
+        } else {
+            getString(R.string.show_calendar_event_summary)
+        }
+    }
+
+    private fun hasCalendarPermission(): Boolean =
+        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) ==
+            PackageManager.PERMISSION_GRANTED
 
     /** Whether the user has granted Nyx notification-listener access (dots need it). */
     private fun hasNotificationAccess(): Boolean =
