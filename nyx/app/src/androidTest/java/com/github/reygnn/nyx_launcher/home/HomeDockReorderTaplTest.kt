@@ -53,8 +53,8 @@ class HomeDockReorderTaplTest {
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
         assumeTrue("Need ≥2 launchable apps for a dock reorder", resolved.size >= 2)
-        keyA = ComponentKey(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
-        keyB = ComponentKey(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
+        keyA = ComponentKey.of(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
+        keyB = ComponentKey.of(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

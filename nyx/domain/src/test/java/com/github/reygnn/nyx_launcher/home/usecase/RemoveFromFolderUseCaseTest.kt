@@ -24,7 +24,7 @@ class RemoveFromFolderUseCaseTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
     private val ids = ItemIdFactory { ItemId("extracted") }
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
 
     @Test
     fun extract_persists_and_returns_extracted() = runTest(mainDispatcherRule.testDispatcher) {

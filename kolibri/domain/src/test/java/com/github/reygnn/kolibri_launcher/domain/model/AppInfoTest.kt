@@ -163,7 +163,7 @@ class AppInfoTest {
         )
         // Identity uses the same normalization source as the launcher, so key,
         // componentName and normalizedClassName never disagree.
-        assertThat(shortForm.key).isEqualTo(ComponentKey("com.example", "com.example.MainActivity"))
+        assertThat(shortForm.key).isEqualTo(ComponentKey.of("com.example", "com.example.MainActivity"))
         assertThat(shortForm.key.flat).isEqualTo("com.example/com.example.MainActivity")
     }
 

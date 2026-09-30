@@ -97,7 +97,7 @@ abstract class DrawerFoldersRepositoryContract {
     }
 
     private companion object {
-        private fun key(p: String) = ComponentKey(p, "$p.Main")
+        private fun key(p: String) = ComponentKey.of(p, "$p.Main")
         val WITH_FOLDER = DrawerFolders(
             listOf(DrawerFolder(DrawerFolderId("f1"), "", listOf(key("a"), key("b")))),
         )

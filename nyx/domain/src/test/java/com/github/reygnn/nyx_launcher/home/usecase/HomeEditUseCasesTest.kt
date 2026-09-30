@@ -21,7 +21,7 @@ class HomeEditUseCasesTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val grid = GridSpec(columns = 4, rows = 6)
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun repo(vararg items: PlacedItem) =
         FakeHomeLayoutRepository(HomeLayout(grid, 1, items.toList(), emptyList()))
 

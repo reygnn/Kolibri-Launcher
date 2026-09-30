@@ -29,7 +29,7 @@ class DrawerEntryDiffTest {
     // --- fixtures ---
 
     private fun app(pkg: String, hidden: Boolean = false, label: String = pkg): DrawerEntry.App =
-        DrawerEntry.App(LauncherApp(ComponentKey(pkg, "$pkg.Main"), label), hidden)
+        DrawerEntry.App(LauncherApp(ComponentKey.of(pkg, "$pkg.Main"), label), hidden)
 
     private fun folder(id: String, title: String = id): DrawerEntry.Folder =
         DrawerEntry.Folder(DrawerFolderId(id), title, members = emptyList())

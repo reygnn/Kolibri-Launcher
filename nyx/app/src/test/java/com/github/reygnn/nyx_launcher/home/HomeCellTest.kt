@@ -19,7 +19,7 @@ import org.junit.Test
 class HomeCellTest {
 
     private val grid = GridSpec(columns = 2, rows = 2) // 4 cells/page, easy to enumerate
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun app(id: String, p: String = id) = HomeItem.App(ItemId(id), ck(p))
     private fun folder(id: String, vararg m: ComponentKey) = HomeItem.Folder(ItemId(id), "", m.toList())
     private fun placed(item: HomeItem, x: Int, y: Int, page: Int = 0) = PlacedItem(item, CellPos(page, x, y))

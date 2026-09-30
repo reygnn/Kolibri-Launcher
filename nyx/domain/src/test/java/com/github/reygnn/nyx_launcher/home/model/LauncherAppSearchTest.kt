@@ -8,7 +8,7 @@ import org.junit.Test
 class LauncherAppSearchTest {
 
     private fun app(label: String, customName: String? = null) =
-        LauncherApp(ComponentKey("com.$label", "com.$label.Main"), label, customName)
+        LauncherApp(ComponentKey.of("com.$label", "com.$label.Main"), label, customName)
 
     @Test
     fun `display name is the label when no custom name`() {

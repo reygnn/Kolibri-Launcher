@@ -42,8 +42,8 @@ class GetFavoriteAppsProvisionalMissingTest {
     @get:Rule
     val timberRule = TimberRule()
 
-    private val present = ComponentKey("com.present", "com.present.Main")
-    private val ghost = ComponentKey("com.ghost.gone", "com.ghost.gone.Main")
+    private val present = ComponentKey.of("com.present", "com.present.Main")
+    private val ghost = ComponentKey.of("com.ghost.gone", "com.ghost.gone.Main")
 
     private fun useCase(resolver: ComponentLabelResolver): GetFavoriteAppsUseCase {
         // Raw list stays EMPTY → the flow takes the provisional (RawStep.Empty) path.

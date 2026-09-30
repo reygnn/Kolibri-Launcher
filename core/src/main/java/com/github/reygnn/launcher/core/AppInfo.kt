@@ -48,16 +48,15 @@ data class AppInfo(
      * `ComponentName` used to launch must carry the fully-qualified class — the
      * system resolves the activity by exact class-name match against the parsed
      * manifest (which stores long-form names), so a relative spelling would fail
-     * to resolve. This is the single source of truth for that normalization; it
-     * feeds [key] (identity), and the shared AppLauncher launches that [key]
-     * verbatim — so the launcher inherits the normalization through [key] rather
-     * than repeating it.
+     * to resolve. The rule itself is [ComponentKey.normalizeClassName] (B14: one
+     * definition for AppInfo, the key factory and every store read); it feeds [key]
+     * (identity), and the shared AppLauncher launches that [key] verbatim — so the
+     * launcher inherits the normalization through [key] rather than repeating it.
      *
      * A body `val` (declared before [key]), which — like [displayNameLower] and
      * [componentName] — keeps it out of `equals`/`hashCode`/`copy`/`componentN`.
      */
-    val normalizedClassName: String =
-        if (className.startsWith(".")) "$packageName$className" else className
+    val normalizedClassName: String = ComponentKey.normalizeClassName(packageName, className)
 
     /**
      * The canonical structured identity of this entry.
@@ -66,7 +65,7 @@ data class AppInfo(
      * never disagree; [ComponentKey.flat] is the single definition of the
      * flattened wire format and [componentName] is merely its projection.
      */
-    val key: ComponentKey = ComponentKey(packageName, normalizedClassName)
+    val key: ComponentKey = ComponentKey.of(packageName, className)
 
     /**
      * Flattened `"pkg/cls"` projection of [key]. Precomputed body `val` (out of

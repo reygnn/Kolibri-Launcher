@@ -8,7 +8,7 @@ import org.junit.Test
 class DrawerAppSearchTest {
 
     private fun app(label: String) =
-        LauncherApp(ComponentKey("com.$label", "com.$label.Main"), label)
+        LauncherApp(ComponentKey.of("com.$label", "com.$label.Main"), label)
 
     private val all = listOf(app("Camera"), app("Calendar"), app("Phone"))
 

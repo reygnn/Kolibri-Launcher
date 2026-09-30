@@ -32,7 +32,7 @@ object RandomHomeLayouts {
         val cols = 2 + rnd.nextInt(5)          // 2..6  → dock capacity 2..6
         val rows = 3 + rnd.nextInt(4)          // 3..6
         val poolSize = 4 + rnd.nextInt(13)     // 4..16 distinct apps
-        val pool = (0 until poolSize).map { ComponentKey("com.app$it", "Main") }
+        val pool = (0 until poolSize).map { ComponentKey.of("com.app$it", "Main") }
         return Scenario(GridSpec(cols, rows), pool)
     }
 

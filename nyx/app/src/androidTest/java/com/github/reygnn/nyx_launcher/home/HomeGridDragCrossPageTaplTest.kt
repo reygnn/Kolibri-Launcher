@@ -56,7 +56,7 @@ class HomeGridDragCrossPageTaplTest {
         val resolved = ctx.packageManager.queryIntentActivities(launcherIntent, 0)
         assumeTrue("Need ≥1 launchable app to seed the grid", resolved.isNotEmpty())
         val info = resolved.first().activityInfo
-        val key = ComponentKey(info.packageName, info.name)
+        val key = ComponentKey.of(info.packageName, info.name)
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

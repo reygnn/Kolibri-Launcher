@@ -53,7 +53,7 @@ class HomeGridDragCreateFolderTaplTest {
         )
         // Distinct components — two top-level tiles with the same ComponentKey would
         // violate items∪dock uniqueness (two LAUNCHER entries can share a key).
-        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        val keys = resolved.map { ComponentKey.of(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
         assumeTrue("Need ≥2 distinct launchable apps", keys.size >= 2)
         key0 = keys[0]
         key1 = keys[1]

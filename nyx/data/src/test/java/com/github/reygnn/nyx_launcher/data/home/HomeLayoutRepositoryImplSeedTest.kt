@@ -193,8 +193,8 @@ class HomeLayoutRepositoryImplSeedTest {
     }
 
     private companion object {
-        val PHONE = ComponentKey("com.phone", "com.phone.Main")
-        val SMS = ComponentKey("com.sms", "com.sms.Main")
-        val PLAY_STORE = ComponentKey("com.android.vending", "com.android.vending.Main")
+        val PHONE = ComponentKey.of("com.phone", "com.phone.Main")
+        val SMS = ComponentKey.of("com.sms", "com.sms.Main")
+        val PLAY_STORE = ComponentKey.of("com.android.vending", "com.android.vending.Main")
     }
 }

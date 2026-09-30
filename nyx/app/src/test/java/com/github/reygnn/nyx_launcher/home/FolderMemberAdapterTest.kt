@@ -28,7 +28,7 @@ class FolderMemberAdapterTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private val a = ck("com.a")
     private val b = ck("com.b")
 

@@ -38,7 +38,7 @@ abstract class NoAutoPruneContract {
     val mainDispatcherRule = MainDispatcherRule()
 
     /** The curated reference whose target is absent from the (non-empty) installed view. */
-    protected val candidate = ComponentKey("com.ghost.gone", "com.ghost.gone.Main")
+    protected val candidate = ComponentKey.of("com.ghost.gone", "com.ghost.gone.Main")
 
     /**
      * Seed this launcher's curated store with [candidate], run its REAL load/reconcile path

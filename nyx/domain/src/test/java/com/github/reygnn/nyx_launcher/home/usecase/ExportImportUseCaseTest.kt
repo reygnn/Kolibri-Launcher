@@ -27,7 +27,7 @@ class ExportImportUseCaseTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val grid = GridSpec(columns = 4, rows = 6)
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun empty() = HomeLayout(grid, 1, emptyList(), emptyList())
     private fun appAt(p: String, x: Int) = PlacedItem(HomeItem.App(ItemId(p), ck(p)), CellPos(0, x, 0))
 

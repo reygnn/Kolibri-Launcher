@@ -402,9 +402,9 @@ class HomeViewModelTest {
     fun drawer_vendor_groups_group_the_flat_app_list_by_maker() =
         runTest(mainDispatcherRule.testDispatcher) {
             coEvery { getDrawerApps() } returns listOf(
-                LauncherApp(ComponentKey("com.google.a", "com.google.a.M"), "GA"),
-                LauncherApp(ComponentKey("com.google.b", "com.google.b.M"), "GB"),
-                LauncherApp(ComponentKey("com.other", "com.other.M"), "O"), // single → dropped
+                LauncherApp(ComponentKey.of("com.google.a", "com.google.a.M"), "GA"),
+                LauncherApp(ComponentKey.of("com.google.b", "com.google.b.M"), "GB"),
+                LauncherApp(ComponentKey.of("com.other", "com.other.M"), "O"), // single → dropped
             )
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -415,8 +415,8 @@ class HomeViewModelTest {
     @Test
     fun addable_vendor_groups_exclude_current_members_and_drop_emptied_groups() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val g1 = ComponentKey("com.google.a", "com.google.a.M")
-            val g2 = ComponentKey("com.google.b", "com.google.b.M")
+            val g1 = ComponentKey.of("com.google.a", "com.google.a.M")
+            val g2 = ComponentKey.of("com.google.b", "com.google.b.M")
             coEvery { getDrawerApps() } returns listOf(LauncherApp(g1, "GA"), LauncherApp(g2, "GB"))
             val viewModel = createViewModel()
             advanceUntilIdle()
@@ -439,8 +439,8 @@ class HomeViewModelTest {
                 assertThat(awaitItem()).isEmpty() // seed: empty = "not loaded"
                 installedAppsStateRepository.updateApps(listOf(appInfo("pa"), appInfo("pb")))
                 assertThat(awaitItem()).containsExactly(
-                    ComponentKey("pa", "pa.Main"),
-                    ComponentKey("pb", "pb.Main"),
+                    ComponentKey.of("pa", "pa.Main"),
+                    ComponentKey.of("pb", "pb.Main"),
                 )
                 cancelAndIgnoreRemainingEvents()
             }
@@ -476,10 +476,10 @@ class HomeViewModelTest {
 
     private companion object {
         fun appInfo(pkg: String) = com.github.reygnn.launcher.core.AppInfo(pkg, pkg, pkg, "$pkg.Main")
-        val KEY = ComponentKey("pa", "pa.Main")
+        val KEY = ComponentKey.of("pa", "pa.Main")
         val APP_A = LauncherApp(KEY, label = "A")
-        val APP_B = LauncherApp(ComponentKey("pb", "pb.Main"), label = "B")
-        val SLOW = LauncherApp(ComponentKey("ps", "ps.Main"), label = "Slow")
+        val APP_B = LauncherApp(ComponentKey.of("pb", "pb.Main"), label = "B")
+        val SLOW = LauncherApp(ComponentKey.of("ps", "ps.Main"), label = "Slow")
         val ITEM = ItemId("a")
         val TARGET: DropTarget = DropTarget.Cell(CellPos(0, 0, 0))
     }

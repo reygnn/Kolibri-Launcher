@@ -11,7 +11,7 @@ import org.junit.Test
  */
 class FolderMembershipTest {
 
-    private fun key(p: String) = ComponentKey(p, "$p.Main")
+    private fun key(p: String) = ComponentKey.of(p, "$p.Main")
     private val a = key("a")
     private val b = key("b")
     private val c = key("c")

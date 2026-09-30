@@ -30,7 +30,7 @@ class GetDrawerContentUseCaseTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun app(pkg: String, label: String = pkg, custom: String? = null) =
-        LauncherApp(ComponentKey(pkg, "$pkg.Main"), label, custom)
+        LauncherApp(ComponentKey.of(pkg, "$pkg.Main"), label, custom)
 
     private fun folder(id: String, title: String, vararg members: LauncherApp) =
         DrawerFolder(DrawerFolderId(id), title, members.map { it.key })
@@ -81,7 +81,7 @@ class GetDrawerContentUseCaseTest {
     @Test
     fun `reconcile drops an uninstalled member from the folder`() {
         val a = app("a"); val b = app("b") // c is persisted in the folder but not installed
-        val persisted = DrawerFolder(DrawerFolderId("f1"), "", listOf(a.key, b.key, ComponentKey("c", "c.Main")))
+        val persisted = DrawerFolder(DrawerFolderId("f1"), "", listOf(a.key, b.key, ComponentKey.of("c", "c.Main")))
         val result = projectDrawerContent(listOf(a, b), DrawerFolders(listOf(persisted)))
         val folderEntry = result.filterIsInstance<DrawerEntry.Folder>().single()
         assertThat(folderEntry.members).containsExactly(a.key, b.key).inOrder()
@@ -90,7 +90,7 @@ class GetDrawerContentUseCaseTest {
     @Test
     fun `folder reconciled below two members auto-dissolves and its survivor goes loose`() {
         val a = app("a"); val x = app("x") // b persisted but uninstalled -> folder drops to {a}
-        val persisted = DrawerFolder(DrawerFolderId("f1"), "", listOf(a.key, ComponentKey("b", "b.Main")))
+        val persisted = DrawerFolder(DrawerFolderId("f1"), "", listOf(a.key, ComponentKey.of("b", "b.Main")))
         val result = projectDrawerContent(listOf(a, x), DrawerFolders(listOf(persisted)))
         assertThat(result.filterIsInstance<DrawerEntry.Folder>()).isEmpty()
         assertThat(result.filterIsInstance<DrawerEntry.App>().map { it.app }).containsExactly(a, x)
@@ -99,7 +99,7 @@ class GetDrawerContentUseCaseTest {
     @Test
     fun `folder with all members uninstalled vanishes entirely`() {
         val x = app("x")
-        val dead = DrawerFolder(DrawerFolderId("f1"), "Gone", listOf(ComponentKey("a", "a.Main"), ComponentKey("b", "b.Main")))
+        val dead = DrawerFolder(DrawerFolderId("f1"), "Gone", listOf(ComponentKey.of("a", "a.Main"), ComponentKey.of("b", "b.Main")))
         val result = projectDrawerContent(listOf(x), DrawerFolders(listOf(dead)))
         assertThat(result).isEqualTo(listOf(DrawerEntry.App(x)))
     }

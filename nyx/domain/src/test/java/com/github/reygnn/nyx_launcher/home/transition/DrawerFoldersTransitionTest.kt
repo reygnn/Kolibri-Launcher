@@ -15,7 +15,7 @@ import org.junit.Test
  */
 class DrawerFoldersTransitionTest {
 
-    private fun key(p: String) = ComponentKey(p, "$p.Main")
+    private fun key(p: String) = ComponentKey.of(p, "$p.Main")
     private fun folder(id: String, vararg members: String) =
         DrawerFolder(DrawerFolderId(id), "", members.map { key(it) })
     private fun folders(vararg f: DrawerFolder) = DrawerFolders(f.toList())

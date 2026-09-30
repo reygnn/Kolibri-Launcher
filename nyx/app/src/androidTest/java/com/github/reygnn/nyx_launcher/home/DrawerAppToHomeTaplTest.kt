@@ -55,7 +55,7 @@ class DrawerAppToHomeTaplTest {
     @Inject lateinit var installedAppsHolderPump: InstalledAppsHolderPump
     @Inject @ApplicationContext lateinit var context: Context
 
-    private val placeholderKey = ComponentKey("com.example.tapl.absent", "com.example.tapl.absent.Nope")
+    private val placeholderKey = ComponentKey.of("com.example.tapl.absent", "com.example.tapl.absent.Nope")
     private var beforeKeys: Set<ComponentKey> = emptySet()
     private lateinit var searchQuery: String
 

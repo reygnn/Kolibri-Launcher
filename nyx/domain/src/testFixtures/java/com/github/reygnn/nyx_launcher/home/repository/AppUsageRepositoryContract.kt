@@ -27,7 +27,7 @@ abstract class AppUsageRepositoryContract {
     /** Provide a fresh, empty repository. */
     abstract fun createRepository(): AppUsageRepository
 
-    private fun app(pkg: String) = LauncherApp(ComponentKey(pkg, "$pkg.Main"), pkg, null)
+    private fun app(pkg: String) = LauncherApp(ComponentKey.of(pkg, "$pkg.Main"), pkg, null)
 
     @Test
     fun record_makes_the_package_appear_in_the_snapshot() = runTest(mainDispatcherRule.testDispatcher) {

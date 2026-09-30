@@ -21,7 +21,7 @@ import kotlin.random.Random
  */
 class HomeLayoutMappersTest {
 
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
 
     // ---------------------------------------------------------------- property
     @Test
@@ -81,7 +81,7 @@ class HomeLayoutMappersTest {
     // ------------------------------------------------- N15: drop invalid keys on decode
     @Test
     fun a_component_key_dto_decodes_only_when_both_parts_are_present() {
-        assertThat(ComponentKeyDto("com.a", "com.a.Main").toDomain()).isEqualTo(ComponentKey("com.a", "com.a.Main"))
+        assertThat(ComponentKeyDto("com.a", "com.a.Main").toDomain()).isEqualTo(ComponentKey.of("com.a", "com.a.Main"))
         assertThat(ComponentKeyDto("", "com.a.Main").toDomain()).isNull() // empty package
         assertThat(ComponentKeyDto("com.a", "").toDomain()).isNull() // empty class
     }
@@ -132,6 +132,6 @@ class HomeLayoutMappersTest {
             schemaVersion = 1,
             apps = listOf(ComponentKeyDto("com.a", "com.a.Main"), ComponentKeyDto("", "com.b.Main")),
         )
-        assertThat(dto.toDomain()).containsExactly(ComponentKey("com.a", "com.a.Main"))
+        assertThat(dto.toDomain()).containsExactly(ComponentKey.of("com.a", "com.a.Main"))
     }
 }

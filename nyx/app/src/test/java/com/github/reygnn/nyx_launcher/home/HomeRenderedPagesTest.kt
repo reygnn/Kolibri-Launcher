@@ -14,7 +14,7 @@ import org.junit.Test
 class HomeRenderedPagesTest {
 
     private val grid = GridSpec(columns = 5, rows = 4)
-    private fun app(id: String) = HomeItem.App(ItemId(id), ComponentKey(id, "$id.Main"))
+    private fun app(id: String) = HomeItem.App(ItemId(id), ComponentKey.of(id, "$id.Main"))
     private fun at(page: Int) = PlacedItem(app("a$page"), CellPos(page, 0, 0))
     private fun layout(items: List<PlacedItem>, pages: Int) = HomeLayout(grid, pages, items, emptyList())
 

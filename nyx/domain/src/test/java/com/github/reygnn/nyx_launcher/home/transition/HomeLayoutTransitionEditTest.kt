@@ -19,7 +19,7 @@ class HomeLayoutTransitionEditTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
 
-    private fun ck(pkg: String) = ComponentKey(pkg, "$pkg.Main")
+    private fun ck(pkg: String) = ComponentKey.of(pkg, "$pkg.Main")
     private fun app(id: String, pkg: String = id) = HomeItem.App(ItemId(id), ck(pkg))
     private fun folder(id: String, vararg m: ComponentKey) = HomeItem.Folder(ItemId(id), "", m.toList())
     private fun placed(item: HomeItem, page: Int, x: Int, y: Int) = PlacedItem(item, CellPos(page, x, y))

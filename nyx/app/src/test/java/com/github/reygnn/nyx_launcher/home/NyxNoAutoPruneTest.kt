@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.first
  */
 class NyxNoAutoPruneTest : NoAutoPruneContract() {
 
-    private val installed = ComponentKey("com.parity.installed", "com.parity.installed.Main")
+    private val installed = ComponentKey.of("com.parity.installed", "com.parity.installed.Main")
 
     override suspend fun candidateSurvivesUninstall(): Boolean {
         // A structurally-clean layout (no dups / folders / trailing empty pages): candidate

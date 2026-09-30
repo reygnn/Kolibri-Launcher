@@ -22,7 +22,7 @@ class HomeLayoutTransitionMoveTest {
     private val grid = GridSpec(columns = 4, rows = 6)
     private val newId = com.github.reygnn.nyx_launcher.home.model.ItemIdFactory { ItemId("folder-new") }
 
-    private fun ck(pkg: String) = ComponentKey(pkg, "$pkg.Main")
+    private fun ck(pkg: String) = ComponentKey.of(pkg, "$pkg.Main")
     private fun app(id: String, pkg: String = id) = HomeItem.App(ItemId(id), ck(pkg))
     private fun folder(id: String, vararg members: ComponentKey) =
         HomeItem.Folder(ItemId(id), title = "", members = members.toList())

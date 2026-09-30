@@ -85,7 +85,7 @@ abstract class HiddenAppsRepositoryContract {
     }
 
     private companion object {
-        val A = ComponentKey("com.a", "com.a.Main")
-        val B = ComponentKey("com.b", "com.b.Main")
+        val A = ComponentKey.of("com.a", "com.a.Main")
+        val B = ComponentKey.of("com.b", "com.b.Main")
     }
 }

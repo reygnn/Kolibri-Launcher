@@ -117,7 +117,7 @@ abstract class HomeLayoutRepositoryContract {
         val WITH_APP = EMPTY.copy(
             items = listOf(
                 PlacedItem(
-                    HomeItem.App(ItemId("a"), ComponentKey("pa", "pa.Main")),
+                    HomeItem.App(ItemId("a"), ComponentKey.of("pa", "pa.Main")),
                     CellPos(0, 0, 0),
                 ),
             ),

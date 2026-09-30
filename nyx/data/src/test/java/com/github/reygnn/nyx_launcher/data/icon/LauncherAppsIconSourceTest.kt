@@ -53,7 +53,7 @@ class LauncherAppsIconSourceTest {
             listOf(activityInfo("com.foo", "com.foo.Main", activityIcon))
         every { rasterizer.rasterize(activityIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
+        source.load(IconRef.System(ComponentKey.of("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { rasterizer.rasterize(activityIcon, 64) }
         verify(exactly = 0) { rasterizer.rasterizeMonochrome(any(), any(), any(), any()) }
@@ -69,7 +69,7 @@ class LauncherAppsIconSourceTest {
             rasterizer.rasterizeMonochrome(activityIcon, 64, 0xFF1C1B22.toInt(), 0xFFE6E1E5.toInt())
         } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.MONOCHROME)
+        source.load(IconRef.System(ComponentKey.of("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.MONOCHROME)
 
         verify(exactly = 1) {
             rasterizer.rasterizeMonochrome(activityIcon, 64, 0xFF1C1B22.toInt(), 0xFFE6E1E5.toInt())
@@ -84,7 +84,7 @@ class LauncherAppsIconSourceTest {
             listOf(activityInfo("com.foo", "com.foo.Main", activityIcon))
         every { rasterizer.rasterizeGrayscale(activityIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.GRAYSCALE)
+        source.load(IconRef.System(ComponentKey.of("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.GRAYSCALE)
 
         verify(exactly = 1) { rasterizer.rasterizeGrayscale(activityIcon, 64) }
         verify(exactly = 0) { rasterizer.rasterize(any(), any()) }
@@ -99,7 +99,7 @@ class LauncherAppsIconSourceTest {
         every { packageManager.getApplicationIcon("com.foo") } returns appIcon
         every { rasterizer.rasterize(appIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
+        source.load(IconRef.System(ComponentKey.of("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { packageManager.getApplicationIcon("com.foo") }
         verify(exactly = 1) { rasterizer.rasterize(appIcon, 64) }
@@ -113,7 +113,7 @@ class LauncherAppsIconSourceTest {
         every { packageManager.getApplicationIcon("com.foo") } returns appIcon
         every { rasterizer.rasterize(appIcon, 64) } returns output
 
-        source.load(IconRef.System(ComponentKey("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
+        source.load(IconRef.System(ComponentKey.of("com.foo", "com.foo.Main")), sizePx = 64, style = IconStyle.COLOR)
 
         verify(exactly = 1) { rasterizer.rasterize(appIcon, 64) }
     }
@@ -126,7 +126,7 @@ class LauncherAppsIconSourceTest {
         every { rasterizer.rasterize(activityIcon, 96) } returns output
 
         source.load(
-            IconRef.Pack(ComponentKey("com.pack", "com.pack.Main"), packId = "some.pack"),
+            IconRef.Pack(ComponentKey.of("com.pack", "com.pack.Main"), packId = "some.pack"),
             sizePx = 96,
             style = IconStyle.COLOR,
         )

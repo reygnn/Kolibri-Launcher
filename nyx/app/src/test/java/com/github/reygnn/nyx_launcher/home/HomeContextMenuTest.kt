@@ -8,7 +8,7 @@ import org.junit.Test
 /** Pure JVM truth-table for [buildHomeContextMenuActions]. */
 class HomeContextMenuTest {
 
-    private val key = ComponentKey("com.example.alpha", "com.example.alpha.Main")
+    private val key = ComponentKey.of("com.example.alpha", "com.example.alpha.Main")
     private val id = ItemId("item-1")
 
     private fun actions(

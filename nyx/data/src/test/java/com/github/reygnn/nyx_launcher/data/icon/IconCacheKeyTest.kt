@@ -8,7 +8,7 @@ import org.junit.Test
 /** Pure JVM tests for deterministic keying + the evict-by-glob prefix (ICL-INV-5). */
 class IconCacheKeyTest {
 
-    private fun sys(pkg: String) = IconRef.System(ComponentKey(pkg, "$pkg.Main"))
+    private fun sys(pkg: String) = IconRef.System(ComponentKey.of(pkg, "$pkg.Main"))
 
     @Test fun same_input_yields_same_key() {
         val a = IconCacheKey.of(sys("com.foo"), 128, IconVariant.ADAPTIVE)

@@ -31,7 +31,7 @@ class HomeGridCellDiffTest {
     // --- fixtures ---
 
     private fun app(pkg: String, missing: Boolean = false): HomeCell.App =
-        HomeCell.App(ItemId(pkg), ComponentKey(pkg, "$pkg.Main"), missing)
+        HomeCell.App(ItemId(pkg), ComponentKey.of(pkg, "$pkg.Main"), missing)
 
     private val empty: HomeCell = HomeCell.Empty
 

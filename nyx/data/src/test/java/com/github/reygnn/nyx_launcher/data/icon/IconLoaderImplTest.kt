@@ -45,7 +45,7 @@ class IconLoaderImplTest {
         }
     }
 
-    private fun ref(pkg: String) = IconRef.System(ComponentKey(pkg, "$pkg.Main"))
+    private fun ref(pkg: String) = IconRef.System(ComponentKey.of(pkg, "$pkg.Main"))
 
     @Test
     fun second_request_for_same_icon_hits_memory() = runTest(mainDispatcherRule.testDispatcher) {

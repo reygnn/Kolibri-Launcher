@@ -13,7 +13,7 @@ import org.junit.Test
 class HomeLayoutQueriesTest {
 
     private val grid = GridSpec(columns = 4, rows = 6) // 24 cells/page
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun app(id: String, p: String = id) = HomeItem.App(ItemId(id), ck(p))
 
     /** Place a filler app at linear reading-order index [li] on [page]. */

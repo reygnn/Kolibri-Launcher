@@ -132,8 +132,8 @@ class DrawerFoldersRepositoryImplSeedTest {
     }
 
     private companion object {
-        val GMAIL = ComponentKey("com.google.android.gm", "com.google.android.gm.Main")
-        val MAPS = ComponentKey("com.google.android.apps.maps", "com.google.android.maps.Main")
+        val GMAIL = ComponentKey.of("com.google.android.gm", "com.google.android.gm.Main")
+        val MAPS = ComponentKey.of("com.google.android.apps.maps", "com.google.android.maps.Main")
 
         fun googleFolder(vararg members: ComponentKey) =
             DrawerFolder(DrawerFolderId("google"), title = "Google", members = members.toList())

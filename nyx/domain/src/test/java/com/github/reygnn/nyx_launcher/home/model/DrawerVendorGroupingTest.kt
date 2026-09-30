@@ -7,7 +7,7 @@ import org.junit.Test
 /** Pins the pure vendor grouping used by the drawer-folder "add all from maker" action. */
 class DrawerVendorGroupingTest {
 
-    private fun app(pkg: String) = LauncherApp(ComponentKey(pkg, "$pkg.Main"), pkg.substringAfterLast('.'))
+    private fun app(pkg: String) = LauncherApp(ComponentKey.of(pkg, "$pkg.Main"), pkg.substringAfterLast('.'))
 
     @Test
     fun `groups by curated maker label`() {

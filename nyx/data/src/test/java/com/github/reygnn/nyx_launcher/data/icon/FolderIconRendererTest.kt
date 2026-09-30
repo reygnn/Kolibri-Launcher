@@ -42,7 +42,7 @@ class FolderIconRendererTest {
         override fun trim(level: Int) = Unit
     }
 
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private val members = listOf(ck("pa"), ck("pb"))
 
     @Test

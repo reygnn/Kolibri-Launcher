@@ -11,7 +11,7 @@ import org.junit.Test
 class DrawerFoldersSerializerTest {
 
     private val serializer = DrawerFoldersSerializer()
-    private fun key(p: String) = ComponentKey(p, "$p.Main")
+    private fun key(p: String) = ComponentKey.of(p, "$p.Main")
 
     private val sample = DrawerFolders(
         listOf(

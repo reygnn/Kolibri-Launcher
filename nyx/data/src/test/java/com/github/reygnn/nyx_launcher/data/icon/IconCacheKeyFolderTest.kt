@@ -8,7 +8,7 @@ import org.junit.Test
 /** Pure JVM tests for folder-preview cache keys. */
 class IconCacheKeyFolderTest {
 
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
 
     @Test fun same_members_and_size_yield_same_key() {
         val a = IconCacheKey.folder(listOf(ck("pa"), ck("pb")), 96, IconStyle.COLOR)

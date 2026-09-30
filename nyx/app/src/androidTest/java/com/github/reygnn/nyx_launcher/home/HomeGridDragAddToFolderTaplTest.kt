@@ -54,7 +54,7 @@ class HomeGridDragAddToFolderTaplTest {
         )
         // Distinct components — duplicate folder members / a loose app equal to a
         // member would make the add a no-op (two LAUNCHER entries can share a key).
-        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        val keys = resolved.map { ComponentKey.of(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
         assumeTrue("Need ≥3 distinct launchable apps", keys.size >= 3)
         member0 = keys[0]; member1 = keys[1]; loose = keys[2]
 

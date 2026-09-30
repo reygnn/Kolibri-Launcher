@@ -11,7 +11,7 @@ import org.junit.Test
  */
 class HomeCellDotTest {
 
-    private fun key(pkg: String) = ComponentKey(pkg, "$pkg.Main")
+    private fun key(pkg: String) = ComponentKey.of(pkg, "$pkg.Main")
 
     @Test
     fun `empty cell never has a dot`() {

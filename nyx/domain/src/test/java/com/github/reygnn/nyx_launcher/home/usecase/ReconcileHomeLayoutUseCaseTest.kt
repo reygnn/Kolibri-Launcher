@@ -35,7 +35,7 @@ class ReconcileHomeLayoutUseCaseTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
     private val ids = ItemIdFactory { ItemId("new") }
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
 
     private fun layoutWith(vararg pkgs: String): HomeLayout = HomeLayout(
         grid,

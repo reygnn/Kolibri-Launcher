@@ -7,7 +7,7 @@ import org.junit.Test
 /** Pins the merge invariant of the Settings hidden-apps manager (merge, not replace). */
 class HiddenAppsSelectionTest {
 
-    private fun key(p: String) = ComponentKey(p, "$p.Main")
+    private fun key(p: String) = ComponentKey.of(p, "$p.Main")
 
     @Test
     fun `keeps hidden keys for apps not shown, applies the checked selection for shown ones`() {

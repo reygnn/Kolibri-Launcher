@@ -31,7 +31,7 @@ class FitHomeGridUseCaseTest {
     private fun layout(spec: GridSpec): HomeLayout = HomeLayout(
         spec,
         pages = 1,
-        items = listOf(PlacedItem(HomeItem.App(ItemId("a"), ComponentKey("pa", "pa.Main")), CellPos(0, 0, 0))),
+        items = listOf(PlacedItem(HomeItem.App(ItemId("a"), ComponentKey.of("pa", "pa.Main")), CellPos(0, 0, 0))),
         dock = emptyList(),
     )
 

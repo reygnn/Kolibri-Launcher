@@ -22,7 +22,7 @@ class HomeLayoutTransitionDeleteFromFolderTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
 
-    private fun ck(pkg: String) = ComponentKey(pkg, "$pkg.Main")
+    private fun ck(pkg: String) = ComponentKey.of(pkg, "$pkg.Main")
     private fun folder(id: String, vararg m: ComponentKey, page: Int, x: Int, y: Int) =
         PlacedItem(HomeItem.Folder(ItemId(id), "", m.toList()), CellPos(page, x, y))
     private fun app(id: String, pkg: String, page: Int, x: Int, y: Int) =

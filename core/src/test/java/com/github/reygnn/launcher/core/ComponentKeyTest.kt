@@ -67,7 +67,7 @@ class ComponentKeyTest {
 
     @Test
     fun `flat is the package and class joined by a single separator`() {
-        val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
+        val key = ComponentKey.of("com.example.alpha", "com.example.alpha.MainActivity")
         assertThat(key.flat).isEqualTo("com.example.alpha/com.example.alpha.MainActivity")
     }
 
@@ -76,12 +76,12 @@ class ComponentKeyTest {
     @Test
     fun `parse splits a well-formed flat string into package and class`() {
         val key = ComponentKey.parse("com.example.alpha/com.example.alpha.MainActivity")
-        assertThat(key).isEqualTo(ComponentKey("com.example.alpha", "com.example.alpha.MainActivity"))
+        assertThat(key).isEqualTo(ComponentKey.of("com.example.alpha", "com.example.alpha.MainActivity"))
     }
 
     @Test
     fun `parse round-trips flat`() {
-        val key = ComponentKey("com.example.alpha", "com.example.alpha.MainActivity")
+        val key = ComponentKey.of("com.example.alpha", "com.example.alpha.MainActivity")
         assertThat(ComponentKey.parse(key.flat)).isEqualTo(key)
     }
 
@@ -102,6 +102,40 @@ class ComponentKeyTest {
     @Test
     fun `parse keeps everything after the first separator as the class`() {
         // Mirrors isValid's first-separator rule (a real class cannot contain '/').
-        assertThat(ComponentKey.parse("pkg/b/c")).isEqualTo(ComponentKey("pkg", "b/c"))
+        assertThat(ComponentKey.parse("pkg/b/c")).isEqualTo(ComponentKey.of("pkg", "b/c"))
+    }
+
+    // ---- B14: one factory, one normalization ------------------------------------
+
+    @Test
+    fun `of expands the manifest short form to the fully-qualified class`() {
+        val key = ComponentKey.of("com.example", ".Main")
+        assertThat(key.className).isEqualTo("com.example.Main")
+        assertThat(key.flat).isEqualTo("com.example/com.example.Main")
+    }
+
+    @Test
+    fun `of keeps a fully-qualified class untouched`() {
+        assertThat(ComponentKey.of("com.example", "org.other.Main").className).isEqualTo("org.other.Main")
+    }
+
+    @Test
+    fun `the short and the long spelling are one identity`() {
+        assertThat(ComponentKey.of("com.example", ".Main"))
+            .isEqualTo(ComponentKey.of("com.example", "com.example.Main"))
+    }
+
+    @Test
+    fun `parse normalizes a stored short form, so it meets the installed app`() {
+        // A favorite / hidden entry / backup written as "pkg/.Cls" must resolve to the same
+        // key as the installed AppInfo (always long form) — the golden case kolibri-kurzform.
+        assertThat(ComponentKey.parse("com.example/.Main"))
+            .isEqualTo(ComponentKey.of("com.example", "com.example.Main"))
+    }
+
+    @Test
+    fun `AppInfo and the factory share the one rule`() {
+        assertThat(ComponentKey.normalizeClassName("com.example", ".Main")).isEqualTo("com.example.Main")
+        assertThat(ComponentKey.normalizeClassName("com.example", "com.example.Main")).isEqualTo("com.example.Main")
     }
 }

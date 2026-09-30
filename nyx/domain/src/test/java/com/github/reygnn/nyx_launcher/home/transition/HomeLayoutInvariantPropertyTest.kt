@@ -38,7 +38,7 @@ import kotlin.test.assertIs
  */
 class HomeLayoutInvariantPropertyTest {
 
-    private val pool = (1..12).map { ComponentKey("com.app$it", "Main") }
+    private val pool = (1..12).map { ComponentKey.of("com.app$it", "Main") }
     private fun ck(i: Int) = pool[i]
 
     // ---------------------------------------------------------------- regression

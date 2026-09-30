@@ -71,7 +71,7 @@ class HomeAppLaunchTaplTest {
         )
         assumeTrue("Need ≥1 launchable app to seed the grid", resolved.isNotEmpty())
         val info = resolved.first().activityInfo
-        seededKey = ComponentKey(info.packageName, info.name)
+        seededKey = ComponentKey.of(info.packageName, info.name)
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

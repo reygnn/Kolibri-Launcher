@@ -58,8 +58,8 @@ class NyxBackupManagerTest {
     private val layout = HomeLayout(
         grid = GridSpec(columns = 4, rows = 6),
         pages = 2,
-        items = listOf(PlacedItem(HomeItem.App(ItemId("a1"), ComponentKey("com.x", "com.x.Main")), CellPos(0, 1, 2))),
-        dock = listOf(HomeItem.App(ItemId("d1"), ComponentKey("com.y", "com.y.Main"))),
+        items = listOf(PlacedItem(HomeItem.App(ItemId("a1"), ComponentKey.of("com.x", "com.x.Main")), CellPos(0, 1, 2))),
+        dock = listOf(HomeItem.App(ItemId("d1"), ComponentKey.of("com.y", "com.y.Main"))),
     )
 
     private val homeLayoutRepository = mockk<HomeLayoutRepository>(relaxed = true) {
@@ -132,7 +132,7 @@ class NyxBackupManagerTest {
                 listOf(
                     DrawerFolder(
                         DrawerFolderId("f1"), "Work",
-                        listOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")),
+                        listOf(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")),
                     ),
                 ),
             )
@@ -149,7 +149,7 @@ class NyxBackupManagerTest {
         assertThat(folders).hasSize(1)
         assertThat(folders.single().title).isEqualTo("Work")
         assertThat(folders.single().members)
-            .containsExactly(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")).inOrder()
+            .containsExactly(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")).inOrder()
     }
 
     @Test
@@ -158,7 +158,7 @@ class NyxBackupManagerTest {
         // restore must repair it (drop it here) rather than persist a malformed folder that only
         // heals at read time. Mirrors the home layout's post-restore reconcile.
         val malformed = DrawerFolders(
-            listOf(DrawerFolder(DrawerFolderId("solo"), "Solo", listOf(ComponentKey("com.a", "com.a.M")))),
+            listOf(DrawerFolder(DrawerFolderId("solo"), "Solo", listOf(ComponentKey.of("com.a", "com.a.M")))),
         )
         val result = manager.import(
             ByteArrayInputStream(zipOf(NyxBackup(drawerFolders = malformed.toDto()))),
@@ -171,7 +171,7 @@ class NyxBackupManagerTest {
 
     @Test
     fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.testDispatcher) {
-        hiddenAppsRepository.update { setOf(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M")) }
+        hiddenAppsRepository.update { setOf(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")) }
         val out = ByteArrayOutputStream()
         assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
 
@@ -181,13 +181,13 @@ class NyxBackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(hiddenAppsRepository.current)
-            .containsExactly(ComponentKey("com.a", "com.a.M"), ComponentKey("com.b", "com.b.M"))
+            .containsExactly(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M"))
     }
 
     @Test
     fun import_with_null_hidden_apps_leaves_current_set_intact() = runTest(mainDispatcherRule.testDispatcher) {
         // An older backup carries no hiddenApps field (null); restore must not clear the current set.
-        hiddenAppsRepository.update { setOf(ComponentKey("com.keep", "com.keep.M")) }
+        hiddenAppsRepository.update { setOf(ComponentKey.of("com.keep", "com.keep.M")) }
         val backup = NyxBackup(timestamp = 1L, appVersion = "old", hiddenApps = null)
         val zip = ByteArrayOutputStream()
         ZipOutputStream(zip).use {
@@ -199,7 +199,7 @@ class NyxBackupManagerTest {
         val result = manager.import(ByteArrayInputStream(zip.toByteArray()), NyxBackupOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(hiddenAppsRepository.current).containsExactly(ComponentKey("com.keep", "com.keep.M"))
+        assertThat(hiddenAppsRepository.current).containsExactly(ComponentKey.of("com.keep", "com.keep.M"))
     }
 
     @Test

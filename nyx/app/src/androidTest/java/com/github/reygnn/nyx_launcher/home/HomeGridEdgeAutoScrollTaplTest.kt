@@ -58,8 +58,8 @@ class HomeGridEdgeAutoScrollTaplTest {
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
         assumeTrue("Need ≥2 launchable apps", resolved.size >= 2)
-        keyX = ComponentKey(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
-        keyY = ComponentKey(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
+        keyX = ComponentKey.of(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
+        keyY = ComponentKey.of(resolved[1].activityInfo.packageName, resolved[1].activityInfo.name)
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

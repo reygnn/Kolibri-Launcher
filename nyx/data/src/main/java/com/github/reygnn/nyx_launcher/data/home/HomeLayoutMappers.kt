@@ -59,4 +59,4 @@ internal fun HomeItemDto.toDomain(): HomeItem? = when (this) {
  * would persist as a dead key (§Audit-2 N15). Uses the single shared validity authority.
  */
 internal fun ComponentKeyDto.toDomain(): ComponentKey? =
-    ComponentKey(packageName, className).takeIf { ComponentKey.isValid(it.flat) }
+    ComponentKey.of(packageName, className).takeIf { ComponentKey.isValid(it.flat) }

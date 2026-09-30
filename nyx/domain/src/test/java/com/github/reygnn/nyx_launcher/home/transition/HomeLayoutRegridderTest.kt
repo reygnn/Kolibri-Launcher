@@ -14,7 +14,7 @@ import org.junit.Test
 /** Pure JVM tests for the device-grid re-fit policy (ICON_HOME_MODEL_SPEC §10). */
 class HomeLayoutRegridderTest {
 
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun app(id: String, p: String) = HomeItem.App(ItemId(id), ck(p))
     private fun placed(item: HomeItem, page: Int, x: Int, y: Int) = PlacedItem(item, CellPos(page, x, y))
     private fun layout(grid: GridSpec, items: List<PlacedItem> = emptyList(), dock: List<HomeItem> = emptyList(), pages: Int = 1) =

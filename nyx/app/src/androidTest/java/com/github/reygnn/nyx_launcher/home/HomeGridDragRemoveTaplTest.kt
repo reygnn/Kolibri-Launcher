@@ -50,7 +50,7 @@ class HomeGridDragRemoveTaplTest {
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
         )
         assumeTrue("Need ≥1 launchable app", resolved.isNotEmpty())
-        val key = ComponentKey(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
+        val key = ComponentKey.of(resolved[0].activityInfo.packageName, resolved[0].activityInfo.name)
 
         runBlocking {
             ConsentBootstrap.seedDecision(context, ConsentDecision.Denied)

@@ -60,7 +60,7 @@ class HomeFolderExtractTaplTest {
         // Distinct components: two LAUNCHER ResolveInfos can map to the same
         // ComponentKey; a duplicate-member folder wouldn't extract (removeFromFolder
         // no-ops), so dedup before picking.
-        val keys = resolved.map { ComponentKey(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
+        val keys = resolved.map { ComponentKey.of(it.activityInfo.packageName, it.activityInfo.name) }.distinct()
         assumeTrue("Need ≥2 distinct launchable apps", keys.size >= 2)
         member0 = keys[0]
         member1 = keys[1]

@@ -58,7 +58,7 @@ class DefaultAppsResolver @Inject constructor(
         // no suspension point — synchronous PackageManager query.
         return runCatching {
             context.packageManager.getLaunchIntentForPackage(packageName)?.component
-                ?.let { ComponentKey(it.packageName, it.className) }
+                ?.let { ComponentKey.of(it.packageName, it.className) }
         }.getOrElse {
             TimberWrapper.silentError(it, "Failed to resolve launcher component for $packageName")
             null

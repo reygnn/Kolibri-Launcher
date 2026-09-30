@@ -14,7 +14,7 @@ import org.junit.Test
 class HomeLayoutSerializerTest {
 
     private val serializer = HomeLayoutSerializer()
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
 
     @Test
     fun round_trips_apps_folders_and_dock() {

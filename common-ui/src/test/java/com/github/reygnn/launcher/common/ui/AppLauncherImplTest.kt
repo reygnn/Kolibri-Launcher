@@ -81,7 +81,7 @@ class AppLauncherImplTest {
         val activity = mockk<Activity>()
         every { activity.getSystemService(Context.LAUNCHER_APPS_SERVICE) } returns null
 
-        val result = AppLauncherImpl().launch(activity, ComponentKey("com.example.x", "com.example.x.Main"))
+        val result = AppLauncherImpl().launch(activity, ComponentKey.of("com.example.x", "com.example.x.Main"))
 
         assertThat(result).isInstanceOf(AppLaunchResult.Failed::class.java)
         assertThat((result as AppLaunchResult.Failed).cause is IllegalStateException).isTrue()
@@ -99,7 +99,7 @@ class AppLauncherImplTest {
         val component = slot<ComponentName>()
         every { launcherApps.startMainActivity(capture(component), any(), any(), any()) } just Runs
 
-        val result = AppLauncherImpl().launch(activity, ComponentKey("com.example.x", "com.example.x.Main"))
+        val result = AppLauncherImpl().launch(activity, ComponentKey.of("com.example.x", "com.example.x.Main"))
 
         assertThat(result).isEqualTo(AppLaunchResult.Launched)
         assertThat(component.captured.packageName).isEqualTo("com.example.x")

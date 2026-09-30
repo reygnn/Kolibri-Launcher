@@ -25,7 +25,7 @@ import org.junit.Test
 class HomeLayoutReconcilerTest {
 
     private val grid = GridSpec(columns = 4, rows = 6)
-    private fun ck(p: String) = ComponentKey(p, "$p.Main")
+    private fun ck(p: String) = ComponentKey.of(p, "$p.Main")
     private fun app(id: String, p: String) = HomeItem.App(ItemId(id), ck(p))
     private fun folder(id: String, vararg m: ComponentKey) = HomeItem.Folder(ItemId(id), "", m.toList())
     private fun placed(item: HomeItem, page: Int, x: Int, y: Int) = PlacedItem(item, CellPos(page, x, y))
