@@ -69,7 +69,7 @@ declare -A OWNS=(
 )
 
 SHARED_MODULES=("$MONO/core" "$MONO/common-ui" "$MONO/common-data" "$MONO/feature-crashreporting"
-                "$MONO/common-testing-android")
+                "$MONO/feature-backup" "$MONO/common-testing-android")
 # Test-support libraries: their src/main IS test code, so the test-convention gates
 # (A7, A12) scan it too. Every module in settings.gradle.kts must be in one of the
 # lists or an app's own modules — see the module-coverage guard below.
