@@ -148,6 +148,27 @@ class ContainerFormatTest {
     }
 
     @Test
+    fun `a read failure propagates instead of reading as an invalid backup`() = runTest(mainDispatcherRule.testDispatcher) {
+        val dir = staging()
+        val bytes = zipOf("manifest.json" to manifest(listOf(BlobEntry(ha, 1000, "x"))), "blobs/$ha" to a)
+        var served = 0
+        val failing = object : java.io.InputStream() {
+            override fun read(): Int = throw java.io.IOException("disk on fire")
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (served > 200) throw java.io.IOException("disk on fire") // fails mid-archive
+                val n = minOf(len, bytes.size - served, 16)
+                if (n <= 0) return -1
+                System.arraycopy(bytes, served, b, off, n)
+                served += n
+                return n
+            }
+        }
+        val error = assertFailsWith<java.io.IOException> { reader().read(failing, dir, ContainerManifestCodec::header) }
+        assertThat(error.message).isEqualTo("disk on fire")
+        assertThat(dir.listFiles().orEmpty()).isEmpty()
+    }
+
+    @Test
     fun `a blob that changes between the passes aborts the export`() = runTest(mainDispatcherRule.testDispatcher) {
         var calls = 0
         val flaky = BlobSource("x") { calls++; ByteArrayInputStream(if (calls == 1) a else b) }

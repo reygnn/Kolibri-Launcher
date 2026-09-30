@@ -142,9 +142,18 @@ class BackupRepositoryImplIoTest {
     // §Audit-2 N5 mirror: the ZIP blob loop is bounded so a decompression bomb can't fill the disk.
 
     /** A ZIP archive with the given wallpaper entries (name → decompressed bytes). */
+    /**
+     * A pre-E5a archive (leading backup.json) with the given image entries. The leading
+     * backup.json matters since 2a-5: only then does the container reader recognise the
+     * archive as a legacy backup and hand it to the old ZIP reader whose caps these
+     * tests pin — an archive without it is simply "not a backup" (InvalidFormat).
+     */
     private fun zipWith(vararg images: Pair<String, ByteArray>): ByteArray {
         val bos = java.io.ByteArrayOutputStream()
         java.util.zip.ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("backup.json"))
+            zip.write("{}".toByteArray())
+            zip.closeEntry()
             images.forEach { (name, bytes) ->
                 zip.putNextEntry(java.util.zip.ZipEntry(name))
                 zip.write(bytes)
@@ -227,24 +236,26 @@ class BackupRepositoryImplIoTest {
     }
 
     @Test
-    fun `loadBackupFromFile - unknown size statSize -1 with over-cap stream - returns Error (bounded read)`() = runTest {
+    fun `loadBackupFromFile - unknown size statSize -1 with over-cap non-zip stream - rejected after reading only its head`() = runTest {
         // RC edge-case audit #1: a streaming/pipe ContentProvider reports statSize == -1,
         // which slips past the `fileSize > MAX` fast-path (`-1 > MAX` is false). The read
-        // must be BOUNDED (readNBytes(cap+1)) so a hostile over-cap stream is rejected
-        // instead of OOMing an unbounded readText() — the hardening the usage-export path
-        // already had. A FRESH stream per openInputStream call: isZipFile opens one (reads
-        // the 2 magic bytes), the JSON read opens another.
+        // must stay BOUNDED. Since 2a-5 (E5a) a backup is always a container; an unzipped
+        // stream is no longer read as legacy JSON at all — the container reader looks at
+        // the ZIP header, finds none and rejects it as invalid without reading the rest.
+        // Stricter than the former readNBytes(cap+1): pinned by counting consumed bytes.
         every { parcelFileDescriptor.statSize } returns -1L
         every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
         val cap = AppConstants.MAX_BACKUP_SIZE_BYTES
+        var consumed = 0L
         every { contentResolver.openInputStream(testUri) } answers {
             object : InputStream() {
                 private var remaining = cap + 1
-                override fun read(): Int = if (remaining-- > 0) 'a'.code else -1
+                override fun read(): Int = if (remaining-- > 0) 'a'.code.also { consumed++ } else -1
                 override fun read(b: ByteArray, off: Int, len: Int): Int {
                     if (remaining <= 0L) return -1
                     val n = minOf(len.toLong(), remaining).toInt()
                     remaining -= n
+                    consumed += n
                     return n
                 }
             }
@@ -252,8 +263,8 @@ class BackupRepositoryImplIoTest {
 
         val result = backupManager.loadBackupFromFile(testUri.toString(), ImportOptions())
 
-        assertThat(result).isInstanceOf(ImportResult.Error::class.java)
-        assertThat((result as ImportResult.Error).message).contains("too large")
+        assertThat(result).isEqualTo(ImportResult.InvalidFormat)
+        assertThat(consumed).isLessThan(64 * 1024L)
     }
 
     @Test

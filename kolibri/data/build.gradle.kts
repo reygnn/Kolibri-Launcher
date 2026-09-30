@@ -49,6 +49,7 @@ dependencies {
     // Shared home-info calendar/alarm reader (HIE Phase B); bound to the :core
     // TimeBasedEventsRepository port in RepositoryModule.
     implementation(project(":common-data"))
+    implementation(project(":feature-backup")) // shared backup engine (SPEC_NYX_REWRITE 2a)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)

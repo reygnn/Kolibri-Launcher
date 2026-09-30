@@ -7,6 +7,7 @@ import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -58,6 +59,17 @@ class BackupSerializer @Inject constructor() {
     /** Serializes [BackupData] to its JSON string form. */
     fun encodeToJsonString(backup: BackupData): String =
         json.encodeToString(backup)
+
+    /** The settings as a JSON tree — the payload of the container section (2a-5). */
+    fun settingsToJson(settings: LauncherSettings): JsonElement =
+        json.encodeToJsonElement(LauncherSettings.serializer(), settings)
+
+    /** Reads a container section back; null when it does not fit the settings shape. */
+    fun settingsFromJson(element: JsonElement): LauncherSettings? = try {
+        json.decodeFromJsonElement(LauncherSettings.serializer(), element)
+    } catch (e: IllegalArgumentException) { // SerializationException extends it
+        null
+    }
 
     /**
      * Parses a JSON backup string. Returns `null` on type-validation

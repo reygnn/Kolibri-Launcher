@@ -2,6 +2,8 @@ package com.github.reygnn.kolibri_launcher.data
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
+import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
+import kotlinx.coroutines.Dispatchers
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
@@ -60,6 +62,9 @@ internal object BackupRepositoryImplTestFactory {
             serializer = serializer,
             wallpaperFileManager = wallpaperFileManager,
             context = context,
+            // Real I/O like BackupRepositoryImpl itself (its Dispatchers.IO is a known A13
+            // entry); no legacy reader bound — the old ZIP path is still in the class (2a-5).
+            engine = BackupEngine(Dispatchers.IO, emptySet()),
         )
     }
 }

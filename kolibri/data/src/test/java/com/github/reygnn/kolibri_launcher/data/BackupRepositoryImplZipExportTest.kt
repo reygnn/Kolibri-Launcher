@@ -1,10 +1,12 @@
 package com.github.reygnn.kolibri_launcher.data
+import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifestCodec
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
@@ -45,9 +47,10 @@ import java.util.zip.ZipInputStream
  * on the `feature/backup-import-wallpaper-warning` branch).
  *
  * This test pins the EXPORT half of that contract cheaply on the JVM: drive
- * `saveBackupToFile` with a mocked `openOutputStream` capturing the ZIP bytes,
- * then inspect the archive entries + `backup.json`. Robolectric for
- * `Uri.parse()`.
+ * `saveBackupToFile` with a mocked `openOutputStream` capturing the archive bytes,
+ * then inspect the E5a container (SPEC_NYX_REWRITE 2a-5): `manifest.json` first, one
+ * `blobs/<sha256>` entry per embedded image, the settings in the `kolibri.backup`
+ * section. Robolectric for `Uri.parse()`.
  */
 @RunWith(RobolectricTestRunner::class)
 class BackupRepositoryImplZipExportTest {
@@ -86,9 +89,9 @@ class BackupRepositoryImplZipExportTest {
 
         every { context.contentResolver } returns contentResolver
         every { contentResolver.openOutputStream(any()) } returns zipBytes
-        // Note: the export path (writeZipBackup) reads bytes via
-        // File.inputStream() and never calls copyToInternal — that is an
-        // import-side concern — so wallpaperFileManager needs no stubbing here.
+        // Note: the export reads image bytes via File.inputStream() and never calls
+        // copyToInternal — that is an import-side concern — so wallpaperFileManager
+        // needs no stubbing here.
 
         backupManager = BackupRepositoryImplTestFactory.create(
             favoritesRepository = FakeFavoritesRepository(),
@@ -106,8 +109,8 @@ class BackupRepositoryImplZipExportTest {
 
     @Test
     fun `content-uri layer is not embedded while file-uri layer is`() = runTest {
-        // A real on-disk file for the file:// layer — the only kind
-        // writeZipBackup can embed (it reads bytes via File.inputStream()).
+        // A real on-disk file for the file:// layer — the only kind the export
+        // can embed (it reads bytes via File.inputStream()).
         val realImage = tempFolder.newFile("layer.img").apply {
             writeBytes(ByteArray(512) { (it and 0xFF).toByte() })
         }
@@ -123,19 +126,24 @@ class BackupRepositoryImplZipExportTest {
 
         val bytes = zipBytes.toByteArray()
         val entries = readZipEntryNames(bytes)
-        val wallpaperEntries = entries.filter { it.startsWith("wallpapers/") }
+        assertThat(entries.first()).isEqualTo("manifest.json")
+        val blobEntries = entries.filter { it.startsWith("blobs/") }
         // Exactly one embedded image — the file:// layer. The content:// layer
-        // is not embeddable, so no orphan wallpapers/ entry is created for it.
-        assertThat(wallpaperEntries).hasSize(1)
+        // is not embeddable, so no blob is created for it.
+        assertThat(blobEntries).hasSize(1)
+        val hash = blobEntries.single().removePrefix("blobs/")
+        val manifest = readManifest(bytes)
+        assertThat(manifest.blobs.map { it.sha256 }).containsExactly(hash)
 
-        val backup = json.decodeFromString<BackupData>(readBackupJson(bytes))
-        val layers = backup.settings.wallpaperLayers
+        val layers = settingsOf(manifest).wallpaperLayers
         assertThat(layers).hasSize(2)
-        // content:// layer: no imageFileName stamped (nothing was written).
+        // content:// layer: no blob reference (nothing was written).
         assertThat(layers[0].imageUri).isEqualTo("content://media/external/images/1")
         assertThat(layers[0].imageFileName).isNull()
-        // file:// layer: stamped with the single embedded entry.
-        assertThat(layers[1].imageFileName).isEqualTo(wallpaperEntries.single())
+        // file:// layer: references its blob by hash; the path is not exported —
+        // the blob is the source of truth.
+        assertThat(layers[1].imageFileName).isEqualTo(hash)
+        assertThat(layers[1].imageUri).isNull()
     }
 
     @Test
@@ -147,12 +155,12 @@ class BackupRepositoryImplZipExportTest {
         assertThat(saved).isTrue()
 
         val bytes = zipBytes.toByteArray()
-        assertThat(readZipEntryNames(bytes).none { it.startsWith("wallpapers/") }).isTrue()
+        assertThat(readZipEntryNames(bytes).none { it.startsWith("blobs/") }).isTrue()
 
-        val backup = json.decodeFromString<BackupData>(readBackupJson(bytes))
-        // The URI is preserved in the JSON, but no file reference is stamped.
-        assertThat(backup.settings.wallpaperUri).isEqualTo("content://media/external/images/9")
-        assertThat(backup.settings.wallpaperImageFileName).isNull()
+        val settings = settingsOf(readManifest(bytes))
+        // The URI is preserved in the section, but no blob reference is stamped.
+        assertThat(settings.wallpaperUri).isEqualTo("content://media/external/images/9")
+        assertThat(settings.wallpaperImageFileName).isNull()
     }
 
     private fun readZipEntryNames(bytes: ByteArray): List<String> {
@@ -168,15 +176,14 @@ class BackupRepositoryImplZipExportTest {
         return names
     }
 
-    private fun readBackupJson(bytes: ByteArray): String {
+    private fun readManifest(bytes: ByteArray): ContainerManifest {
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                if (entry.name == "backup.json") return zip.readBytes().toString(Charsets.UTF_8)
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
+            val first = zip.nextEntry ?: error("empty archive")
+            check(first.name == "manifest.json") { "manifest.json must be the first entry" }
+            return checkNotNull(ContainerManifestCodec.decode(zip.readBytes())) { "manifest unreadable" }
         }
-        error("backup.json missing from exported ZIP")
     }
+
+    private fun settingsOf(manifest: ContainerManifest): LauncherSettings =
+        json.decodeFromJsonElement(LauncherSettings.serializer(), manifest.sections.getValue("kolibri.backup").data)
 }

@@ -6,7 +6,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FilterInputStream
+import java.io.EOFException
 import java.io.IOException
+import java.util.zip.ZipException
 import java.io.InputStream
 import java.util.zip.ZipInputStream
 
@@ -22,7 +24,8 @@ import java.util.zip.ZipInputStream
  *   hashed and size-checked; a mismatch drops just that blob and is reported. Entries
  *   without a table row are dropped.
  * - Every non-[ContainerRead.Ok] outcome — and any exception, cancellation included —
- *   leaves nothing staged.
+ *   leaves nothing staged. A read failure that is not a format problem (disk / provider
+ *   error) propagates as the IOException it is.
  */
 class ContainerReader(
     private val ioDispatcher: CoroutineDispatcher,
@@ -42,11 +45,16 @@ class ContainerReader(
             if (archive.limitReached) return@withContext ContainerRead.TooLarge("archive")
             ok = result is ContainerRead.Ok
             result
-        } catch (e: IOException) {
+        } catch (e: ZipException) {
+            ContainerRead.Invalid("not a readable ZIP: ${e.message}")
+        } catch (e: EOFException) {
             // The archive cap ends the stream early, which ZipInputStream reports as a
-            // truncated entry (EOFException) — that is "too large", not "corrupt".
-            if (archive.limitReached) ContainerRead.TooLarge("archive")
-            else ContainerRead.Invalid("not a readable ZIP: ${e.message}")
+            // truncated entry — that is "too large"; without the cap it is a truncated file.
+            if (archive.limitReached) ContainerRead.TooLarge("archive") else ContainerRead.Invalid("truncated archive")
+        } catch (e: IOException) {
+            // Any other I/O failure is not a format problem (a disk or provider error): it
+            // propagates, so the caller reports it as such instead of "invalid backup".
+            if (archive.limitReached) ContainerRead.TooLarge("archive") else throw e
         } finally {
             if (!ok) {
                 staged.values.forEach { it.delete() }

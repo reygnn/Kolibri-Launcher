@@ -172,6 +172,12 @@ class BackupRepositoryImplZipOrphanTest {
     fun `an over-sized image deletes the images extracted before it`() = runTest {
         val bos = ByteArrayOutputStream()
         ZipOutputStream(bos).use { zip ->
+            // A pre-E5a archive needs its backup.json: only then does the container reader
+            // (2a-5) hand it to the old ZIP reader whose cleanup this test pins — without it
+            // the archive is simply "not a backup" and nothing is ever extracted.
+            zip.putNextEntry(ZipEntry("backup.json"))
+            zip.write("{}".toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
             zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
             zip.write(byteArrayOf(1))
             zip.closeEntry()
