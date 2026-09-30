@@ -24,6 +24,8 @@ object ContainerFormat {
     /** Readers accept this major only; any minor (unknown fields are ignored). */
     const val SUPPORTED_MAJOR = 1
     const val CURRENT_VERSION = "1.0"
+    /** `TooLarge.what` of the whole-archive cap — also what a too large declared size reports. */
+    const val CAP_ARCHIVE = "archive"
 
     private val SHA256_HEX = Regex("[0-9a-f]{64}")
     /** Hashes become file names in the staging dir, so only well-formed hex is accepted. */

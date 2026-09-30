@@ -8,6 +8,8 @@
 // 2a-2: the container format (E5a) — manifest first, blobs by SHA-256, caps, staging.
 // 2a-3: the engine over it (sections, producer check, staged-blob ownership) and the
 // LegacyFormatReader port (Hilt set, empty by default).
+// 2b-0: the app-neutral frame around the engine, so Nyx uses it instead of a copy —
+// writeOrDiscard (U3) and readStaged (staging dir, size check before reading).
 plugins {
     id("launcher.jvm.library") // Kotlin JVM + toolchain/target 21 (build-logic)
     alias(libs.plugins.kotlin.serialization) // also the Kotlin-plugin carrier under AGP 9

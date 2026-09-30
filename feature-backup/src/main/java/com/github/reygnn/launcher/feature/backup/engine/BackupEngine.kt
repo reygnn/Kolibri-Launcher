@@ -27,7 +27,9 @@ import javax.inject.Inject
 class BackupEngine internal constructor(
     ioDispatcher: CoroutineDispatcher,
     private val legacyReaders: Set<LegacyFormatReader>,
-    limits: ContainerLimits,
+    private val limits: ContainerLimits,
+    /** Parent of the per-read staging dirs of [readStaged]; tests pass a temp folder. */
+    private val stagingRoot: File = defaultStagingRoot(),
 ) {
 
     @Inject
@@ -89,6 +91,38 @@ class BackupEngine internal constructor(
         }
     }
 
+    /**
+     * [read] with the frame every app needs around it (2b-0): a fresh staging dir under
+     * [stagingRoot], deleted afterwards on every path, also on failure and cancellation;
+     * on [BackupRead.Ok] the staged blobs are closed after [onRead], so whatever it did not
+     * claim is gone. [onRead] gets the staging dir as a place to claim blobs into.
+     *
+     * @param kind names the staging dir (`<appId>-backup-<kind>-<nanos>`), e.g. "import".
+     * @param declaredSize the document's size as the platform reports it, or
+     *   [UNKNOWN_SIZE]. Above the archive cap the backup is [BackupRead.TooLarge] without
+     *   a single byte read; the reader's own cap still bounds a size that was unknown or
+     *   wrong.
+     */
+    suspend fun <T> readStaged(
+        open: () -> InputStream,
+        appId: String,
+        knownSections: Set<String>,
+        kind: String,
+        declaredSize: Long = UNKNOWN_SIZE,
+        onRead: suspend (read: BackupRead, stagingDir: File) -> T,
+    ): T {
+        val staging = File(stagingRoot, "$appId-backup-$kind-${System.nanoTime()}")
+        try {
+            if (declaredSize > limits.maxArchiveBytes) {
+                return onRead(BackupRead.TooLarge(ContainerFormat.CAP_ARCHIVE), staging)
+            }
+            val read = read(open, staging, appId, knownSections)
+            return if (read is BackupRead.Ok) read.blobs.use { onRead(read, staging) } else onRead(read, staging)
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
     private fun fromContainer(container: ContainerRead.Ok, appId: String, known: Set<String>): BackupRead {
         val staged = StagedBlobs(container.staged)
         val manifest = ContainerManifestCodec.decode(container.manifestBytes)
@@ -138,6 +172,16 @@ class BackupEngine internal constructor(
         return BackupRead.OutdatedFormat
     }
 }
+
+/** [BackupEngine.readStaged]: the platform could not tell the document's size. */
+const val UNKNOWN_SIZE = -1L
+
+/**
+ * Staging lives under java.io.tmpdir: on Android the framework points it at the app's
+ * cache dir when the process starts, on the JVM it is the normal temp dir. No Context
+ * needed, so a strictly mocked Context in app tests sees no extra call.
+ */
+private fun defaultStagingRoot() = File(System.getProperty("java.io.tmpdir"))
 
 /** Outcome of [BackupEngine.read]. Only [Ok] leaves staged blobs, owned by the caller. */
 sealed interface BackupRead {

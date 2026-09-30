@@ -8,8 +8,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Writes a container (E5a). Works on a caller-opened [OutputStream] (U1: SAF opening and
- * `writeOrDiscard` stay with the caller) and never closes it.
+ * Writes a container (E5a). Works on a caller-opened [OutputStream] (U1: SAF opening stays
+ * with the caller, which wraps the export in the engine's `writeOrDiscard`, U3) and never
+ * closes it.
  *
  * Two passes, because the manifest comes first and names every blob by its hash:
  *  1. hash every blob, build the table — equal content lands in it once (dedup, B6);

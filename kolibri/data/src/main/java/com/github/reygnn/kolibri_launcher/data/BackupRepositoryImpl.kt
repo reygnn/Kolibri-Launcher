@@ -22,6 +22,8 @@ import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
 import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import com.github.reygnn.launcher.feature.backup.engine.BackupRead
 import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
+import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
+import com.github.reygnn.launcher.feature.backup.engine.writeOrDiscard
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -374,7 +376,9 @@ class BackupRepositoryImpl @Inject constructor(
             }
 
             val backupData = assembler.buildBackupData()
-            writeOrDiscard(uri) { output -> exportContainer(output, backupData) }
+            writeOrDiscard(open = { openOutput(uri) }, discard = { discardDocument(uri) }) { output ->
+                exportContainer(output, backupData)
+            }
 
             Timber.i("Backup saved to: $uri")
             true
@@ -416,40 +420,28 @@ class BackupRepositoryImpl @Inject constructor(
                 return@withContext ImportResult.Error("Invalid format")
             }
 
-            // OOM protection: check file size before reading
-            val fileSize = try {
-                context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { pfd ->
-                    pfd.statSize
-                } ?: 0L
-            } catch (e: Exception) {
-                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-                // Exception sufficient (pure I/O probe, no allocation path → no Error).
-                Timber.w(e, "Could not determine file size, proceeding with caution")
-                0L
-            }
+            // OOM protection: the engine refuses a declared size above the archive cap unread.
+            val fileSize = declaredSize(uri)
 
-            if (fileSize > AppConstants.MAX_BACKUP_SIZE_BYTES) {
-                TimberWrapper.silentError("File too large: $fileSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
-                return@withContext ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
-            }
-
-            // Format detection: ZIP or JSON?
             if (options.importNothing) return@withContext ImportResult.Error("No import options selected")
-            val staging = stagingDir("import")
-            try {
-                when (val read = engine.read({ openInput(uri) }, staging, KolibriBackupSchema.APP_ID, KolibriBackupSchema.KNOWN_SECTIONS)) {
-                    is BackupRead.Ok -> read.blobs.use { blobs -> importContainer(read, blobs, staging, options) }
+            engine.readStaged(
+                open = { openInput(uri) },
+                appId = KolibriBackupSchema.APP_ID,
+                knownSections = KolibriBackupSchema.KNOWN_SECTIONS,
+                kind = "import",
+                declaredSize = fileSize,
+            ) { read, staging ->
+                when (read) {
+                    is BackupRead.Ok -> importContainer(read, read.blobs, staging, options)
                     // A pre-E5a archive reaches this only when no LegacyFormatReader is bound — after
                     // the sunset of :kolibri:backup-legacy (2a-6). While the module is there, it
                     // up-converts old archives and they arrive as BackupRead.Ok.
                     BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
                     is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
                     is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
-                    is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
+                    is BackupRead.TooLarge -> tooLarge(fileSize)
                     is BackupRead.Invalid -> ImportResult.InvalidFormat
                 }
-            } finally {
-                staging.deleteRecursively()
             }
 
         } catch (e: CancellationException) {
@@ -489,30 +481,18 @@ class BackupRepositoryImpl @Inject constructor(
                 return@withContext null
             }
 
-            val fileSize = try {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    pfd.statSize
-                } ?: 0L
-            } catch (e: Exception) {
-                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-                // Exception sufficient (pure I/O probe, no allocation path → no Error).
-                Timber.w(e, "Could not determine file size for preview")
-                0L
-            }
-
-            val staging = stagingDir("preview")
-            try {
-                when (val read = engine.read({ openInput(uri) }, staging, KolibriBackupSchema.APP_ID, KolibriBackupSchema.KNOWN_SECTIONS)) {
-                    is BackupRead.Ok -> read.blobs.use {
-                        val settings = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP]
-                            ?.let { section -> serializer.settingsFromJson(section.data) }
-                            ?: return@withContext null
-                        serializer.buildPreview(backupDataOf(read.manifest.producer, settings))
-                    }
-                    else -> null
-                }
-            } finally {
-                staging.deleteRecursively()
+            engine.readStaged(
+                open = { openInput(uri) },
+                appId = KolibriBackupSchema.APP_ID,
+                knownSections = KolibriBackupSchema.KNOWN_SECTIONS,
+                kind = "preview",
+                declaredSize = declaredSize(uri),
+            ) { read, _ ->
+                if (read !is BackupRead.Ok) return@readStaged null
+                val settings = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP]
+                    ?.let { section -> serializer.settingsFromJson(section.data) }
+                    ?: return@readStaged null
+                serializer.buildPreview(backupDataOf(read.manifest.producer, settings))
             }
 
         } catch (e: SecurityException) {
@@ -630,45 +610,45 @@ class BackupRepositoryImpl @Inject constructor(
         settings = settings,
     )
 
-    /**
-     * A fresh staging dir per import/preview, under java.io.tmpdir — on Android the framework
-     * points that at the app's cache dir when the process starts; on the JVM (tests with a
-     * mocked Context) it is the normal temp dir. Deleted by the caller in `finally`.
-     */
-    private fun stagingDir(kind: String) =
-        File(System.getProperty("java.io.tmpdir"), "kolibri-backup-$kind-${System.nanoTime()}")
-
     private fun openInput(uri: Uri): InputStream =
         context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot read from selected location")
 
+    private fun openOutput(uri: Uri): OutputStream =
+        context.contentResolver.openOutputStream(uri) ?: throw BackupException("Cannot write to selected location")
+
     /**
-     * U3: an export writes into a document the user has just created. If writing fails or
-     * is cancelled, the document is deleted — no half, unimportable ZIP is left behind.
+     * The platform part of U3 (the frame is the shared writeOrDiscard): removes the
+     * half-written document. A failure here is logged by writeOrDiscard, never masking
+     * the export's own failure.
      */
-    private suspend fun writeOrDiscard(uri: Uri, write: suspend (OutputStream) -> Unit) {
-        var complete = false
-        try {
-            val output = context.contentResolver.openOutputStream(uri)
-                ?: throw BackupException("Cannot write to selected location")
-            output.use { write(it) }
-            complete = true
-        } finally {
-            if (!complete) discardDocument(uri)
+    private fun discardDocument(uri: Uri) {
+        if (uri.scheme == AppConstants.SCHEME_FILE) {
+            uri.path?.let { File(it).delete() }
+        } else {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
         }
     }
 
-    private fun discardDocument(uri: Uri) {
-        try {
-            if (uri.scheme == AppConstants.SCHEME_FILE) {
-                uri.path?.let { File(it).delete() }
-            } else {
-                DocumentsContract.deleteDocument(context.contentResolver, uri)
-            }
-        } catch (e: Exception) {
-            // no suspension point; Exception sufficient — a best-effort delete of the half-written
-            // document; the export's own failure is what the user is told about.
-            Timber.w(e, "Could not delete the incomplete backup document")
-        }
+    /** The document's size for the engine's archive cap, or UNKNOWN_SIZE when the provider can't tell. */
+    private fun declaredSize(uri: Uri): Long = try {
+        context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { pfd ->
+            pfd.statSize
+        } ?: UNKNOWN_SIZE
+    } catch (e: Exception) {
+        // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
+        // Exception sufficient (pure I/O probe, no allocation path → no Error).
+        Timber.w(e, "Could not determine file size, proceeding with caution")
+        UNKNOWN_SIZE
+    }
+
+    /**
+     * A declared size over the cap (refused by the engine unread) keeps its detailed message;
+     * a cap the reader hits while streaming keeps the short one.
+     */
+    private fun tooLarge(declaredSize: Long): ImportResult.Error {
+        if (declaredSize <= AppConstants.MAX_BACKUP_SIZE_BYTES) return ImportResult.Error("Backup file is too large")
+        TimberWrapper.silentError("File too large: $declaredSize bytes (max: ${AppConstants.MAX_BACKUP_SIZE_BYTES})")
+        return ImportResult.Error("Backup file is too large (>${AppConstants.MAX_BACKUP_SIZE_BYTES / 1024 / 1024}MB)")
     }
 
     private companion object {

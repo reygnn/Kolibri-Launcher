@@ -42,7 +42,7 @@ class ContainerReader(
         var ok = false
         try {
             val result = ZipInputStream(archive).use { zip -> readZip(zip, archive, stagingDir, staged, decodeHeader) }
-            if (archive.limitReached) return@withContext ContainerRead.TooLarge("archive")
+            if (archive.limitReached) return@withContext ContainerRead.TooLarge(ContainerFormat.CAP_ARCHIVE)
             ok = result is ContainerRead.Ok
             result
         } catch (e: ZipException) {
@@ -50,11 +50,11 @@ class ContainerReader(
         } catch (e: EOFException) {
             // The archive cap ends the stream early, which ZipInputStream reports as a
             // truncated entry — that is "too large"; without the cap it is a truncated file.
-            if (archive.limitReached) ContainerRead.TooLarge("archive") else ContainerRead.Invalid("truncated archive")
+            if (archive.limitReached) ContainerRead.TooLarge(ContainerFormat.CAP_ARCHIVE) else ContainerRead.Invalid("truncated archive")
         } catch (e: IOException) {
             // Any other I/O failure is not a format problem (a disk or provider error): it
             // propagates, so the caller reports it as such instead of "invalid backup".
-            if (archive.limitReached) ContainerRead.TooLarge("archive") else throw e
+            if (archive.limitReached) ContainerRead.TooLarge(ContainerFormat.CAP_ARCHIVE) else throw e
         } finally {
             if (!ok) {
                 staged.values.forEach { it.delete() }
@@ -96,7 +96,7 @@ class ContainerReader(
             currentCoroutineContextCheck()
             val entry = zip.nextEntry ?: break
             if (++entries > limits.maxBlobCount + 1) return ContainerRead.TooLarge("entry count")
-            if (archive.limitReached) return ContainerRead.TooLarge("archive")
+            if (archive.limitReached) return ContainerRead.TooLarge(ContainerFormat.CAP_ARCHIVE)
             val hash = entry.name.removePrefix(ContainerFormat.BLOB_DIR)
             val expected = if (entry.name.startsWith(ContainerFormat.BLOB_DIR)) table[hash] else null
             if (expected == null || hash in staged || rejected.any { it.sha256 == hash }) {
