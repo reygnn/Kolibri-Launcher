@@ -2,8 +2,6 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
-import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.launcher.core.CappedInputStream
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -14,6 +12,11 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
+import com.github.reygnn.launcher.feature.backup.container.BlobSource
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
+import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
+import com.github.reygnn.launcher.feature.backup.engine.BackupRead
+import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
@@ -29,23 +32,19 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Nyx's full backup engine (Scope B, nyx-local): a ZIP container
- * (`backup.json` + `wallpapers/ image` blobs) over the [NyxBackup] schema, composing
- * Nyx's repos + the shared wallpaper file/state layer. Assembler + ZIP-I/O in one
- * (Nyx's surface is small enough not to warrant Kolibri's serializer/assembler/impl
- * three-way split).
+ * Nyx's backup over the shared [BackupEngine] (SPEC_NYX_REWRITE 2b-1): the E5a container
+ * with one `nyx.backup` section ([NyxBackupSchema]) and the wallpaper images as blobs,
+ * referenced by hash. The container itself — ZIP, caps, hashing, staging — is the engine's;
+ * this class assembles the section from Nyx's repos and applies it.
  *
  * Callers own the streams (the settings UI opens the SAF Uri); this stays
  * ContentResolver-free and testable. Blob restore reuses the shared
- * [WallpaperFileManager.copyFromInputStream] (extract → internal file), so imported
- * layers land in internal storage exactly like a fresh pick.
+ * [WallpaperFileManager.copyFromInputStream] (staged blob → internal file), so imported
+ * layers land in internal storage exactly like a fresh pick. Dissolved in 2b-4.
  */
 @Singleton
 class NyxBackupManager @Inject constructor(
@@ -59,19 +58,17 @@ class NyxBackupManager @Inject constructor(
     private val fileManager: WallpaperFileManager,
     private val serializer: NyxBackupSerializer,
     private val reconcileHomeLayout: ReconcileHomeLayoutUseCase,
+    private val engine: BackupEngine,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    /** Writes a full backup ZIP to [out]. Returns true on success. */
+    /** Writes a full backup container to [out] (left open for the caller). Returns true on success. */
     suspend fun export(out: OutputStream, appVersion: String, timestamp: Long): Boolean =
         withContext(ioDispatcher) {
             try {
                 val layout = homeLayoutRepository.layout().first().toDto()
                 val fab = fabPositionStore.fabPositionFlow.first() // read once (x/y atomic)
-                val iconStyle = preferences.iconStyle().first()
                 val prefs = NyxBackupPrefs(
-                    iconStyle = iconStyle.name,
-                    // Mirror into the legacy flag so an older Nyx can still restore this backup.
-                    monochromeIcons = iconStyle == IconStyle.MONOCHROME,
+                    iconStyle = preferences.iconStyle().first().name,
                     searchAutoLaunch = preferences.searchAutoLaunch().first(),
                     usageSortEnabled = preferences.usageSortEnabled().first(),
                     notificationDots = preferences.notificationDots().first(),
@@ -83,42 +80,39 @@ class NyxBackupManager @Inject constructor(
                     fabXFraction = fab.xFraction,
                     fabYFraction = fab.yFraction,
                 )
-                // Layers + their blob file names. Only file:// layers with an existing
-                // file get a blob entry; the imageFileName ties manifest ↔ blob.
+                // Every layer backed by an existing internal file becomes a blob; the section
+                // references it by hash (equal images are stored once). Other layers keep
+                // their imageUri and have no blob.
                 val state = wallpaperRepository.getWallpaperStateSync()
-                val layerBlobs = ArrayList<Pair<String, File>>() // entryName -> source file
-                val layers = state.layers.mapIndexedNotNull { index, layer ->
-                    val backup = WallpaperLayerBackup.fromLayerState(layer)
-                    val file = layer.imageUri?.let { localFileOrNull(it) }
-                    if (file != null) {
-                        val entryName = "wallpapers/layer_$index.img"
-                        layerBlobs += entryName to file
-                        backup.copy(imageFileName = entryName)
-                    } else {
-                        backup
+                val sources = ArrayList<BlobSource>()
+                val layerSource = state.layers.map { layer ->
+                    layer.imageUri?.let { localFileOrNull(it) }?.let { file ->
+                        sources += BlobSource(IMAGE_MEDIA_TYPE) { file.inputStream() }
+                        sources.size - 1
                     }
                 }
-                val backup = NyxBackup(
-                    timestamp = timestamp,
-                    appVersion = appVersion,
-                    layout = layout,
-                    prefs = prefs,
-                    drawerFolders = drawerFoldersRepository.folders().first().toDto(),
-                    hiddenApps = hiddenAppsRepository.hidden().first().map { it.toDto() },
-                    wallpaperLayers = layers,
-                )
+                val drawerFolders = drawerFoldersRepository.folders().first().toDto()
+                val hiddenApps = hiddenAppsRepository.hidden().first().map { it.toDto() }
 
-                ZipOutputStream(out).use { zip ->
-                    zip.putNextEntry(ZipEntry(MANIFEST))
-                    zip.write(serializer.serialize(backup).toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-                    // One blob per layer entry (each Nyx layer is a distinct internal
-                    // file), so every referenced imageFileName has its blob written.
-                    for ((entryName, file) in layerBlobs) {
-                        zip.putNextEntry(ZipEntry(entryName))
-                        file.inputStream().use { it.copyTo(zip) }
-                        zip.closeEntry()
+                engine.export(
+                    output = out,
+                    producer = ContainerManifest.Producer(NyxBackupSchema.APP_ID, appVersion, timestamp),
+                    schemaVersion = NyxBackupSchema.SCHEMA_VERSION,
+                    blobs = sources,
+                ) { hashes ->
+                    val layers = state.layers.mapIndexed { index, layer ->
+                        val backup = WallpaperLayerBackup.fromLayerState(layer)
+                        val source = layerSource[index]
+                        if (source != null) backup.copy(imageUri = null, imageFileName = hashes[source]) else backup.copy(imageFileName = null)
                     }
+                    val backup = NyxBackup(
+                        layout = layout,
+                        prefs = prefs,
+                        drawerFolders = drawerFolders,
+                        hiddenApps = hiddenApps,
+                        wallpaperLayers = layers,
+                    )
+                    mapOf(NyxBackupSchema.SECTION_BACKUP to ContainerManifest.Section(NyxBackupSchema.SECTION_VERSION, serializer.toJson(backup)))
                 }
                 true
             } catch (e: CancellationException) {
@@ -129,127 +123,124 @@ class NyxBackupManager @Inject constructor(
             }
         }
 
-    /** Reads a backup ZIP from [inp] and applies it per [options]. */
+    /**
+     * Reads a backup container from [inp] and applies it per [options]. Nyx binds no
+     * LegacyFormatReader, so the engine opens the stream exactly once and [inp] can be handed
+     * over as is. Every outcome other than a readable Nyx backup is [ImportResult.InvalidData]
+     * until 2b-3 gives them their own messages.
+     */
     suspend fun import(inp: InputStream, options: NyxBackupOptions): ImportResult =
         withContext(ioDispatcher) {
-            val extracted = HashMap<String, String>() // entryName -> internal uri
-            // Extracted blobs the restored wallpaper state references, claimed BEFORE its save is
-            // attempted. Every other extracted blob is deleted in `finally` (§Audit-3 A3-05).
-            var adopted: Set<String> = emptySet()
             try {
-                // Extract: manifest + each blob (copied to internal storage now, so
-                // the restored URIs are already internal file://).
-                var manifest: String? = null
-                var blobCount = 0
-                // Cap the whole compressed archive (kolibri parity, shared MAX_BACKUP_SIZE_BYTES):
-                // ZipInputStream can never pull more than this many compressed bytes in total —
-                // extraction AND the closeEntry skips of unread entries — so a decompression bomb's
-                // work stays bounded. copyFromInputStream / readNBytes read through this wrapper.
-                val boundedInput = CappedInputStream(inp, MAX_BACKUP_SIZE_BYTES + 1)
-                ZipInputStream(boundedInput).use { zip ->
-                    var entry = zip.nextEntry
-                    while (entry != null) {
-                        if (entry.name == MANIFEST) {
-                            // Bounded read: a real manifest (layout + prefs JSON) is a few KB; cap
-                            // it so a crafted/oversized/zip-bomb manifest can't OOM the import.
-                            // readNBytes(cap+1) returns >cap only if the entry exceeds the cap.
-                            val bytes = zip.readNBytes(MAX_MANIFEST_BYTES + 1)
-                            if (bytes.size > MAX_MANIFEST_BYTES) return@withContext ImportResult.InvalidData
-                            manifest = bytes.toString(Charsets.UTF_8)
-                        } else if (options.importWallpaper && entry.name.startsWith(WALLPAPER_DIR)) {
-                            val entryName = entry.name
-                            // Extract only when actually importing wallpaper — else the
-                            // blobs would land in internal storage unreferenced (leak).
-                            // Reject an archive with an absurd number of blobs (a real Nyx backup
-                            // has one per wallpaper layer) before it can spam the wallpaper dir.
-                            if (++blobCount > MAX_BLOB_ENTRIES) return@withContext ImportResult.InvalidData
-                            // Cap each blob's DECOMPRESSED size so a bomb entry can't fill the disk:
-                            // extract through a per-blob CappedInputStream and reject (dropping the
-                            // partial file) if it exceeds the limit. copyFromInputStream reads to
-                            // entry-end without closing the (wrapped) zip stream.
-                            val cappedBlob = CappedInputStream(zip, MAX_BLOB_BYTES + 1)
-                            val uri = fileManager.copyFromInputStream(cappedBlob)
-                            if (cappedBlob.limitReached) {
-                                uri?.let { localFileOrNull(it.toString())?.delete() }
-                                return@withContext ImportResult.InvalidData
-                            }
-                            uri?.let { extracted[entryName] = it.toString() }
-                        }
-                        zip.closeEntry()
-                        entry = zip.nextEntry
-                    }
-                    // A bomb that inflated past the whole-archive cap leaves the stream truncated;
-                    // if ZipInputStream didn't already throw (caught below), flag it explicitly.
-                    if (boundedInput.limitReached) return@withContext ImportResult.InvalidData
+                engine.readStaged(
+                    open = { inp },
+                    appId = NyxBackupSchema.APP_ID,
+                    knownSections = NyxBackupSchema.KNOWN_SECTIONS,
+                    kind = "import",
+                ) { read, staging ->
+                    if (read is BackupRead.Ok) apply(read, staging, options) else ImportResult.InvalidData
                 }
-                val backup = manifest?.let { serializer.deserialize(it) } ?: return@withContext ImportResult.InvalidData
-
-                // Apply the home layout LAST. Cross-DataStore atomicity isn't available,
-                // so if a settings/wallpaper write throws mid-import, doing layout last
-                // leaves the existing (most valuable) home layout intact rather than
-                // half-replaced — it is a single write and the least likely to fail.
-                if (options.importSettings) applyPrefs(backup.prefs)
-                if (options.importWallpaper) {
-                    restoredWallpaperState(backup.wallpaperLayers, extracted)?.let { state ->
-                        // Claim the blobs BEFORE saving, never after: DataStore can commit the write
-                        // and the call still end in a CancellationException (the import runs in the
-                        // settings screen's lifecycleScope). Claiming afterwards would let `finally`
-                        // delete files the persisted state already points at — a broken wallpaper.
-                        // Failing safe keeps them; a save that truly didn't land leaves at most an
-                        // orphan for the startup sweep.
-                        adopted = state.layers.mapNotNullTo(HashSet()) { it.imageUri }
-                        wallpaperRepository.saveWallpaperState(state)
-                    }
-                }
-                if (options.importLayout) {
-                    // Drawer folders are structural organisation too — restore them under the
-                    // layout toggle. A replace (return the restored value), mirroring the home
-                    // layout's save; a null field (older backup) leaves current folders intact.
-                    // Sanitize first (like the home layout's reconcile): a crafted/cross-device
-                    // blob can carry 0-1-member or duplicate-member folders, so repair them at
-                    // rest instead of relying on the read-time projection (§Audit-2 N10).
-                    backup.drawerFolders?.toDomain()?.let { restored ->
-                        val repaired = DrawerFoldersTransition.sanitize(restored)
-                        drawerFoldersRepository.update { repaired }
-                    }
-                    // Hidden apps are drawer organisation too — restore under the layout toggle
-                    // (replace; a null field from an older backup leaves the current set intact).
-                    backup.hiddenApps?.let { dto ->
-                        hiddenAppsRepository.update { dto.mapNotNull { it.toDomain() }.toSet() } // drop invalid keys (§Audit-2 N15)
-                    }
-                    backup.layout?.toDomain()?.let {
-                        homeLayoutRepository.save(it)
-                        // Structural-only cleanup of the restored layout NOW (not just on the
-                        // next cold start): a cross-device backup can carry duplicate keys /
-                        // 0-1-member folders / an over-capacity dock, which would otherwise render
-                        // as duplicate/malformed tiles for the rest of this session. reconcile()
-                        // is total (fail-closed) and no-prune, so it never drops uninstalled refs.
-                        reconcileHomeLayout()
-                    }
-                }
-
-                ImportResult.Success
             } catch (e: CancellationException) {
                 throw e // cooperative cancellation must propagate, never become InvalidData
             } catch (e: Throwable) {
                 TimberWrapper.silentError(e, "Nyx backup import failed")
                 ImportResult.InvalidData
-            } finally {
-                // Blobs are extracted before the manifest is validated, so an aborted import
-                // (invalid/missing manifest, a cap tripped, a failed write, cancellation) — or a
-                // blob no restored layer references — would otherwise sit orphaned in internal
-                // storage until the next startup orphan sweep. Drop them now (§Audit-3 A3-05).
-                (extracted.values - adopted).forEach { fileManager.deleteFile(it) }
             }
         }
 
+    private suspend fun apply(read: BackupRead.Ok, staging: File, options: NyxBackupOptions): ImportResult {
+        val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidData
+        val backup = serializer.fromJson(section.data) ?: return ImportResult.InvalidData
+        // Layer index → internal file copied from its blob. Every layer gets its OWN file, also
+        // when two layers share one blob: removing a layer deletes its file right away, so a
+        // file shared between layers would take the other layer's image with it.
+        val extracted = HashMap<Int, String>()
+        // Copied files the restored wallpaper state references, claimed BEFORE its save is
+        // attempted. Every other copied file is deleted in `finally` (§Audit-3 A3-05).
+        var adopted: Set<String> = emptySet()
+        try {
+            if (options.importWallpaper) extractLayerImages(backup.wallpaperLayers, read.blobs, staging, extracted)
+
+            // Apply the home layout LAST. Cross-DataStore atomicity isn't available,
+            // so if a settings/wallpaper write throws mid-import, doing layout last
+            // leaves the existing (most valuable) home layout intact rather than
+            // half-replaced — it is a single write and the least likely to fail.
+            if (options.importSettings) applyPrefs(backup.prefs)
+            if (options.importWallpaper) {
+                restoredWallpaperState(backup.wallpaperLayers, extracted)?.let { state ->
+                    // Claim the files BEFORE saving, never after: DataStore can commit the write
+                    // and the call still end in a CancellationException (the import runs in the
+                    // settings screen's lifecycleScope). Claiming afterwards would let `finally`
+                    // delete files the persisted state already points at — a broken wallpaper.
+                    // Failing safe keeps them; a save that truly didn't land leaves at most an
+                    // orphan for the startup sweep.
+                    adopted = state.layers.mapNotNullTo(HashSet()) { it.imageUri }
+                    wallpaperRepository.saveWallpaperState(state)
+                }
+            }
+            if (options.importLayout) {
+                // Drawer folders are structural organisation too — restore them under the
+                // layout toggle. A replace (return the restored value), like the home
+                // layout's save; a null field leaves current folders intact.
+                // Sanitize first (like the home layout's reconcile): a crafted/cross-device
+                // blob can carry 0-1-member or duplicate-member folders, so repair them at
+                // rest instead of relying on the read-time projection (§Audit-2 N10).
+                backup.drawerFolders?.toDomain()?.let { restored ->
+                    val repaired = DrawerFoldersTransition.sanitize(restored)
+                    drawerFoldersRepository.update { repaired }
+                }
+                // Hidden apps are drawer organisation too — restore under the layout toggle
+                // (replace; a null field leaves the current set intact).
+                backup.hiddenApps?.let { dto ->
+                    hiddenAppsRepository.update { dto.mapNotNull { it.toDomain() }.toSet() } // drop invalid keys (§Audit-2 N15)
+                }
+                backup.layout?.toDomain()?.let {
+                    homeLayoutRepository.save(it)
+                    // Structural-only cleanup of the restored layout NOW (not just on the
+                    // next cold start): a cross-device backup can carry duplicate keys /
+                    // 0-1-member folders / an over-capacity dock, which would otherwise render
+                    // as duplicate/malformed tiles for the rest of this session. reconcile()
+                    // is total (fail-closed) and no-prune, so it never drops uninstalled refs.
+                    reconcileHomeLayout()
+                }
+            }
+            return ImportResult.Success
+        } finally {
+            // A copied file no restored layer ended up referencing (a failed write, cancellation,
+            // every layer dropped) must not sit orphaned in internal storage until the next
+            // startup sweep. Drop it now (§Audit-3 A3-05).
+            (extracted.values - adopted).forEach { fileManager.deleteFile(it) }
+        }
+    }
+
+    /**
+     * Copies each blob-backed layer's image into internal storage, one file per layer. A
+     * blob that was rejected (hash/size) or is missing leaves its layer out of [extracted];
+     * the layer is then dropped. The staged blob is claimed once and deleted after its copies.
+     */
+    private fun extractLayerImages(
+        layers: List<WallpaperLayerBackup>,
+        blobs: StagedBlobs,
+        staging: File,
+        extracted: MutableMap<Int, String>,
+    ) {
+        val claimed = HashMap<String, File>()
+        try {
+            layers.forEachIndexed { index, layer ->
+                val hash = layer.imageFileName ?: return@forEachIndexed
+                val file = claimed[hash]
+                    ?: blobs.claim(hash, File(staging, "claimed-$hash"))?.also { claimed[hash] = it }
+                    ?: return@forEachIndexed
+                file.inputStream().use { fileManager.copyFromInputStream(it) }?.let { extracted[index] = it.toString() }
+            }
+        } finally {
+            claimed.values.forEach { it.delete() }
+        }
+    }
+
     private suspend fun applyPrefs(prefs: NyxBackupPrefs?) {
         prefs ?: return
-        // Prefer the tri-state field; fall back to the legacy boolean for old backups.
-        // no suspension point — enum parse of a backup string.
-        val importedStyle = prefs.iconStyle?.let { runCatching { IconStyle.valueOf(it) }.getOrNull() }
-            ?: prefs.monochromeIcons?.let { if (it) IconStyle.MONOCHROME else IconStyle.COLOR }
-        importedStyle?.let { preferences.setIconStyle(it) }
+        prefs.iconStyle?.toEnumOrNull<IconStyle>()?.let { preferences.setIconStyle(it) }
         prefs.searchAutoLaunch?.let { preferences.setSearchAutoLaunch(it) }
         prefs.usageSortEnabled?.let { preferences.setUsageSortEnabled(it) }
         prefs.notificationDots?.let { preferences.setNotificationDots(it) }
@@ -264,17 +255,17 @@ class NyxBackupManager @Inject constructor(
     }
 
     /**
-     * The wallpaper state to restore from [layers] + their [extracted] blobs, or null to keep the
-     * current wallpaper. The caller claims its blob URIs and saves it.
+     * The wallpaper state to restore from [layers] + their [extracted] files (by layer index),
+     * or null to keep the current wallpaper. The caller claims its file URIs and saves it.
      */
-    private fun restoredWallpaperState(layers: List<WallpaperLayerBackup>, extracted: Map<String, String>): WallpaperState? {
+    private fun restoredWallpaperState(layers: List<WallpaperLayerBackup>, extracted: Map<Int, String>): WallpaperState? {
         // Replace semantics: a backup with no wallpaper clears the current one.
         if (layers.isEmpty()) return WallpaperState.NONE
-        // Rebind each blob-backed layer to its freshly-extracted internal URI. A
-        // blob-backed layer whose blob is missing/failed is DROPPED (its source
-        // file:// path is dead on the restore target) — all-or-nothing per layer.
-        val restored = layers.mapNotNull { layer ->
-            val uri = if (layer.imageFileName != null) extracted[layer.imageFileName] else layer.imageUri
+        // Rebind each blob-backed layer to its freshly copied internal URI. A blob-backed
+        // layer whose blob is missing/failed is DROPPED (its source file:// path is dead on
+        // the restore target) — all-or-nothing per layer.
+        val restored = layers.mapIndexedNotNull { index, layer ->
+            val uri = if (layer.imageFileName != null) extracted[index] else layer.imageUri
             uri?.let {
                 WallpaperLayerState(
                     id = layer.id ?: WallpaperLayerState.newId(),
@@ -304,16 +295,6 @@ class NyxBackupManager @Inject constructor(
         runCatching { enumValueOf<E>(this) }.getOrNull()
 
     private companion object {
-        const val MANIFEST = "backup.json"
-        const val WALLPAPER_DIR = "wallpapers/"
-        // Defensive cap for the manifest JSON entry (a real one is a few KB); guards against a
-        // crafted/oversized/zip-bomb manifest OOMing the import (input is user-chosen via SAF).
-        const val MAX_MANIFEST_BYTES = 5 * 1024 * 1024 // 5 MiB
-        // Whole-archive compressed cap (shared with kolibri via AppConstants) + per-blob
-        // decompressed cap + a generous blob-count cap: together they bound both the total
-        // decompression work and the on-disk bytes an untrusted backup can write.
-        const val MAX_BACKUP_SIZE_BYTES = AppConstants.MAX_BACKUP_SIZE_BYTES // 10 MiB (compressed archive)
-        const val MAX_BLOB_BYTES = AppConstants.MAX_BACKUP_SIZE_BYTES // 10 MiB per decompressed blob
-        const val MAX_BLOB_ENTRIES = 64 // far above any real per-layer blob count
+        const val IMAGE_MEDIA_TYPE = "image/*"
     }
 }

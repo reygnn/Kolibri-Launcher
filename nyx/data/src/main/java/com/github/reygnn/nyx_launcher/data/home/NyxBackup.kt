@@ -4,47 +4,38 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import kotlinx.serialization.Serializable
 
 /**
- * The full Nyx backup payload — the `@Serializable` envelope written into the ZIP
- * container's `backup.json`. Lives in `:data` alongside [HomeLayoutDto] (the domain
- * stays annotation-free). Every field is optional/defaulted so an older backup still
- * decodes forward-compatibly (kotlinx `ignoreUnknownKeys` + defaults).
- *
- * Unlike Kolibri's paranoid multi-pass serializer, Nyx starts lean: a straight
- * kotlinx round-trip, no org.json strict-recovery (a fresh product with no
- * hand-edited-backup legacy to defend).
+ * The Nyx backup payload — the `@Serializable` data of the one `nyx.backup` section in the
+ * E5a container ([NyxBackupSchema]). Lives in `:data` alongside [HomeLayoutDto] (the domain
+ * stays annotation-free). Every field is optional/defaulted so a later schema that adds a
+ * field still decodes here (kotlinx `ignoreUnknownKeys` + defaults). Producer, app version,
+ * time and schema version are the container manifest's, not the payload's.
  */
 @Serializable
 data class NyxBackup(
-    val schemaVersion: Int = 1,
-    val timestamp: Long = 0L,
-    val appVersion: String = "",
     /** Home grid layout (null = not included / not restored). */
     val layout: HomeLayoutDto? = null,
     /** DataStore-backed preferences (null = not included). */
     val prefs: NyxBackupPrefs? = null,
     /**
-     * Drawer-folder membership (null = not included, e.g. an older backup). Persisted in
-     * its own DataStore blob (separate from [layout], D-5), so it must be carried here
-     * explicitly or it is lost on restore. Restored under the layout import toggle.
+     * Drawer-folder membership (null = not included). Persisted in its own DataStore blob
+     * (separate from [layout], D-5), so it must be carried here explicitly or it is lost on
+     * restore. Restored under the layout import toggle.
      */
     val drawerFolders: DrawerFoldersDto? = null,
     /**
-     * Apps hidden from the drawer (null = not included, e.g. an older backup). Own DataStore
-     * blob, so carried here explicitly or it is lost on restore. Restored under the layout
-     * import toggle (drawer organisation, like [drawerFolders]).
+     * Apps hidden from the drawer (null = not included). Own DataStore blob, so carried here
+     * explicitly or it is lost on restore. Restored under the layout import toggle (drawer
+     * organisation, like [drawerFolders]).
      */
     val hiddenApps: List<ComponentKeyDto>? = null,
     /**
-     * Wallpaper layers with per-layer transforms. Each [WallpaperLayerBackup.imageFileName]
-     * points at a blob inside the ZIP's `wallpapers/` dir (restored to internal storage).
+     * Wallpaper layers with per-layer transforms. [WallpaperLayerBackup.imageFileName] is the
+     * SHA-256 of the layer's image blob in the container; a layer without a blob keeps its
+     * `imageUri`.
      */
     val wallpaperLayers: List<WallpaperLayerBackup> = emptyList(),
 )
 
-/**
- * Nyx's DataStore preferences in backup form. All nullable: a null means "not in the
- * backup" and the import leaves the current value untouched (skip-on-null).
- */
 /** Selective-import toggles (not persisted — a runtime choice from the restore UI). */
 data class NyxBackupOptions(
     val importLayout: Boolean = true,
@@ -52,12 +43,14 @@ data class NyxBackupOptions(
     val importWallpaper: Boolean = true,
 )
 
+/**
+ * Nyx's DataStore preferences in backup form. All nullable: a null means "not in the
+ * backup" and the import leaves the current value untouched (skip-on-null).
+ */
 @Serializable
 data class NyxBackupPrefs(
     /** [com.github.reygnn.nyx_launcher.home.model.IconStyle] name (COLOR/MONOCHROME/GRAYSCALE). */
     val iconStyle: String? = null,
-    /** Legacy pre-tri-state flag; kept so older backups still restore (maps to MONOCHROME). */
-    val monochromeIcons: Boolean? = null,
     val searchAutoLaunch: Boolean? = null,
     val usageSortEnabled: Boolean? = null,
     val notificationDots: Boolean? = null,

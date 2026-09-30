@@ -27,6 +27,11 @@ import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.github.reygnn.launcher.feature.backup.container.BlobSource
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifestCodec
+import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
+import com.github.reygnn.launcher.feature.backup.engine.BackupRead
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -37,18 +42,22 @@ import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.security.MessageDigest
 import kotlin.random.Random
 
 /**
- * Round-trips a backup through the ZIP container (export → import) with mocked repos,
- * pinning the assembler both directions. Wallpaper blobs (file I/O) are covered on
- * device; here wallpaper is empty so no Uri parsing is needed (pure JVM).
+ * Round-trips a backup through the shared E5a container (export → import, 2b-1) with mocked
+ * repos, pinning the assembler both directions. Containers for the import-only cases are
+ * written by the real engine ([containerOf]) or, for hostile archives, by hand. Uri is
+ * mocked, not parsed (pure JVM).
  */
 class NyxBackupManagerTest {
 
@@ -93,10 +102,13 @@ class NyxBackupManagerTest {
     // layout THEN reconciles it, and reconcile is gated behind the importLayout toggle.
     private val reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true)
 
+    private val engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet())
+    private val serializer = NyxBackupSerializer()
+
     private val manager = NyxBackupManager(
         homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
-        wallpaperRepository, fabPositionStore, fileManager, NyxBackupSerializer(),
-        reconcileHomeLayout, mainDispatcherRule.testDispatcher,
+        wallpaperRepository, fabPositionStore, fileManager, serializer,
+        reconcileHomeLayout, engine, mainDispatcherRule.testDispatcher,
     )
 
 
@@ -161,7 +173,7 @@ class NyxBackupManagerTest {
             listOf(DrawerFolder(DrawerFolderId("solo"), "Solo", listOf(ComponentKey.of("com.a", "com.a.M")))),
         )
         val result = manager.import(
-            ByteArrayInputStream(zipOf(NyxBackup(drawerFolders = malformed.toDto()))),
+            ByteArrayInputStream(containerOf(NyxBackup(drawerFolders = malformed.toDto()))),
             NyxBackupOptions(),
         )
 
@@ -186,17 +198,10 @@ class NyxBackupManagerTest {
 
     @Test
     fun import_with_null_hidden_apps_leaves_current_set_intact() = runTest(mainDispatcherRule.testDispatcher) {
-        // An older backup carries no hiddenApps field (null); restore must not clear the current set.
+        // A backup without a hiddenApps field (null); restore must not clear the current set.
         hiddenAppsRepository.update { setOf(ComponentKey.of("com.keep", "com.keep.M")) }
-        val backup = NyxBackup(timestamp = 1L, appVersion = "old", hiddenApps = null)
-        val zip = ByteArrayOutputStream()
-        ZipOutputStream(zip).use {
-            it.putNextEntry(ZipEntry("backup.json"))
-            it.write(NyxBackupSerializer().serialize(backup).toByteArray(Charsets.UTF_8))
-            it.closeEntry()
-        }
 
-        val result = manager.import(ByteArrayInputStream(zip.toByteArray()), NyxBackupOptions())
+        val result = manager.import(ByteArrayInputStream(containerOf(NyxBackup(hiddenApps = null))), NyxBackupOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(hiddenAppsRepository.current).containsExactly(ComponentKey.of("com.keep", "com.keep.M"))
@@ -210,53 +215,109 @@ class NyxBackupManagerTest {
 
     @Test
     fun import_rejects_an_archive_with_too_many_wallpaper_blobs() = runTest(mainDispatcherRule.testDispatcher) {
-        // Count cap (MAX_BLOB_ENTRIES = 64): a real backup has one blob per layer; an archive
-        // spamming the wallpaper dir with far more entries is rejected before it can.
-        every { fileManager.copyFromInputStream(any()) } returns null // extraction result irrelevant here
-        val bytes = zipOf(NyxBackup(), blobs = (0..64).map { "wallpapers/layer_$it.img" }) // 65 > 64
-        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+        // Count cap (engine, 64 blobs): a real backup has one blob per distinct layer image; a
+        // manifest listing far more is refused before anything is staged or copied.
+        val table = (0..64).map { ContainerManifest.Blob(sha256Of(byteArrayOf(it.toByte())), 1, "image/*") } // 65 > 64
+        val result = manager.import(ByteArrayInputStream(handMade(table)), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        verify(exactly = 0) { fileManager.copyFromInputStream(any()) }
+    }
+
+    @Test
+    fun import_rejects_a_blob_declared_larger_than_the_per_blob_cap() = runTest(mainDispatcherRule.testDispatcher) {
+        // Per-blob cap (engine, 10 MiB): the manifest's table declares every blob's size, so an
+        // over-cap blob is refused from the table alone, before a byte of it is read.
+        val table = listOf(ContainerManifest.Blob(sha256Of(byteArrayOf(1)), 11L * 1024 * 1024, "image/*"))
+        val result = manager.import(ByteArrayInputStream(handMade(table)), NyxBackupOptions())
         assertThat(result).isEqualTo(ImportResult.InvalidData)
     }
 
     @Test
-    fun import_rejects_a_blob_larger_than_the_per_blob_cap() = runTest(mainDispatcherRule.testDispatcher) {
-        // Per-blob decompressed cap (MAX_BLOB_BYTES = 10 MiB): drain the stream like the real
-        // copyFromInputStream so the per-blob CappedInputStream counts the bytes; an 11 MiB blob
-        // (compresses tiny, so the whole-archive cap is untouched) trips the cap → InvalidData.
-        every { fileManager.copyFromInputStream(any()) } answers {
-            firstArg<java.io.InputStream>().readBytes(); null
-        }
-        val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write(NyxBackupSerializer().serialize(NyxBackup()).toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
-            zip.write(ByteArray(11 * 1024 * 1024)) // 11 MiB decompressed > 10 MiB per-blob cap
-            zip.closeEntry()
-        }
-        val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
-        assertThat(result).isEqualTo(ImportResult.InvalidData)
+    fun a_blob_larger_than_its_table_entry_drops_only_its_layer() = runTest(mainDispatcherRule.testDispatcher) {
+        // BackupFormatContract: a size or hash mismatch rejects just that blob — its layer is
+        // dropped (here the only one, so the current wallpaper stays), the rest imports.
+        val declared = byteArrayOf(1, 2, 3)
+        val table = listOf(ContainerManifest.Blob(sha256Of(declared), declared.size.toLong(), "image/*"))
+        val backup = NyxBackup(
+            layout = layout.toDto(),
+            wallpaperLayers = listOf(layerBackup(0).copy(imageFileName = table.single().sha256)),
+        )
+        val bytes = handMade(table, section = serializer.toJson(backup), blobEntries = mapOf(table.single().sha256 to ByteArray(11 * 1024 * 1024)))
+
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success)
+        verify(exactly = 0) { fileManager.copyFromInputStream(any()) }
+        coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
+        coVerify { homeLayoutRepository.save(any()) }
     }
 
     @Test
     fun import_rejects_an_archive_exceeding_the_whole_archive_cap() = runTest(mainDispatcherRule.testDispatcher) {
-        // §Audit-2 N5: the whole-archive cap bounds the total COMPRESSED bytes ZipInputStream may
-        // pull — including the closeEntry skip of a non-wallpaper padding entry. WITHOUT the cap
-        // the padding is skipped and the (valid) manifest imports fine; WITH it the archive is
-        // rejected before it can decompress unbounded. A single incompressible > 10 MiB entry that
-        // is neither the manifest nor a wallpaper blob, so only the whole-archive cap can catch it.
+        // §Audit-2 N5: the whole-archive cap bounds the total COMPRESSED bytes the reader may
+        // pull — including the skip of an entry the manifest does not list. WITHOUT the cap
+        // the padding is skipped and the (valid) section imports fine; WITH it the archive is
+        // rejected before it can decompress unbounded. A single incompressible > 10 MiB entry
+        // that is no listed blob, so only the whole-archive cap can catch it.
+        val bytes = handMade(
+            table = emptyList(),
+            section = serializer.toJson(NyxBackup(layout = layout.toDto())),
+            extraEntries = mapOf("pad.bin" to Random(0).nextBytes(11 * 1024 * 1024)), // ~11 MiB compressed > 10 MiB budget
+        )
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
+    }
+
+    @Test
+    fun import_refuses_another_apps_backup_without_writing_anything() = runTest(mainDispatcherRule.testDispatcher) {
+        // The producer check (E5a): a Kolibri container is never partially applied to Nyx.
+        val bytes = containerOf(NyxBackup(layout = layout.toDto()), appId = "kolibri")
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
+        coVerify(exactly = 0) { preferences.setIconStyle(any()) }
+    }
+
+    @Test
+    fun import_refuses_a_pre_container_archive() = runTest(mainDispatcherRule.testDispatcher) {
+        // Nyx binds no LegacyFormatReader (E5a): a `backup.json` archive is an older version.
         val bos = ByteArrayOutputStream()
         ZipOutputStream(bos).use { zip ->
             zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write(NyxBackupSerializer().serialize(NyxBackup()).toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("pad.bin"))
-            zip.write(Random(0).nextBytes(11 * 1024 * 1024)) // incompressible → ~11 MiB compressed > 10 MiB budget
+            zip.write("{}".toByteArray())
             zip.closeEntry()
         }
         val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
         assertThat(result).isEqualTo(ImportResult.InvalidData)
+    }
+
+    @Test
+    fun export_writes_one_nyx_section_under_the_nyx_producer() = runTest(mainDispatcherRule.testDispatcher) {
+        val out = ByteArrayOutputStream()
+        assertThat(manager.export(out, appVersion = "0.2.0", timestamp = 99L)).isTrue()
+
+        val manifest = engine.readStaged({ ByteArrayInputStream(out.toByteArray()) }, NyxBackupSchema.APP_ID, NyxBackupSchema.KNOWN_SECTIONS, "test") { read, _ ->
+            (read as BackupRead.Ok).manifest
+        }
+
+        assertThat(manifest.producer).isEqualTo(ContainerManifest.Producer("nyx", "0.2.0", 99L))
+        assertThat(manifest.schemaVersion).isEqualTo(NyxBackupSchema.SCHEMA_VERSION)
+        assertThat(manifest.sections.keys).containsExactly(NyxBackupSchema.SECTION_BACKUP)
+    }
+
+    @Test
+    fun every_icon_style_survives_the_round_trip() = runTest(mainDispatcherRule.testDispatcher) {
+        // The tri-state icon style is a core Nyx feature; the backup carries it as `iconStyle`.
+        for (style in IconStyle.entries) {
+            every { preferences.iconStyle() } returns flowOf(style)
+            val out = ByteArrayOutputStream()
+            assertThat(manager.export(out, "v", 0L)).isTrue()
+
+            manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
+
+            coVerify { preferences.setIconStyle(style) }
+        }
     }
 
     @Test
@@ -280,7 +341,7 @@ class NyxBackupManagerTest {
         // over-capacity dock). Order is the contract, so a cross-device backup renders
         // clean tiles this session, not on the next cold start only.
         val backup = NyxBackup(layout = layout.toDto())
-        val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
+        val result = manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         coVerifyOrder {
@@ -295,7 +356,7 @@ class NyxBackupManagerTest {
         // never saved, so there is nothing to reconcile — it must not run.
         val backup = NyxBackup(layout = layout.toDto())
         val result = manager.import(
-            ByteArrayInputStream(zipOf(backup)),
+            ByteArrayInputStream(containerOf(backup)),
             NyxBackupOptions(importLayout = false),
         )
 
@@ -306,25 +367,63 @@ class NyxBackupManagerTest {
 
     // ---- restoreWallpaper branches (import path; pure JVM — Uri is mocked, not parsed) ----
 
-    private fun layerBackup(fileName: String) = WallpaperLayerBackup(
-        id = "L-$fileName", imageFileName = fileName, scale = 1.5f, translateX = 2f, translateY = 3f,
+    /** A layer referencing blob [blobIndex] of [containerOf]; the hash is filled in there. */
+    private fun layerBackup(blobIndex: Int) = WallpaperLayerBackup(
+        id = "L-$blobIndex", imageFileName = "$BLOB_REF$blobIndex", scale = 1.5f, translateX = 2f, translateY = 3f,
     )
 
-    /** A hand-built backup ZIP (manifest + optional blob entries), bypassing export(). */
-    private fun zipOf(backup: NyxBackup, blobs: List<String> = emptyList()): ByteArray {
+    private fun image(seed: Int) = ByteArray(64) { (it * 31 + seed).toByte() }
+
+    /**
+     * A container written by the real engine, bypassing export(): [blobs] become blobs, and
+     * every layer's `#<i>` reference becomes the hash of blobs[i].
+     */
+    private suspend fun containerOf(backup: NyxBackup, blobs: List<ByteArray> = emptyList(), appId: String = NyxBackupSchema.APP_ID): ByteArray {
+        val out = ByteArrayOutputStream()
+        engine.export(
+            out,
+            ContainerManifest.Producer(appId, "test", 1L),
+            NyxBackupSchema.SCHEMA_VERSION,
+            blobs.map { bytes -> BlobSource("image/*") { ByteArrayInputStream(bytes) } },
+        ) { hashes ->
+            val layers = backup.wallpaperLayers.map { layer ->
+                val index = layer.imageFileName?.removePrefix(BLOB_REF)?.toIntOrNull()
+                if (index != null) layer.copy(imageFileName = hashes[index]) else layer
+            }
+            mapOf(NyxBackupSchema.SECTION_BACKUP to ContainerManifest.Section(NyxBackupSchema.SECTION_VERSION, serializer.toJson(backup.copy(wallpaperLayers = layers))))
+        }
+        return out.toByteArray()
+    }
+
+    /** A hand-written container for cases the engine would never write (hostile tables, padding). */
+    private fun handMade(
+        table: List<ContainerManifest.Blob>,
+        section: JsonElement = serializer.toJson(NyxBackup()),
+        blobEntries: Map<String, ByteArray> = emptyMap(),
+        extraEntries: Map<String, ByteArray> = emptyMap(),
+    ): ByteArray {
+        val manifest = ContainerManifest(
+            producer = ContainerManifest.Producer(NyxBackupSchema.APP_ID, "test", 1L),
+            schemaVersion = NyxBackupSchema.SCHEMA_VERSION,
+            blobs = table,
+            sections = mapOf(NyxBackupSchema.SECTION_BACKUP to ContainerManifest.Section(NyxBackupSchema.SECTION_VERSION, section)),
+        )
         val bos = ByteArrayOutputStream()
-        java.util.zip.ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(java.util.zip.ZipEntry("backup.json"))
-            zip.write(NyxBackupSerializer().serialize(backup).toByteArray(Charsets.UTF_8))
+        ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(ZipEntry("manifest.json"))
+            zip.write(ContainerManifestCodec.encode(manifest))
             zip.closeEntry()
-            blobs.forEach { name ->
-                zip.putNextEntry(java.util.zip.ZipEntry(name))
-                zip.write(byteArrayOf(1, 2, 3))
+            (blobEntries.mapKeys { "blobs/${it.key}" } + extraEntries).forEach { (name, bytes) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(bytes)
                 zip.closeEntry()
             }
         }
         return bos.toByteArray()
     }
+
+    private fun sha256Of(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     @Test
     fun import_restores_blob_backed_wallpaper_layers() = runTest(mainDispatcherRule.testDispatcher) {
@@ -334,11 +433,11 @@ class NyxBackupManagerTest {
         val saved = slot<WallpaperState>()
         coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
 
-        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
-        manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
 
         assertThat(saved.captured.layers).hasSize(1)
-        assertThat(saved.captured.layers.single().imageUri).isEqualTo(uri.toString()) // extracted blob URI
+        assertThat(saved.captured.layers.single().imageUri).isEqualTo(uri.toString()) // copied blob URI
         assertThat(saved.captured.layers.single().scale).isEqualTo(1.5f) // per-layer transform survives
     }
 
@@ -350,16 +449,8 @@ class NyxBackupManagerTest {
         val saved = slot<WallpaperState>()
         coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
 
-        val backup = NyxBackup(
-            wallpaperLayers = listOf(
-                layerBackup("wallpapers/layer_0.img"),
-                layerBackup("wallpapers/layer_1.img"),
-            ),
-        )
-        manager.import(
-            ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img", "wallpapers/layer_1.img"))),
-            NyxBackupOptions(),
-        )
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0), layerBackup(1)))
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0), image(1)))), NyxBackupOptions())
 
         assertThat(saved.captured.layers).hasSize(1) // the failed layer is dropped
         assertThat(saved.captured.layers.single().imageUri).isEqualTo(ok.toString()) // the surviving one
@@ -367,9 +458,9 @@ class NyxBackupManagerTest {
 
     @Test
     fun import_keeps_current_wallpaper_when_every_blob_fails() = runTest(mainDispatcherRule.testDispatcher) {
-        every { fileManager.copyFromInputStream(any()) } returns null // corrupt backup: nothing extracts
-        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
-        manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+        every { fileManager.copyFromInputStream(any()) } returns null // nothing copies
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
 
         // restored is empty → the current wallpaper is left untouched (no save at all).
         coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
@@ -378,46 +469,51 @@ class NyxBackupManagerTest {
     // ---- §Audit-3 A3-05: extracted blobs never outlive a failed / partial import ----
 
     @Test
-    fun import_deletes_extracted_blobs_when_the_manifest_is_invalid() = runTest(mainDispatcherRule.testDispatcher) {
-        // Blobs are extracted BEFORE the manifest is parsed; a garbage manifest aborts the import
-        // and must not leave the already-extracted blob orphaned in internal storage.
-        val uri = mockk<Uri>()
-        every { fileManager.copyFromInputStream(any()) } returns uri
-        val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write("{ not json".toByteArray())
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
-            zip.write(byteArrayOf(1, 2, 3))
-            zip.closeEntry()
-        }
+    fun an_unreadable_section_copies_no_blob() = runTest(mainDispatcherRule.testDispatcher) {
+        // Blobs are only staged by the engine; nothing reaches internal storage before the
+        // section has decoded, so an unreadable section leaves no file behind to delete.
+        val blob = byteArrayOf(1, 2, 3)
+        val table = listOf(ContainerManifest.Blob(sha256Of(blob), blob.size.toLong(), "image/*"))
+        val bytes = handMade(table, section = JsonPrimitive("{ not a backup"), blobEntries = mapOf(table.single().sha256 to blob))
 
-        val result = manager.import(ByteArrayInputStream(bos.toByteArray()), NyxBackupOptions())
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
 
         assertThat(result).isEqualTo(ImportResult.InvalidData)
-        val extractedUri = uri.toString()
-        verify { fileManager.deleteFile(extractedUri) }
+        verify(exactly = 0) { fileManager.copyFromInputStream(any()) }
     }
 
     @Test
-    fun import_deletes_a_blob_that_no_restored_layer_references() = runTest(mainDispatcherRule.testDispatcher) {
-        // Two blobs extracted, but the manifest only references layer_0 → layer_1 is garbage.
+    fun a_blob_no_layer_references_is_never_copied() = runTest(mainDispatcherRule.testDispatcher) {
+        // Two blobs staged, but the section only references the first → the second is left to
+        // the engine's cleanup and never lands in internal storage.
         val used = mockk<Uri>()
-        val stray = mockk<Uri>()
-        every { fileManager.copyFromInputStream(any()) } returns used andThen stray
-        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+        every { fileManager.copyFromInputStream(any()) } returns used
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
 
-        manager.import(
-            ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img", "wallpapers/layer_1.img"))),
-            NyxBackupOptions(),
-        )
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0), image(1)))), NyxBackupOptions())
 
-        // Resolve the strings OUTSIDE verify{}: a mock's toString() inside the block is recorded as a call.
-        val strayUri = stray.toString()
+        // Resolve the string OUTSIDE verify{}: a mock's toString() inside the block is recorded as a call.
         val usedUri = used.toString()
-        verify { fileManager.deleteFile(strayUri) }
+        verify(exactly = 1) { fileManager.copyFromInputStream(any()) }
         verify(exactly = 0) { fileManager.deleteFile(usedUri) } // the restored layer's file stays
+    }
+
+    @Test
+    fun layers_sharing_one_image_get_one_file_each() = runTest(mainDispatcherRule.testDispatcher) {
+        // The container stores an image once, but removing a layer deletes its file right away —
+        // so each layer gets its own copy, or deleting one would break the other.
+        val first = mockk<Uri>()
+        val second = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns first andThen second
+        val saved = slot<WallpaperState>()
+        coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0), layerBackup(0).copy(id = "L-copy")))
+
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
+
+        val firstUri = first.toString()
+        val secondUri = second.toString()
+        assertThat(saved.captured.layers.map { it.imageUri }).containsExactly(firstUri, secondUri).inOrder()
     }
 
     @Test
@@ -427,9 +523,9 @@ class NyxBackupManagerTest {
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
         coEvery { homeLayoutRepository.save(any()) } throws java.io.IOException("disk full")
-        val backup = NyxBackup(layout = layout.toDto(), wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+        val backup = NyxBackup(layout = layout.toDto(), wallpaperLayers = listOf(layerBackup(0)))
 
-        val result = manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+        val result = manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
 
         assertThat(result).isEqualTo(ImportResult.InvalidData)
         coVerify { wallpaperRepository.saveWallpaperState(any()) }
@@ -445,10 +541,10 @@ class NyxBackupManagerTest {
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
         coEvery { wallpaperRepository.saveWallpaperState(any()) } throws kotlinx.coroutines.CancellationException("left settings")
-        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
 
         runCatching {
-            manager.import(ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))), NyxBackupOptions())
+            manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
         }
 
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
@@ -456,34 +552,33 @@ class NyxBackupManagerTest {
 
     @Test
     fun import_with_empty_wallpaper_layers_clears_the_current_wallpaper() = runTest(mainDispatcherRule.testDispatcher) {
-        manager.import(ByteArrayInputStream(zipOf(NyxBackup(wallpaperLayers = emptyList()))), NyxBackupOptions())
+        manager.import(ByteArrayInputStream(containerOf(NyxBackup(wallpaperLayers = emptyList()))), NyxBackupOptions())
         coVerify { wallpaperRepository.saveWallpaperState(WallpaperState.NONE) }
     }
 
     @Test
     fun import_skips_wallpaper_when_option_off_even_with_layers() = runTest(mainDispatcherRule.testDispatcher) {
-        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup("wallpapers/layer_0.img")))
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
         manager.import(
-            ByteArrayInputStream(zipOf(backup, listOf("wallpapers/layer_0.img"))),
+            ByteArrayInputStream(containerOf(backup, listOf(image(0)))),
             NyxBackupOptions(importWallpaper = false),
         )
         coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
-        verify(exactly = 0) { fileManager.copyFromInputStream(any()) } // blobs not even extracted
+        verify(exactly = 0) { fileManager.copyFromInputStream(any()) } // blobs not even copied
     }
 
     @Test
     fun import_skips_unknown_enum_pref_names_without_failing() = runTest(mainDispatcherRule.testDispatcher) {
         val backup = NyxBackup(
             prefs = NyxBackupPrefs(
-                monochromeIcons = true,
+                iconStyle = "MONOCHROME",
                 backdrop = "NOT_A_REAL_BACKDROP", // invalid enum name → skipped, must not crash import
                 surfaceMode = "ALSO_BOGUS",
             ),
         )
-        val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
+        val result = manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        // Legacy-only backup (monochromeIcons=true) still maps to the tri-state setter.
         coVerify { preferences.setIconStyle(IconStyle.MONOCHROME) } // valid pref still applied
         coVerify(exactly = 0) { displaySettings.setWallpaperBackdrop(any()) } // invalid enum skipped
         coVerify(exactly = 0) { displaySettings.setWallpaperSurfaceMode(any()) }
@@ -495,11 +590,16 @@ class NyxBackupManagerTest {
             // Settings are applied before the layout write; a mid-import settings failure
             // must not have already replaced the existing home layout (layout is last).
             coEvery { preferences.setIconStyle(any()) } throws java.io.IOException("disk full")
-            val backup = NyxBackup(layout = layout.toDto(), prefs = NyxBackupPrefs(monochromeIcons = true))
+            val backup = NyxBackup(layout = layout.toDto(), prefs = NyxBackupPrefs(iconStyle = "MONOCHROME"))
 
-            val result = manager.import(ByteArrayInputStream(zipOf(backup)), NyxBackupOptions())
+            val result = manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
 
             assertThat(result).isEqualTo(ImportResult.InvalidData)
             coVerify(exactly = 0) { homeLayoutRepository.save(any()) } // layout write never reached
         }
+
+    private companion object {
+        /** Placeholder in a test layer's imageFileName: `#<i>` → hash of blob i. */
+        const val BLOB_REF = "#"
+    }
 }

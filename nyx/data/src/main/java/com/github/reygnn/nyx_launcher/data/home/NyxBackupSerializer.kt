@@ -1,28 +1,29 @@
 package com.github.reygnn.nyx_launcher.data.home
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 /**
- * [NyxBackup] ↔ JSON (the `backup.json` manifest inside the ZIP). Pure logic — no
+ * [NyxBackup] ↔ the JSON data of the `nyx.backup` section. Pure logic — no
  * Context/Uri/repos — so it's JVM round-trip-testable. Lean kotlinx only:
  * `ignoreUnknownKeys` keeps forward-compat, `encodeDefaults` writes a stable shape,
- * and a failed decode returns null (the caller maps that to InvalidData).
+ * and a failed decode returns null (the caller maps that to an invalid backup).
  */
 class NyxBackupSerializer @Inject constructor() {
 
-    fun serialize(backup: NyxBackup): String = JSON.encodeToString(backup)
+    fun toJson(backup: NyxBackup): JsonElement = JSON.encodeToJsonElement(NyxBackup.serializer(), backup)
 
-    fun deserialize(raw: String): NyxBackup? =
-        // no suspension point — synchronous JSON decode of a stored string.
-        runCatching { JSON.decodeFromString<NyxBackup>(raw) }.getOrNull()
+    fun fromJson(data: JsonElement): NyxBackup? = try {
+        JSON.decodeFromJsonElement(NyxBackup.serializer(), data)
+    } catch (e: IllegalArgumentException) { // SerializationException extends it
+        null
+    }
 
     private companion object {
         val JSON = Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
-            prettyPrint = true
         }
     }
 }

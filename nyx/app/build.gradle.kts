@@ -59,6 +59,7 @@ dependencies {
     implementation(project(":common-ui"))
     implementation(project(":common-data"))
     implementation(project(":feature-crashreporting"))
+    implementation(project(":feature-backup")) // shared backup engine (SPEC_NYX_REWRITE 2b); Nyx binds no LegacyFormatReader
 
     implementation(libs.material)
     implementation(libs.androidx.appcompat)

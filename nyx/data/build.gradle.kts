@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":nyx:domain"))
     // Shared home-info calendar/alarm reader (HIE Phase C); bound in RepositoryModule.
     implementation(project(":common-data"))
+    implementation(project(":feature-backup")) // shared backup engine (SPEC_NYX_REWRITE 2b)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)

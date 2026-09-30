@@ -2,9 +2,11 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
 
-/** Pure JVM: NyxBackup serialize → deserialize round-trips, forward-compat, defaults. */
+/** Pure JVM: the `nyx.backup` section data round-trips, forward-compat, defaults. */
 class NyxBackupSerializerTest {
 
     private val serializer = NyxBackupSerializer()
@@ -23,12 +25,9 @@ class NyxBackupSerializerTest {
     @Test
     fun round_trips_a_full_backup() {
         val backup = NyxBackup(
-            schemaVersion = 1,
-            timestamp = 123L,
-            appVersion = "0.1.2-dev",
             layout = sampleLayout(),
             prefs = NyxBackupPrefs(
-                monochromeIcons = true,
+                iconStyle = "GRAYSCALE",
                 notificationDots = true,
                 showAlarm = false,
                 showCalendarEvent = true,
@@ -39,40 +38,40 @@ class NyxBackupSerializerTest {
                 fabYFraction = 0.75f,
             ),
             wallpaperLayers = listOf(
-                WallpaperLayerBackup(id = "l0", imageFileName = "wallpapers/layer_0.img", scale = 1.5f, translateX = 10f, translateY = -5f, captureSampleSize = 2),
-                WallpaperLayerBackup(id = "l1", imageFileName = "wallpapers/layer_1.img"),
+                WallpaperLayerBackup(id = "l0", imageFileName = "a".repeat(64), scale = 1.5f, translateX = 10f, translateY = -5f, captureSampleSize = 2),
+                WallpaperLayerBackup(id = "l1", imageFileName = "b".repeat(64)),
             ),
         )
 
-        val restored = serializer.deserialize(serializer.serialize(backup))
+        val restored = serializer.fromJson(serializer.toJson(backup))
 
         assertThat(restored).isEqualTo(backup)
     }
 
     @Test
     fun missing_optional_fields_decode_to_defaults() {
-        // Only layout present; prefs + wallpaperLayers absent.
-        val json = """{ "schemaVersion": 1, "layout": null }"""
-        val restored = serializer.deserialize(json)
+        // Only layout present; everything else absent.
+        val restored = serializer.fromJson(Json.parseToJsonElement("""{ "layout": null }"""))
 
         assertThat(restored).isNotNull()
         assertThat(restored!!.prefs).isNull()
+        assertThat(restored.drawerFolders).isNull()
+        assertThat(restored.hiddenApps).isNull()
         assertThat(restored.wallpaperLayers).isEmpty()
-        assertThat(restored.timestamp).isEqualTo(0L)
     }
 
     @Test
     fun unknown_keys_are_ignored_forward_compat() {
-        val json = """{ "schemaVersion": 2, "futureField": 42, "prefs": { "monochromeIcons": true, "brandNewToggle": true } }"""
-        val restored = serializer.deserialize(json)
+        val json = """{ "futureField": 42, "prefs": { "iconStyle": "MONOCHROME", "brandNewToggle": true } }"""
+        val restored = serializer.fromJson(Json.parseToJsonElement(json))
 
         assertThat(restored).isNotNull()
-        assertThat(restored!!.schemaVersion).isEqualTo(2)
-        assertThat(restored.prefs?.monochromeIcons).isTrue()
+        assertThat(restored!!.prefs?.iconStyle).isEqualTo("MONOCHROME")
     }
 
     @Test
-    fun malformed_json_returns_null() {
-        assertThat(serializer.deserialize("{ not valid json")).isNull()
+    fun section_data_of_the_wrong_shape_returns_null() {
+        assertThat(serializer.fromJson(JsonPrimitive("{ not valid json"))).isNull()
+        assertThat(serializer.fromJson(Json.parseToJsonElement("""{ "layout": 7 }"""))).isNull()
     }
 }
