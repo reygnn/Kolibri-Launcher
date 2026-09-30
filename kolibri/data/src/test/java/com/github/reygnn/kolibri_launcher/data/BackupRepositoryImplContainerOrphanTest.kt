@@ -51,7 +51,8 @@ import java.io.InputStream
  * leaves wallpaper images orphaned in internal storage: only blobs a layer references are ever
  * copied in, every copy the restored wallpaper does not claim is deleted, nothing is copied
  * when the wallpaper isn't imported or the backup is refused, and the restore claims its images
- * BEFORE saving so an interrupted save never deletes referenced files.
+ * BEFORE saving so an interrupted save never deletes referenced files. Every restored layer
+ * gets a file of its own, also when two layers share one blob (O2).
  *
  * Robolectric for real [Uri] parsing; the file manager is a mock (extraction/copy/delete are
  * observed, not performed).
@@ -198,6 +199,55 @@ class BackupRepositoryImplContainerOrphanTest {
         coEvery { interrupted.saveWallpaperState(any()) } throws CancellationException("left the screen")
         runCatching { repository(interrupted).loadBackupFromFile(backupUri.toString(), ImportOptions()) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
+    }
+
+    // ---- one file per layer (SPEC_NYX_REWRITE O2) ----
+
+    @Test
+    fun `two layers sharing one image get one file each`() = runTest {
+        // The container stores the image once and both layers resolve to the same extracted
+        // file. Removing a layer deletes its file right away, so the second layer needs a copy
+        // of its own — otherwise removing either layer breaks the other.
+        serve(
+            container(imageA) { hashes ->
+                LauncherSettings(
+                    wallpaperLayers = listOf(
+                        WallpaperLayerBackup(id = "l0", imageFileName = hashes[0]),
+                        WallpaperLayerBackup(id = "l1", imageFileName = hashes[0]),
+                    ),
+                )
+            },
+        )
+        val wallpaperRepository = FakeWallpaperRepository()
+
+        val result = repository(wallpaperRepository).loadBackupFromFile(backupUri.toString(), ImportOptions())
+
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        assertThat(wallpaperRepository.currentState.layers.map { it.imageUri })
+            .containsExactly(extracted0, extracted1).inOrder()
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted1) }
+    }
+
+    @Test
+    fun `layers with different images keep their own files without an extra copy`() = runTest {
+        serve(
+            container(imageA, imageB) { hashes ->
+                LauncherSettings(
+                    wallpaperLayers = listOf(
+                        WallpaperLayerBackup(id = "l0", imageFileName = hashes[0]),
+                        WallpaperLayerBackup(id = "l1", imageFileName = hashes[1]),
+                    ),
+                )
+            },
+        )
+        val wallpaperRepository = FakeWallpaperRepository()
+
+        repository(wallpaperRepository).loadBackupFromFile(backupUri.toString(), ImportOptions())
+
+        assertThat(wallpaperRepository.currentState.layers.map { it.imageUri })
+            .containsExactly(extracted0, extracted1).inOrder()
+        verify(exactly = 2) { wallpaperFileManager.copyFromInputStream(any()) } // one per blob, none extra
     }
 
     // ---- outcomes the UI shows as their own message (2a-7) ----

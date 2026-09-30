@@ -228,6 +228,8 @@ class BackupRepositoryImpl @Inject constructor(
         onClaim: (Collection<String>) -> Unit,
     ): Int {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
+        // Internal files already given to a restored layer (see ownFileFor).
+        val taken = HashSet<String>()
 
         for ((index, layerBackup) in layerBackups.withIndex()) {
             val uriString = layerBackup.imageUri
@@ -247,8 +249,9 @@ class BackupRepositoryImpl @Inject constructor(
                 }
 
                 if (canAccess) {
-                    val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
+                    val internalUri = wallpaperFileManager.copyToInternal(sourceUri)?.let { ownFileFor(it, taken) }
                     if (internalUri != null) {
+                        taken += internalUri.toString()
                         validLayerStates.add(
                             layerBackup.toLayerState().copy(imageUri = internalUri.toString())
                         )
@@ -288,6 +291,20 @@ class BackupRepositoryImpl @Inject constructor(
         // so this difference is exactly the image-bearing layers that failed.
         val layersWithImage = layerBackups.count { !it.imageUri.isNullOrBlank() }
         return layersWithImage - validLayerStates.size
+    }
+
+    /**
+     * One internal file per restored layer (SPEC_NYX_REWRITE O2). The container stores equal
+     * content once, so every layer of the same image resolves to the same extracted file,
+     * and copyToInternal hands an internal file back unchanged. Removing a layer deletes its
+     * file right away (WallpaperDelegate), which would take the other layer's image with it —
+     * so a file that an earlier layer already got is copied for this one.
+     *
+     * @return [internalUri] when no earlier layer has it, else a fresh copy (null if that fails).
+     */
+    private fun ownFileFor(internalUri: Uri, taken: Set<String>): Uri? {
+        if (internalUri.toString() !in taken) return internalUri
+        return context.contentResolver.openInputStream(internalUri)?.use { wallpaperFileManager.copyFromInputStream(it) }
     }
 
     /**
