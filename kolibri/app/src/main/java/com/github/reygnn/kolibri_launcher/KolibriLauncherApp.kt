@@ -60,7 +60,7 @@ class KolibriLauncherApp : Application() {
     lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
     @Inject
-    @field:IoDispatcher
+    @IoDispatcher
     lateinit var ioDispatcher: CoroutineDispatcher
 
     // Created on first use — after super.onCreate(), when Hilt has injected the dispatcher.
