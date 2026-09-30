@@ -25,4 +25,7 @@
     <string name="crash_report_health_notif_title">Kolibri: Crash-Reporting inaktiv</string>
     <string name="crash_report_health_notif_text">Der Crash-Report-Bootstrap ist beim Start fehlgeschlagen, es werden keine Crash- und ANR-Reports gesendet. Logcat prüfen.</string>
     <string name="toast_crash_report_consent_save_failed">Deine Auswahl konnte nicht gespeichert werden und gilt nur für diese Sitzung. Bitte versuche es erneut.</string>
+    <!-- Settings summary when consent is granted but the bootstrap gate failed (health
+         BROKEN); shared by both apps since SPEC_NYX_REWRITE 1c-3. -->
+    <string name="crash_report_summary_broken">⚠️ Funktioniert nicht — der Crash-Report-Bootstrap ist fehlgeschlagen, es werden keine Reports gesendet.</string>
 </resources>

@@ -50,6 +50,9 @@ import androidx.viewpager2.widget.ViewPager2
 import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.MainDispatcher
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthNotifier
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthState
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.PackageEventCoordinator
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
@@ -170,6 +173,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
 
     // Drives the shared first-launch ACRA consent dialog (see onCreate); all builds.
     @Inject lateinit var consentController: ConsentController
+    @Inject lateinit var crashReportingHealthMonitor: CrashReportingHealthMonitor
+    @Inject lateinit var crashReportingHealthNotifier: CrashReportingHealthNotifier
 
     // The shared first-launch consent dialog (setCancelable(false)); tracked so onDestroy
     // can dismiss it and not leak its window.
@@ -837,6 +842,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                 consentDialog = ConsentDialog.show(this) { consentController.applyConsent(it) }
             is ConsentController.StartupAction.Reaffirm -> consentController.reaffirmConsent(action.granted)
             ConsentController.StartupAction.Skip -> Unit
+        }
+        // Out-of-band ACRA-health check once consent is settled (same as Kolibri, shared
+        // since SPEC_NYX_REWRITE 1c-3): Granted consent but a dead bootstrap gate means
+        // bootstrap-time reporting is broken — surface it via a notification + the Settings
+        // summary, never via ACRA/silentError (circular). Cleared again once healthy.
+        when (crashReportingHealthMonitor.evaluate()) {
+            CrashReportingHealthState.BROKEN -> crashReportingHealthNotifier.showBroken()
+            else -> crashReportingHealthNotifier.clear()
         }
     }
 

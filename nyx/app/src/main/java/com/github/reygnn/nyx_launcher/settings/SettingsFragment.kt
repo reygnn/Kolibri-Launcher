@@ -20,6 +20,9 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealth
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthMonitor
+import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AlertDialog
 import com.github.reygnn.launcher.common.ui.showToastSafe
@@ -67,6 +70,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     @Inject lateinit var getDrawerApps: GetDrawerAppsUseCase
     @Inject lateinit var hiddenAppsRepository: HiddenAppsRepository
     @Inject lateinit var consentController: ConsentController
+    @Inject lateinit var crashReportingHealthMonitor: CrashReportingHealthMonitor
 
     private var crashReportPref: Preference? = null
     // ConsentDialog is setCancelable(false); tracked so onDestroyView can dismiss it.
@@ -394,22 +398,40 @@ class SettingsFragment : PreferenceFragmentCompat() {
             consentDialog = ConsentDialog.show(requireActivity()) { granted ->
                 consentController.applyConsent(granted)
                 toast(getString(if (granted) R.string.toast_crash_reports_enabled else R.string.toast_crash_reports_disabled))
-                crashReportPref?.summary = crashReportSummary(granted)
+                // Summary from the just-made choice + the in-memory bootstrap-health flag
+                // (no store re-read, which could race the still-running persist write —
+                // AUDIT-10 #1, same as Kolibri): a fresh grant on a broken bootstrap shows
+                // BROKEN, not a false "enabled".
+                crashReportPref?.summary = crashReportSummary(
+                    when {
+                        !granted -> CrashReportingHealthState.NOT_APPLICABLE
+                        CrashReportingHealth.isBootstrapHealthy -> CrashReportingHealthState.HEALTHY
+                        else -> CrashReportingHealthState.BROKEN
+                    },
+                )
             }
         }
     }
 
+    /**
+     * An HONEST health indicator, not a consent-only one (which read "enabled" even when the
+     * bootstrap gate died — Kolibri's 2026-08 bug, shared fix since SPEC_NYX_REWRITE 1c-3):
+     * evaluate() folds consent + the bootstrap-health flag into one verdict. I/O problems come
+     * back as a value; an UNKNOWN verdict leaves the summary as it is (safe stale).
+     */
     private suspend fun refreshCrashReportSummary() {
-        val granted = when (val action = consentController.resolveStartupAction()) {
-            is ConsentController.StartupAction.Reaffirm -> action.granted
-            // NeverAsked (ShowDialog) or unreadable (Skip): crash reporting is off.
-            else -> false
-        }
-        crashReportPref?.summary = crashReportSummary(granted)
+        val state = crashReportingHealthMonitor.evaluate()
+        if (state != CrashReportingHealthState.UNKNOWN) crashReportPref?.summary = crashReportSummary(state)
     }
 
-    private fun crashReportSummary(granted: Boolean): String =
-        getString(if (granted) R.string.crash_report_summary_enabled else R.string.crash_report_summary_disabled)
+    private fun crashReportSummary(state: CrashReportingHealthState): String = getString(
+        when (state) {
+            CrashReportingHealthState.HEALTHY -> R.string.crash_report_summary_enabled
+            CrashReportingHealthState.BROKEN -> R.string.crash_report_summary_broken
+            CrashReportingHealthState.NOT_APPLICABLE,
+            CrashReportingHealthState.UNKNOWN -> R.string.crash_report_summary_disabled
+        },
+    )
 
     /**
      * Factory reset (mirrors Kolibri): confirm, then wipe all state. The positive
