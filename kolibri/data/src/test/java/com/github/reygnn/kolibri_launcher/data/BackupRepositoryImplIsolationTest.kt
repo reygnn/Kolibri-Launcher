@@ -279,17 +279,13 @@ class BackupRepositoryImplIsolationTest {
         val result = backupManager.importFromJson(createTargetBackupJson(), options)
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
 
-        // CHANGED — additive MERGE, not replace. Import phase 3 calls
-        // updateComponentVisibilities(toHide = imported, toShow = emptySet()),
-        // so the imported hidden components are ADDED to whatever is already
-        // hidden and nothing is un-hidden. This is a deliberate asymmetry with
-        // favorites (ISOLATION 1, which replaces): restoring a backup onto a
-        // configured device must not silently drop the user's current hidden
-        // apps that are absent from the backup. containsExactly(base + target)
-        // pins both halves — a regression to replace-semantics (result would be
-        // just {target}) turns this red.
+        // CHANGED — REPLACE (snapshot semantics), decided as X5 / B13 in SPEC_NYX_REWRITE
+        // (2026-09-29). The earlier deliberate merge (never un-hide current apps absent
+        // from the backup) was overruled: a backup restores the hidden set it recorded, the
+        // same as favorites (ISOLATION 1) and as Nyx already did. containsExactly(target)
+        // pins it — a regression to merge (base + target) turns this red.
         assertThat(fakeHiddenRepo.hiddenApps)
-            .containsExactlyElementsIn(baselineHidden + targetHidden)
+            .containsExactlyElementsIn(targetHidden)
 
         // UNCHANGED:
         assertFavoritesUnchanged()

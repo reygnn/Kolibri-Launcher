@@ -18,6 +18,7 @@ import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
-import kotlin.test.assertFailsWith
 
 /**
  * ============================================================================
@@ -70,7 +70,10 @@ class BackupDataAssemblerColdImportTest {
 
     private val favoritesRepository: FavoritesRepository = mockk(relaxed = true)
     private val favoritesOrderRepository: FavoritesOrderRepository = mockk(relaxed = true)
-    private val hiddenAppsRepository: HiddenAppsRepository = mockk(relaxed = true)
+    // performImport reads the current hidden set (B13 replace); a relaxed mock's Flow never emits.
+    private val hiddenAppsRepository: HiddenAppsRepository = mockk<HiddenAppsRepository>(relaxed = true).also {
+        every { it.hiddenAppsFlow } returns flowOf(emptySet())
+    }
     private val customNamesRepository: CustomNamesRepository = mockk(relaxed = true)
     private val installedAppsRepository: InstalledAppsRepository = mockk(relaxed = true)
     private val swipeActionsRepository: SwipeActionsRepository = mockk(relaxed = true)
@@ -174,23 +177,38 @@ class BackupDataAssemblerColdImportTest {
     }
 
     @Test
-    fun `performImport throws IllegalStateException when installed apps never populate within timeout`() = runTest {
-        // ── ARRANGE: the pathological case — upstream never delivers.
-        // withTimeoutOrNull's elapse uses virtual time, so this test
-        // doesn't actually wait BACKUP_IMPORT_PRIME_TIMEOUT_MS in wall
-        // time; runTest fast-forwards through it.
+    fun `performImport still imports when installed apps never populate, reporting nothing missing (E1)`() = runTest {
+        // Before E1 this threw ("Timed out waiting for InstalledAppsRepository") and imported
+        // nothing. The installed-apps snapshot now only REPORTS missing apps: an import on a
+        // device whose app list is not ready in time restores everything and claims nothing
+        // is missing — that cannot be known. withTimeoutOrNull elapses in virtual time.
         val installedAppsFlow = MutableStateFlow<List<AppInfo>>(emptyList())
         every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
 
-        // ── ACT + ASSERT
-        val ex = assertFailsWith<IllegalStateException> {
-            makeAssembler()
-                .performImport(backupWithFavorite(targetComponent), ImportOptions(), wallpaperRestorer)
-        }
-        assertThat(ex.message).contains("Timed out waiting for InstalledAppsRepository")
+        val result = makeAssembler()
+            .performImport(backupWithFavorite(targetComponent), ImportOptions(), wallpaperRestorer)
 
-        // ── ASSERT: no partial writes happened — the gate blocks before
-        // any phase runs.
-        coVerify(exactly = 0) { favoritesRepository.saveFavoriteComponents(any()) }
+        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
+        val success = result as ImportResult.Success
+        assertThat(success.importedCount).isEqualTo(1)
+        assertThat(success.missingApps).isEmpty()
+        coVerify(exactly = 1) { favoritesRepository.saveFavoriteComponents(listOf(targetComponent)) }
+    }
+
+    @Test
+    fun `favorites and their order are written last, after hidden apps (U4)`() = runTest {
+        // U4: the most valuable stores come last, so a failure in any earlier phase leaves
+        // the current favorites and order intact.
+        val installedAppsFlow = MutableStateFlow(listOf(installedApp))
+        every { installedAppsRepository.getInstalledApps() } returns installedAppsFlow.map { AppLoad.Loaded(it) }
+        stubFavoritesFlowForPhase2(setOf(targetComponent))
+
+        makeAssembler().performImport(backupWithFavorite(targetComponent), ImportOptions(), wallpaperRestorer)
+
+        coVerifyOrder {
+            hiddenAppsRepository.updateComponentVisibilities(any(), any())
+            favoritesRepository.saveFavoriteComponents(listOf(targetComponent))
+            favoritesOrderRepository.saveOrder(any())
+        }
     }
 }

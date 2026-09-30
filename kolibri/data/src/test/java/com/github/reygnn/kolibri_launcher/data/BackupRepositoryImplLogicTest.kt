@@ -154,7 +154,7 @@ class BackupRepositoryImplLogicTest {
     }
 
     @Test
-    fun `importFromJson - imports custom names ONLY if app is installed`() = runTest {
+    fun `importFromJson - keeps custom names of non-installed apps too (E1)`() = runTest {
         // ARRANGE
         // Wir nutzen dein FakeInstalledAppsRepository!
         // Nur "com.whatsapp" ist installiert.
@@ -191,10 +191,9 @@ class BackupRepositoryImplLogicTest {
         assertThat(fakeCustomNamesRepo.getDisplayNameForPackage("com.whatsapp", "Original"))
             .isEqualTo("Was Geht App")
 
-        // "com.missing.app" sollte ignoriert worden sein (da nicht installiert)
-        // Das FakeCustomNamesRepo gibt den Originalnamen zurück, wenn kein Custom Name existiert.
+        // E1: the name of the uninstalled app is kept too — it applies again once the app is back.
         assertThat(fakeCustomNamesRepo.getDisplayNameForPackage("com.missing.app", "Original"))
-            .isEqualTo("Original")
+            .isEqualTo("Ghost App")
 
         // Statistik Check
         assertThat(success.importedCount).isEqualTo(0) // custom names zählen nicht zum globalen "importedCount" im Result, das zählt oft nur Favoriten
@@ -205,7 +204,7 @@ class BackupRepositoryImplLogicTest {
     // ========================================================================
 
     @Test
-    fun `importFromJson - filters out favorite apps that are not installed`() = runTest {
+    fun `importFromJson - keeps favorite apps that are not installed and reports them (E1)`() = runTest {
         // ARRANGE
         // Dein Fake: Nur "com.exist" ist installiert.
         fakeInstalledAppsRepo.installedApps = listOf(
@@ -234,13 +233,16 @@ class BackupRepositoryImplLogicTest {
         val success = result as ImportResult.Success
 
         // Statistik prüfen
-        assertThat(success.importedCount).isEqualTo(1) // Nur com.exist wurde importiert
-        assertThat(success.missingApps).contains("com.missing/com.missing.MainActivity")
+        // E1: both favorites are imported; the uninstalled one is only reported (lazy slot)
+        assertThat(success.importedCount).isEqualTo(2)
+        assertThat(success.missingApps).containsExactly("com.missing/com.missing.MainActivity")
 
-        // Repo prüfen: Darf NUR die installierte App enthalten
+        // E1: the uninstalled favorite is kept, not dropped
         val savedFavorites = fakeFavoritesRepo.favoriteComponentsFlow.first()
-        assertThat(savedFavorites).contains("com.exist/com.exist.MainActivity")
-        assertThat(savedFavorites).doesNotContain("com.missing/com.missing.MainActivity")
+        assertThat(savedFavorites).containsExactly(
+            "com.exist/com.exist.MainActivity",
+            "com.missing/com.missing.MainActivity",
+        )
     }
 
     @Test

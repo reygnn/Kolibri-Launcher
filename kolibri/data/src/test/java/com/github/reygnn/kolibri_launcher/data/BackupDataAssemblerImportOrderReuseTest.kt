@@ -64,7 +64,10 @@ class BackupDataAssemblerImportOrderReuseTest {
 
     private val favoritesRepository: FavoritesRepository = mockk(relaxed = true)
     private val favoritesOrderRepository: FavoritesOrderRepository = mockk(relaxed = true)
-    private val hiddenAppsRepository: HiddenAppsRepository = mockk(relaxed = true)
+    // performImport reads the current hidden set (B13 replace); a relaxed mock's Flow never emits.
+    private val hiddenAppsRepository: HiddenAppsRepository = mockk<HiddenAppsRepository>(relaxed = true).also {
+        every { it.hiddenAppsFlow } returns flowOf(emptySet())
+    }
     private val customNamesRepository: CustomNamesRepository = mockk(relaxed = true)
     private val installedAppsRepository: InstalledAppsRepository = mockk(relaxed = true)
     private val swipeActionsRepository: SwipeActionsRepository = mockk(relaxed = true)

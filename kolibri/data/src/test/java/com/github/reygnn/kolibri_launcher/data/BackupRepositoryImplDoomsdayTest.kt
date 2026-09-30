@@ -487,7 +487,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - swipe actions - filters non-installed left app`() = runTest {
+    fun `importFromJson - swipe actions - keeps a non-installed left app and reports it (E1)`() = runTest {
         // 1. Mock: App2 ist installiert
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app2", "com.app2.MainActivity")
@@ -506,8 +506,8 @@ class BackupRepositoryImplDoomsdayTest {
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
 
-        // 3. Assert: Links null, Rechts gesetzt
-        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
+        // 3. Assert (E1): the uninstalled left app is kept (lazy slot), right is set
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.nonexistent/com.nonexistent.MainActivity")
         Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
 
         // 4. Assert: Fehlende App wird gemeldet
@@ -515,7 +515,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - swipe actions - filters non-installed right app`() = runTest {
+    fun `importFromJson - swipe actions - keeps a non-installed right app and reports it (E1)`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
@@ -533,13 +533,13 @@ class BackupRepositoryImplDoomsdayTest {
         val success = result as ImportResult.Success
         Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp)
             .isEqualTo("com.app1/com.app1.MainActivity")
-        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.nonexistent/com.nonexistent.MainActivity")
         Truth.assertThat(success.missingApps)
             .contains("com.nonexistent/com.nonexistent.MainActivity")
     }
 
     @Test
-    fun `importFromJson - swipe actions - filters both non-installed apps`() = runTest {
+    fun `importFromJson - swipe actions - keeps both non-installed apps and reports them (E1)`() = runTest {
 
         val backup = createTestBackup(
             swipeLeft = "com.app1/com.app1.MainActivity",
@@ -552,8 +552,8 @@ class BackupRepositoryImplDoomsdayTest {
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isNull()
-        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isNull()
+        Truth.assertThat(fakeSwipeActionsRepo.swipeLeftApp).isEqualTo("com.app1/com.app1.MainActivity")
+        Truth.assertThat(fakeSwipeActionsRepo.swipeRightApp).isEqualTo("com.app2/com.app2.MainActivity")
         Truth.assertThat(success.missingApps).hasSize(2)
     }
 
@@ -637,7 +637,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - filters non-installed apps`() = runTest {
+    fun `importFromJson - keeps non-installed favorites and reports them (E1)`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
@@ -655,11 +655,11 @@ class BackupRepositoryImplDoomsdayTest {
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val success = result as ImportResult.Success
-        Truth.assertThat(success.importedCount).isEqualTo(1)
-        Truth.assertThat(success.skippedCount).isEqualTo(1)
+        Truth.assertThat(success.importedCount).isEqualTo(2)
+        Truth.assertThat(success.skippedCount).isEqualTo(0)
         Truth.assertThat(success.missingApps)
             .contains("com.nonexistent/com.nonexistent.MainActivity")
-        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(1)
+        Truth.assertThat(fakeFavoritesRepo.favorites).hasSize(2)
         Truth.assertThat(fakeFavoritesRepo.favorites).contains("com.app1/com.app1.MainActivity")
     }
 
@@ -694,7 +694,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `importFromJson - filters hidden apps by installed`() = runTest {
+    fun `importFromJson - keeps non-installed hidden apps (E1)`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
@@ -711,12 +711,15 @@ class BackupRepositoryImplDoomsdayTest {
         val result = backupManager.importFromJson(jsonString, options)
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(1)
-        Truth.assertThat(fakeVisibilityRepo.hiddenApps).contains("com.app1/com.app1.MainActivity")
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).hasSize(2)
+        Truth.assertThat(fakeVisibilityRepo.hiddenApps).containsExactly(
+            "com.app1/com.app1.MainActivity",
+            "com.nonexistent/com.nonexistent.MainActivity",
+        )
     }
 
     @Test
-    fun `importFromJson - filters custom names by installed packages`() = runTest {
+    fun `importFromJson - keeps custom names of non-installed packages (E1)`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
@@ -734,8 +737,9 @@ class BackupRepositoryImplDoomsdayTest {
 
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         val importedNames = fakeNamesRepo.getAllCustomNames()
-        Truth.assertThat(importedNames).hasSize(1)
+        Truth.assertThat(importedNames).hasSize(2)
         Truth.assertThat(importedNames).containsKey("com.app1")
+        Truth.assertThat(importedNames).containsKey("com.nonexistent")
     }
 
     // ========== EDGE CASES ==========
@@ -1316,7 +1320,7 @@ class BackupRepositoryImplDoomsdayTest {
     }
 
     @Test
-    fun `predator - unicode injection in package name`() = runTest {
+    fun `predator - unicode injection in package name - never matches the installed app`() = runTest {
         fakeInstalledAppsRepo.installedApps = listOf(
             createAppInfo("com.app1", "com.app1.MainActivity")
         )
@@ -1336,8 +1340,13 @@ class BackupRepositoryImplDoomsdayTest {
 
         val result = backupManager.importFromJson(toxicJson, ImportOptions(importFavorites = true))
         Truth.assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        // Der manipulierte String sollte NICHT matchen
-        Truth.assertThat(fakeFavoritesRepo.favorites).isEmpty()
+        // The manipulated string must never impersonate the installed com.app1. Since E1 an
+        // uninstalled favorite is kept (lazy slot) instead of dropped — so it stays as its own,
+        // distinct entry and is reported missing, never as com.app1.
+        Truth.assertThat(fakeFavoritesRepo.favorites).containsExactly("com.app1\u200B/com.app1.MainActivity")
+        Truth.assertThat(fakeFavoritesRepo.favorites).doesNotContain("com.app1/com.app1.MainActivity")
+        Truth.assertThat((result as ImportResult.Success).missingApps)
+            .containsExactly("com.app1\u200B/com.app1.MainActivity")
     }
 
     @Test

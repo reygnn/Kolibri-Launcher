@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
@@ -197,126 +198,72 @@ class BackupDataAssembler @Inject constructor(
         // silently drop everything. Wait for the first successful, non-empty load
         // (INSTALLED_APPS_LOAD_SPEC: a Failed emission is NOT a populated list, so
         // it must not satisfy the priming), bounded by a timeout.
-        val installedApps = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
+        // E1: the installed-apps snapshot only REPORTS missing apps; the import neither filters
+        // on it nor fails without it (null = not known in time → nothing reported as missing).
+        val installedComponents: Set<String>? = withTimeoutOrNull(AppConstants.INSTALLED_APPS_PRIME_TIMEOUT_MS) {
             installedAppsRepository.getInstalledApps()
                 .filterIsInstance<AppLoad.Loaded>()
                 .first { it.apps.isNotEmpty() }
                 .apps
-        } ?: error("Timed out waiting for InstalledAppsRepository to populate during backup import")
-        // Build the component HashSet directly (dedup + membership store in one),
-        // then derive the package set from it — avoids the extra intermediate
-        // LinkedHashSet a `.toSet().toHashSet()` chain would allocate.
-        val installedComponentsSet = installedApps.mapTo(HashSet()) { it.componentName }
-        val installedPackagesSet = installedComponentsSet
-            .mapTo(HashSet()) { it.substringBefore('/') }
+                .mapTo(HashSet()) { it.componentName }
+        }
+        fun isMissing(component: String) = installedComponents != null && component !in installedComponents
 
         var importedCount = 0
         var skippedCount = 0
         val missingApps = mutableSetOf<String>()
 
-        // ===== PHASE 1: Import Favorites =====
-        // Holds the exact favorites set Phase 1 writes, so Phase 2 can filter
-        // the order against it WITHOUT re-reading favoriteComponentsFlow. In
-        // production that flow is a WhileSubscribed(replay = 1) hot share
-        // (FavoritesRepositoryImpl): while no UI collector is subscribed — and
-        // during an import from the Settings/Backup screen the Home fragment is
-        // stopped, so after FLOW_SHARING_TIMEOUT_MS nobody is — the retained
-        // replay value lags this Phase-1 edit(). A bare .first() would then see
-        // the pre-import favorites and Phase 2 would drop the freshly imported
-        // order (worst case: empty replay on a fresh restore → saveOrder(empty),
-        // silently discarding the whole imported order). AUDIT-9 #2 — same trap
-        // the InstalledApps prime above guards against.
-        var importedFavorites: Set<String>? = null
+        // B14: every stored component goes through ComponentKey (short form "pkg/.Cls" →
+        // "pkg/pkg.Cls"); malformed entries are the only ones dropped (counted as skipped).
+        val favorites: Set<String> = backup.settings.favoriteComponents.normalizedComponents()
+        val order: List<String> = backup.settings.favoritesOrder.mapNotNull(::normalizeComponent).distinct()
+
+        // Validate BEFORE any write: a refused import must not leave a half-applied state.
         if (options.importFavorites) {
-            val validFavorites = backup.settings.favoriteComponents
-                .filterTo(HashSet()) { it in installedComponentsSet }
-
-            skippedCount += backup.settings.favoriteComponents.size - validFavorites.size
-            missingApps.addAll(backup.settings.favoriteComponents - installedComponentsSet)
-
-            val uniquePackages = validFavorites
-                .mapTo(HashSet()) { it.substringBefore('/') }
-
+            val uniquePackages = favorites.mapTo(HashSet()) { it.substringBefore('/') }
             if (uniquePackages.size > AppConstants.MAX_FAVORITES_ON_HOME) {
                 return ImportResult.LimitExceeded(
                     packageCount = uniquePackages.size,
                     limit = AppConstants.MAX_FAVORITES_ON_HOME,
                 )
             }
-
-            favoritesRepository.saveFavoriteComponents(validFavorites.toList())
-            importedFavorites = validFavorites
-            importedCount += validFavorites.size
-            Timber.i("Imported favorites: $importedCount (skipped: ${backup.settings.favoriteComponents.size - validFavorites.size})")
         }
 
-        // ===== PHASE 2: Import Order =====
-        if (options.importOrder) {
-            // Prefer the set Phase 1 just wrote; otherwise read the current
-            // favorites from the flow. Since the hot-share teardown
-            // (DATASTORE_READ_SPEC Belang A) favoriteComponentsFlow is cold, so
-            // .first() is a fresh read of the store — no replay cache to lag.
-            val currentFavoritesSet = importedFavorites
-                ?: favoritesRepository.favoriteComponentsFlow.first().toHashSet()
-
-            val validOrder = backup.settings.favoritesOrder
-                .filter { it in currentFavoritesSet && it in installedComponentsSet }
-
-            favoritesOrderRepository.saveOrder(validOrder)
-            Timber.i("Imported order: ${validOrder.size} items")
-        }
-
-        // ===== PHASE 3: Import Hidden Apps =====
         if (options.importHiddenApps) {
-            val validHidden = backup.settings.hiddenComponents
-                .filterTo(HashSet()) { it in installedComponentsSet }
-
-            val skippedHidden = backup.settings.hiddenComponents.size - validHidden.size
+            // B13: the backup's hidden set REPLACES the current one (snapshot semantics) — an
+            // app hidden on this device but not in the backup becomes visible again.
+            val hidden = backup.settings.hiddenComponents.normalizedComponents()
+            val currentlyHidden = hiddenAppsRepository.hiddenAppsFlow.first()
             hiddenAppsRepository.updateComponentVisibilities(
-                componentsToHide = validHidden,
-                componentsToShow = emptySet(),
+                componentsToHide = hidden,
+                componentsToShow = currentlyHidden - hidden,
             )
-            Timber.i("Imported hidden apps: ${validHidden.size} (skipped $skippedHidden)")
+            skippedCount += backup.settings.hiddenComponents.count { normalizeComponent(it) == null }
+            Timber.i("Imported hidden apps: ${hidden.size} (replaced ${currentlyHidden.size})")
         }
 
-        // ===== PHASE 4: Import Custom App Names =====
         if (options.importCustomNames) {
-            val validNames = backup.settings.customAppNames
-                .filterKeys { it in installedPackagesSet }
-
-            if (validNames.isNotEmpty()) {
-                customNamesRepository.setCustomNamesInBatch(validNames)
-                Timber.i("Imported custom names: ${validNames.size}")
+            // E1: names of apps that are not installed are kept — back when the app is.
+            val names = backup.settings.customAppNames
+            if (names.isNotEmpty()) {
+                customNamesRepository.setCustomNamesInBatch(names)
+                Timber.i("Imported custom names: ${names.size}")
             }
         }
 
-        // ===== PHASE 5: Import Swipe Actions =====
         if (options.importSwipeActions) {
-            var swipeImportedCount = 0
-            val leftApp = backup.settings.swipeLeftApp
-            if (leftApp != null) {
-                if (leftApp in installedComponentsSet) {
-                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, leftApp)
-                    swipeImportedCount++
-                } else {
-                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, null)
-                    missingApps.add(leftApp)
-                }
+            // E1: a swipe slot keeps an app that is not installed (the lazy slot shows it greyed).
+            val slots = listOf(
+                SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT to backup.settings.swipeLeftApp,
+                SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT to backup.settings.swipeRightApp,
+            )
+            for ((slot, raw) in slots) {
+                val component = raw?.let(::normalizeComponent) ?: continue
+                swipeActionsRepository.setSwipeAction(slot, component)
+                if (isMissing(component)) missingApps += component
             }
-            val rightApp = backup.settings.swipeRightApp
-            if (rightApp != null) {
-                if (rightApp in installedComponentsSet) {
-                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, rightApp)
-                    swipeImportedCount++
-                } else {
-                    swipeActionsRepository.setSwipeAction(SwipeSlot.SWIPE_FROM_RIGHT_TO_LEFT, null)
-                    missingApps.add(rightApp)
-                }
-            }
-            if (swipeImportedCount > 0) Timber.i("Imported swipe actions")
         }
 
-        // ===== PHASE 7: Import Theme Settings =====
         var droppedWallpaperLayers = 0
         if (options.importThemeSettings) {
             backup.settings.textColor?.let { settingsRepository.setTextColor(it) }
@@ -426,6 +373,26 @@ class BackupDataAssembler @Inject constructor(
             backup.settings.rotationLocked?.let { settingsRepository.setRotationLocked(it) }
         }
 
+        // U4: the most valuable stores are written LAST — if anything above failed, the
+        // current favorites and their order are still intact.
+        if (options.importFavorites) {
+            favoritesRepository.saveFavoriteComponents(favorites.toList())
+            importedCount += favorites.size
+            skippedCount += backup.settings.favoriteComponents.count { normalizeComponent(it) == null }
+            favorites.filterTo(missingApps, ::isMissing)
+            Timber.i("Imported favorites: ${favorites.size}")
+        }
+        if (options.importOrder) {
+            val currentFavorites = if (options.importFavorites) {
+                favorites
+            } else {
+                favoritesRepository.favoriteComponentsFlow.first().toHashSet()
+            }
+            val validOrder = order.filter { it in currentFavorites }
+            favoritesOrderRepository.saveOrder(validOrder)
+            Timber.i("Imported order: ${validOrder.size} items")
+        }
+
         return ImportResult.Success(
             importedCount = importedCount,
             skippedCount = skippedCount,
@@ -433,6 +400,13 @@ class BackupDataAssembler @Inject constructor(
             droppedWallpaperLayers = droppedWallpaperLayers,
         )
     }
+
+
+    /** B14: the one normalization for a stored component string; null when malformed. */
+    private fun normalizeComponent(value: String): String? = ComponentKey.parse(value)?.flat
+
+    private fun Collection<String>.normalizedComponents(): Set<String> =
+        mapNotNullTo(LinkedHashSet(), ::normalizeComponent)
 
     /**
      * Single-method bridge that lets the [WallpaperRestorer] write a
