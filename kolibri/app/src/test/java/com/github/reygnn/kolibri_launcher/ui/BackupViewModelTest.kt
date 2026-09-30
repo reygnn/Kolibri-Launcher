@@ -188,6 +188,34 @@ class BackupViewModelTest {
         }
 
     @Test
+    fun `importBackup - ForeignBackup result - emits ForeignBackup with the app id`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            fakeBackupRepository.importResult = ImportResult.ForeignBackup("nyx")
+
+            viewModel.backupState.test {
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                viewModel.importBackup("content://fake/backup.zip", ImportOptions())
+                advanceUntilIdle()
+
+                Truth.assertThat(expectMostRecentItem()).isEqualTo(BackupState.ForeignBackup("nyx"))
+            }
+        }
+
+    @Test
+    fun `importBackup - OutdatedBackup result - emits OutdatedBackup`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            fakeBackupRepository.importResult = ImportResult.OutdatedBackup
+
+            viewModel.backupState.test {
+                Truth.assertThat(awaitItem()).isEqualTo(BackupState.Idle)
+                viewModel.importBackup("content://fake/backup.zip", ImportOptions())
+                advanceUntilIdle()
+
+                Truth.assertThat(expectMostRecentItem()).isEqualTo(BackupState.OutdatedBackup)
+            }
+        }
+
+    @Test
     fun `importBackup - Error result - emits Error`() = runTest(mainDispatcherRule.testDispatcher) {
         val mockUriString = "content://fake/backup.json"
         val options = ImportOptions()

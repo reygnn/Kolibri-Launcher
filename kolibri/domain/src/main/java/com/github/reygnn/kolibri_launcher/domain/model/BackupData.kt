@@ -184,6 +184,12 @@ sealed class ImportResult {
     data class UnsupportedVersion(val version: String) : ImportResult()
     data class LimitExceeded(val packageCount: Int, val limit: Int) : ImportResult()
     object InvalidFormat : ImportResult()
+
+    /** A backup written by another app (E5a producer check) — refused, never partially applied. */
+    data class ForeignBackup(val appId: String) : ImportResult()
+
+    /** A pre-E5a backup and no legacy reader any more (after the :kolibri:backup-legacy sunset). */
+    object OutdatedBackup : ImportResult()
     data class Error(val message: String) : ImportResult()
 }
 

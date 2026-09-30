@@ -154,6 +154,8 @@
     <string name="onboarding_restore_limit_exceeded">This backup has too many favorites to restore.</string>
     <string name="onboarding_restore_unsupported_version">This backup version isn\'t supported.</string>
     <string name="onboarding_restore_invalid_format">This file isn\'t a valid backup.</string>
+    <string name="onboarding_restore_foreign_app">This backup is from another app.</string>
+    <string name="onboarding_restore_outdated">This backup is from an older version and is no longer supported.</string>
     <string name="onboarding_default_launcher_set">Kolibri is now your default launcher</string>
     <string name="onboarding_default_launcher_not_set">Kolibri was not set as default launcher</string>
     <plurals name="onboarding_restore_missing_apps">
@@ -259,6 +261,8 @@
 <string name="backup_unsupported_version">Backup version %1$s is not supported</string>
 <string name="backup_limit_exceeded">Too many apps in backup: %1$d (limit: %2$d packages)</string>
 <string name="backup_invalid_format">Invalid backup format</string>
+<string name="backup_foreign_app">This backup was made by another app (%1$s) and can\'t be restored here</string>
+<string name="backup_outdated_format">This backup was made by an older version of Kolibri and is no longer supported</string>
 <string name="backup_missing_apps">Missing apps</string>
 <string name="backup_and_more">and %1$d more</string>
 <plurals name="backup_import_wallpaper_layers_dropped">

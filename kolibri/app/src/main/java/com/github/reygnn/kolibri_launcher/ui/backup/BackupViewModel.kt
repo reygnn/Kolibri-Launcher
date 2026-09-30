@@ -82,6 +82,12 @@ class BackupViewModel @Inject constructor(
                     is ImportResult.InvalidFormat -> {
                         _backupState.value = BackupState.InvalidFormat
                     }
+                    is ImportResult.ForeignBackup -> {
+                        _backupState.value = BackupState.ForeignBackup(result.appId)
+                    }
+                    is ImportResult.OutdatedBackup -> {
+                        _backupState.value = BackupState.OutdatedBackup
+                    }
                     is ImportResult.Error -> {
                         _backupState.value = BackupState.Error(result.message)
                     }

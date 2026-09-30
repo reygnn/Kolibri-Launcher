@@ -16,5 +16,7 @@ sealed class BackupState {
     ) : BackupState()
     data class UnsupportedVersion(val version: String) : BackupState()
     object InvalidFormat : BackupState()
+    data class ForeignBackup(val appId: String) : BackupState()
+    object OutdatedBackup : BackupState()
     data class Error(val message: String) : BackupState()
 }

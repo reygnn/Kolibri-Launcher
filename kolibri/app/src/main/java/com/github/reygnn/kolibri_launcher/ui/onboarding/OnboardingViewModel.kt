@@ -317,6 +317,10 @@ class OnboardingViewModel @Inject constructor(
                         failRestore(R.string.onboarding_restore_unsupported_version)
                     is ImportResult.InvalidFormat ->
                         failRestore(R.string.onboarding_restore_invalid_format)
+                    is ImportResult.ForeignBackup ->
+                        failRestore(R.string.onboarding_restore_foreign_app)
+                    is ImportResult.OutdatedBackup ->
+                        failRestore(R.string.onboarding_restore_outdated)
                     is ImportResult.Error ->
                         failRestore(R.string.onboarding_restore_failed)
                 }

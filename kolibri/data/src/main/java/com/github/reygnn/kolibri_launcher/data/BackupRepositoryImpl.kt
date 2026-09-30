@@ -442,8 +442,8 @@ class BackupRepositoryImpl @Inject constructor(
                     // A pre-E5a archive reaches this only when no LegacyFormatReader is bound — after
                     // the sunset of :kolibri:backup-legacy (2a-6). While the module is there, it
                     // up-converts old archives and they arrive as BackupRead.Ok.
-                    BackupRead.OutdatedFormat -> ImportResult.Error("Backup of an older version — no longer supported")
-                    is BackupRead.ForeignApp -> ImportResult.Error("Backup was made by another app (${read.appId})")
+                    BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
+                    is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
                     is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
                     is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
                     is BackupRead.Invalid -> ImportResult.InvalidFormat

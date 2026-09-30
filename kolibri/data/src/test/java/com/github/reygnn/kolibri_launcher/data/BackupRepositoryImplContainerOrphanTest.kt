@@ -199,4 +199,39 @@ class BackupRepositoryImplContainerOrphanTest {
         runCatching { repository(interrupted).loadBackupFromFile(backupUri.toString(), ImportOptions()) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
     }
+
+    // ---- outcomes the UI shows as their own message (2a-7) ----
+
+    @Test
+    fun `a backup written by another app is refused as ForeignBackup and copies nothing in`() = runTest {
+        val out = ByteArrayOutputStream()
+        engine.export(
+            output = out,
+            producer = ContainerManifest.Producer("nyx", "test", 1L),
+            schemaVersion = 1,
+            blobs = listOf(BlobSource("image/*") { ByteArrayInputStream(imageA) }),
+        ) { mapOf("nyx.layout" to ContainerManifest.Section(1, JsonPrimitive("x"))) }
+        serve(out.toByteArray())
+
+        val result = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.ForeignBackup("nyx"))
+        verify(exactly = 0) { wallpaperFileManager.copyFromInputStream(any()) }
+    }
+
+    @Test
+    fun `a pre-E5a archive with no legacy reader bound is OutdatedBackup`() = runTest {
+        // :kolibri:data's engine binds no reader — the situation after the legacy sunset.
+        val bos = ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(bos).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("backup.json"))
+            zip.write("{}".toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+        }
+        serve(bos.toByteArray())
+
+        val result = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.OutdatedBackup)
+    }
 }

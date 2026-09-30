@@ -374,6 +374,16 @@ class BackupFragment : Fragment() {
                 showError(getString(R.string.backup_invalid_format))
                 viewModel.resetBackupState()
             }
+            is BackupState.ForeignBackup -> {
+                hideLoading()
+                showError(getString(R.string.backup_foreign_app, state.appId))
+                viewModel.resetBackupState()
+            }
+            is BackupState.OutdatedBackup -> {
+                hideLoading()
+                showError(getString(R.string.backup_outdated_format))
+                viewModel.resetBackupState()
+            }
             is BackupState.Error -> {
                 hideLoading()
                 showError(state.message)
