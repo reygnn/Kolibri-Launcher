@@ -9,7 +9,7 @@ import android.content.Intent
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.Resources
-import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.net.Uri
@@ -1100,7 +1100,7 @@ class HomeFragment : Fragment() {
         val w = view.width
         val h = view.height
         if (w <= 0 || h <= 0) return null
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(w, h)
         view.draw(Canvas(bitmap))
         var first = -1
         var last = -1
