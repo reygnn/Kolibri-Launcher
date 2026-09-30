@@ -8,6 +8,7 @@ import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
 import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
 import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
 import dagger.hilt.android.HiltAndroidApp
@@ -25,8 +26,8 @@ import timber.log.Timber
  * way Kolibri wires it (rules 7-9): ACRA is initialised disabled in
  * [attachBaseContext] and only enabled for a stored Granted consent in
  * [onCreate]. Nyx supplies its own [AcraConfig] (endpoint from its BuildConfig,
- * fed by the shared root secrets.properties) and a [NoOpAnrDrainer] (no ANR
- * watermark store yet). The per-block try/catch(Throwable) guards mirror
+ * fed by the shared root secrets.properties) and the shared [AnrReporter] as ANR
+ * drainer. The per-block try/catch(Throwable) guards mirror
  * Kolibri's crash-safe Application (rule 7).
  */
 @HiltAndroidApp
@@ -48,7 +49,10 @@ class NyxApplication : Application() {
     lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val anrDrainer = NoOpAnrDrainer()
+    // Post-mortem ANR reports (ApplicationExitInfo), shared with Kolibri since
+    // SPEC_NYX_REWRITE 1c-1 — before, Nyx passed a no-op drainer and reported no ANRs.
+    @Inject
+    lateinit var anrReporter: AnrReporter
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
@@ -85,7 +89,7 @@ class NyxApplication : Application() {
         }
 
         try {
-            CrashReportingBootstrap.onCreate(this, applicationScope, anrDrainer)
+            CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
         } catch (e: Throwable) {
             Log.e("NyxApplication", "ACRA onCreate failed", e)
         }

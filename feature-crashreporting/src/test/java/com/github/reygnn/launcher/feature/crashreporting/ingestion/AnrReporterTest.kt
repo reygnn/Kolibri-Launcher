@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
+package com.github.reygnn.launcher.feature.crashreporting.ingestion
 
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
-import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk

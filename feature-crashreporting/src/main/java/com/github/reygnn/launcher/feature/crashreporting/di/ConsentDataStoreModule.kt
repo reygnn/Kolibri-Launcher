@@ -13,8 +13,9 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Separate DataStore<Preferences> holding ONLY the ACRA crash-report consent
- * state. Owned by :feature-crashreporting (moved out of :data with the slice so
+ * Separate DataStore<Preferences> holding crash reporting's own device-local state:
+ * the ACRA crash-report consent and, since SPEC_NYX_REWRITE 1c-1, [AnrReporter]'s
+ * ANR dedup watermark. Nothing else — and nothing app-specific. Owned by :feature-crashreporting (moved out of :data with the slice so
  * the shared feature does not depend back on any app's :data module).
  *
  * Deliberately a second file rather than a key in the settings store: Android

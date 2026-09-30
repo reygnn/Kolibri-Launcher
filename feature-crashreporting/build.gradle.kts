@@ -4,8 +4,9 @@
 // package (§5 rename applied; MRG-INV-6). The module NAMESPACE matches, so its
 // R/BuildConfig do not collide with :app.
 //
-// AnrReporter stays per-app (settings-store watermark + @IntoSet keep-list) and
-// implements this module's AnrDrainer; each app supplies AcraConfig + drainer.
+// AnrReporter lives here too since SPEC_NYX_REWRITE 1c-1 (its watermark sits in this
+// module's own acra_consent store, not in an app's settings store); each app supplies
+// AcraConfig and passes the reporter as the bootstrap's AnrDrainer.
 plugins {
     id("launcher.android.library") // SDK, Java/Kotlin 21, unit-test setup (build-logic)
     alias(libs.plugins.hilt.android)

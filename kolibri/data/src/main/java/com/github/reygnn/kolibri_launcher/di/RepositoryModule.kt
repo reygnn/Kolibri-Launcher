@@ -176,9 +176,9 @@ abstract class RepositoryModule {
     // forgotten binding would silently drop that owner and let the cleanup delete
     // its live keys. That is caught by the checkConventions binding-parity gate
     // (tools/check-conventions.sh), which fails the build unless every structural
-    // owner has exactly one @IntoSet binding. AnrReporter (:app) is NOT a
-    // repository and contributes its watermark key separately, from
-    // SettingsStoreKeyOwnerModule in :app.
+    // owner has exactly one @IntoSet binding. (AnrReporter used to contribute its
+    // watermark key from :app; since SPEC_NYX_REWRITE 1c-1 that key lives in
+    // :feature-crashreporting's own store and is no longer a settings-store key.)
     @Multibinds
     abstract fun settingsStoreKeyOwners(): Set<OwnsSettingsStoreKeys>
 

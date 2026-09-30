@@ -19,8 +19,8 @@ package com.github.reygnn.launcher.core
  *
  * Every implementation is aggregated into `Set<OwnsSettingsStoreKeys>` via Hilt multibinding. Note
  * that `@IntoSet` registration is **NOT** automatic: implementing this interface has no Dagger
- * effect on its own — you must add a `@Binds/@Provides @IntoSet` line (RepositoryModule for `:data`,
- * SettingsStoreKeyOwnerModule for `:app`). Forgetting it would silently drop the owner from the set
+ * effect on its own — you must add a `@Binds/@Provides @IntoSet` line (RepositoryModule for `:data`;
+ * an owner in `:app` needs a module of its own). Forgetting it would silently drop the owner from the set
  * and let the cleanup delete its live keys, so the binding-parity gate above fails the build unless
  * every owner is bound.
  *

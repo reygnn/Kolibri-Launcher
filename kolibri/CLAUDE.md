@@ -97,7 +97,7 @@ in `:app`.
                           @Named("appVersionName") from BuildConfig),
                           AppUpdateModule
   KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
-                          AnrReporter (post-mortem ApplicationExitInfo)
+                          ANR drain (AnrReporter lives in :feature-crashreporting)
 ```
 
 Key points to remember when adding code:

@@ -18,12 +18,12 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
-import com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceiver
 import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
 import com.github.reygnn.launcher.common.ui.LaunchTrace
+import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig

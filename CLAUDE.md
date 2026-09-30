@@ -156,8 +156,9 @@ carries names only so it cannot drift against the catalog.
    settings-store key an owner declares must appear in its
    `ownedExactKeys()`/`ownedKeyPrefixes()` — a **straggler guard** — any file that
    declares a `PreferencesKey` but is neither an owner nor a known usage/consent
-   writer flags (the cross-module `AnrReporter` case: a non-repo in `:app` that owns
-   one settings key) — and **binding parity** — every structural owner must have
+   writer flags (historically the `AnrReporter` case: a non-repo in `:app` that owned
+   one settings key; since 1c-1 its watermark lives in `:feature-crashreporting`'s own
+   store) — and **binding parity** — every structural owner must have
    exactly one `@IntoSet` binding. The parity gate exists because `@IntoSet` is
    **not** auto-registration: implementing `OwnsSettingsStoreKeys` has no Dagger
    effect, the binding is a manual per-owner line, and a forgotten one would drop

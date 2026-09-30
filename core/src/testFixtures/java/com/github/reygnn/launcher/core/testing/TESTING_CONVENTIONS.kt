@@ -549,7 +549,7 @@ package com.github.reygnn.launcher.core.testing
  * every test, and its `onCreate()` installs ACRA's global
  * UncaughtExceptionHandler, plants Timber trees, registers a
  * BroadcastReceiver, creates a CoroutineScope, launches the
- * [com.github.reygnn.kolibri_launcher.crashreporting.ingestion.AnrReporter] coroutine,
+ * [com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReporter] coroutine,
  * and starts a [com.github.reygnn.launcher.feature.crashreporting.resilience.RecoveryWatchdog]
  * daemon thread. None of that is torn down between tests, so every
  * Robolectric test class would leak one of each. With ~10+ Robolectric

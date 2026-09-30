@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.crashreporting.ingestion
+package com.github.reygnn.launcher.feature.crashreporting.ingestion
 
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
@@ -8,10 +8,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
 import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrDrainer
-import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReport
+import com.github.reygnn.launcher.feature.crashreporting.di.ConsentDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,10 +43,16 @@ import kotlinx.coroutines.withContext
  *
  * ## Storage
  *
- * Watermark timestamp lives in the project's settings DataStore (per CLAUDE.md
- * Rule 5). Key: `anr_reporter_last_reported_ts`. The read+write are both
- * `suspend`, which fits because [reportPendingAnrs] is called from an
- * application-scope coroutine in `KolibriLauncherApp.onCreate`.
+ * Watermark timestamp lives in :feature-crashreporting's OWN DataStore (the
+ * `acra_consent` file, [ConsentDataStore]) — device-local crash-reporting state:
+ * excluded from Auto Backup (the exit history belongs to this device, a restored
+ * watermark would hide nothing useful) and untouched by any app reset or settings
+ * cleanup. Key: `anr_reporter_last_reported_ts`. Until SPEC_NYX_REWRITE 1c-1 the
+ * reporter lived in Kolibri's :app and wrote into Kolibri's settings store; moving
+ * the key starts that watermark from zero once, so ANRs still in the system's exit
+ * history are reported one more time (developer-visible only; no migration code,
+ * Rule 5). The read+write are both `suspend`, which fits because
+ * [reportPendingAnrs] runs from the application-scope coroutine in the bootstrap.
  *
  * ## Dedup contract
  *
@@ -70,14 +74,9 @@ import kotlinx.coroutines.withContext
 @Singleton
 class AnrReporter @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
-    private val dataStore: DataStore<Preferences>,
+    @param:ConsentDataStore private val dataStore: DataStore<Preferences>,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : OwnsSettingsStoreKeys, AnrDrainer {
-
-    // AnrReporter is NOT a repository, but it owns a settings-store key (its ANR
-    // dedup watermark). It joins the cleanup keep-list so the blacklist cleanup
-    // never wipes the watermark and resurrects already-reported ANRs.
-    override fun ownedExactKeys(): Set<String> = setOf(KEY_WATERMARK.name)
+) : AnrDrainer {
 
     /**
      * Walks all ANRs in `getHistoricalProcessExitReasons` newer than the stored

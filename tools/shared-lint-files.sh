@@ -42,6 +42,9 @@ SHARED_OOM_FILES=(
   "$_shared_root/common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt"
   "$_shared_root/common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"
   "$_shared_root/common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperBitmapLuminanceImpl.kt"
+  # Trace read of an ApplicationExitInfo (allocation boundary); moved from Kolibri's
+  # :app in SPEC_NYX_REWRITE 1c-1.
+  "$_shared_root/feature-crashreporting/src/main/java/com/github/reygnn/launcher/feature/crashreporting/ingestion/AnrReporter.kt"
 )
 
 # Init-order launch whitelist — shared-module files (none today; FolderIconRenderer
