@@ -8,7 +8,6 @@ common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/Wallp
 common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt	suspend fun copyToInternal(sourceUri: Uri): Uri? = withContext(Dispatchers.IO) {
 common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/WallpaperFlattener.kt	withContext(Dispatchers.IO) {
 feature-crashreporting/src/main/java/com/github/reygnn/launcher/feature/crashreporting/consent/ConsentDialog.kt	return withContext(Dispatchers.Main) {
-kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/KolibriLauncherApp.kt	private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt	coroutineContext = Dispatchers.Main,
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appcontextmenu/AppContextMenuDialogFragment.kt	val actions = withContext(Dispatchers.IO) {
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/appdrawer/AppDrawerFragment.kt	coroutineContext = Dispatchers.Main + fragmentExceptionHandler,
@@ -38,7 +37,6 @@ kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupReposit
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	withContext(Dispatchers.IO) {
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/NyxApplication.kt	private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	withContext(Dispatchers.IO) {
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	withContext(Dispatchers.IO) {
 nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) {

@@ -12,7 +12,8 @@ import android.os.StrictMode
  * Purpose: suppress the benign StrictMode DiskRead violations Samsung raises via
  * on-UI-thread IPC/DB reads inside otherwise innocuous framework calls
  * (`Toast.makeText`, `PreferenceFragmentCompat.setPreferencesFromResource`).
- * StrictMode is armed in DEBUG only (see `KolibriLauncherApp.setupStrictMode`),
+ * StrictMode is armed in DEBUG only, in both apps (see `LauncherAppBootstrap`
+ * in :feature-crashreporting),
  * so in release this is an effectively free save/restore.
  *
  * This is the single owner of the save → relax → restore dance that

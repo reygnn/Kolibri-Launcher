@@ -16,25 +16,22 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.github.reygnn.kolibri_launcher.core.SystemWallpaperColorsSignal
 import com.github.reygnn.kolibri_launcher.data.InstalledAppsRepositoryEntryPoint
 import com.github.reygnn.launcher.common.data.installedapps.PackageUpdateReceiver
 import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
-import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
 import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReporter
-import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
-import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
+import com.github.reygnn.launcher.feature.crashreporting.resilience.LauncherAppBootstrap
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -54,9 +51,7 @@ import timber.log.Timber
 class KolibriLauncherApp : Application() {
 
     companion object {
-        // Compiled once instead of re-allocated per debug-log call: strips the
-        // anonymous-class suffix ("Foo$1") from the DebugTree stack tag. DEBUG-only.
-        private val ANON_CLASS_SUFFIX = Regex("\\$\\d+")
+        private const val LOG_TAG = "KolibriLauncher"
     }
 
     @Inject
@@ -64,7 +59,12 @@ class KolibriLauncherApp : Application() {
     @Inject
     lateinit var systemWallpaperColorsSignal: SystemWallpaperColorsSignal
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    @field:IoDispatcher
+    lateinit var ioDispatcher: CoroutineDispatcher
+
+    // Created on first use — after super.onCreate(), when Hilt has injected the dispatcher.
+    private val applicationScope by lazy { CoroutineScope(SupervisorJob() + ioDispatcher) }
 
     /**
      * Last known locale tags, to detect a system locale change in
@@ -88,82 +88,43 @@ class KolibriLauncherApp : Application() {
      */
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-
-        if (base != null) {
-            try {
-                // Owns ACRA init (A1) + the uncaught-handler install, in the §12
-                // order. The X2-gated consent read is NOT here — it runs in
-                // CrashReportingBootstrap.onCreate (applicationContext is null
-                // during attach). See CrashReportingBootstrap.
-                // Traced (cold-start): synchronous, runs before onCreate and
-                // blocks the Main thread; wraps the ACRA-init sub-section.
-                LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
-                    CrashReportingBootstrap.attachBaseContext(
-                        this,
-                        AcraConfig(
-                            buildConfigClass = BuildConfig::class.java,
-                            url = BuildConfig.ACRA_URL,
-                            login = BuildConfig.ACRA_LOGIN,
-                            password = BuildConfig.ACRA_PASSWORD,
-                        ),
-                    )
-                }
-            } catch (e: Throwable) {
-                // Ultra paranoid: even crash-reporting init must not crash the
-                // app. Android Log fallback since Timber may not be wired yet.
-                try {
-                    Log.e("KolibriLauncher", "CRITICAL: Failed to initialize crash reporting", e)
-                } catch (ignored: Throwable) {
-                    // Even logging can fail - nothing we can do
-                }
-            }
+        // ACRA init (disabled until consent) + uncaught handler, Rule-7 guarded with a Log
+        // fallback (Timber is not wired yet) — shared with Nyx (1c-2). The consent read
+        // runs later in onCreate (applicationContext is null during attach). Traced
+        // (cold start): synchronous, runs before onCreate and blocks the Main thread.
+        LaunchTrace.section(LaunchTrace.Names.COLD_START_ATTACH) {
+            LauncherAppBootstrap.attachBaseContext(
+                this,
+                base,
+                AcraConfig(
+                    buildConfigClass = BuildConfig::class.java,
+                    url = BuildConfig.ACRA_URL,
+                    login = BuildConfig.ACRA_LOGIN,
+                    password = BuildConfig.ACRA_PASSWORD,
+                ),
+                LOG_TAG,
+            )
         }
     }
 
     override fun onCreate() {
         super.onCreate()
 
-        // Wire the pure-Kotlin :core logging seam (TimberWrapper + KolibriLog) to Timber.
-        // :core has no Timber on its compile classpath (Timber 5.x is .aar-only); it forwards
-        // through these lambdas. Must run before any code path that may log / invoke
-        // silentError. Shared with nyx so the routing can't drift.
-        wireKolibriLogToTimber(BuildConfig.DEBUG)
-
-        // Setup Timber with crash protection
-        try {
-            if (BuildConfig.DEBUG) {
-                // Custom DebugTree with short tags
-                Timber.plant(object : Timber.DebugTree() {
-                    override fun createStackElementTag(element: StackTraceElement): String {
-                        val className = element.className
-                            .substringAfterLast('.')
-                            .replace(ANON_CLASS_SUFFIX, "")
-                            .replace("$", ".")
-                        return "Kolibri_$className"
-                    }
-                })
-                Timber.plant(ToastErrorTree())
-            }
-        } catch (e: Throwable) {
-            // Timber initialization failed - continue without it
-            Log.e("KolibriLauncher", "Failed to initialize Timber", e)
-        }
-
-        // Setup StrictMode for debugging
-        if (BuildConfig.DEBUG) {
-            try {
-                setupStrictMode()
-            } catch (e: Throwable) {
-                TimberWrapper.reportToAcra(e, "Error setting up StrictMode")
-            }
-        }
-
-        // Plant the delivery tree, drain post-mortem ANRs, start the watchdog
-        // (§12·3). See CrashReportingBootstrap.
-        // Traced (cold-start): synchronous Main-thread work in onCreate.
-        LaunchTrace.section(LaunchTrace.Names.COLD_START_ONCREATE_BOOTSTRAP) {
-            CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
-        }
+        // Shared bootstrap (SPEC_NYX_REWRITE 1c-2): :core logging seam, DEBUG trees
+        // ("Kolibri_<Class>" tags), StrictMode in DEBUG, then crash reporting + the
+        // post-mortem ANR drain + watchdog — each block Rule-7 guarded. Only the
+        // crash-bootstrap call is traced (cold start: synchronous Main-thread work).
+        LauncherAppBootstrap.onCreate(
+            app = this,
+            isDebug = BuildConfig.DEBUG,
+            logTag = LOG_TAG,
+            tagPrefix = "Kolibri",
+            applicationScope = applicationScope,
+            anrDrainer = anrReporter,
+            traceBootstrap = { bootstrap ->
+                LaunchTrace.section(LaunchTrace.Names.COLD_START_ONCREATE_BOOTSTRAP) { bootstrap() }
+            },
+        )
 
         // Receiver registration — der Helper hat seinen eigenen catch(Throwable)
         // mit silentError, also kann hier nichts entkommen. Ein zusätzlicher
@@ -299,44 +260,9 @@ class KolibriLauncherApp : Application() {
         }
     }
 
-    private fun setupStrictMode() {
-        // WICHTIG: StrictMode darf NUR im Debug-Modus laufen!
-        // Im Release kostet das Performance und nervt den User.
-        if (!BuildConfig.DEBUG) return
-
-        try {
-            android.os.StrictMode.setThreadPolicy(
-                android.os.StrictMode.ThreadPolicy.Builder()
-                    .detectAll() // Erkennt Disk I/O, Network im Main Thread
-                    .penaltyLog() // Schreibt in den Logcat
-                    .penaltyFlashScreen()
-                    // .penaltyDeath() // Optional: bei Main-Thread I/O hart crashen (sehr strikt!)
-                    .build()
-            )
-
-            android.os.StrictMode.setVmPolicy(
-                android.os.StrictMode.VmPolicy.Builder()
-                    .detectAll() // Erkennt Leaked SqlLite, Closable Objects, Activity Leaks
-                    .penaltyLog()
-                    // .penaltyDeath() // Optional: App hart crashen lassen bei Leaks (sehr strikt!)
-                    .build()
-            )
-
-            Timber.d("StrictMode initialized successfully")
-
-        } catch (e: Throwable) {
-            // Sollte eigentlich nie passieren, aber gut für Defensive Programming
-            TimberWrapper.reportToAcra(e, "Error setting up StrictMode")
-        }
-    }
-
     override fun onTerminate() {
         super.onTerminate()
-        try {
-            applicationScope.cancel()
-        } catch (e: Throwable) {
-            TimberWrapper.reportToAcra(e, "Error in onTerminate")
-        }
+        LauncherAppBootstrap.onTerminate(applicationScope)
     }
 
 }

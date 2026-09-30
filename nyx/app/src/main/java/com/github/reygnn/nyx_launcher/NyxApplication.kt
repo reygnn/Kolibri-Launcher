@@ -3,20 +3,16 @@ package com.github.reygnn.nyx_launcher
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
-import android.util.Log
 import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
-import com.github.reygnn.launcher.core.TimberWrapper
-import com.github.reygnn.launcher.feature.crashreporting.ToastErrorTree
-import com.github.reygnn.launcher.feature.crashreporting.wireKolibriLogToTimber
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.feature.crashreporting.ingestion.AnrReporter
 import com.github.reygnn.launcher.feature.crashreporting.resilience.AcraConfig
-import com.github.reygnn.launcher.feature.crashreporting.resilience.CrashReportingBootstrap
+import com.github.reygnn.launcher.feature.crashreporting.resilience.LauncherAppBootstrap
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import timber.log.Timber
 
 /**
  * Nyx application root. `@HiltAndroidApp` triggers Hilt's aggregating codegen and
@@ -27,8 +23,8 @@ import timber.log.Timber
  * [attachBaseContext] and only enabled for a stored Granted consent in
  * [onCreate]. Nyx supplies its own [AcraConfig] (endpoint from its BuildConfig,
  * fed by the shared root secrets.properties) and the shared [AnrReporter] as ANR
- * drainer. The per-block try/catch(Throwable) guards mirror
- * Kolibri's crash-safe Application (rule 7).
+ * drainer. The Rule-7 guards (catch Throwable per block, Log before Timber is
+ * wired, reportToAcra after) live in the shared LauncherAppBootstrap (1c-2).
  */
 @HiltAndroidApp
 class NyxApplication : Application() {
@@ -48,7 +44,13 @@ class NyxApplication : Application() {
     @Inject
     lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    @field:IoDispatcher
+    lateinit var ioDispatcher: CoroutineDispatcher
+
+    // Created on first use — after super.onCreate(), when Hilt has injected the dispatcher.
+    private val applicationScope by lazy { CoroutineScope(SupervisorJob() + ioDispatcher) }
+
     // Post-mortem ANR reports (ApplicationExitInfo), shared with Kolibri since
     // SPEC_NYX_REWRITE 1c-1 — before, Nyx passed a no-op drainer and reported no ANRs.
     @Inject
@@ -56,43 +58,36 @@ class NyxApplication : Application() {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
-        if (base != null) {
-            try {
-                CrashReportingBootstrap.attachBaseContext(
-                    this,
-                    AcraConfig(
-                        buildConfigClass = BuildConfig::class.java,
-                        url = BuildConfig.ACRA_URL,
-                        login = BuildConfig.ACRA_LOGIN,
-                        password = BuildConfig.ACRA_PASSWORD,
-                    ),
-                )
-            } catch (e: Throwable) {
-                Log.e("NyxApplication", "ACRA attachBaseContext failed", e)
-            }
-        }
+        // ACRA init (disabled until consent) + uncaught handler, Rule-7 guarded with a Log
+        // fallback (Timber is not wired yet) — shared with Kolibri (SPEC_NYX_REWRITE 1c-2).
+        LauncherAppBootstrap.attachBaseContext(
+            this,
+            base,
+            AcraConfig(
+                buildConfigClass = BuildConfig::class.java,
+                url = BuildConfig.ACRA_URL,
+                login = BuildConfig.ACRA_LOGIN,
+                password = BuildConfig.ACRA_PASSWORD,
+            ),
+            LOG_TAG,
+        )
     }
 
     override fun onCreate() {
         super.onCreate()
 
-        // Hand BuildConfig.DEBUG to :core's TimberWrapper and wire KolibriLog to Timber
-        // (both pure-Kotlin in :core with no Timber on their classpath). Shared with kolibri
-        // so the routing can't drift.
-        wireKolibriLogToTimber(BuildConfig.DEBUG)
-
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-            // Feed ERROR logs to the ErrorEventBus so BaseActivity surfaces a dev error
-            // toast (DEBUG only; SILENT_ERROR-tagged entries are suppressed there).
-            Timber.plant(ToastErrorTree())
-        }
-
-        try {
-            CrashReportingBootstrap.onCreate(this, applicationScope, anrReporter)
-        } catch (e: Throwable) {
-            Log.e("NyxApplication", "ACRA onCreate failed", e)
-        }
+        // Shared bootstrap (SPEC_NYX_REWRITE 1c-2): :core logging seam, DEBUG trees
+        // ("Nyx_<Class>" tags), StrictMode in DEBUG, then crash reporting + the post-mortem
+        // ANR drain + watchdog — each block Rule-7 guarded (before: Timber unguarded, the
+        // crash bootstrap caught with Log.e, no StrictMode).
+        LauncherAppBootstrap.onCreate(
+            app = this,
+            isDebug = BuildConfig.DEBUG,
+            logTag = LOG_TAG,
+            tagPrefix = "Nyx",
+            applicationScope = applicationScope,
+            anrDrainer = anrReporter,
+        )
 
         packageEvents.start()
         installedAppsHolderPump.start()
@@ -101,11 +96,14 @@ class NyxApplication : Application() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         // Rule 7: a throw from a cache op must not crash the process from a system callback.
-        try {
-            trimMemoryInternal(level)
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "NyxApplication.onTrimMemory failed")
-        }
+        // Reported via reportToAcra (Rule 9: crash infrastructure) — silentError, used here
+        // before 1c-2, throws in DEBUG from inside this safety net.
+        LauncherAppBootstrap.guard("NyxApplication.onTrimMemory failed") { trimMemoryInternal(level) }
+    }
+
+    override fun onTerminate() {
+        super.onTerminate()
+        LauncherAppBootstrap.onTerminate(applicationScope)
     }
 
     private fun trimMemoryInternal(level: Int) {
@@ -120,5 +118,9 @@ class NyxApplication : Application() {
         if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
             wallpaperLayerCache.clear()
         }
+    }
+
+    private companion object {
+        const val LOG_TAG = "NyxApplication"
     }
 }
