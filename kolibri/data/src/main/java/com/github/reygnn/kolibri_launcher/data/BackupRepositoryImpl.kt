@@ -6,7 +6,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.launcher.core.CappedInputStream
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupException
@@ -28,13 +27,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.CancellationException
-import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -200,156 +197,6 @@ class BackupRepositoryImpl @Inject constructor(
     // ===========================================
     // ZIP IMPORT
     // ===========================================
-
-    /**
-     * Imports from a ZIP backup.
-     *
-     * 1. Extracts `backup.json` and wallpaper images
-     * 2. Saves images to internal storage via [WallpaperFileManager]
-     * 3. Resolves `imageFileName` references to internal URIs
-     * 4. Performs the standard import path
-     *
-     * Every extracted image the restored wallpaper does not claim is deleted afterwards, on
-     * every path (aborted extraction, invalid/unsupported backup, failed import, dropped layer,
-     * cancellation), so an import never leaves orphans in internal storage until the next
-     * cold-start gcOrphans sweep (port of nyx §Audit-3 A3-05).
-     */
-    private suspend fun importFromZip(uri: Uri, options: ImportOptions): ImportResult {
-        val extractedImages = mutableMapOf<String, String>() // zipEntryName → internal URI string
-        // Claimed by the wallpaper restore BEFORE it saves (see restoreWallpaperFromBackup).
-        val claimedImages = HashSet<String>()
-        return try {
-            extractAndImportZip(uri, options, extractedImages, claimedImages)
-        } finally {
-            (extractedImages.values - claimedImages).forEach { wallpaperFileManager.deleteFile(it) }
-        }
-    }
-
-    private suspend fun extractAndImportZip(
-        uri: Uri,
-        options: ImportOptions,
-        extractedImages: MutableMap<String, String>,
-        claimedImages: MutableSet<String>,
-    ): ImportResult {
-        var jsonString: String? = null
-        var imageEntryCount = 0
-
-        // 1. Extract ZIP
-        try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                // Bound the whole compressed archive: a streaming provider can report statSize == -1
-                // and slip past the size gate in loadBackupFromFile, so cap the bytes ZipInputStream
-                // may pull (extraction AND closeEntry skips) — a decompression bomb's work stays
-                // bounded. Shared CappedInputStream, mirroring nyx's backup import (§Audit-2 N5).
-                val boundedInput = CappedInputStream(
-                    BufferedInputStream(inputStream),
-                    AppConstants.MAX_BACKUP_SIZE_BYTES + 1,
-                )
-                ZipInputStream(boundedInput).use { zipIn ->
-                    var entry = zipIn.nextEntry
-                    while (entry != null) {
-                        when {
-                            entry.name == "backup.json" -> {
-                                jsonString = zipIn.readBytes().toString(Charsets.UTF_8)
-                            }
-                            // Extract only when the wallpaper is actually being restored — else
-                            // nothing would ever reference the blobs (nyx parity).
-                            options.importWallpaper && entry.name.startsWith("wallpapers/") && !entry.isDirectory -> {
-                                // Reject an archive spamming the wallpaper dir before it can.
-                                if (++imageEntryCount > MAX_IMAGE_ENTRIES) {
-                                    return ImportResult.Error("Backup archive has too many images")
-                                }
-                                // Cap each blob's DECOMPRESSED size so a bomb entry can't fill the
-                                // disk: extract through a per-blob CappedInputStream and reject
-                                // (dropping the partial file) if it exceeds the limit.
-                                val cappedBlob = CappedInputStream(zipIn, AppConstants.MAX_BACKUP_SIZE_BYTES + 1)
-                                val internalUri = wallpaperFileManager.copyFromInputStream(cappedBlob)
-                                if (cappedBlob.limitReached) {
-                                    internalUri?.let { wallpaperFileManager.deleteFile(it) }
-                                    return ImportResult.Error("Backup image is too large")
-                                }
-                                if (internalUri != null) {
-                                    extractedImages[entry.name] = internalUri.toString()
-                                    Timber.d("Extracted ${entry.name} → $internalUri")
-                                }
-                            }
-                        }
-                        zipIn.closeEntry()
-                        entry = zipIn.nextEntry
-                    }
-                    if (boundedInput.limitReached) return ImportResult.Error("Backup file is too large")
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error extracting ZIP backup")
-            return ImportResult.Error("Failed to extract backup archive")
-        }
-
-        val jsonContent = jsonString
-        if (jsonContent.isNullOrBlank()) {
-            TimberWrapper.silentError("ZIP backup does not contain backup.json")
-            return ImportResult.InvalidFormat
-        }
-
-        // 2. Parse JSON via serializer
-        val backup = serializer.parseBackupData(jsonContent)
-            ?: return ImportResult.InvalidFormat
-
-        if (options.importNothing) return ImportResult.Error("No import options selected")
-        if (!serializer.isVersionSupported(backup.version)) {
-            return ImportResult.UnsupportedVersion(backup.version)
-        }
-
-        // 3. Resolve imageFileName → internal URI
-        val resolvedBackup = serializer.resolveZipImages(backup, extractedImages)
-
-        // 4. Standard import
-        Timber.i("ZIP import: ${extractedImages.size} images extracted, starting import")
-        // Per-import restorer so the claimed set stays local to THIS import (the class is a
-        // @Singleton; a shared field would race between overlapping imports).
-        val zipWallpaperRestorer = object : WallpaperRestorer {
-            override suspend fun restoreFromBackup(settings: LauncherSettings) =
-                restoreWallpaperFromBackup(settings, onClaim = claimedImages::addAll)
-        }
-        return try {
-            assembler.performImport(resolvedBackup, options, zipWallpaperRestorer)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // Catch kept (Expected error, four-category frame): bitmap
-            // copying during wallpaper restore + multi-repo writes are
-            // memory-heavy. OOM extends Error → Throwable.
-            TimberWrapper.silentError(e, "Error importing ZIP backup")
-            ImportResult.Error(e.message ?: "Unknown error")
-        }
-    }
-
-    /**
-     * Reads only `backup.json` from a ZIP archive (for preview).
-     */
-    private fun readJsonFromZip(uri: Uri): String? {
-        return try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                ZipInputStream(BufferedInputStream(inputStream)).use { zipIn ->
-                    var entry = zipIn.nextEntry
-                    while (entry != null) {
-                        if (entry.name == "backup.json") {
-                            return@use zipIn.readBytes().toString(Charsets.UTF_8)
-                        }
-                        zipIn.closeEntry()
-                        entry = zipIn.nextEntry
-                    }
-                    null
-                }
-            }
-        } catch (e: Throwable) {
-            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-            TimberWrapper.silentError(e, "Error reading JSON from ZIP")
-            null
-        }
-    }
 
     // ===========================================
     // WALLPAPER RESTORE (file-system side; called by Assembler)
@@ -590,12 +437,12 @@ class BackupRepositoryImpl @Inject constructor(
             if (options.importNothing) return@withContext ImportResult.Error("No import options selected")
             val staging = stagingDir("import")
             try {
-                when (val read = engine.read({ openInput(uri) }, staging, APP_ID, KNOWN_SECTIONS)) {
+                when (val read = engine.read({ openInput(uri) }, staging, KolibriBackupSchema.APP_ID, KolibriBackupSchema.KNOWN_SECTIONS)) {
                     is BackupRead.Ok -> read.blobs.use { blobs -> importContainer(read, blobs, staging, options) }
-                    // A pre-E5a Kolibri archive: the old ZIP reader below still imports it until
-                    // :kolibri:backup-legacy takes over (2a-6). Unzipped legacy JSON is no longer
-                    // read (every valid backup is zipped — SPEC_NYX_REWRITE E5a).
-                    BackupRead.OutdatedFormat -> importFromZip(uri, options)
+                    // A pre-E5a archive reaches this only when no LegacyFormatReader is bound — after
+                    // the sunset of :kolibri:backup-legacy (2a-6). While the module is there, it
+                    // up-converts old archives and they arrive as BackupRead.Ok.
+                    BackupRead.OutdatedFormat -> ImportResult.Error("Backup of an older version — no longer supported")
                     is BackupRead.ForeignApp -> ImportResult.Error("Backup was made by another app (${read.appId})")
                     is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
                     is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
@@ -655,14 +502,13 @@ class BackupRepositoryImpl @Inject constructor(
 
             val staging = stagingDir("preview")
             try {
-                when (val read = engine.read({ openInput(uri) }, staging, APP_ID, KNOWN_SECTIONS)) {
+                when (val read = engine.read({ openInput(uri) }, staging, KolibriBackupSchema.APP_ID, KolibriBackupSchema.KNOWN_SECTIONS)) {
                     is BackupRead.Ok -> read.blobs.use {
-                        val settings = read.manifest.sections[SECTION_BACKUP]
+                        val settings = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP]
                             ?.let { section -> serializer.settingsFromJson(section.data) }
                             ?: return@withContext null
                         serializer.buildPreview(backupDataOf(read.manifest.producer, settings))
                     }
-                    BackupRead.OutdatedFormat -> legacyPreview(uri) // until 2a-6
                     else -> null
                 }
             } finally {
@@ -712,8 +558,8 @@ class BackupRepositoryImpl @Inject constructor(
         }
         engine.export(
             output = output,
-            producer = ContainerManifest.Producer(APP_ID, backupData.appVersion, backupData.timestamp),
-            schemaVersion = SCHEMA_VERSION,
+            producer = ContainerManifest.Producer(KolibriBackupSchema.APP_ID, backupData.appVersion, backupData.timestamp),
+            schemaVersion = KolibriBackupSchema.SCHEMA_VERSION,
             blobs = sources,
         ) { hashes ->
             val layers = settings.wallpaperLayers.mapIndexed { index, layer ->
@@ -722,7 +568,7 @@ class BackupRepositoryImpl @Inject constructor(
             }
             val single = singleSource?.let { hashes[it] } ?: layers.firstNotNullOfOrNull { it.imageFileName }
             val sectionSettings = settings.copy(wallpaperLayers = layers, wallpaperImageFileName = single)
-            mapOf(SECTION_BACKUP to ContainerManifest.Section(SECTION_VERSION, serializer.settingsToJson(sectionSettings)))
+            mapOf(KolibriBackupSchema.SECTION_BACKUP to ContainerManifest.Section(KolibriBackupSchema.SECTION_VERSION, serializer.settingsToJson(sectionSettings)))
         }
         Timber.i("Backup written: ${sources.size} image source(s)")
     }
@@ -738,7 +584,7 @@ class BackupRepositoryImpl @Inject constructor(
         staging: File,
         options: ImportOptions,
     ): ImportResult {
-        val section = read.manifest.sections[SECTION_BACKUP] ?: return ImportResult.InvalidFormat
+        val section = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidFormat
         val settings = serializer.settingsFromJson(section.data) ?: return ImportResult.InvalidFormat
         val backup = backupDataOf(read.manifest.producer, settings)
         val extracted = mutableMapOf<String, String>() // blob hash → internal wallpaper URI
@@ -795,13 +641,6 @@ class BackupRepositoryImpl @Inject constructor(
     private fun openInput(uri: Uri): InputStream =
         context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot read from selected location")
 
-    /** Preview of a pre-E5a archive through the old reader — until 2a-6. */
-    private fun legacyPreview(uri: Uri): BackupPreview? {
-        val json = readJsonFromZip(uri) ?: return null
-        val backup = serializer.parseBackupData(json) ?: return null
-        return serializer.buildPreview(backup)
-    }
-
     /**
      * U3: an export writes into a document the user has just created. If writing fails or
      * is cancelled, the document is deleted — no half, unimportable ZIP is left behind.
@@ -833,16 +672,6 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     private companion object {
-        // A real backup carries one image per wallpaper layer; reject an archive with absurdly
-        // many image entries before it can spam internal storage (§Audit-2 N5 mirror).
-        const val MAX_IMAGE_ENTRIES = 64
-
-        // E5a container schema of Kolibri (2a-5): one versioned section with the settings.
-        const val APP_ID = "kolibri"
-        const val SCHEMA_VERSION = 1
-        const val SECTION_BACKUP = "kolibri.backup"
-        const val SECTION_VERSION = 1
-        val KNOWN_SECTIONS = setOf(SECTION_BACKUP)
         const val IMAGE_MEDIA_TYPE = "image/*"
     }
 }

@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import com.github.reygnn.launcher.core.AppInfo
-import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
@@ -19,10 +18,15 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
-import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
+import com.github.reygnn.launcher.feature.backup.container.BlobSource
+import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
+import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.every
@@ -41,14 +45,13 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.FileDescriptor
 import java.io.InputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
- * ZIP import never leaves extracted wallpaper images orphaned in internal storage (port of nyx
- * §Audit-3 A3-05): every extracted image the restored wallpaper does not claim is deleted on
- * every path, images are not even extracted when the wallpaper isn't being imported, and the
- * restore claims its images BEFORE saving so an interrupted save never deletes referenced files.
+ * Container import (SPEC_NYX_REWRITE 2a-6; formerly the ZIP-orphan test, §Audit-3 A3-05) never
+ * leaves wallpaper images orphaned in internal storage: only blobs a layer references are ever
+ * copied in, every copy the restored wallpaper does not claim is deleted, nothing is copied
+ * when the wallpaper isn't imported or the backup is refused, and the restore claims its images
+ * BEFORE saving so an interrupted save never deletes referenced files.
  *
  * Robolectric for real [Uri] parsing; the file manager is a mock (extraction/copy/delete are
  * observed, not performed).
@@ -56,7 +59,7 @@ import java.util.zip.ZipOutputStream
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class BackupRepositoryImplZipOrphanTest {
+class BackupRepositoryImplContainerOrphanTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -112,42 +115,43 @@ class BackupRepositoryImplZipOrphanTest {
             context = context,
         )
 
-    /** Serves [zipBytes] for the backup URI (fresh per call: isZipFile + import) and a readable stream for every extracted image. */
+    /** Serves [zipBytes] for the backup URI (fresh per call) and a readable stream for every extracted image. */
     private fun serve(zipBytes: ByteArray) {
         every { contentResolver.openInputStream(any()) } answers {
             if (firstArg<Uri>() == backupUri) ByteArrayInputStream(zipBytes) else ByteArrayInputStream(byteArrayOf(1))
         }
     }
 
-    private fun zipOf(manifest: String, vararg images: String): ByteArray {
-        val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write(manifest.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            images.forEach { name ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(byteArrayOf(1, 2, 3))
-                zip.closeEntry()
-            }
+    private val engine = BackupEngine(Dispatchers.IO, emptySet())
+    private val imageA = byteArrayOf(1, 2, 3)
+    private val imageB = byteArrayOf(4, 5, 6)
+
+    /** A current-format backup; [settings] gets each blob's hash so its layers can reference them. */
+    private suspend fun container(
+        vararg blobs: ByteArray,
+        section: JsonElement? = null,
+        settings: (List<String>) -> LauncherSettings = ::oneLayer,
+    ): ByteArray {
+        val out = ByteArrayOutputStream()
+        engine.export(
+            output = out,
+            producer = ContainerManifest.Producer(KolibriBackupSchema.APP_ID, "test", 1L),
+            schemaVersion = KolibriBackupSchema.SCHEMA_VERSION,
+            blobs = blobs.map { bytes -> BlobSource("image/*") { ByteArrayInputStream(bytes) } },
+        ) { hashes ->
+            val data = section ?: BackupSerializer().settingsToJson(settings(hashes))
+            mapOf(KolibriBackupSchema.SECTION_BACKUP to ContainerManifest.Section(KolibriBackupSchema.SECTION_VERSION, data))
         }
-        return bos.toByteArray()
+        return out.toByteArray()
     }
 
-    /** A valid manifest whose wallpaper has one layer backed by the ZIP entry `wallpapers/layer_0.img`. */
-    private fun oneLayerManifest(): String = BackupSerializer().encodeToJsonString(
-        BackupData(
-            version = AppConstants.BACKUP_VERSION,
-            timestamp = 1L,
-            settings = LauncherSettings(
-                wallpaperLayers = listOf(WallpaperLayerBackup(id = "l0", imageFileName = "wallpapers/layer_0.img")),
-            ),
-        ),
-    )
+    /** One wallpaper layer backed by the first blob. */
+    private fun oneLayer(hashes: List<String>) =
+        LauncherSettings(wallpaperLayers = listOf(WallpaperLayerBackup(id = "l0", imageFileName = hashes[0])))
 
     @Test
-    fun `a restored layer keeps its image and an unreferenced image is deleted`() = runTest {
-        serve(zipOf(oneLayerManifest(), "wallpapers/layer_0.img", "wallpapers/stray.img"))
+    fun `a restored layer keeps its image and an unreferenced blob is never copied in`() = runTest {
+        serve(container(imageA, imageB)) // imageB is in the backup, but no layer references it
         val wallpaperRepository = FakeWallpaperRepository()
 
         val result = repository(wallpaperRepository).loadBackupFromFile(backupUri.toString(), ImportOptions())
@@ -155,50 +159,33 @@ class BackupRepositoryImplZipOrphanTest {
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(wallpaperRepository.currentState.layers.single().imageUri).isEqualTo(extracted0)
         verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
-        verify { wallpaperFileManager.deleteFile(extracted1) }
+        verify(exactly = 1) { wallpaperFileManager.copyFromInputStream(any()) }
     }
 
     @Test
-    fun `an invalid manifest deletes the already-extracted images`() = runTest {
-        serve(zipOf("{ not json", "wallpapers/layer_0.img"))
+    fun `an invalid section copies nothing in`() = runTest {
+        serve(container(imageA, section = JsonPrimitive("not settings")))
 
         val result = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
 
         assertThat(result).isEqualTo(ImportResult.InvalidFormat)
-        verify { wallpaperFileManager.deleteFile(extracted0) }
+        verify(exactly = 0) { wallpaperFileManager.copyFromInputStream(any()) }
     }
 
     @Test
-    fun `an over-sized image deletes the images extracted before it`() = runTest {
-        val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { zip ->
-            // A pre-E5a archive needs its backup.json: only then does the container reader
-            // (2a-5) hand it to the old ZIP reader whose cleanup this test pins — without it
-            // the archive is simply "not a backup" and nothing is ever extracted.
-            zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write("{}".toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("wallpapers/layer_0.img"))
-            zip.write(byteArrayOf(1))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry("wallpapers/big.img"))
-            zip.write(ByteArray(11 * 1024 * 1024)) // > the per-blob cap, compresses tiny
-            zip.closeEntry()
-        }
-        serve(bos.toByteArray())
+    fun `an over-sized blob is refused before anything is copied in`() = runTest {
+        serve(container(imageA, ByteArray(11 * 1024 * 1024))) // > the per-blob cap, compresses tiny
 
         val result = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
 
         assertThat(result).isInstanceOf(ImportResult.Error::class.java)
-        verify { wallpaperFileManager.deleteFile(extracted0) }
+        verify(exactly = 0) { wallpaperFileManager.copyFromInputStream(any()) }
     }
 
     @Test
-    fun `images are not extracted when the wallpaper is not being imported`() = runTest {
-        serve(zipOf(oneLayerManifest(), "wallpapers/layer_0.img"))
-
+    fun `images are not copied in when the wallpaper is not being imported`() = runTest {
+        serve(container(imageA))
         repository().loadBackupFromFile(backupUri.toString(), ImportOptions(importWallpaper = false))
-
         verify(exactly = 0) { wallpaperFileManager.copyFromInputStream(any()) }
     }
 
@@ -206,12 +193,10 @@ class BackupRepositoryImplZipOrphanTest {
     fun `an interrupted wallpaper save keeps the claimed image`() = runTest {
         // DataStore can commit and the call still end in a CancellationException: the image was
         // claimed BEFORE the save, so it must survive (at worst an orphan for gcOrphans).
-        serve(zipOf(oneLayerManifest(), "wallpapers/layer_0.img"))
+        serve(container(imageA))
         val interrupted = mockk<WallpaperRepository>(relaxed = true)
         coEvery { interrupted.saveWallpaperState(any()) } throws CancellationException("left the screen")
-
         runCatching { repository(interrupted).loadBackupFromFile(backupUri.toString(), ImportOptions()) }
-
         verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
     }
 }

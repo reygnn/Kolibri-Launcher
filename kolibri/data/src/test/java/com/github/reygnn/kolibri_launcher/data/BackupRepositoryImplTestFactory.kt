@@ -63,7 +63,8 @@ internal object BackupRepositoryImplTestFactory {
             wallpaperFileManager = wallpaperFileManager,
             context = context,
             // Real I/O like BackupRepositoryImpl itself (its Dispatchers.IO is a known A13
-            // entry); no legacy reader bound — the old ZIP path is still in the class (2a-5).
+            // entry). No legacy reader bound: :kolibri:data's tests see the engine as it is
+            // after the sunset; the pre-E5a reader is tested in :kolibri:backup-legacy.
             engine = BackupEngine(Dispatchers.IO, emptySet()),
         )
     }

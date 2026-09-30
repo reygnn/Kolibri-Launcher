@@ -119,6 +119,8 @@ dependencies {
     implementation(project(":common-ui"))
     implementation(project(":feature-crashreporting"))
     implementation(project(":feature-backup")) // shared backup engine (SPEC_NYX_REWRITE 2a)
+    // Reads pre-E5a backups until its sunset (kolibri/backup-legacy/SUNSET); remove with the module.
+    implementation(project(":kolibri:backup-legacy"))
     // Project modules
     implementation(project(":kolibri:domain"))
     implementation(project(":kolibri:data"))

@@ -41,6 +41,7 @@ include(":feature-backup")
 include(":kolibri:app")
 include(":kolibri:domain")
 include(":kolibri:data")
+include(":kolibri:backup-legacy") // pre-E5a backup reader until its sunset (SPEC_NYX_REWRITE E5a)
 include(":kolibri:macrobenchmark")
 include(":kolibri:baselineprofile")
 

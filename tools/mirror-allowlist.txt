@@ -6,9 +6,6 @@ core/src/main/java/com/github/reygnn/launcher/core/SyncInstalledAppsToHolder.kt	
 core/src/main/java/com/github/reygnn/launcher/core/wallpaper/WallpaperDisplaySettings.kt	* Member names mirror Kolibri's existing SettingsRepository members so call sites
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt	* container's own background (§25 P5, nyx-parity — the former separate
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/main/MainActivity.kt	// Overlay slide-in/out duration; mirrors nyx DRAWER_SLIDE_MS. (Drawer-open
-kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	* cold-start gcOrphans sweep (port of nyx §Audit-3 A3-05).
-kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	// bounded. Shared CappedInputStream, mirroring nyx's backup import (§Audit-2 N5).
-kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	// nothing would ever reference the blobs (nyx parity).
 kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/GetFavoriteAppsUseCase.kt	// ~150 ms later (parity with nyx tiles). The former "ghost-free" omission is
 kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/ObserveInstalledAppsUseCase.kt	* [SyncInstalledAppsToHolder] (`:core`), used verbatim by nyx too — parity by
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/InstalledAppsHolderPump.kt	* Reporting + resilience (kolibri parity, plus a nyx-specific restart):

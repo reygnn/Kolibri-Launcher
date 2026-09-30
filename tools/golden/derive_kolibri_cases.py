@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Derive the Kolibri golden cases from the anonymized base backup.
 
-Single source of truth for testdata/golden-backups/kolibri-*.{zip,expected.json}:
+Single source of truth for kolibri/backup-legacy/src/test/resources/golden/kolibri-*.{zip,expected.json}:
 reads kolibri-voll.zip and (re)writes every derived ZIP and every expected file,
 including kolibri-voll.expected.json. Output is deterministic (fixed ZIP
 timestamps, sorted JSON keys), so re-running it produces no diff.
@@ -9,11 +9,11 @@ timestamps, sorted JSON keys), so re-running it produces no diff.
 Semantics encoded here are the NEW ones from SPEC_NYX_REWRITE (E1, E2, B11,
 B13, B14). If one of those decisions changes, change it here and re-run.
 
-Usage: derive_kolibri_cases.py [golden-dir]   (default: testdata/golden-backups)
+Usage: derive_kolibri_cases.py [golden-dir]   (default: kolibri/backup-legacy/src/test/resources/golden)
 """
 import copy, hashlib, json, os, sys, zipfile
 
-D = sys.argv[1] if len(sys.argv) > 1 else "testdata/golden-backups"
+D = sys.argv[1] if len(sys.argv) > 1 else "kolibri/backup-legacy/src/test/resources/golden"
 BASE = os.path.join(D, "kolibri-voll.zip")
 ZIP_TIME = (2026, 9, 29, 10, 0, 0)
 

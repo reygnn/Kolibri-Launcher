@@ -44,7 +44,7 @@ conf="$det/conventions/$app.conf"
 # ── Registry: check id → detector files it owns (order = report order) ───────
 CHECK_IDS=(rule9 rule12 toast naming rule11 cancel initorder flowcatch sharedflow
            purge arresult adapter oom parity triple keeplist whilesub mirror
-           harddisp buildparity testconv stalereplay rule13)
+           harddisp buildparity legacysunset testconv stalereplay rule13)
 declare -A OWNS=(
   [rule9]="check-intent-gate.awk"
   [rule11]="check-rule11-annotation.awk"
@@ -309,6 +309,19 @@ if run testconv; then
   if [ -n "$out" ]; then echo "$out"; violations=$((violations + $(printf '%s\n' "$out" | grep -c '^═══'))); fi
 fi
 # stalereplay / rule13: TASK = own Gradle task; only their decision is gated here.
+
+# Legacy-module sunset (SPEC_NYX_REWRITE E5a): a WARNING, never a failure. From the date in
+# <app>/backup-legacy/SUNSET on, the pre-E5a reader is due for removal (see SUNSET.md there).
+if run legacysunset; then
+  sunset_file="$APP_DIR/backup-legacy/SUNSET"
+  if [ -f "$sunset_file" ]; then
+    sunset=$(tr -d '[:space:]' < "$sunset_file")
+    if [ -n "$sunset" ] && [[ ! "$(date +%F)" < "$sunset" ]]; then
+      echo; echo "═══ ⚠ WARNING (not a failure): legacy backup reader past its sunset ($sunset) ═══"
+      echo "Remove ${APP_DIR#"$MONO"/}/backup-legacy — steps in its SUNSET.md."
+    fi
+  fi
+fi
 
 echo
 if [ "$violations" -gt 0 ]; then
