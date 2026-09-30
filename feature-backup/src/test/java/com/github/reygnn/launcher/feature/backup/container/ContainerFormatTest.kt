@@ -51,7 +51,7 @@ class ContainerFormatTest {
     @Test
     fun `round trip — manifest first, equal content once, staged bytes identical`() = runTest(mainDispatcherRule.testDispatcher) {
         val out = ByteArrayOutputStream()
-        val table = writer().write(out, listOf(source(a), source(b), source(a.copyOf()))) { manifest(it) }
+        val table = writer().write(out, listOf(source(a), source(b), source(a.copyOf()))) { _, table -> manifest(table) }
 
         assertThat(table.map { it.sha256 }).containsExactly(ha, hb).inOrder()
         assertThat(entryNames(out.toByteArray())).containsExactly("manifest.json", "blobs/$ha", "blobs/$hb").inOrder()
@@ -152,7 +152,7 @@ class ContainerFormatTest {
         var calls = 0
         val flaky = BlobSource("x") { calls++; ByteArrayInputStream(if (calls == 1) a else b) }
         assertFailsWith<BlobChangedDuringExportException> {
-            writer().write(ByteArrayOutputStream(), listOf(flaky)) { manifest(it) }
+            writer().write(ByteArrayOutputStream(), listOf(flaky)) { _, table -> manifest(table) }
         }
     }
 
@@ -160,7 +160,7 @@ class ContainerFormatTest {
     fun `the writer leaves the caller's stream open`() = runTest(mainDispatcherRule.testDispatcher) {
         var closed = false
         val sink = object : ByteArrayOutputStream() { override fun close() { closed = true } }
-        writer().write(sink, listOf(source(a))) { manifest(it) }
+        writer().write(sink, listOf(source(a))) { _, table -> manifest(table) }
         assertThat(closed).isFalse()
     }
 

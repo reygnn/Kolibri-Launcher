@@ -5,17 +5,21 @@
 // U1-U4 in comments are the spec's engine takeover items (written without the umlaut,
 // which Rule 13 reads as German).
 //
-// Step 2a-2: the container format (E5a) — manifest first, blobs by SHA-256, caps,
-// staging. App schemas, the engine proper and the legacy port follow.
+// 2a-2: the container format (E5a) — manifest first, blobs by SHA-256, caps, staging.
+// 2a-3: the engine over it (sections, producer check, staged-blob ownership) and the
+// LegacyFormatReader port (Hilt set, empty by default).
 plugins {
     id("launcher.jvm.library") // Kotlin JVM + toolchain/target 21 (build-logic)
     alias(libs.plugins.kotlin.serialization) // also the Kotlin-plugin carrier under AGP 9
+    alias(libs.plugins.ksp)
 }
 
 dependencies {
     implementation(project(":core"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.hilt.core)
+    ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

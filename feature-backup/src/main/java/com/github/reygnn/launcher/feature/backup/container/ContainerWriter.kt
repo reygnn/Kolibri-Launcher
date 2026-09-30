@@ -21,25 +21,27 @@ import java.util.zip.ZipOutputStream
 class ContainerWriter(private val ioDispatcher: CoroutineDispatcher) {
 
     /**
-     * @param manifest builds the manifest bytes from the final blob table (the schema
-     *   layer puts sections and references into it).
+     * @param manifest builds the manifest bytes from each source's hash (same order as
+     *   [blobs], so sections can reference them) and the final, deduplicated blob table.
      * @return the blob table that was written.
      */
     suspend fun write(
         output: OutputStream,
         blobs: List<BlobSource>,
-        manifest: (List<BlobEntry>) -> ByteArray,
+        manifest: (sourceHashes: List<String>, table: List<BlobEntry>) -> ByteArray,
     ): List<BlobEntry> = withContext(ioDispatcher) {
         val table = LinkedHashMap<String, Pair<BlobEntry, BlobSource>>()
+        val sourceHashes = ArrayList<String>(blobs.size)
         for (source in blobs) {
             ensureActive()
             val digest = sha256()
             val size = source.open().use { copyHashing(it, null, digest) }
             val hash = digest.hex()
+            sourceHashes += hash
             if (hash !in table) table[hash] = BlobEntry(hash, size, source.mediaType) to source
         }
         val entries = table.values.map { it.first }
-        val manifestBytes = manifest(entries)
+        val manifestBytes = manifest(sourceHashes, entries)
 
         val zip = ZipOutputStream(output)
         zip.putNextEntry(ZipEntry(ContainerFormat.MANIFEST_ENTRY))
