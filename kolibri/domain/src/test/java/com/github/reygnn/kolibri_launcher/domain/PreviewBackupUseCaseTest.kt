@@ -1,6 +1,7 @@
 package com.github.reygnn.kolibri_launcher.domain
 
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.PreviewBackupUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
@@ -42,11 +43,11 @@ class PreviewBackupUseCaseTest {
             hasTimeBasedEvents = false, hasQualityOfLife = false, hasPowerUserSettings = false
         )
 
-        coEvery { repository.previewBackup(uriString) } returns expectedPreview
+        coEvery { repository.previewBackup(uriString) } returns PreviewResult.Readable(expectedPreview)
 
         val result = useCase(uriString)
 
-        assertThat(result).isEqualTo(expectedPreview)
+        assertThat(result).isEqualTo(PreviewResult.Readable(expectedPreview))
         coVerify { repository.previewBackup(uriString) }
     }
 }

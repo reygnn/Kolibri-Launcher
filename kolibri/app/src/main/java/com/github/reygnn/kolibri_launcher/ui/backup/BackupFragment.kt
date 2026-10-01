@@ -16,6 +16,7 @@ import com.github.reygnn.kolibri_launcher.databinding.DialogImportOptionsBinding
 import com.github.reygnn.kolibri_launcher.databinding.FragmentBackupBinding
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.kolibri_launcher.ui.util.FilenameBuilder
 import androidx.appcompat.app.AlertDialog
@@ -141,16 +142,22 @@ class BackupFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch(exceptionHandler) {
             try {
-                val preview = withTimeoutOrNull(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS) {
-                    viewModel.backupPreview.first { it != null }
-                }
-
-                // Wenn preview null ist (Timeout) oder Fragment weg ist -> Abbruch
-                if (preview == null) {
-                    TimberWrapper.silentError("Preview timeout or loading failed")
-                    hideLoading()
-                    showError(getString(R.string.error_generic))
-                    return@launch
+                // The timeout only guards against a provider that hangs. A refused file never
+                // waits for it: the ViewModel reports the reason through backupState at once and
+                // no dialog opens (2a-7b).
+                val preview = when (
+                    val result = withTimeoutOrNull(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS) {
+                        viewModel.previewResult.first { it != null }
+                    }
+                ) {
+                    null -> {
+                        TimberWrapper.silentError("Preview timed out")
+                        hideLoading()
+                        showError(getString(R.string.error_generic))
+                        return@launch
+                    }
+                    is PreviewResult.Refused -> return@launch
+                    is PreviewResult.Readable -> result.preview
                 }
 
                 if (!isAdded || _binding == null) return@launch
@@ -286,7 +293,7 @@ class BackupFragment : Fragment() {
                     .show()
 
             } catch (e: CancellationException) {
-                // The try body suspends (withTimeoutOrNull + backupPreview.first);
+                // The try body suspends (withTimeoutOrNull + previewResult.first);
                 // a view-teardown cancellation must propagate, not be reported as
                 // a crash. Rethrow per canonical.
                 throw e

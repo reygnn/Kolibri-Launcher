@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
@@ -205,12 +206,11 @@ class BackupRepositoryImplIoTest {
     }
 
     @Test
-    fun `previewBackup - unknown size statSize -1 with over-preview-limit stream - returns null (bounded at preview limit)`() = runTest {
-        // The preview path caps the statSize == -1 read at MAX_PREVIEW_SIZE_BYTES (1 MB for
-        // non-ZIP), NOT the larger import cap — matching its own fast-path check. A stream
-        // just past the preview limit must be rejected, so previewBackup returns null. A
-        // fresh stream per openInputStream call: isZipFile reads the 2 magic bytes (leading
-        // 'a' != "PK", so it is treated as JSON), then the bounded JSON read runs.
+    fun `previewBackup - unknown size statSize -1 with a large non-ZIP stream - is refused`() = runTest {
+        // Size unknown (statSize == -1), so only the engine's own read bounds it; a stream of
+        // 'a' bytes is no container. The preview is refused with a reason (2a-7b; it used to
+        // return null). Which refusal exactly is pinned per case in
+        // BackupRepositoryImplContainerOrphanTest — here only that it never becomes readable.
         every { parcelFileDescriptor.statSize } returns -1L
         every { contentResolver.openFileDescriptor(eq(testUri), any()) } returns parcelFileDescriptor
         val previewLimit = AppConstants.MAX_PREVIEW_SIZE_BYTES
@@ -229,7 +229,7 @@ class BackupRepositoryImplIoTest {
 
         val result = backupManager.previewBackup(testUri.toString())
 
-        assertThat(result).isNull()
+        assertThat(result).isInstanceOf(PreviewResult.Refused::class.java)
     }
 
     @Test

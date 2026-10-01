@@ -5,6 +5,7 @@ import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.usecase.ExportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ImportBackupUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.PreviewBackupUseCase
@@ -270,43 +271,65 @@ class BackupViewModelTest {
                 hasQualityOfLife = true,
                 hasPowerUserSettings = true
             )
-            fakeBackupRepository.previewResult = expectedPreview
+            fakeBackupRepository.previewResult = PreviewResult.Readable(expectedPreview)
 
-            viewModel.backupPreview.test {
+            viewModel.previewResult.test {
                 Truth.assertThat(awaitItem()).isNull()
                 viewModel.previewBackup(mockUriString)
                 advanceUntilIdle()
-                val preview = expectMostRecentItem()
-                Truth.assertThat(preview).isNotNull()
-                Truth.assertThat(preview?.favoriteCount).isEqualTo(5)
+                Truth.assertThat(expectMostRecentItem()).isEqualTo(PreviewResult.Readable(expectedPreview))
             }
+            // A readable file is no outcome yet: the options dialog comes first.
+            Truth.assertThat(viewModel.backupState.value).isEqualTo(BackupState.Idle)
         }
 
     @Test
-    fun `previewBackup - failure - emits null`() = runTest(mainDispatcherRule.testDispatcher) {
-        val mockUriString = "content://fake/backup.json"
-        fakeBackupRepository.previewResult = null
+    fun `previewBackup - refused file - reports the reason at once`() = runTest(mainDispatcherRule.testDispatcher) {
+        // 2a-7b (was: preview stays null and the fragment times out into "error"). The refusal
+        // goes straight to backupState, which shows its own message; no dialog can open, since
+        // the fragment opens it only for PreviewResult.Readable.
+        fakeBackupRepository.previewResult = PreviewResult.Refused(ImportResult.ForeignBackup("nyx"))
 
-        viewModel.backupPreview.test {
-            Truth.assertThat(awaitItem()).isNull()
-            viewModel.previewBackup(mockUriString)
+        viewModel.previewBackup("content://fake/backup.zip")
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.previewResult.value).isEqualTo(PreviewResult.Refused(ImportResult.ForeignBackup("nyx")))
+        Truth.assertThat(viewModel.backupState.value).isEqualTo(BackupState.ForeignBackup("nyx"))
+    }
+
+    @Test
+    fun `previewBackup - every refusal maps to the same state as its import`() = runTest(mainDispatcherRule.testDispatcher) {
+        val refusals = listOf(
+            ImportResult.ForeignBackup("nyx") to BackupState.ForeignBackup("nyx"),
+            ImportResult.OutdatedBackup to BackupState.OutdatedBackup,
+            ImportResult.UnsupportedVersion("9.0") to BackupState.UnsupportedVersion("9.0"),
+            ImportResult.InvalidFormat to BackupState.InvalidFormat,
+            ImportResult.Error("Backup file is too large") to BackupState.Error("Backup file is too large"),
+        )
+        for ((refusal, state) in refusals) {
+            fakeBackupRepository.previewResult = PreviewResult.Refused(refusal)
+            viewModel.previewBackup("content://fake/backup.zip")
             advanceUntilIdle()
-            expectNoEvents() // Bleibt null
+            Truth.assertWithMessage("preview refused with $refusal").that(viewModel.backupState.value).isEqualTo(state)
+
+            fakeBackupRepository.importResult = refusal
+            viewModel.importBackup("content://fake/backup.zip", ImportOptions())
+            advanceUntilIdle()
+            Truth.assertWithMessage("import refused with $refusal").that(viewModel.backupState.value).isEqualTo(state)
         }
     }
 
     @Test
-    fun `previewBackup - exception thrown - emits null`() =
+    fun `previewBackup - exception thrown - refused with an error`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val mockUriString = "content://fake/backup.json"
             fakeBackupRepository.shouldThrowOnPreview = true
 
-            viewModel.backupPreview.test {
-                Truth.assertThat(awaitItem()).isNull()
-                viewModel.previewBackup(mockUriString)
-                advanceUntilIdle()
-                expectNoEvents() // Bleibt null
-            }
+            viewModel.previewBackup("content://fake/backup.json")
+            advanceUntilIdle()
+
+            Truth.assertThat(viewModel.previewResult.value)
+                .isEqualTo(PreviewResult.Refused(ImportResult.Error("Simulated preview exception")))
+            Truth.assertThat(viewModel.backupState.value).isEqualTo(BackupState.Error("Simulated preview exception"))
         }
 
     // ========== RESET STATE TESTS ==========
@@ -330,7 +353,7 @@ class BackupViewModelTest {
     }
 
     @Test
-    fun `resetBackupState - clears preview`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `resetBackupState - leaves the preview, the next previewBackup clears it first`() = runTest(mainDispatcherRule.testDispatcher) {
         val mockUriString = "content://fake/backup.json"
         val preview = BackupPreview(
             "1.0.0",
@@ -348,17 +371,21 @@ class BackupViewModelTest {
             false,
             false
         )
-        fakeBackupRepository.previewResult = preview
+        fakeBackupRepository.previewResult = PreviewResult.Readable(preview)
         viewModel.previewBackup(mockUriString)
         advanceUntilIdle()
 
-        // Act & Assert
-        viewModel.backupPreview.test {
-            Truth.assertThat(awaitItem()).isEqualTo(preview)
-            viewModel.resetBackupState()
-            advanceUntilIdle()
-            Truth.assertThat(awaitItem()).isNull()
-        }
+        // 2a-7b (was: reset cleared the preview). The fragment may still be waiting for the
+        // preview while a refusal's state is shown and reset, so reset leaves it alone…
+        viewModel.resetBackupState()
+        advanceUntilIdle()
+        Truth.assertThat(viewModel.previewResult.value).isEqualTo(PreviewResult.Readable(preview))
+
+        // …and the next file starts from null, synchronously, before anything waits for it.
+        viewModel.previewBackup(mockUriString)
+        Truth.assertThat(viewModel.previewResult.value).isNull()
+        advanceUntilIdle()
+        Truth.assertThat(viewModel.previewResult.value).isEqualTo(PreviewResult.Readable(preview))
     }
 
     // ========== STATE TRANSITION TESTS ==========

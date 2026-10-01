@@ -62,10 +62,11 @@ internal object BackupRepositoryImplTestFactory {
             serializer = serializer,
             wallpaperFileManager = wallpaperFileManager,
             context = context,
-            // Real I/O like BackupRepositoryImpl itself (its Dispatchers.IO is a known A13
-            // entry). No legacy reader bound: :kolibri:data's tests see the engine as it is
-            // after the sunset; the pre-E5a reader is tested in :kolibri:backup-legacy.
+            // Real I/O, as before BackupRepositoryImpl took its dispatcher injected (2a-7b). No
+            // legacy reader bound: :kolibri:data's tests see the engine as it is after the
+            // sunset; the pre-E5a reader is tested in :kolibri:backup-legacy.
             engine = BackupEngine(Dispatchers.IO, emptySet()),
+            ioDispatcher = Dispatchers.IO,
         )
     }
 }

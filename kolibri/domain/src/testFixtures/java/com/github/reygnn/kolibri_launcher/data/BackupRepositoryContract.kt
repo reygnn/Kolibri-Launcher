@@ -48,14 +48,13 @@ import org.junit.Test
  *
  *   - `exportToJson()` returnt einen Non-Null-String (auch wenn er nur
  *     ein leeres Stub-Object ist — das einzige API-Versprechen).
- *   - `previewBackup()` darf `null` returnen (Vertrag der Methode).
+ *   - `previewBackup()` always returns a result: readable, or refused with the reason (2a-7b).
  *   - Methoden mit konfigurierbarem ImportResult-Output liefern den
  *     konfigurierten Wert zurück.
  *   - Default-Verhalten (kein Throw-Hook gesetzt) ist non-throwing.
  *
- * Das ist wenig — bewahrt aber davor, dass jemand später `exportToJson()`
- * versehentlich auf `null` setzbar macht oder `previewBackup` zu
- * `non-null` zwingt.
+ * Little, but it keeps `exportToJson()` from silently becoming nullable and
+ * `previewBackup()` from slipping back to a nullable result.
  *
  * @see FakeBackupRepositoryContractTest
  * ============================================================================
@@ -111,8 +110,7 @@ abstract class BackupRepositoryContract {
     @Test
     fun `previewBackup does not throw on default repository`() = runTest {
         val repo = createRepository()
-        // Returns nullable BackupPreview. null ist erlaubt (z.B. wenn die
-        // Datei nicht lesbar ist); kein assertNotNull hier. Nur "wirft nicht".
-        repo.previewBackup(fakeUri)
+        // Returns a PreviewResult (readable or refused, never null since 2a-7b).
+        assertThat(repo.previewBackup(fakeUri)).isNotNull()
     }
 }

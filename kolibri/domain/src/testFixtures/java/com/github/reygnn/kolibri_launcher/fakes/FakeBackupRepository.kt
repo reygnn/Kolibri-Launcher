@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.fakes
 
-import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
@@ -12,7 +12,8 @@ class FakeBackupRepository : BackupRepository {
     var shouldThrowOnPreview = false
 
     var importResult: ImportResult = ImportResult.Success(0, 0, emptySet())
-    var previewResult: BackupPreview? = null
+    /** Default: a file that is no readable backup. */
+    var previewResult: PreviewResult = PreviewResult.Refused(ImportResult.InvalidFormat)
     var lastOptions: ImportOptions? = null
 
     override suspend fun exportToJson(): String {
@@ -45,7 +46,7 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    override suspend fun previewBackup(uriString: String): BackupPreview? {
+    override suspend fun previewBackup(uriString: String): PreviewResult {
         if (shouldThrowOnPreview) {
             throw Exception("Simulated preview exception")
         }

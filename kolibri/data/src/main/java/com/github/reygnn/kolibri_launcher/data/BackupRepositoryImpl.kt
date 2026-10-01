@@ -6,12 +6,13 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.model.BackupData
 import com.github.reygnn.kolibri_launcher.domain.model.BackupException
-import com.github.reygnn.kolibri_launcher.domain.model.BackupPreview
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
@@ -25,8 +26,8 @@ import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
 import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
 import com.github.reygnn.launcher.feature.backup.engine.writeOrDiscard
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -107,6 +108,9 @@ class BackupRepositoryImpl @Inject constructor(
     private val wallpaperFileManager: WallpaperFileManager,
     @param:ApplicationContext private val context: Context,
     private val engine: BackupEngine,
+    // Injected since 2a-7b: changing previewBackup's signature would otherwise have meant a new
+    // A13 entry; all three file operations now use it (A13: -3).
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : BackupRepository {
 
     /**
@@ -372,7 +376,7 @@ class BackupRepositoryImpl @Inject constructor(
     // PUBLIC API: FILE I/O — SAVE
     // ===========================================
 
-    override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(ioDispatcher) {
         try {
             if (uriString.isBlank()) {
                 TimberWrapper.silentError("Empty URI string provided")
@@ -425,7 +429,7 @@ class BackupRepositoryImpl @Inject constructor(
     // PUBLIC API: FILE I/O — LOAD
     // ===========================================
 
-    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(Dispatchers.IO) {
+    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(ioDispatcher) {
         try {
             if (uriString.isBlank()) return@withContext ImportResult.Error("Invalid file location")
 
@@ -448,17 +452,7 @@ class BackupRepositoryImpl @Inject constructor(
                 kind = "import",
                 declaredSize = fileSize,
             ) { read, staging ->
-                when (read) {
-                    is BackupRead.Ok -> importContainer(read, read.blobs, staging, options)
-                    // A pre-E5a archive reaches this only when no LegacyFormatReader is bound — after
-                    // the sunset of :kolibri:backup-legacy (2a-6). While the module is there, it
-                    // up-converts old archives and they arrive as BackupRead.Ok.
-                    BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
-                    is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
-                    is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
-                    is BackupRead.TooLarge -> tooLarge(fileSize)
-                    is BackupRead.Invalid -> ImportResult.InvalidFormat
-                }
+                refusalOf(read, fileSize) ?: importContainer(read as BackupRead.Ok, read.blobs, staging, options)
             }
 
         } catch (e: CancellationException) {
@@ -478,54 +472,77 @@ class BackupRepositoryImpl @Inject constructor(
     // PUBLIC API: FILE I/O — PREVIEW
     // ===========================================
 
-    override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(Dispatchers.IO) {
+    override suspend fun previewBackup(uriString: String): PreviewResult = withContext(ioDispatcher) {
         try {
             if (uriString.isBlank()) {
                 TimberWrapper.silentError("Empty URI string provided for preview")
-                return@withContext null
+                return@withContext PreviewResult.Refused(ImportResult.Error("Invalid file location"))
             }
 
             val uri = try {
                 uriString.toUri()
             } catch (e: IllegalArgumentException) {
                 TimberWrapper.silentError(e, "Invalid URI format for preview: $uriString")
-                return@withContext null
+                return@withContext PreviewResult.Refused(ImportResult.Error("Invalid format"))
             }
 
             val scheme = uri.scheme
             if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
                 TimberWrapper.silentError("Unsupported URI scheme for preview: $scheme")
-                return@withContext null
+                return@withContext PreviewResult.Refused(ImportResult.Error("Unsupported file location type: $scheme"))
             }
 
+            val fileSize = declaredSize(uri)
             engine.readStaged(
                 open = { openInput(uri) },
                 appId = KolibriBackupSchema.APP_ID,
                 knownSections = KolibriBackupSchema.KNOWN_SECTIONS,
                 kind = "preview",
-                declaredSize = declaredSize(uri),
+                declaredSize = fileSize,
             ) { read, _ ->
-                if (read !is BackupRead.Ok) return@readStaged null
-                val settings = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP]
-                    ?.let { section -> serializer.settingsFromJson(section.data) }
-                    ?: return@readStaged null
-                serializer.buildPreview(backupDataOf(read.manifest.producer, settings))
+                // 2a-7b: a refusal names its reason, mapped exactly like the import's.
+                refusalOf(read, fileSize)?.let { PreviewResult.Refused(it) }
+                    ?: previewOf(read as BackupRead.Ok)
             }
-
+        } catch (e: CancellationException) {
+            throw e // readStaged suspends; a cancellation must propagate, never become a refusal
         } catch (e: SecurityException) {
             TimberWrapper.silentError(e, "Permission denied for preview")
-            null
+            PreviewResult.Refused(ImportResult.Error("Permission denied"))
         } catch (e: Throwable) {
-            // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-            // Umbrella catch widened from Exception per four-category frame:
-            // preview path reads the JSON content and parses it; OOM during
-            // JSONObject construction or parseBackupData on a large input can
-            // still happen even with MAX_PREVIEW_SIZE_BYTES — the cap protects
-            // the read, not subsequent in-memory parsing. OOM extends Error →
-            // Throwable.
+            // Umbrella catch widened from Exception per four-category frame: the preview reads
+            // the whole container and parses it; OOM during parsing can still happen even with
+            // the archive cap — the cap protects the read, not the in-memory parse. OOM extends
+            // Error → Throwable.
             TimberWrapper.silentError(e, "Unexpected error while creating preview")
-            null
+            PreviewResult.Refused(ImportResult.Error("Failed to load backup: ${e.message}"))
         }
+    }
+
+    /**
+     * The one mapping of a refused engine outcome, shared by import and preview (2a-7b) so the
+     * two can never disagree on the reason. Null for [BackupRead.Ok] — not a refusal.
+     */
+    private fun refusalOf(read: BackupRead, declaredSize: Long): ImportResult? = when (read) {
+        is BackupRead.Ok -> null
+        // A pre-E5a archive reaches this only when no LegacyFormatReader is bound — after the
+        // sunset of :kolibri:backup-legacy (2a-6). While the module is there, it up-converts old
+        // archives and they arrive as BackupRead.Ok.
+        BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
+        is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
+        is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
+        is BackupRead.TooLarge -> tooLarge(declaredSize)
+        is BackupRead.Invalid -> ImportResult.InvalidFormat
+    }
+
+    /** The section of a readable container, or null when it is missing or can't be decoded. */
+    private fun settingsOf(read: BackupRead.Ok): LauncherSettings? =
+        read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP]?.let { section -> serializer.settingsFromJson(section.data) }
+
+    /** A readable container whose section does not decode is refused like its import: invalid. */
+    private fun previewOf(read: BackupRead.Ok): PreviewResult {
+        val settings = settingsOf(read) ?: return PreviewResult.Refused(ImportResult.InvalidFormat)
+        return PreviewResult.Readable(serializer.buildPreview(backupDataOf(read.manifest.producer, settings)))
     }
 
     // ===========================================
@@ -581,8 +598,7 @@ class BackupRepositoryImpl @Inject constructor(
         staging: File,
         options: ImportOptions,
     ): ImportResult {
-        val section = read.manifest.sections[KolibriBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidFormat
-        val settings = serializer.settingsFromJson(section.data) ?: return ImportResult.InvalidFormat
+        val settings = settingsOf(read) ?: return ImportResult.InvalidFormat
         val backup = backupDataOf(read.manifest.producer, settings)
         val extracted = mutableMapOf<String, String>() // blob hash → internal wallpaper URI
         val claimed = HashSet<String>()
