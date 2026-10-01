@@ -15,6 +15,7 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -245,10 +246,14 @@ class HiddenAppsRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - clears hidden components`() = runTest {
+    fun `purgeRepository - removes the hidden components key`() = runTest {
+        fakeDataStore.setInitialData(preferencesOf(hiddenComponentsKey to setOf("com.hidden.app/ComponentA")))
+
         hiddenAppsManager.purgeRepository()
 
-        assertThat(fakeDataStore.updateDataCallCount > 0).isTrue()
+        // Gone, not merely empty (2b-4c-1, ResetCompletenessContract) — an empty set left behind
+        // was the old behaviour and must not come back.
+        assertThat(fakeDataStore.data.first().contains(hiddenComponentsKey)).isFalse()
     }
 
     @Test

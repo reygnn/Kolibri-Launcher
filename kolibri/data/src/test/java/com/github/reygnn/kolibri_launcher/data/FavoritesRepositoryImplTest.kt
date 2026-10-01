@@ -420,7 +420,7 @@ class FavoritesRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - clears all favorites`() = runTest {
+    fun `purgeRepository - removes the favorites key`() = runTest {
         val fakeDataStore = FakeDataStore()
         fakeDataStore.setInitialData(preferencesOf(favoritesKey to setOf("com.test/App")))
 
@@ -429,9 +429,9 @@ class FavoritesRepositoryImplTest {
         // Act
         favoritesRepositoryImpl.purgeRepository()
 
-        // Assert
-        val saved = fakeDataStore.data.first()[favoritesKey]
-        assertThat(saved.isNullOrEmpty()).isTrue()
+        // Assert: gone, not merely empty (2b-4c-1, ResetCompletenessContract) — an empty set left
+        // behind was the old behaviour and must not come back.
+        assertThat(fakeDataStore.data.first().contains(favoritesKey)).isFalse()
     }
 
     @Test

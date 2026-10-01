@@ -235,7 +235,9 @@ class FavoritesRepositoryImpl @Inject constructor(
 
     override suspend fun purgeRepository() {
         dataStore.safePurge("FavoritesRepositoryImpl") { preferences ->
-            preferences[PreferencesKeys.FAVORITES] = emptySet()
+            // Removed, not set to an empty set (2b-4c-1): a reset leaves no key behind, like every
+            // other purge; reads treat a missing key as empty.
+            preferences.remove(PreferencesKeys.FAVORITES)
         }
     }
 }
