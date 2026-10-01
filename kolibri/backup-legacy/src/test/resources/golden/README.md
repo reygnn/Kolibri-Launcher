@@ -39,4 +39,8 @@ names and wallpaper images are replaced, structure is kept).
 | `kolibri-kurzform` | derived: `pkg/.Cls` in favorites, order, hidden, swipe | B14: normalized, not missing |
 | `kolibri-ohne-wallpaper` | derived: no layers, no blobs | E2: current wallpaper stays |
 | `kolibri-werte-ausserhalb` | derived: 4 floats out of range, unknown enum | B11: clamped; unknown enum keeps current |
-| `kolibri-in-nyx` | `kolibri-voll.zip`, imported by Nyx | UnsupportedLegacyFormat, nothing written |
+
+The former case `kolibri-in-nyx` (this archive imported by Nyx) is pinned by the shared
+`BackupFormatContract` in `:feature-backup` (2b-3c): "an archive from before the container
+format is refused as outdated", run by both apps. The engine decides by structure alone, so the
+contract needs no real archive — and the case survives this directory's sunset.

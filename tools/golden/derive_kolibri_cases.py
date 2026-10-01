@@ -191,15 +191,9 @@ expected("kolibri-werte-ausserhalb", "kolibri-werte-ausserhalb.zip", b, blobs, [
     "Unknown enum name keeps the target's current value (today's skip-on-unknown).",
 ], before={"favoritesAlignment": "CENTER"})
 
-# 7 altes Kolibri-Backup in Nyx ------------------------------------------------
-expected("kolibri-in-nyx", "kolibri-voll.zip", base, blobs,
-         ["legacy format without a bound LegacyFormatReader"], [
-    "Nyx binds no legacy reader; the engine recognizes backup.json without manifest.json.",
-    "Nothing is written; the message is the targeted 'older version' one, not a generic error.",
-], importer="nyx", result={
-    "importResult": {"type": "UnsupportedLegacyFormat",
-                     "message": "Backup einer älteren Version – nicht mehr unterstützt"},
-    "stateChanged": False,
-})
+# The former case "kolibri-in-nyx" (an old Kolibri archive imported by Nyx) is no golden case
+# any more (2b-3c): the engine refuses it by structure alone, and BackupFormatContract
+# ("an archive from before the container format is refused as outdated") pins that for both
+# apps without the real archive, which goes away with :kolibri:backup-legacy.
 
 print("ok")

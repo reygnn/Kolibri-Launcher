@@ -31,8 +31,8 @@ import java.io.File
 /**
  * Kolibri's run of the shared [BackupRoundTripContract] (2b-2c) through `saveBackupToFile` /
  * `loadBackupFromFile` on fresh fakes ([KolibriBackupHarness]). Custom names and swipe slots
- * are not in [replacingParts]: importing them over an existing state merges or skips today,
- * which is open question O3, not agreed semantics.
+ * are not in [replacingParts]: imported over an existing state they merge — decided as O3 and
+ * pinned by [mergeCases] (2b-3c).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -65,6 +65,27 @@ class KolibriBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
     override val writeLog: List<String> get() = harness.log.toList()
     override val mostValuableParts = setOf(FAVORITES, ORDER)
     override val wallpaperPart = WALLPAPER
+
+    override val mergeCases = listOf(
+        // Names hang on the package and are labels only; replacing them would silently drop names
+        // of apps the backup doesn't even mention (against the idea of E1).
+        MergeCase(
+            name = "custom names merge",
+            prepareBackup = { seed(Variant.A) },
+            prepareCurrent = { seed(Variant.B) },
+            part = NAMES,
+            expected = mapOf("com.b1" to "Beta", "com.a1" to "Alpha"),
+        ),
+        // null means both "not set" and "field missing in an older backup"; clearing would lose
+        // data in the second case. A set slot replaces, an empty one keeps the current.
+        MergeCase(
+            name = "an empty swipe slot keeps the current one",
+            prepareBackup = { seed(Variant.A); harness.swipe.swipeRightApp = null },
+            prepareCurrent = { seed(Variant.B) },
+            part = SWIPE,
+            expected = listOf(flat("com.a1"), flat("com.b3")),
+        ),
+    )
 
     override suspend fun seed(variant: Variant) {
         freshStores()

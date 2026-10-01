@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
@@ -60,10 +61,13 @@ internal class KolibriBackupHarness(private val dir: File) {
 
     private val backupUri = Uri.parse("content://kolibri.test/backup")
     private var document = ByteArray(0)
+
+    /** The size the platform reports for the document; null reports the real size. */
+    var declaredSize: Long? = null
     private val written = ByteArrayOutputStream()
 
     private val descriptor = mockk<ParcelFileDescriptor>(relaxed = true) {
-        every { statSize } answers { document.size.toLong() }
+        every { statSize } answers { declaredSize ?: document.size.toLong() }
         every { fileDescriptor } returns FileDescriptor()
     }
     private val contentResolver = mockk<ContentResolver> {
@@ -154,6 +158,14 @@ internal class KolibriBackupHarness(private val dir: File) {
         document = bytes
         return repository.loadBackupFromFile(backupUri.toString(), options)
     }
+
+    suspend fun preview(bytes: ByteArray): PreviewResult {
+        document = bytes
+        return repository.previewBackup(backupUri.toString())
+    }
+
+    /** Names of the image files the import copied into [dir]. */
+    fun storedImages(): Set<String> = dir.list { _, name -> name.startsWith("internal-") }.orEmpty().toSet()
 
     /** Every setter the import calls, logged by the import option that covers it. */
     private class RecordingSettings(

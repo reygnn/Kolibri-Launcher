@@ -18,10 +18,10 @@ import org.junit.Test
  *  - the most valuable stores are written last (U4);
  *  - a backup without wallpaper leaves the current wallpaper standing (E2).
  *
- * Not here, deliberately: importing a part over an existing state where the launcher MERGES
- * (Kolibri's custom names, an empty swipe slot) — open question O3; once decided, a case
- * for it joins this contract or not. [freshStores] is a harness operation (new, empty
- * stores), never the product's factory reset, so the contract does not depend on it.
+ * Importing a part over an existing state where the launcher MERGES is pinned case by case
+ * through [mergeCases] (O3, decided 30.09.: Kolibri's custom names merge, an empty swipe slot
+ * in the backup keeps the current one; Nyx has neither). [freshStores] is a harness operation
+ * (new, empty stores), never the product's factory reset, so the contract does not depend on it.
  *
  * Parts are named by the subclass; [snapshot] returns one comparable value per part. Seeds
  * use normalized component keys only, and the wallpaper part compares layer id, transform
@@ -74,6 +74,22 @@ abstract class BackupRoundTripContract<O : Any> {
 
     /** The part holding the wallpaper. */
     protected abstract val wallpaperPart: String
+
+    /**
+     * O3: an import over an existing state that merges instead of replacing. [prepareBackup] sets
+     * up the state to export, [prepareCurrent] the state imported over; afterwards [part] must
+     * equal [expected].
+     */
+    class MergeCase(
+        val name: String,
+        val prepareBackup: suspend () -> Unit,
+        val prepareCurrent: suspend () -> Unit,
+        val part: String,
+        val expected: Any?,
+    )
+
+    /** The launcher's agreed merge cases; none for a launcher whose every part replaces. */
+    protected open val mergeCases: List<MergeCase> = emptyList()
 
     @Test
     fun `export then import onto empty stores restores the exported state`() =
@@ -153,5 +169,20 @@ abstract class BackupRoundTripContract<O : Any> {
 
             assertWithMessage("E2: a backup without layers must not touch the wallpaper")
                 .that(snapshot()[wallpaperPart]).isEqualTo(before)
+        }
+
+    @Test
+    fun `an import over an existing state merges where that is agreed`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            for (case in mergeCases) {
+                case.prepareBackup()
+                val bytes = export()
+                case.prepareCurrent()
+
+                assertWithMessage("${case.name}: import must succeed").that(import(bytes, allOptions)).isTrue()
+
+                assertWithMessage("${case.name}: part '${case.part}' after the import")
+                    .that(snapshot()[case.part]).isEqualTo(case.expected)
+            }
         }
 }

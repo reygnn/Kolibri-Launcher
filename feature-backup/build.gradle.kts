@@ -37,4 +37,6 @@ dependencies {
     testFixturesImplementation(libs.junit)
     testFixturesImplementation(libs.truth) // contracts assert with Truth (A12)
     testFixturesImplementation(libs.kotlinx.coroutines.test)
+    // BackupFormatContract builds refused documents with the codec (2b-3c): JsonElement in signatures.
+    testFixturesImplementation(libs.kotlinx.serialization.json)
 }
