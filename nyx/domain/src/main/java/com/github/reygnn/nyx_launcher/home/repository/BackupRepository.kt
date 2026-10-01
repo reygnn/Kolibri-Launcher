@@ -1,8 +1,8 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
-import com.github.reygnn.nyx_launcher.home.model.BackupPreview
 import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
+import com.github.reygnn.nyx_launcher.home.model.PreviewResult
 
 /**
  * Nyx's backup to and from a document the user picked (SAF), over the shared engine
@@ -15,6 +15,6 @@ interface BackupRepository {
 
     suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult
 
-    /** What the backup at [uriString] contains, or null if it can't be read as a Nyx backup. */
-    suspend fun previewBackup(uriString: String): BackupPreview?
+    /** What the backup at [uriString] contains, or why it can't be imported (2b-3b). */
+    suspend fun previewBackup(uriString: String): PreviewResult
 }

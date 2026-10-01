@@ -1,14 +1,17 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
-import com.github.reygnn.nyx_launcher.home.model.BackupPreview
 import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
+import com.github.reygnn.nyx_launcher.home.model.PreviewResult
 
 /** Configurable stub of [BackupRepository] for UI tests; records the last call's arguments. */
 class FakeBackupRepository : BackupRepository {
     var exportSuccess = true
     var importResult: ImportResult = ImportResult.Success()
-    var previewResult: BackupPreview? = null
+    /** Default: a file that is no readable backup. */
+    var previewResult: PreviewResult = PreviewResult.Refused(ImportResult.InvalidFormat)
+    /** Set to suspend previewBackup forever, like a provider that hangs. */
+    var previewHangs = false
 
     var lastExportUri: String? = null
     var lastImportUri: String? = null
@@ -26,8 +29,9 @@ class FakeBackupRepository : BackupRepository {
         return importResult
     }
 
-    override suspend fun previewBackup(uriString: String): BackupPreview? {
+    override suspend fun previewBackup(uriString: String): PreviewResult {
         lastPreviewUri = uriString
+        if (previewHangs) kotlinx.coroutines.awaitCancellation()
         return previewResult
     }
 }

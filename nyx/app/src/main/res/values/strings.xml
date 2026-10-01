@@ -126,4 +126,21 @@
     <string name="home_missing_dialog_remove">Remove</string>
     <!-- Missing folder member (app no longer installed); removed from the folder, not the home screen -->
     <string name="home_missing_folder_member_dialog_message">\"%1$s\" is no longer installed. Remove it from the folder?</string>
+
+    <!-- Backup restore dialog and outcome messages (2b-3b). -->
+    <string name="backup_import_dialog_title">Backup · %1$s</string>
+    <string name="backup_preview_date_unknown">unknown date</string>
+    <string name="backup_import_action">Restore</string>
+    <string name="backup_option_layout">Home screen and drawer folders (%1$d / %2$d)</string>
+    <string name="backup_option_hidden_apps">Hidden apps (%1$d)</string>
+    <string name="backup_option_settings">Settings</string>
+    <string name="backup_option_wallpaper">Wallpaper (%1$d)</string>
+    <plurals name="backup_import_done_dropped_layers">
+        <item quantity="one">Layout imported – %1$d wallpaper layer could not be restored</item>
+        <item quantity="other">Layout imported – %1$d wallpaper layers could not be restored</item>
+    </plurals>
+    <string name="backup_foreign_app">This backup was made by another app (%1$s) and can\'t be restored here</string>
+    <string name="backup_outdated_format">This backup was made by an older version and is no longer supported</string>
+    <string name="backup_unsupported_version">Backup version %1$s is not supported</string>
+    <string name="backup_import_nothing_selected">Nothing selected to restore</string>
 </resources>

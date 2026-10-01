@@ -11,6 +11,7 @@ import android.view.View
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -24,6 +25,7 @@ import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHe
 import com.github.reygnn.launcher.feature.crashreporting.health.CrashReportingHealthState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AlertDialog
+import com.github.reygnn.launcher.common.ui.collectOnStarted
 import com.github.reygnn.launcher.common.ui.showToastSafe
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentController
@@ -32,9 +34,6 @@ import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
-import com.github.reygnn.nyx_launcher.home.model.ImportOptions
-import com.github.reygnn.nyx_launcher.home.model.ImportResult
-import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
 import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
@@ -46,7 +45,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.text.DateFormat
+import java.util.Date
 import javax.inject.Inject
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Settings as a Material 3 [PreferenceFragmentCompat] with categorised rows
@@ -58,7 +60,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
 
-    @Inject lateinit var backupRepository: BackupRepository
+    private val backupViewModel: NyxBackupViewModel by viewModels()
     @Inject lateinit var resetManager: NyxResetManager
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
     @Inject lateinit var preferences: PreferencesRepository
@@ -210,6 +212,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        collectOnStarted(backupViewModel.event, errorTag = "backupEvents", coroutineContext = EmptyCoroutineContext) { onBackupEvent(it) }
         // Reflect the stored crash-report decision in the preference summary.
         viewLifecycleOwner.lifecycleScope.launch { refreshCrashReportSummary() }
         viewLifecycleOwner.lifecycleScope.launch {
@@ -297,27 +300,63 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
-    // The repository opens the SAF document off the main thread, removes a half-written
-    // export (U3) and reports every outcome; a cancelled call propagates (B12: no toast on a
-    // dead fragment). 2b-3b moves this into a ViewModel with its own messages.
-    private fun doExport(uri: Uri) = lifecycleScope.launch {
-        val ok = backupRepository.saveBackupToFile(uri.toString())
-        toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
+    // Backup through NyxBackupViewModel (2b-3b): it reports every outcome as an event, and a
+    // refused file comes back as its message at once, never as the restore dialog.
+    private fun doExport(uri: Uri) = backupViewModel.export(uri.toString())
+
+    private fun doImport(uri: Uri) = backupViewModel.previewForImport(uri.toString())
+
+    private fun onBackupEvent(event: BackupEvent) {
+        when (event) {
+            is BackupEvent.Show -> toast(textOf(event.message))
+            is BackupEvent.ChooseImportOptions -> showImportOptions(event)
+            BackupEvent.CloseSettings -> activity?.finish() // home re-renders from the restored state
+        }
     }
 
-    private fun doImport(uri: Uri) = lifecycleScope.launch {
-        when (backupRepository.loadBackupFromFile(uri.toString(), ImportOptions())) {
-            is ImportResult.Success -> {
-                toast(getString(R.string.backup_import_done))
-                requireActivity().finish() // back to home, which re-renders from the restored state
+    /** The restore dialog: what the backup contains, each part as a switch (all on). */
+    private fun showImportOptions(event: BackupEvent.ChooseImportOptions) {
+        val choices = event.ui.choices
+        val preview = event.preview
+        val labels = choices.map { choice ->
+            when (choice) {
+                ImportChoice.LAYOUT -> getString(R.string.backup_option_layout, preview.homeItemCount ?: 0, preview.drawerFolderCount)
+                ImportChoice.HIDDEN_APPS -> getString(R.string.backup_option_hidden_apps, preview.hiddenAppCount ?: 0)
+                ImportChoice.SETTINGS -> getString(R.string.backup_option_settings)
+                ImportChoice.WALLPAPER -> getString(R.string.backup_option_wallpaper, preview.wallpaperLayerCount)
             }
-            ImportResult.InvalidFormat,
-            ImportResult.OutdatedBackup,
-            is ImportResult.ForeignBackup,
-            is ImportResult.UnsupportedVersion,
-            -> toast(getString(R.string.backup_import_invalid))
-            is ImportResult.Error -> toast(getString(R.string.backup_import_failed))
+        }.toTypedArray()
+        val checked = BooleanArray(choices.size) { true }
+        val date = if (event.ui.dateHasTimestamp) {
+            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(preview.timestamp))
+        } else {
+            getString(R.string.backup_preview_date_unknown)
         }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.backup_import_dialog_title, date))
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(R.string.backup_import_action) { _, _ ->
+                val selected = choices.filterIndexedTo(HashSet()) { index, _ -> checked[index] }
+                backupViewModel.import(event.uriString, event.ui.toImportOptions(selected))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun textOf(message: BackupMessage): String = when (message) {
+        BackupMessage.ExportDone -> getString(R.string.backup_export_done)
+        BackupMessage.ExportFailed -> getString(R.string.backup_export_failed)
+        is BackupMessage.ImportDone -> if (message.droppedWallpaperLayers == 0) {
+            getString(R.string.backup_import_done)
+        } else {
+            resources.getQuantityString(R.plurals.backup_import_done_dropped_layers, message.droppedWallpaperLayers, message.droppedWallpaperLayers)
+        }
+        is BackupMessage.ForeignBackup -> getString(R.string.backup_foreign_app, message.appId)
+        BackupMessage.OutdatedBackup -> getString(R.string.backup_outdated_format)
+        is BackupMessage.UnsupportedVersion -> getString(R.string.backup_unsupported_version, message.version)
+        BackupMessage.InvalidBackup -> getString(R.string.backup_import_invalid)
+        BackupMessage.ImportFailed -> getString(R.string.backup_import_failed)
+        BackupMessage.NothingSelected -> getString(R.string.backup_import_nothing_selected)
     }
 
     /**

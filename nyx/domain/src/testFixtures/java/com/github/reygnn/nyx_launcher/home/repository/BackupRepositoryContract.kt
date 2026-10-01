@@ -19,7 +19,7 @@ import org.junit.Test
  * (`NyxBackupRoundTripTest`, `NyxImportKeepsMissingAppsTest`; refusals from 2b-3c).
  *
  * What this pins anyway: every operation returns without throwing on a default repository,
- * and the preview may be null (a document that is no Nyx backup).
+ * and the preview always returns a result — readable, or refused with the reason (2b-3b).
  */
 abstract class BackupRepositoryContract {
 
@@ -40,7 +40,7 @@ abstract class BackupRepositoryContract {
 
     @Test
     fun previewBackup_returns_without_throwing() = runTest(mainDispatcherRule.testDispatcher) {
-        createRepository().previewBackup(URI) // null is allowed
+        assertThat(createRepository().previewBackup(URI)).isNotNull()
     }
 
     private companion object {

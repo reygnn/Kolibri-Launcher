@@ -25,6 +25,7 @@ import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
 import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
 import com.github.reygnn.launcher.feature.backup.engine.writeOrDiscard
 import com.github.reygnn.nyx_launcher.home.model.BackupPreview
+import com.github.reygnn.nyx_launcher.home.model.PreviewResult
 import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
@@ -112,29 +113,31 @@ class NyxBackupManager @Inject constructor(
             }
         }
 
-    override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(ioDispatcher) {
+    override suspend fun previewBackup(uriString: String): PreviewResult = withContext(ioDispatcher) {
         try {
             val uri = documentUri(uriString)
+            val fileSize = declaredSize(uri)
             engine.readStaged(
                 open = { openInput(uri) },
                 appId = NyxBackupSchema.APP_ID,
                 knownSections = NyxBackupSchema.KNOWN_SECTIONS,
                 kind = "preview",
-                declaredSize = declaredSize(uri),
+                declaredSize = fileSize,
             ) { read, _ ->
-                if (read !is BackupRead.Ok) return@readStaged null
-                val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return@readStaged null
-                serializer.fromJson(section.data)?.let { previewOf(read.manifest.producer, it) }
+                // A refusal names its reason, mapped exactly like the import's (2b-3b).
+                refusalOf(read)?.let { PreviewResult.Refused(it) } ?: previewOf(read as BackupRead.Ok)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             // Catch kept (Expected error, four-category frame): reading the whole container
-            // stages its blobs; OOM extends Error → Throwable. A preview that fails is null.
+            // stages its blobs; OOM extends Error → Throwable. A failed preview is a refusal
+            // with the reason, never a missing result.
             TimberWrapper.silentError(e, "Error previewing backup")
-            null
+            PreviewResult.Refused(ImportResult.Error("Failed to load backup: ${e.message}"))
         }
     }
+
     /**
      * Writes a full backup container to [out] (left open for the caller). Throws on any
      * failure — the caller's writeOrDiscard needs the exception to remove the document.
@@ -211,15 +214,7 @@ class NyxBackupManager @Inject constructor(
                 kind = "import",
                 declaredSize = declaredSize,
             ) { read, staging ->
-                when (read) {
-                    is BackupRead.Ok -> apply(read, staging, options)
-                    // Nyx binds no LegacyFormatReader (E5a): every pre-container archive lands here.
-                    BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
-                    is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
-                    is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
-                    is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
-                    is BackupRead.Invalid -> ImportResult.InvalidFormat
-                }
+                refusalOf(read) ?: apply(read as BackupRead.Ok, staging, options)
             }
         } catch (e: CancellationException) {
             throw e // cooperative cancellation must propagate, never become an error result
@@ -231,9 +226,33 @@ class NyxBackupManager @Inject constructor(
         }
     }
 
+    /**
+     * The one mapping of a refused engine outcome, shared by import and preview (2b-3b) so the
+     * two can never disagree on the reason; mapped like Kolibri's (pinned by the backup
+     * contracts). Null for [BackupRead.Ok] — not a refusal.
+     */
+    private fun refusalOf(read: BackupRead): ImportResult? = when (read) {
+        is BackupRead.Ok -> null
+        // Nyx binds no LegacyFormatReader (E5a): every pre-container archive lands here.
+        BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
+        is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
+        is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
+        is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
+        is BackupRead.Invalid -> ImportResult.InvalidFormat
+    }
+
+    /** The Nyx section of a readable container, or null when it is missing or can't be decoded. */
+    private fun backupOf(read: BackupRead.Ok): NyxBackup? =
+        read.manifest.sections[NyxBackupSchema.SECTION_BACKUP]?.let { serializer.fromJson(it.data) }
+
+    /** A readable container whose section does not decode is refused like its import: invalid. */
+    private fun previewOf(read: BackupRead.Ok): PreviewResult {
+        val backup = backupOf(read) ?: return PreviewResult.Refused(ImportResult.InvalidFormat)
+        return PreviewResult.Readable(previewOf(read.manifest.producer, backup))
+    }
+
     private suspend fun apply(read: BackupRead.Ok, staging: File, options: ImportOptions): ImportResult {
-        val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidFormat
-        val backup = serializer.fromJson(section.data) ?: return ImportResult.InvalidFormat
+        val backup = backupOf(read) ?: return ImportResult.InvalidFormat
         // Layer index → internal file copied from its blob. Every layer gets its OWN file, also
         // when two layers share one blob: removing a layer deletes its file right away, so a
         // file shared between layers would take the other layer's image with it.

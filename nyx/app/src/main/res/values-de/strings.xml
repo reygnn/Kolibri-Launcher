@@ -116,4 +116,21 @@
     <string name="home_missing_dialog_remove">Entfernen</string>
     <!-- Missing folder member (app no longer installed); removed from the folder, not the home screen -->
     <string name="home_missing_folder_member_dialog_message">\"%1$s\" ist nicht mehr installiert. Aus dem Ordner entfernen?</string>
+
+    <!-- Backup restore dialog and outcome messages (2b-3b). -->
+    <string name="backup_import_dialog_title">Backup · %1$s</string>
+    <string name="backup_preview_date_unknown">Datum unbekannt</string>
+    <string name="backup_import_action">Wiederherstellen</string>
+    <string name="backup_option_layout">Startbildschirm und Drawer-Ordner (%1$d / %2$d)</string>
+    <string name="backup_option_hidden_apps">Ausgeblendete Apps (%1$d)</string>
+    <string name="backup_option_settings">Einstellungen</string>
+    <string name="backup_option_wallpaper">Hintergrund (%1$d)</string>
+    <plurals name="backup_import_done_dropped_layers">
+        <item quantity="one">Layout importiert – %1$d Hintergrund-Ebene konnte nicht wiederhergestellt werden</item>
+        <item quantity="other">Layout importiert – %1$d Hintergrund-Ebenen konnten nicht wiederhergestellt werden</item>
+    </plurals>
+    <string name="backup_foreign_app">Dieses Backup stammt von einer anderen App (%1$s) und kann hier nicht wiederhergestellt werden</string>
+    <string name="backup_outdated_format">Dieses Backup stammt von einer älteren Version und wird nicht mehr unterstützt</string>
+    <string name="backup_unsupported_version">Backup-Version %1$s wird nicht unterstützt</string>
+    <string name="backup_import_nothing_selected">Nichts zum Wiederherstellen ausgewählt</string>
 </resources>
