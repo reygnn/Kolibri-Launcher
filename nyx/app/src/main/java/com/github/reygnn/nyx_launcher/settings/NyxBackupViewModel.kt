@@ -10,6 +10,7 @@ import com.github.reygnn.nyx_launcher.home.model.PreviewResult
 import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
@@ -31,7 +32,8 @@ sealed interface BackupEvent {
 /**
  * Export, preview and import for Nyx's settings (2b-3b), in the form of Kolibri's 2a-7b: a
  * refused file is reported at once with its own message and never opens the dialog; only a
- * readable one does. The preview timeout guards against a provider that hangs, nothing else.
+ * readable one does. The preview timeout guards against a provider that hangs, nothing else —
+ * also one that ignores cancellation (2b-3b-c).
  */
 @HiltViewModel
 class NyxBackupViewModel @Inject constructor(
@@ -47,8 +49,12 @@ class NyxBackupViewModel @Inject constructor(
     }
 
     fun previewForImport(uriString: String) = launchSafe {
-        val result = withTimeoutOrNull(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS) { backupRepository.previewBackup(uriString) }
-            ?: PreviewResult.Refused(ImportResult.Error("Preview timed out"))
+        // The timeout sits on await(), not around the call: a provider blocked in read() does not
+        // react to cancellation, so a timeout around the call itself only returns once the read
+        // ends (measured: 2028 instead of 207 ms). The abandoned read is cancelled and dropped.
+        val reading = async { backupRepository.previewBackup(uriString) }
+        val result = withTimeoutOrNull(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS) { reading.await() }
+            ?: PreviewResult.Refused(ImportResult.Error("Preview timed out")).also { reading.cancel() }
         when (result) {
             is PreviewResult.Readable ->
                 sendEvent(BackupEvent.ChooseImportOptions(uriString, result.preview, ImportOptionsUiState.from(result.preview)))

@@ -84,7 +84,9 @@ class NyxBackupViewModelTest {
     }
 
     @Test
-    fun a_provider_that_hangs_ends_in_the_failure_message_after_the_timeout() = runTest(mainDispatcherRule.testDispatcher) {
+    fun a_provider_that_hangs_ends_in_the_failure_message_at_the_timeout() = runTest(mainDispatcherRule.testDispatcher) {
+        // The fake ignores cancellation, like a provider blocked in read(): the message must come
+        // at the timeout, not when the read finally ends ten timeouts later (2b-3b-c).
         val events = mutableListOf<BackupEvent>()
         val collectorJob = recordEmissions(viewModel.event, events)
         repository.previewHangs = true
@@ -92,9 +94,11 @@ class NyxBackupViewModelTest {
         viewModel.previewForImport(uri)
         advanceTimeBy(AppConstants.BACKUP_PREVIEW_TIMEOUT_MS - 1)
         assertThat(events).isEmpty()
-        advanceUntilIdle()
+        advanceTimeBy(2)
 
         assertThat(events).containsExactly(BackupEvent.Show(BackupMessage.ImportFailed))
+        advanceUntilIdle() // let the abandoned read run out
+        assertThat(events).hasSize(1)
         collectorJob.cancel()
     }
 
