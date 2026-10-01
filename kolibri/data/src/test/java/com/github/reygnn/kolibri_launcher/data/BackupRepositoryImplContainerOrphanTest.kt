@@ -9,7 +9,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
 import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
 import com.github.reygnn.kolibri_launcher.domain.model.LauncherSettings
 import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
-import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
@@ -25,13 +24,11 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.backup.container.BlobSource
 import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
-import com.github.reygnn.launcher.feature.backup.container.ContainerManifestCodec
 import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -273,82 +270,14 @@ class BackupRepositoryImplContainerOrphanTest {
         verify(exactly = 0) { wallpaperFileManager.copyFromInputStream(any()) }
     }
 
-    @Test
-    fun `a pre-E5a archive with no legacy reader bound is OutdatedBackup`() = runTest {
-        // :kolibri:data's engine binds no reader — the situation after the legacy sunset.
-        val bos = ByteArrayOutputStream()
-        java.util.zip.ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(java.util.zip.ZipEntry("backup.json"))
-            zip.write("{}".toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-        }
-        serve(bos.toByteArray())
-
-        val result = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
-
-        assertThat(result).isEqualTo(ImportResult.OutdatedBackup)
-    }
-
     // ---- the preview names the reason, the same as the import (2a-7b) ----
-
-    @Test
-    fun `preview and import refuse every engine outcome alike`() = runTest {
-        // One mapping (refusalOf) serves both paths, so the backup screen can show the import's
-        // own message at once instead of a timeout. Each case: the same bytes, both paths.
-        val foreign = ByteArrayOutputStream().also { out ->
-            engine.export(out, ContainerManifest.Producer("nyx", "test", 1L), 1, emptyList()) {
-                mapOf("nyx.backup" to ContainerManifest.Section(1, JsonPrimitive("x")))
-            }
-        }.toByteArray()
-        val newerFormat = zipOf(
-            "manifest.json" to ContainerManifestCodec.encode(
-                ContainerManifest(formatVersion = "9.0", producer = ContainerManifest.Producer(KolibriBackupSchema.APP_ID, "test", 1L), schemaVersion = 1),
-            ),
-        )
-        val cases = listOf(
-            Triple("another app", foreign, ImportResult.ForeignBackup("nyx")),
-            Triple("pre-container archive", zipOf("backup.json" to "{}".toByteArray()), ImportResult.OutdatedBackup),
-            Triple("newer format", newerFormat, ImportResult.UnsupportedVersion("9.0")),
-            Triple("not a ZIP", "not a zip".toByteArray(), ImportResult.InvalidFormat),
-            Triple("undecodable section", container(section = JsonPrimitive("not settings")), ImportResult.InvalidFormat),
-        )
-
-        for ((case, bytes, expected) in cases) {
-            serve(bytes)
-            assertWithMessage("import of: $case").that(repository().loadBackupFromFile(backupUri.toString(), ImportOptions())).isEqualTo(expected)
-            assertWithMessage("preview of: $case").that(repository().previewBackup(backupUri.toString())).isEqualTo(PreviewResult.Refused(expected))
-        }
-    }
-
-    @Test
-    fun `a declared size over the cap is refused alike by preview and import, unread`() = runTest {
-        every { parcelFileDescriptor.statSize } returns AppConstants.MAX_BACKUP_SIZE_BYTES + 1
-        serve(container(imageA))
-
-        val imported = repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
-        val previewed = repository().previewBackup(backupUri.toString())
-
-        assertThat(imported).isInstanceOf(ImportResult.Error::class.java)
-        assertThat(previewed).isEqualTo(PreviewResult.Refused(imported))
-        verify(exactly = 0) { contentResolver.openInputStream(backupUri) }
-    }
+    // Every refusal case, preview against import, runs in KolibriBackupFormatTest (shared
+    // BackupFormatContract, 2b-3c); this file keeps what the contract does not see.
 
     @Test
     fun `a readable backup previews as readable`() = runTest {
         serve(container(imageA))
 
         assertThat(repository().previewBackup(backupUri.toString())).isInstanceOf(PreviewResult.Readable::class.java)
-    }
-
-    private fun zipOf(vararg entries: Pair<String, ByteArray>): ByteArray {
-        val bos = ByteArrayOutputStream()
-        java.util.zip.ZipOutputStream(bos).use { zip ->
-            for ((name, bytes) in entries) {
-                zip.putNextEntry(java.util.zip.ZipEntry(name))
-                zip.write(bytes)
-                zip.closeEntry()
-            }
-        }
-        return bos.toByteArray()
     }
 }

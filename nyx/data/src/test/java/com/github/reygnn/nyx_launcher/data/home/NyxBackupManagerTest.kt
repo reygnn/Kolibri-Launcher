@@ -224,29 +224,6 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_refuses_another_apps_backup_without_writing_anything() = runTest(mainDispatcherRule.testDispatcher) {
-        // The producer check (E5a): a Kolibri container is never partially applied to Nyx.
-        val bytes = containerOf(NyxBackup(layout = layout.toDto()), appId = "kolibri")
-        val result = manager.importFrom(opener(bytes), ImportOptions())
-        assertThat(result).isEqualTo(ImportResult.ForeignBackup("kolibri"))
-        coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
-        coVerify(exactly = 0) { preferences.setIconStyle(any()) }
-    }
-
-    @Test
-    fun import_refuses_a_pre_container_archive() = runTest(mainDispatcherRule.testDispatcher) {
-        // Nyx binds no LegacyFormatReader (E5a): a `backup.json` archive is an older version.
-        val bos = ByteArrayOutputStream()
-        ZipOutputStream(bos).use { zip ->
-            zip.putNextEntry(ZipEntry("backup.json"))
-            zip.write("{}".toByteArray())
-            zip.closeEntry()
-        }
-        val result = manager.importFrom(opener(bos.toByteArray()), ImportOptions())
-        assertThat(result).isEqualTo(ImportResult.OutdatedBackup)
-    }
-
-    @Test
     fun export_writes_one_nyx_section_under_the_nyx_producer() = runTest(mainDispatcherRule.testDispatcher) {
         val out = ByteArrayOutputStream()
         manager.writeBackup(out, timestamp = 99L)
