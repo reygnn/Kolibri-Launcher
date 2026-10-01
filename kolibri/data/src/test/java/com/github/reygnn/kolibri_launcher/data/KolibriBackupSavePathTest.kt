@@ -4,6 +4,9 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.kolibri_launcher.domain.model.BackupException
+import com.github.reygnn.kolibri_launcher.domain.model.ImportOptions
+import com.github.reygnn.kolibri_launcher.domain.model.ImportResult
+import com.github.reygnn.kolibri_launcher.domain.model.PreviewResult
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeCustomNamesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesOrderRepository
@@ -13,9 +16,11 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
@@ -53,10 +58,15 @@ class KolibriBackupSavePathTest {
     /** Fails on the first write, like a full disk. */
     private var failWrites = false
 
+    /** The provider hands out no output stream at all (D3). */
+    private var noOutputStream = false
+
     private val resolver = mockk<ContentResolver> {
         every { openOutputStream(any()) } answers {
             val file = File(firstArg<Uri>().path!!)
-            if (!failWrites) {
+            if (noOutputStream) {
+                null
+            } else if (!failWrites) {
                 file.outputStream()
             } else {
                 object : FileOutputStream(file) {
@@ -117,5 +127,50 @@ class KolibriBackupSavePathTest {
         assertFailsWith<BackupException> { repository(failing).saveBackupToFile(target.toString()) }
 
         assertThat(File(target.path!!).exists()).isFalse()
+    }
+
+    // ---- the location and the stream (2b-4a, SafDocuments) ----
+
+    @Test
+    fun `a location that is no document is refused before the resolver is asked`() = runTest(mainDispatcherRule.testDispatcher) {
+        // D1: the import used to hand any scheme to the resolver; now all three paths refuse it first.
+        val web = "https://example.org/backup.zip"
+        val repository = repository()
+
+        assertThat(assertFailsWith<BackupException> { repository.saveBackupToFile(web) })
+            .hasMessageThat().isEqualTo("Unsupported file location type")
+        assertThat(repository.loadBackupFromFile(web, ImportOptions())).isEqualTo(ImportResult.Error("Unsupported file location type"))
+        assertThat(repository.previewBackup(web))
+            .isEqualTo(PreviewResult.Refused(ImportResult.Error("Unsupported file location type: https")))
+
+        verify(exactly = 0) { resolver.openInputStream(any()) }
+        verify(exactly = 0) { resolver.openOutputStream(any()) }
+        verify(exactly = 0) { resolver.openFileDescriptor(any(), any()) }
+    }
+
+    @Test
+    fun `an empty location keeps each path's own text`() = runTest(mainDispatcherRule.testDispatcher) {
+        // D2: the visible texts stay exactly as before the check moved to SafDocuments.
+        val repository = repository()
+
+        assertThat(assertFailsWith<BackupException> { repository.saveBackupToFile("") }).hasMessageThat().isEqualTo("Invalid file location")
+        assertThat(repository.loadBackupFromFile("", ImportOptions())).isEqualTo(ImportResult.Error("Invalid file location"))
+        assertThat(repository.previewBackup("")).isEqualTo(PreviewResult.Refused(ImportResult.Error("Invalid file location")))
+    }
+
+    @Test
+    fun `no output stream keeps its own text`() = runTest(mainDispatcherRule.testDispatcher) {
+        // D3: not the generic "Failed to write file (storage full or unavailable?)".
+        noOutputStream = true
+
+        val error = assertFailsWith<BackupException> { repository().saveBackupToFile(createdDocument().toString()) }
+
+        assertThat(error).hasMessageThat().isEqualTo("Cannot write to selected location")
+    }
+
+    @Test
+    fun `the unknown size means the same to SafDocuments and the engine`() {
+        // :common-data does not depend on :feature-backup, so the value is pinned here.
+        assertThat(SafDocuments.UNKNOWN_SIZE).isEqualTo(UNKNOWN_SIZE)
     }
 }

@@ -3,6 +3,7 @@ package com.github.reygnn.nyx_launcher.data.home
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
@@ -66,7 +67,7 @@ class NyxBackupSavePathTest {
     private val layout = HomeLayout(grid = GridSpec(columns = 4, rows = 6), pages = 1, items = emptyList(), dock = emptyList())
 
     private fun manager(homeLayoutRepository: HomeLayoutRepository = FakeHomeLayoutRepository(layout)) = NyxBackupManager(
-        context = context,
+        safDocuments = SafDocuments(context),
         homeLayoutRepository = homeLayoutRepository,
         drawerFoldersRepository = FakeDrawerFoldersRepository(),
         hiddenAppsRepository = FakeHiddenAppsRepository(),
@@ -141,5 +142,8 @@ class NyxBackupSavePathTest {
         assertThat(manager.loadBackupFromFile("https://example.org/backup.zip", ImportOptions())).isInstanceOf(ImportResult.Error::class.java)
         assertThat(manager.previewBackup("https://example.org/backup.zip")).isInstanceOf(PreviewResult.Refused::class.java)
         verify(exactly = 0) { resolver.openOutputStream(any()) }
+        // D1 (2b-4a): refused before the resolver is asked at all.
+        verify(exactly = 0) { resolver.openInputStream(any()) }
+        verify(exactly = 0) { resolver.openFileDescriptor(any(), any()) }
     }
 }

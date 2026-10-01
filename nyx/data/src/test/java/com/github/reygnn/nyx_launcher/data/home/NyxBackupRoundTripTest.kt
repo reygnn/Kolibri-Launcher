@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import android.content.Context
 import android.net.Uri
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
@@ -147,7 +148,7 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
     // ---- harness ----
 
     private fun manager() = NyxBackupManager(
-        context = mockk<Context>(), // the stream-level writeBackup/importFrom never touch it
+        safDocuments = SafDocuments(mockk<Context>()), // the stream-level writeBackup/importFrom never touch it
         homeLayoutRepository = stores.recordingLayout,
         drawerFoldersRepository = stores.recordingFolders,
         hiddenAppsRepository = stores.recordingHidden,

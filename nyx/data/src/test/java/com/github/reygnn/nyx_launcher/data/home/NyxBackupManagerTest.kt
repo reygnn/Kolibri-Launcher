@@ -2,6 +2,7 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import android.content.Context
 import android.net.Uri
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -112,7 +113,7 @@ class NyxBackupManagerTest {
     // The stream-level writeBackup/importFrom never touch the Context; the SAF path is
     // NyxBackupSavePathTest's.
     private val manager = NyxBackupManager(
-        mockk<Context>(), homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
+        SafDocuments(mockk<Context>()), homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
         wallpaperRepository, fabPositionStore, fileManager, serializer,
         reconcileHomeLayout, engine, appVersionName = "0.2.0", ioDispatcher = mainDispatcherRule.testDispatcher,
     )

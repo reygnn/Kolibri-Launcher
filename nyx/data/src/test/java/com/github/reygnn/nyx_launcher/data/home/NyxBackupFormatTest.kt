@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
@@ -116,7 +117,7 @@ class NyxBackupFormatTest : BackupFormatContract() {
             }
         }
         return NyxBackupManager(
-            context = mockk<Context> { every { contentResolver } returns resolver },
+            safDocuments = SafDocuments(mockk<Context> { every { contentResolver } returns resolver }),
             homeLayoutRepository = layoutStore,
             drawerFoldersRepository = foldersStore,
             hiddenAppsRepository = hiddenStore,

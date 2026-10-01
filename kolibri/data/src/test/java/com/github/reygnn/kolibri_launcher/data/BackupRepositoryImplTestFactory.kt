@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
@@ -66,6 +67,7 @@ internal object BackupRepositoryImplTestFactory {
             // legacy reader bound: :kolibri:data's tests see the engine as it is after the
             // sunset; the pre-E5a reader is tested in :kolibri:backup-legacy.
             engine = BackupEngine(Dispatchers.IO, emptySet()),
+            safDocuments = SafDocuments(context),
             ioDispatcher = Dispatchers.IO,
         )
     }

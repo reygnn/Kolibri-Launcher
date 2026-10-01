@@ -1,13 +1,10 @@
 package com.github.reygnn.nyx_launcher.data.home
 
-import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
-import androidx.core.net.toUri
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.IoDispatcher
-import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -40,9 +37,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import javax.inject.Inject
@@ -55,8 +50,8 @@ import javax.inject.Singleton
  * referenced by hash. The container itself — ZIP, caps, hashing, staging — is the engine's;
  * this class assembles the section from Nyx's repos and applies it.
  *
- * 2b-3a: the [BackupRepository] for the settings UI — it opens the SAF document itself,
- * wraps the export in the shared `writeOrDiscard` (U3) and maps every engine outcome to its
+ * 2b-3a: the [BackupRepository] for the settings UI — it reaches the SAF document through the
+ * shared [SafDocuments] (2b-4a), wraps the export in the shared `writeOrDiscard` (U3) and maps every engine outcome to its
  * own [ImportResult], like Kolibri. The stream-level [writeBackup] / [importFrom] stay
  * internal for tests and the backup contracts. Blob restore reuses the shared
  * [WallpaperFileManager.copyFromInputStream] (staged blob → internal file), so imported
@@ -64,7 +59,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class NyxBackupManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    /** The Android half of SAF documents, shared with Kolibri (2b-4a). */
+    private val safDocuments: SafDocuments,
     private val homeLayoutRepository: HomeLayoutRepository,
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
@@ -82,10 +78,10 @@ class NyxBackupManager @Inject constructor(
 
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(ioDispatcher) {
         try {
-            val uri = documentUri(uriString)
+            val uri = safDocuments.documentUri(uriString)
             // U3: a failure throws out of the write, never returns false, so writeOrDiscard
             // removes the half-written document (2b-3a).
-            writeOrDiscard(open = { openOutput(uri) }, discard = { discardDocument(uri) }) { out -> writeBackup(out) }
+            writeOrDiscard(open = { safDocuments.openOutput(uri) }, discard = { safDocuments.discard(uri) }) { out -> writeBackup(out) }
             true
         } catch (e: CancellationException) {
             throw e // cooperative cancellation must propagate, never become `false`
@@ -101,8 +97,8 @@ class NyxBackupManager @Inject constructor(
         withContext(ioDispatcher) {
             if (options.importNothing) return@withContext ImportResult.Error("No import options selected")
             try {
-                val uri = documentUri(uriString)
-                importFrom(open = { openInput(uri) }, options = options, declaredSize = declaredSize(uri))
+                val uri = safDocuments.documentUri(uriString)
+                importFrom(open = { safDocuments.openInput(uri) }, options = options, declaredSize = safDocuments.declaredSize(uri))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -115,10 +111,10 @@ class NyxBackupManager @Inject constructor(
 
     override suspend fun previewBackup(uriString: String): PreviewResult = withContext(ioDispatcher) {
         try {
-            val uri = documentUri(uriString)
-            val fileSize = declaredSize(uri)
+            val uri = safDocuments.documentUri(uriString)
+            val fileSize = safDocuments.declaredSize(uri)
             engine.readStaged(
-                open = { openInput(uri) },
+                open = { safDocuments.openInput(uri) },
                 appId = NyxBackupSchema.APP_ID,
                 knownSections = NyxBackupSchema.KNOWN_SECTIONS,
                 kind = "preview",
@@ -358,40 +354,6 @@ class NyxBackupManager @Inject constructor(
         hasSettings = backup.prefs != null,
         wallpaperLayerCount = backup.wallpaperLayers.size,
     )
-
-    /** A content:// or file:// document URI, or an exception the caller reports. */
-    private fun documentUri(uriString: String): Uri {
-        val uri = uriString.toUri()
-        if (uri.scheme != AppConstants.SCHEME_CONTENT && uri.scheme != AppConstants.SCHEME_FILE) {
-            throw IOException("Unsupported file location type: ${uri.scheme}")
-        }
-        return uri
-    }
-
-    private fun openInput(uri: Uri): InputStream =
-        context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot read from selected location")
-
-    private fun openOutput(uri: Uri): OutputStream =
-        context.contentResolver.openOutputStream(uri) ?: throw IOException("Cannot write to selected location")
-
-    /** The platform part of U3: removes the half-written document; writeOrDiscard logs a failure. */
-    private fun discardDocument(uri: Uri) {
-        if (uri.scheme == AppConstants.SCHEME_FILE) {
-            uri.path?.let { File(it).delete() }
-        } else {
-            DocumentsContract.deleteDocument(context.contentResolver, uri)
-        }
-    }
-
-    /** The document's size for the engine's archive cap, or UNKNOWN_SIZE when the provider can't tell. */
-    private fun declaredSize(uri: Uri): Long = try {
-        context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { it.statSize } ?: UNKNOWN_SIZE
-    } catch (e: Exception) {
-        // No suspension point in this block — synchronous I/O only.
-        // Exception sufficient (pure I/O probe, no allocation path → no Error).
-        KolibriLog.w(e, "Could not determine backup file size")
-        UNKNOWN_SIZE
-    }
 
     private suspend fun applyPrefs(prefs: NyxBackupPrefs?) {
         prefs ?: return

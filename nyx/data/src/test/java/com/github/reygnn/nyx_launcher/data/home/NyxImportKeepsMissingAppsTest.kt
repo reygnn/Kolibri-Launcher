@@ -1,6 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
 import android.content.Context
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -52,7 +53,7 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
         val hidden = FakeHiddenAppsRepository()
         val folders = FakeDrawerFoldersRepository()
         val manager = NyxBackupManager(
-            context = mockk<Context>(), // the stream-level importFrom never touches it
+            safDocuments = SafDocuments(mockk<Context>()), // the stream-level importFrom never touches it
             homeLayoutRepository = layout,
             drawerFoldersRepository = folders,
             hiddenAppsRepository = hidden,

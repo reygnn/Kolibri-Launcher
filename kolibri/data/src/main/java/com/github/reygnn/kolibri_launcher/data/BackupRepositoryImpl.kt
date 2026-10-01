@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
-import android.provider.DocumentsContract
+import com.github.reygnn.launcher.common.data.saf.DocumentUnavailableException
+import com.github.reygnn.launcher.common.data.saf.InvalidDocumentLocationException
+import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
@@ -23,7 +25,6 @@ import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
 import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import com.github.reygnn.launcher.feature.backup.engine.BackupRead
 import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
-import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
 import com.github.reygnn.launcher.feature.backup.engine.writeOrDiscard
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -108,6 +109,8 @@ class BackupRepositoryImpl @Inject constructor(
     private val wallpaperFileManager: WallpaperFileManager,
     @param:ApplicationContext private val context: Context,
     private val engine: BackupEngine,
+    /** The Android half of SAF documents, shared with Nyx (2b-4a). */
+    private val safDocuments: SafDocuments,
     // Injected since 2a-7b: changing previewBackup's signature would otherwise have meant a new
     // A13 entry; all three file operations now use it (A13: -3).
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -378,27 +381,16 @@ class BackupRepositoryImpl @Inject constructor(
 
     override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(ioDispatcher) {
         try {
-            if (uriString.isBlank()) {
-                TimberWrapper.silentError("Empty URI string provided")
-                throw BackupException("Invalid file location")
-            }
-
             val uri = try {
-                uriString.toUri()
-            } catch (e: IllegalArgumentException) {
-                TimberWrapper.silentError(e, "Invalid URI format: $uriString")
-                throw BackupException("Invalid file location format", e)
-            }
-
-            val scheme = uri.scheme
-            if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                TimberWrapper.silentError("Unsupported URI scheme: $scheme")
-                throw BackupException("Unsupported file location type")
+                safDocuments.documentUri(uriString)
+            } catch (e: InvalidDocumentLocationException) {
+                TimberWrapper.silentError(e, "Invalid backup location: $uriString")
+                throw BackupException(saveLocationMessage(e), e)
             }
 
             // Assembling runs inside the write: if reading a store fails, the document is discarded
             // as well (U3) instead of staying behind empty, as Nyx does (2b-3c follow-up).
-            writeOrDiscard(open = { openOutput(uri) }, discard = { discardDocument(uri) }) { output ->
+            writeOrDiscard(open = { safDocuments.openOutput(uri) }, discard = { safDocuments.discard(uri) }) { output ->
                 exportContainer(output, assembler.buildBackupData())
             }
 
@@ -409,6 +401,11 @@ class BackupRepositoryImpl @Inject constructor(
             throw e
         } catch (e: BackupException) {
             throw e
+        } catch (e: DocumentUnavailableException) {
+            // D3 (2b-4a): the provider gave no output stream — keeps its own visible text instead
+            // of the generic I/O one below.
+            TimberWrapper.silentError(e, "No output stream for the backup document")
+            throw BackupException(e.message ?: "Cannot write to selected location", e)
         } catch (e: SecurityException) {
             TimberWrapper.silentError(e, "Permission denied for URI")
             throw BackupException("No permission to write to this location", e)
@@ -432,22 +429,20 @@ class BackupRepositoryImpl @Inject constructor(
 
     override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult = withContext(ioDispatcher) {
         try {
-            if (uriString.isBlank()) return@withContext ImportResult.Error("Invalid file location")
-
+            // D1 (2b-4a): only content:// and file:// — the import used to pass any scheme to the
+            // resolver; now it is refused before the resolver is asked.
             val uri = try {
-                uriString.toUri()
-            } catch (e: Exception) {
-                // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-                // Exception sufficient (URI parse, no allocation path → no Error).
-                return@withContext ImportResult.Error("Invalid format")
+                safDocuments.documentUri(uriString)
+            } catch (e: InvalidDocumentLocationException) {
+                return@withContext ImportResult.Error(loadLocationMessage(e))
             }
 
             // OOM protection: the engine refuses a declared size above the archive cap unread.
-            val fileSize = declaredSize(uri)
+            val fileSize = safDocuments.declaredSize(uri)
 
             if (options.importNothing) return@withContext ImportResult.Error("No import options selected")
             engine.readStaged(
-                open = { openInput(uri) },
+                open = { safDocuments.openInput(uri) },
                 appId = KolibriBackupSchema.APP_ID,
                 knownSections = KolibriBackupSchema.KNOWN_SECTIONS,
                 kind = "import",
@@ -475,27 +470,16 @@ class BackupRepositoryImpl @Inject constructor(
 
     override suspend fun previewBackup(uriString: String): PreviewResult = withContext(ioDispatcher) {
         try {
-            if (uriString.isBlank()) {
-                TimberWrapper.silentError("Empty URI string provided for preview")
-                return@withContext PreviewResult.Refused(ImportResult.Error("Invalid file location"))
-            }
-
             val uri = try {
-                uriString.toUri()
-            } catch (e: IllegalArgumentException) {
-                TimberWrapper.silentError(e, "Invalid URI format for preview: $uriString")
-                return@withContext PreviewResult.Refused(ImportResult.Error("Invalid format"))
+                safDocuments.documentUri(uriString)
+            } catch (e: InvalidDocumentLocationException) {
+                TimberWrapper.silentError(e, "Invalid location for preview: $uriString")
+                return@withContext PreviewResult.Refused(ImportResult.Error(previewLocationMessage(e)))
             }
 
-            val scheme = uri.scheme
-            if (scheme == null || scheme !in listOf(AppConstants.SCHEME_CONTENT, AppConstants.SCHEME_FILE)) {
-                TimberWrapper.silentError("Unsupported URI scheme for preview: $scheme")
-                return@withContext PreviewResult.Refused(ImportResult.Error("Unsupported file location type: $scheme"))
-            }
-
-            val fileSize = declaredSize(uri)
+            val fileSize = safDocuments.declaredSize(uri)
             engine.readStaged(
-                open = { openInput(uri) },
+                open = { safDocuments.openInput(uri) },
                 appId = KolibriBackupSchema.APP_ID,
                 knownSections = KolibriBackupSchema.KNOWN_SECTIONS,
                 kind = "preview",
@@ -644,35 +628,26 @@ class BackupRepositoryImpl @Inject constructor(
         settings = settings,
     )
 
-    private fun openInput(uri: Uri): InputStream =
-        context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot read from selected location")
+    // D2 (2b-4a): each operation keeps its own visible text for an invalid location, exactly as
+    // before the location check moved to SafDocuments.
 
-    private fun openOutput(uri: Uri): OutputStream =
-        context.contentResolver.openOutputStream(uri) ?: throw BackupException("Cannot write to selected location")
-
-    /**
-     * The platform part of U3 (the frame is the shared writeOrDiscard): removes the
-     * half-written document. A failure here is logged by writeOrDiscard, never masking
-     * the export's own failure.
-     */
-    private fun discardDocument(uri: Uri) {
-        if (uri.scheme == AppConstants.SCHEME_FILE) {
-            uri.path?.let { File(it).delete() }
-        } else {
-            DocumentsContract.deleteDocument(context.contentResolver, uri)
-        }
+    private fun saveLocationMessage(e: InvalidDocumentLocationException) = when (e.reason) {
+        InvalidDocumentLocationException.Reason.BLANK -> "Invalid file location"
+        InvalidDocumentLocationException.Reason.MALFORMED -> "Invalid file location format"
+        InvalidDocumentLocationException.Reason.UNSUPPORTED_SCHEME -> "Unsupported file location type"
     }
 
-    /** The document's size for the engine's archive cap, or UNKNOWN_SIZE when the provider can't tell. */
-    private fun declaredSize(uri: Uri): Long = try {
-        context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { pfd ->
-            pfd.statSize
-        } ?: UNKNOWN_SIZE
-    } catch (e: Exception) {
-        // No suspension point in this block — synchronous I/O only (AUDIT-12 whitelist review).
-        // Exception sufficient (pure I/O probe, no allocation path → no Error).
-        Timber.w(e, "Could not determine file size, proceeding with caution")
-        UNKNOWN_SIZE
+    private fun loadLocationMessage(e: InvalidDocumentLocationException) = when (e.reason) {
+        InvalidDocumentLocationException.Reason.BLANK -> "Invalid file location"
+        InvalidDocumentLocationException.Reason.MALFORMED -> "Invalid format"
+        // New with D1: the import had no scheme check before; same text as the save path.
+        InvalidDocumentLocationException.Reason.UNSUPPORTED_SCHEME -> "Unsupported file location type"
+    }
+
+    private fun previewLocationMessage(e: InvalidDocumentLocationException) = when (e.reason) {
+        InvalidDocumentLocationException.Reason.BLANK -> "Invalid file location"
+        InvalidDocumentLocationException.Reason.MALFORMED -> "Invalid format"
+        InvalidDocumentLocationException.Reason.UNSUPPORTED_SCHEME -> "Unsupported file location type: ${e.scheme}"
     }
 
     /**
