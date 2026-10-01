@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import android.os.Bundle
@@ -33,10 +32,10 @@ import com.github.reygnn.nyx_launcher.BuildConfig
 import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
+import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
+import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
-import com.github.reygnn.nyx_launcher.data.home.NyxBackupOptions
 import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
 import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
 import com.github.reygnn.nyx_launcher.home.model.HiddenAppsSelection
@@ -44,11 +43,8 @@ import com.github.reygnn.nyx_launcher.home.model.displayName
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.usecase.GetDrawerAppsUseCase
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -62,7 +58,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SettingsFragment : PreferenceFragmentCompat() {
 
-    @Inject lateinit var backupManager: NyxBackupManager
+    @Inject lateinit var backupRepository: BackupRepository
     @Inject lateinit var resetManager: NyxResetManager
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
     @Inject lateinit var preferences: PreferencesRepository
@@ -301,52 +297,26 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    // The repository opens the SAF document off the main thread, removes a half-written
+    // export (U3) and reports every outcome; a cancelled call propagates (B12: no toast on a
+    // dead fragment). 2b-3b moves this into a ViewModel with its own messages.
     private fun doExport(uri: Uri) = lifecycleScope.launch {
-        // Open the SAF stream off the main thread (a DocumentsProvider binder IPC
-        // can block); the manager also hops to IO for the ZIP transfer.
-        val resolver = requireContext().contentResolver
-        val ok = try {
-            withContext(Dispatchers.IO) {
-                // CreateDocument made this target just for us: on any failure delete it, so no
-                // truncated, unimportable .zip is left behind (§Audit-3 A3-06).
-                writeOrDiscard(
-                    write = {
-                        resolver.openOutputStream(uri)?.use { out ->
-                            backupManager.export(out, BuildConfig.VERSION_NAME, System.currentTimeMillis())
-                        } ?: false
-                    },
-                    discard = { DocumentsContract.deleteDocument(resolver, uri) },
-                )
-            }
-        } catch (e: CancellationException) {
-            throw e // fragment gone mid-export: no toast on a dead fragment (B12)
-        } catch (e: Throwable) {
-            // Catch kept — SAF/backup I/O boundary; the outcome is reported as a toast.
-            false // unchanged outcome: any failure means "export failed"
-        }
+        val ok = backupRepository.saveBackupToFile(uri.toString())
         toast(getString(if (ok) R.string.backup_export_done else R.string.backup_export_failed))
     }
 
     private fun doImport(uri: Uri) = lifecycleScope.launch {
-        val result = try {
-            withContext(Dispatchers.IO) {
-                requireContext().contentResolver.openInputStream(uri)?.use { inp ->
-                    backupManager.import(inp, NyxBackupOptions())
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e // fragment gone mid-import: no toast / requireActivity() on a dead fragment (B12)
-        } catch (e: Throwable) {
-            // Catch kept — SAF/backup I/O boundary; the outcome is reported as a toast.
-            null // unchanged outcome: any failure means "import failed"
-        }
-        when (result) {
-            ImportResult.Success -> {
+        when (backupRepository.loadBackupFromFile(uri.toString(), ImportOptions())) {
+            is ImportResult.Success -> {
                 toast(getString(R.string.backup_import_done))
                 requireActivity().finish() // back to home, which re-renders from the restored state
             }
-            ImportResult.InvalidData -> toast(getString(R.string.backup_import_invalid))
-            null -> toast(getString(R.string.backup_import_failed))
+            ImportResult.InvalidFormat,
+            ImportResult.OutdatedBackup,
+            is ImportResult.ForeignBackup,
+            is ImportResult.UnsupportedVersion,
+            -> toast(getString(R.string.backup_import_invalid))
+            is ImportResult.Error -> toast(getString(R.string.backup_import_failed))
         }
     }
 

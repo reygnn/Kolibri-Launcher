@@ -1,9 +1,13 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.IoDispatcher
+import com.github.reygnn.launcher.core.KolibriLog
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -18,8 +22,13 @@ import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
 import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import com.github.reygnn.launcher.feature.backup.engine.BackupRead
 import com.github.reygnn.launcher.feature.backup.engine.StagedBlobs
+import com.github.reygnn.launcher.feature.backup.engine.UNKNOWN_SIZE
+import com.github.reygnn.launcher.feature.backup.engine.writeOrDiscard
+import com.github.reygnn.nyx_launcher.home.model.BackupPreview
+import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
+import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
 import com.github.reygnn.nyx_launcher.home.repository.DrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
@@ -30,10 +39,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -42,13 +54,16 @@ import javax.inject.Singleton
  * referenced by hash. The container itself — ZIP, caps, hashing, staging — is the engine's;
  * this class assembles the section from Nyx's repos and applies it.
  *
- * Callers own the streams (the settings UI opens the SAF Uri); this stays
- * ContentResolver-free and testable. Blob restore reuses the shared
+ * 2b-3a: the [BackupRepository] for the settings UI — it opens the SAF document itself,
+ * wraps the export in the shared `writeOrDiscard` (U3) and maps every engine outcome to its
+ * own [ImportResult], like Kolibri. The stream-level [writeBackup] / [importFrom] stay
+ * internal for tests and the backup contracts. Blob restore reuses the shared
  * [WallpaperFileManager.copyFromInputStream] (staged blob → internal file), so imported
  * layers land in internal storage exactly like a fresh pick. Dissolved in 2b-4.
  */
 @Singleton
 class NyxBackupManager @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val homeLayoutRepository: HomeLayoutRepository,
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
@@ -60,98 +75,165 @@ class NyxBackupManager @Inject constructor(
     private val serializer: NyxBackupSerializer,
     private val reconcileHomeLayout: ReconcileHomeLayoutUseCase,
     private val engine: BackupEngine,
+    @param:Named("appVersionName") private val appVersionName: String,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) {
-    /** Writes a full backup container to [out] (left open for the caller). Returns true on success. */
-    suspend fun export(out: OutputStream, appVersion: String, timestamp: Long): Boolean =
-        withContext(ioDispatcher) {
-            try {
-                val layout = homeLayoutRepository.layout().first().toDto()
-                val fab = fabPositionStore.fabPositionFlow.first() // read once (x/y atomic)
-                val prefs = NyxBackupPrefs(
-                    iconStyle = preferences.iconStyle().first().name,
-                    searchAutoLaunch = preferences.searchAutoLaunch().first(),
-                    usageSortEnabled = preferences.usageSortEnabled().first(),
-                    notificationDots = preferences.notificationDots().first(),
-                    showAlarm = preferences.showAlarmFlow.first(),
-                    showCalendarEvent = preferences.showCalendarEventFlow.first(),
-                    scrimAlpha = displaySettings.wallpaperScrimAlphaStateFlow.first(),
-                    backdrop = displaySettings.wallpaperBackdropFlow.first().name,
-                    surfaceMode = displaySettings.wallpaperSurfaceModeFlow.first().name,
-                    fabXFraction = fab.xFraction,
-                    fabYFraction = fab.yFraction,
-                )
-                // Every layer backed by an existing internal file becomes a blob; the section
-                // references it by hash (equal images are stored once). Other layers keep
-                // their imageUri and have no blob.
-                val state = wallpaperRepository.getWallpaperStateSync()
-                val sources = ArrayList<BlobSource>()
-                val layerSource = state.layers.map { layer ->
-                    layer.imageUri?.let { localFileOrNull(it) }?.let { file ->
-                        sources += BlobSource(IMAGE_MEDIA_TYPE) { file.inputStream() }
-                        sources.size - 1
-                    }
-                }
-                val drawerFolders = drawerFoldersRepository.folders().first().toDto()
-                val hiddenApps = hiddenAppsRepository.hidden().first().map { it.toDto() }
+) : BackupRepository {
 
-                engine.export(
-                    output = out,
-                    producer = ContainerManifest.Producer(NyxBackupSchema.APP_ID, appVersion, timestamp),
-                    schemaVersion = NyxBackupSchema.SCHEMA_VERSION,
-                    blobs = sources,
-                ) { hashes ->
-                    val layers = state.layers.mapIndexed { index, layer ->
-                        val backup = WallpaperLayerBackup.fromLayerState(layer)
-                        val source = layerSource[index]
-                        if (source != null) backup.copy(imageUri = null, imageFileName = hashes[source]) else backup.copy(imageFileName = null)
-                    }
-                    val backup = NyxBackup(
-                        layout = layout,
-                        prefs = prefs,
-                        drawerFolders = drawerFolders,
-                        hiddenApps = hiddenApps,
-                        wallpaperLayers = layers,
-                    )
-                    mapOf(NyxBackupSchema.SECTION_BACKUP to ContainerManifest.Section(NyxBackupSchema.SECTION_VERSION, serializer.toJson(backup)))
-                }
-                true
+    override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(ioDispatcher) {
+        try {
+            val uri = documentUri(uriString)
+            // U3: a failure throws out of the write, never returns false, so writeOrDiscard
+            // removes the half-written document (2b-3a).
+            writeOrDiscard(open = { openOutput(uri) }, discard = { discardDocument(uri) }) { out -> writeBackup(out) }
+            true
+        } catch (e: CancellationException) {
+            throw e // cooperative cancellation must propagate, never become `false`
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): assembling and writing the
+            // container allocates per wallpaper blob; OOM extends Error → Throwable.
+            TimberWrapper.silentError(e, "Nyx backup export failed")
+            false
+        }
+    }
+
+    override suspend fun loadBackupFromFile(uriString: String, options: ImportOptions): ImportResult =
+        withContext(ioDispatcher) {
+            if (options.importNothing) return@withContext ImportResult.Error("No import options selected")
+            try {
+                val uri = documentUri(uriString)
+                importFrom(open = { openInput(uri) }, options = options, declaredSize = declaredSize(uri))
             } catch (e: CancellationException) {
-                throw e // cooperative cancellation must propagate, never become `false`
+                throw e
             } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Nyx backup export failed")
-                false
+                // Catch kept (Expected error, four-category frame): an invalid URI or a
+                // provider failure before the engine runs. OOM extends Error → Throwable.
+                TimberWrapper.silentError(e, "Error loading backup")
+                ImportResult.Error("Failed to load backup: ${e.message}")
             }
         }
+
+    override suspend fun previewBackup(uriString: String): BackupPreview? = withContext(ioDispatcher) {
+        try {
+            val uri = documentUri(uriString)
+            engine.readStaged(
+                open = { openInput(uri) },
+                appId = NyxBackupSchema.APP_ID,
+                knownSections = NyxBackupSchema.KNOWN_SECTIONS,
+                kind = "preview",
+                declaredSize = declaredSize(uri),
+            ) { read, _ ->
+                if (read !is BackupRead.Ok) return@readStaged null
+                val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return@readStaged null
+                serializer.fromJson(section.data)?.let { previewOf(read.manifest.producer, it) }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): reading the whole container
+            // stages its blobs; OOM extends Error → Throwable. A preview that fails is null.
+            TimberWrapper.silentError(e, "Error previewing backup")
+            null
+        }
+    }
+    /**
+     * Writes a full backup container to [out] (left open for the caller). Throws on any
+     * failure — the caller's writeOrDiscard needs the exception to remove the document.
+     */
+    internal suspend fun writeBackup(out: OutputStream, timestamp: Long = System.currentTimeMillis()) {
+        withContext(ioDispatcher) {
+            val layout = homeLayoutRepository.layout().first().toDto()
+            val fab = fabPositionStore.fabPositionFlow.first() // read once (x/y atomic)
+            val prefs = NyxBackupPrefs(
+                iconStyle = preferences.iconStyle().first().name,
+                searchAutoLaunch = preferences.searchAutoLaunch().first(),
+                usageSortEnabled = preferences.usageSortEnabled().first(),
+                notificationDots = preferences.notificationDots().first(),
+                showAlarm = preferences.showAlarmFlow.first(),
+                showCalendarEvent = preferences.showCalendarEventFlow.first(),
+                scrimAlpha = displaySettings.wallpaperScrimAlphaStateFlow.first(),
+                backdrop = displaySettings.wallpaperBackdropFlow.first().name,
+                surfaceMode = displaySettings.wallpaperSurfaceModeFlow.first().name,
+                fabXFraction = fab.xFraction,
+                fabYFraction = fab.yFraction,
+            )
+            // Every layer backed by an existing internal file becomes a blob; the section
+            // references it by hash (equal images are stored once). Other layers keep
+            // their imageUri and have no blob.
+            val state = wallpaperRepository.getWallpaperStateSync()
+            val sources = ArrayList<BlobSource>()
+            val layerSource = state.layers.map { layer ->
+                layer.imageUri?.let { localFileOrNull(it) }?.let { file ->
+                    sources += BlobSource(IMAGE_MEDIA_TYPE) { file.inputStream() }
+                    sources.size - 1
+                }
+            }
+            val drawerFolders = drawerFoldersRepository.folders().first().toDto()
+            val hiddenApps = hiddenAppsRepository.hidden().first().map { it.toDto() }
+
+            engine.export(
+                output = out,
+                producer = ContainerManifest.Producer(NyxBackupSchema.APP_ID, appVersionName, timestamp),
+                schemaVersion = NyxBackupSchema.SCHEMA_VERSION,
+                blobs = sources,
+            ) { hashes ->
+                val layers = state.layers.mapIndexed { index, layer ->
+                    val backup = WallpaperLayerBackup.fromLayerState(layer)
+                    val source = layerSource[index]
+                    if (source != null) backup.copy(imageUri = null, imageFileName = hashes[source]) else backup.copy(imageFileName = null)
+                }
+                val backup = NyxBackup(
+                    layout = layout,
+                    prefs = prefs,
+                    drawerFolders = drawerFolders,
+                    hiddenApps = hiddenApps,
+                    wallpaperLayers = layers,
+                )
+                mapOf(NyxBackupSchema.SECTION_BACKUP to ContainerManifest.Section(NyxBackupSchema.SECTION_VERSION, serializer.toJson(backup)))
+            }
+        }
+    }
 
     /**
-     * Reads a backup container from [inp] and applies it per [options]. Nyx binds no
-     * LegacyFormatReader, so the engine opens the stream exactly once and [inp] can be handed
-     * over as is. Every outcome other than a readable Nyx backup is [ImportResult.InvalidData]
-     * until 2b-3 gives them their own messages.
+     * Reads a backup container and applies it per [options]. Every engine outcome has its own
+     * result, mapped exactly like Kolibri's (pinned by the backup contracts, 2b-3c); a refused
+     * backup writes nothing.
      */
-    suspend fun import(inp: InputStream, options: NyxBackupOptions): ImportResult =
-        withContext(ioDispatcher) {
-            try {
-                engine.readStaged(
-                    open = { inp },
-                    appId = NyxBackupSchema.APP_ID,
-                    knownSections = NyxBackupSchema.KNOWN_SECTIONS,
-                    kind = "import",
-                ) { read, staging ->
-                    if (read is BackupRead.Ok) apply(read, staging, options) else ImportResult.InvalidData
+    internal suspend fun importFrom(
+        open: () -> InputStream,
+        options: ImportOptions,
+        declaredSize: Long = UNKNOWN_SIZE,
+    ): ImportResult = withContext(ioDispatcher) {
+        try {
+            engine.readStaged(
+                open = open,
+                appId = NyxBackupSchema.APP_ID,
+                knownSections = NyxBackupSchema.KNOWN_SECTIONS,
+                kind = "import",
+                declaredSize = declaredSize,
+            ) { read, staging ->
+                when (read) {
+                    is BackupRead.Ok -> apply(read, staging, options)
+                    // Nyx binds no LegacyFormatReader (E5a): every pre-container archive lands here.
+                    BackupRead.OutdatedFormat -> ImportResult.OutdatedBackup
+                    is BackupRead.ForeignApp -> ImportResult.ForeignBackup(read.appId)
+                    is BackupRead.UnsupportedFormat -> ImportResult.UnsupportedVersion(read.formatVersion)
+                    is BackupRead.TooLarge -> ImportResult.Error("Backup file is too large")
+                    is BackupRead.Invalid -> ImportResult.InvalidFormat
                 }
-            } catch (e: CancellationException) {
-                throw e // cooperative cancellation must propagate, never become InvalidData
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Nyx backup import failed")
-                ImportResult.InvalidData
             }
+        } catch (e: CancellationException) {
+            throw e // cooperative cancellation must propagate, never become an error result
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): reading the container and
+            // applying it allocate per blob and per store; OOM extends Error → Throwable.
+            TimberWrapper.silentError(e, "Nyx backup import failed")
+            ImportResult.Error("Failed to load backup: ${e.message}")
         }
+    }
 
-    private suspend fun apply(read: BackupRead.Ok, staging: File, options: NyxBackupOptions): ImportResult {
-        val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidData
-        val backup = serializer.fromJson(section.data) ?: return ImportResult.InvalidData
+    private suspend fun apply(read: BackupRead.Ok, staging: File, options: ImportOptions): ImportResult {
+        val section = read.manifest.sections[NyxBackupSchema.SECTION_BACKUP] ?: return ImportResult.InvalidFormat
+        val backup = serializer.fromJson(section.data) ?: return ImportResult.InvalidFormat
         // Layer index → internal file copied from its blob. Every layer gets its OWN file, also
         // when two layers share one blob: removing a layer deletes its file right away, so a
         // file shared between layers would take the other layer's image with it.
@@ -190,11 +272,15 @@ class NyxBackupManager @Inject constructor(
                     val repaired = DrawerFoldersTransition.sanitize(restored)
                     drawerFoldersRepository.update { repaired }
                 }
-                // Hidden apps are drawer organisation too — restore under the layout toggle
-                // (replace; a null field leaves the current set intact).
+            }
+            if (options.importHiddenApps) {
+                // Own switch since 2b-3, like Kolibri's. B13: the set is replaced; a backup without
+                // the field (null) leaves the current set standing.
                 backup.hiddenApps?.let { dto ->
                     hiddenAppsRepository.update { dto.mapNotNull { it.toDomain() }.toSet() } // drop invalid keys (§Audit-2 N15)
                 }
+            }
+            if (options.importLayout) {
                 backup.layout?.toDomain()?.let {
                     homeLayoutRepository.save(it)
                     // Structural-only cleanup of the restored layout NOW (not just on the
@@ -205,7 +291,12 @@ class NyxBackupManager @Inject constructor(
                     reconcileHomeLayout()
                 }
             }
-            return ImportResult.Success
+            val dropped = if (options.importWallpaper) {
+                backup.wallpaperLayers.indices.count { backup.wallpaperLayers[it].imageFileName != null && it !in extracted }
+            } else {
+                0
+            }
+            return ImportResult.Success(droppedWallpaperLayers = dropped)
         } finally {
             // A copied file no restored layer ended up referencing (a failed write, cancellation,
             // every layer dropped) must not sit orphaned in internal storage until the next
@@ -237,6 +328,50 @@ class NyxBackupManager @Inject constructor(
         } finally {
             claimed.values.forEach { it.delete() }
         }
+    }
+
+    private fun previewOf(producer: ContainerManifest.Producer, backup: NyxBackup) = BackupPreview(
+        appVersion = producer.appVersion,
+        timestamp = producer.createdAtEpochMillis,
+        homeItemCount = backup.layout?.let { it.items.size + it.dock.size },
+        drawerFolderCount = backup.drawerFolders?.folders?.size ?: 0,
+        hiddenAppCount = backup.hiddenApps?.size,
+        hasSettings = backup.prefs != null,
+        wallpaperLayerCount = backup.wallpaperLayers.size,
+    )
+
+    /** A content:// or file:// document URI, or an exception the caller reports. */
+    private fun documentUri(uriString: String): Uri {
+        val uri = uriString.toUri()
+        if (uri.scheme != AppConstants.SCHEME_CONTENT && uri.scheme != AppConstants.SCHEME_FILE) {
+            throw IOException("Unsupported file location type: ${uri.scheme}")
+        }
+        return uri
+    }
+
+    private fun openInput(uri: Uri): InputStream =
+        context.contentResolver.openInputStream(uri) ?: throw IOException("Cannot read from selected location")
+
+    private fun openOutput(uri: Uri): OutputStream =
+        context.contentResolver.openOutputStream(uri) ?: throw IOException("Cannot write to selected location")
+
+    /** The platform part of U3: removes the half-written document; writeOrDiscard logs a failure. */
+    private fun discardDocument(uri: Uri) {
+        if (uri.scheme == AppConstants.SCHEME_FILE) {
+            uri.path?.let { File(it).delete() }
+        } else {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        }
+    }
+
+    /** The document's size for the engine's archive cap, or UNKNOWN_SIZE when the provider can't tell. */
+    private fun declaredSize(uri: Uri): Long = try {
+        context.contentResolver.openFileDescriptor(uri, AppConstants.MODE_READ_ONLY)?.use { it.statSize } ?: UNKNOWN_SIZE
+    } catch (e: Exception) {
+        // No suspension point in this block — synchronous I/O only.
+        // Exception sufficient (pure I/O probe, no allocation path → no Error).
+        KolibriLog.w(e, "Could not determine backup file size")
+        UNKNOWN_SIZE
     }
 
     private suspend fun applyPrefs(prefs: NyxBackupPrefs?) {

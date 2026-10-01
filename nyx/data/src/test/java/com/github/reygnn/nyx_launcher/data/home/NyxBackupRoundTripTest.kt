@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import android.content.Context
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
@@ -20,6 +21,7 @@ import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
+import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.model.ItemId
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
@@ -55,7 +57,7 @@ import java.io.InputStream
  * rebinds every layer to a new file.
  */
 @RunWith(RobolectricTestRunner::class)
-class NyxBackupRoundTripTest : BackupRoundTripContract<NyxBackupOptions>() {
+class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
 
     @get:Rule
     val tmp = TemporaryFolder()
@@ -63,11 +65,12 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<NyxBackupOptions>() {
     private val log = ArrayList<String>()
     private lateinit var stores: Stores
 
-    override val allOptions = NyxBackupOptions()
+    override val allOptions = ImportOptions()
     override val singleOptions = mapOf(
-        NyxBackupOptions(importLayout = true, importSettings = false, importWallpaper = false) to setOf(LAYOUT, FOLDERS, HIDDEN),
-        NyxBackupOptions(importLayout = false, importSettings = true, importWallpaper = false) to setOf(SETTINGS),
-        NyxBackupOptions(importLayout = false, importSettings = false, importWallpaper = true) to setOf(WALLPAPER),
+        NONE.copy(importLayout = true) to setOf(LAYOUT, FOLDERS),
+        NONE.copy(importHiddenApps = true) to setOf(HIDDEN),
+        NONE.copy(importSettings = true) to setOf(SETTINGS),
+        NONE.copy(importWallpaper = true) to setOf(WALLPAPER),
     )
     override val replacingParts = setOf(LAYOUT, FOLDERS, HIDDEN, SETTINGS, WALLPAPER)
     override val writeLog: List<String> get() = log.toList()
@@ -132,18 +135,19 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<NyxBackupOptions>() {
     override suspend fun export(withWallpaper: Boolean): ByteArray {
         if (!withWallpaper) stores.wallpaper.state.value = WallpaperState.NONE
         val out = ByteArrayOutputStream()
-        check(manager().export(out, appVersion = "test", timestamp = 1L)) { "export failed" }
+        manager().writeBackup(out, timestamp = 1L)
         return out.toByteArray()
     }
 
-    override suspend fun import(bytes: ByteArray, options: NyxBackupOptions): Boolean {
+    override suspend fun import(bytes: ByteArray, options: ImportOptions): Boolean {
         log.clear()
-        return manager().import(ByteArrayInputStream(bytes), options) == ImportResult.Success
+        return manager().importFrom({ ByteArrayInputStream(bytes) }, options) is ImportResult.Success
     }
 
     // ---- harness ----
 
     private fun manager() = NyxBackupManager(
+        context = mockk<Context>(), // the stream-level writeBackup/importFrom never touch it
         homeLayoutRepository = stores.recordingLayout,
         drawerFoldersRepository = stores.recordingFolders,
         hiddenAppsRepository = stores.recordingHidden,
@@ -155,6 +159,7 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<NyxBackupOptions>() {
         serializer = NyxBackupSerializer(),
         reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
         engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet()),
+        appVersionName = "test",
         ioDispatcher = mainDispatcherRule.testDispatcher,
     )
 
@@ -271,6 +276,8 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<NyxBackupOptions>() {
         const val HIDDEN = "hiddenApps"
         const val SETTINGS = "settings"
         const val WALLPAPER = "wallpaper"
+
+        val NONE = ImportOptions(importLayout = false, importHiddenApps = false, importSettings = false, importWallpaper = false)
 
         val EMPTY_LAYOUT = HomeLayout(grid = GridSpec(columns = 4, rows = 6), pages = 1, items = emptyList(), dock = emptyList())
     }

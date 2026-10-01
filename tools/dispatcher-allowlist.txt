@@ -37,8 +37,6 @@ kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupReposit
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/BackupRepositoryImpl.kt	override suspend fun saveBackupToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	withContext(Dispatchers.IO) {
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	withContext(Dispatchers.IO) {
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	withContext(Dispatchers.IO) {
 nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) {
 nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) { fileManager.gcOrphans(referenced) }
 nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) { previous.forEach { fileManager.deleteFile(it) } }

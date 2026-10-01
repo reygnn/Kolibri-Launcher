@@ -31,6 +31,8 @@ import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
 import com.github.reygnn.launcher.common.data.timeinfo.TimeBasedEventsRepositoryImpl
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
+import com.github.reygnn.nyx_launcher.data.home.NyxBackupManager
+import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -73,6 +75,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
+
+    // Backup to/from a SAF document over the shared engine (2b-3a); NyxBackupManager is
+    // dissolved into a BackupRepositoryImpl in 2b-4.
+    @Binds
+    @Singleton
+    abstract fun bindBackupRepository(impl: NyxBackupManager): BackupRepository
 
     // ── Shared installed-apps subsystem (:core port → :common-data impls, decision B) ──
     // The LauncherApps-backed motor (drawer loader) and the enumerator (read directly

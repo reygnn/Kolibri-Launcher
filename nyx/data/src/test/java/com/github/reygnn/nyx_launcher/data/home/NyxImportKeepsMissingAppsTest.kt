@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import android.content.Context
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
@@ -10,6 +11,7 @@ import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import com.github.reygnn.nyx_launcher.home.model.GridSpec
 import com.github.reygnn.nyx_launcher.home.model.HomeItem
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
+import com.github.reygnn.nyx_launcher.home.model.ImportOptions
 import com.github.reygnn.nyx_launcher.home.model.ImportResult
 import com.github.reygnn.nyx_launcher.home.repository.FakeDrawerFoldersRepository
 import com.github.reygnn.nyx_launcher.home.repository.FakeHiddenAppsRepository
@@ -50,6 +52,7 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
         val hidden = FakeHiddenAppsRepository()
         val folders = FakeDrawerFoldersRepository()
         val manager = NyxBackupManager(
+            context = mockk<Context>(), // the stream-level importFrom never touches it
             homeLayoutRepository = layout,
             drawerFoldersRepository = folders,
             hiddenAppsRepository = hidden,
@@ -61,11 +64,13 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
             serializer = NyxBackupSerializer(),
             reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
             engine = engine,
+            appVersionName = "test",
             ioDispatcher = mainDispatcherRule.testDispatcher,
         )
 
-        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
-        check(result == ImportResult.Success) { "import failed: $result" }
+        val bytes = out.toByteArray()
+        val result = manager.importFrom({ ByteArrayInputStream(bytes) }, ImportOptions())
+        check(result is ImportResult.Success) { "import failed: $result" }
 
         return mapOf(
             "home grid" to layout.current.items.mapNotNullTo(HashSet()) { (it.item as? HomeItem.App)?.key },
