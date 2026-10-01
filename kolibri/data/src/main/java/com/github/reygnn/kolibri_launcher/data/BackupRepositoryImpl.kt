@@ -396,9 +396,10 @@ class BackupRepositoryImpl @Inject constructor(
                 throw BackupException("Unsupported file location type")
             }
 
-            val backupData = assembler.buildBackupData()
+            // Assembling runs inside the write: if reading a store fails, the document is discarded
+            // as well (U3) instead of staying behind empty, as Nyx does (2b-3c follow-up).
             writeOrDiscard(open = { openOutput(uri) }, discard = { discardDocument(uri) }) { output ->
-                exportContainer(output, backupData)
+                exportContainer(output, assembler.buildBackupData())
             }
 
             Timber.i("Backup saved to: $uri")
