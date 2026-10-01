@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import java.io.IOException
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
 import android.content.Context
@@ -400,6 +401,20 @@ class SettingsRepositoryImplTest {
         legacyKeys.forEach { key ->
             assertFalse("Legacy key $key should be cleared by purge", remaining.contains(key))
         }
+    }
+
+    @Test
+    fun `purgeRepository - rethrows a store failure, the setters still swallow theirs`() = runTest {
+        // 2b-4c, F1: only the purge reports a failure (the reset needs it); whether the setters
+        // should swallow is a separate decision, so they keep doing it.
+        fakeDataStore.makeEditFail()
+
+        assertFailsWith<IOException> { settingsManager.purgeRepository() }
+        settingsManager.setRotationLocked(true) // no exception
+
+        fakeDataStore.resetErrorFlags()
+        fakeDataStore.makeCancellable()
+        assertFailsWith<CancellationException> { settingsManager.purgeRepository() }
     }
 
     // ========================================================================

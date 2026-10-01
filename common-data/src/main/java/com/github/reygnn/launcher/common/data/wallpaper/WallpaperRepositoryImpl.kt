@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
+import java.io.IOException
 import org.json.JSONObject
 import timber.log.Timber
 import javax.inject.Inject
@@ -225,18 +226,31 @@ class WallpaperRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeRepository() {
-        dataStore.safePurge("WallpaperRepositoryImpl") { preferences ->
-            removeAllKeys(preferences)
+        // Every independent cleanup step runs, and only then is an error reported (2b-4c, F1):
+        // a failed key removal must not keep the files from being deleted.
+        var failure: Throwable? = null
+        try {
+            dataStore.safePurge("WallpaperRepositoryImpl") { preferences ->
+                removeAllKeys(preferences)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            failure = e // already logged by safePurge
         }
         // Delete the on-disk wallpaper images as well, not just the DataStore
         // keys. Otherwise a factory reset leaves orphaned files in
         // filesDir/wallpapers/ until the next cold-start gcOrphans sweep (a
-        // 60s-cutoff, best-effort net — not a prompt guarantee). This is the
-        // Factory Reset caller clearAll()'s KDoc already documents. IO-wrapped
+        // 60s-cutoff, best-effort net — not a prompt guarantee). IO-wrapped
         // because clearAll() does blocking file deletion.
-        withContext(ioDispatcher) {
+        val filesCleared = withContext(ioDispatcher) {
             wallpaperFileManager.clearAll()
         }
+        if (!filesCleared) {
+            val incomplete = IOException("Not every wallpaper file could be deleted")
+            failure?.addSuppressed(incomplete) ?: run { failure = incomplete }
+        }
+        failure?.let { throw it }
     }
 
     /** Removes the wallpaper key. */

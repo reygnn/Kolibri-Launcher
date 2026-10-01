@@ -35,6 +35,8 @@ class WallpaperRepositoryImplContractTest : WallpaperRepositoryContract() {
         val fakeDataStore = FakeDataStore()
         val fileManager: WallpaperFileManager = mockk(relaxed = true)
         every { fileManager.fileExists(any<Uri>()) } returns true
+        // A relaxed Boolean is false; clearAll() == false means "files left" and fails the purge (F1).
+        every { fileManager.clearAll() } returns true
         return WallpaperRepositoryImpl(fakeDataStore, fileManager, mainDispatcherRule.testDispatcher)
     }
 }

@@ -125,6 +125,22 @@ class SettingsRepositoryImpl @Inject constructor(
      * Schützt vor Fehlern beim Schreiben und reduziert Boilerplate.
      * Re-throwt CancellationException korrekt für Coroutines.
      */
+    /**
+     * The purge's own edit (2b-4c, F1): logs AND rethrows, so the factory reset reports a partial
+     * failure instead of a success. The setters keep [safeEdit]; whether they should swallow is a
+     * separate decision.
+     */
+    private suspend fun purgeEdit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(block)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            TimberWrapper.silentError(e, "Failed to purge SettingsRepositoryImpl repository")
+            throw e
+        }
+    }
+
     private suspend fun safeEdit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         try {
             dataStore.edit(block)
@@ -275,7 +291,7 @@ class SettingsRepositoryImpl @Inject constructor(
      * * AUSNAHME: Onboarding Status bleibt erhalten.
      */
     override suspend fun purgeRepository() {
-        safeEdit { preferences ->
+        purgeEdit { preferences ->
             preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
             preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
             preferences.remove(PreferenceKeys.TEXT_COLOR)

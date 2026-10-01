@@ -257,13 +257,17 @@ class HiddenAppsRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - handles exceptions gracefully`() = runTest {
+    fun `purgeRepository - rethrows a store failure after logging it`() = runTest {
         fakeDataStore.makeEditFail()
 
-        // Should not crash
-        hiddenAppsManager.purgeRepository()
-
+        // The store's failure is rethrown (2b-4c, F1), so the factory reset reports a partial
+        // failure instead of a success; the attempt is still counted, and a cancellation passes.
+        assertFailsWith<IOException> { hiddenAppsManager.purgeRepository() }
         assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+
+        fakeDataStore.resetErrorFlags()
+        fakeDataStore.makeCancellable()
+        assertFailsWith<CancellationException> { hiddenAppsManager.purgeRepository() }
     }
 
     // ========== AUDIT-14 V2: distinctUntilChanged regression ==========

@@ -232,13 +232,16 @@ class CustomNamesRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - handles exceptions gracefully`() = runTest {
+    fun `purgeRepository - rethrows a store failure after logging it`() = runTest {
         fakeDataStore.makeEditFail()
 
-        // Should not crash
-        customNamesManager.purgeRepository()
-
-        // FakeDataStore zählt den Versuch auch bei Fehler
+        // The store's failure is rethrown (2b-4c, F1), so the factory reset reports a partial
+        // failure instead of a success; the attempt is still counted, and a cancellation passes.
+        assertFailsWith<IOException> { customNamesManager.purgeRepository() }
         assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+
+        fakeDataStore.resetErrorFlags()
+        fakeDataStore.makeCancellable()
+        assertFailsWith<CancellationException> { customNamesManager.purgeRepository() }
     }
 }

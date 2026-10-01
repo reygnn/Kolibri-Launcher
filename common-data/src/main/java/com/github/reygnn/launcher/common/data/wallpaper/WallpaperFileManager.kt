@@ -162,22 +162,28 @@ class WallpaperFileManager @Inject constructor(
     fun deleteFile(uriString: String) = deleteFile(uriString.toUri())
 
     /**
-     * Löscht ALLE Wallpaper-Dateien im internen Speicher.
-     * Wird aufgerufen bei "Wallpaper entfernen" und Factory Reset.
+     * Deletes ALL wallpaper files in internal storage ("remove wallpaper" and the factory reset).
+     * Never throws. Returns true when the directory holds no file afterwards, false otherwise —
+     * also when it can't even be listed (2b-4c, F1): the reset's purge turns false into an error,
+     * other callers may ignore it.
      */
-    fun clearAll() {
-        try {
+    fun clearAll(): Boolean {
+        return try {
             val dir = getWallpaperDir()
-            val files = dir.listFiles() ?: return
-            var count = 0
+            val files = dir.listFiles() ?: return false.also { Timber.w("Could not list the wallpaper directory") }
+            var deleted = 0
             for (file in files) {
-                if (file.delete()) count++
+                if (file.delete()) deleted++
             }
-            if (count > 0) {
-                Timber.d("Cleared $count wallpaper files from internal storage")
+            if (deleted > 0) {
+                Timber.d("Cleared $deleted wallpaper files from internal storage")
             }
+            val left = files.size - deleted
+            if (left > 0) Timber.w("$left wallpaper files could not be deleted")
+            left == 0
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Error clearing wallpaper files")
+            false
         }
     }
 

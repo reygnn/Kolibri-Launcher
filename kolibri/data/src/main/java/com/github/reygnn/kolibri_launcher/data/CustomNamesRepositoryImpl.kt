@@ -219,6 +219,7 @@ class CustomNamesRepositoryImpl @Inject constructor(
             throw e
         } catch (e: Throwable) {
             TimberWrapper.silentError(e, "Failed to purge CustomNamesRepositoryImpl repository")
+            throw e // 2b-4c, F1: the reset reports a partial failure instead of a success
         }
     }
 

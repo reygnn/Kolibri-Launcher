@@ -205,4 +205,30 @@ class WallpaperFileManagerTest {
 
         assertThat(f.exists()).isFalse()
     }
+
+    // ---- clearAll reports whether everything is gone (2b-4c, F1) ----
+
+    @Test
+    fun `clearAll deletes every file and reports true`() {
+        File(wallpaperDir, "a.jpg").writeBytes(byteArrayOf(1))
+        File(wallpaperDir, "b.jpg").writeBytes(byteArrayOf(2))
+
+        assertThat(manager.clearAll()).isTrue()
+        assertThat(wallpaperDir.list().orEmpty()).isEmpty()
+    }
+
+    @Test
+    fun `clearAll on an empty directory reports true`() {
+        assertThat(manager.clearAll()).isTrue()
+    }
+
+    @Test
+    fun `clearAll reports false when an entry can't be deleted, and still deletes the rest`() {
+        File(wallpaperDir, "a.jpg").writeBytes(byteArrayOf(1))
+        // A non-empty directory can't be deleted with File.delete() — the stand-in for a locked file.
+        File(wallpaperDir, "stuck").apply { mkdirs() }.resolve("inner").writeBytes(byteArrayOf(2))
+
+        assertThat(manager.clearAll()).isFalse()
+        assertThat(wallpaperDir.list().orEmpty().toList()).containsExactly("stuck")
+    }
 }

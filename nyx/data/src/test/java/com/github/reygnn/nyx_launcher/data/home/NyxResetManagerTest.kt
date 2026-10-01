@@ -1,5 +1,10 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import java.io.IOException
+import kotlinx.coroutines.flow.flowOf
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -80,5 +85,29 @@ class NyxResetManagerTest {
             assertThat(ok).isFalse() // a step failed
             assertThat(dataStore.data.first().asMap()).isEmpty() // step 1 still ran
             verify(exactly = 1) { fileManager.clearAll() } // step 3 ran despite step 2 failing
+        }
+
+    @Test
+    fun a_failing_usage_store_is_reported_and_the_other_steps_still_run() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // 2b-4c, F1, between steps 2 and 3: safePurge now rethrows, so the REAL usage purge
+            // fails this step instead of reporting success. The reset catches per step: no crash,
+            // the other steps run, the result is false and the settings show the failure message.
+            val dataStore = FakeDataStore()
+            dataStore.edit { it[stringPreferencesKey("home_layout_v1")] = "{...}" }
+            val failingUsageStore = object : DataStore<Preferences> {
+                override val data = flowOf(emptyPreferences())
+                override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
+                    throw IOException("usage store full")
+            }
+            val manager = NyxResetManager(
+                dataStore, AppUsageRepositoryImpl(failingUsageStore), fileManager, mainDispatcherRule.testDispatcher,
+            )
+
+            val ok = manager.reset()
+
+            assertThat(ok).isFalse()
+            assertThat(dataStore.data.first().asMap()).isEmpty() // step 1 ran
+            verify(exactly = 1) { fileManager.clearAll() } // step 3 ran
         }
 }

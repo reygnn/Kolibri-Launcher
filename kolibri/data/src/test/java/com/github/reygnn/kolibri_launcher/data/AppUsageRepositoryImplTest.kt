@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import java.io.IOException
 import io.mockk.mockk
 
 import android.content.Context
@@ -563,14 +564,16 @@ class AppUsageRepositoryImplTest {
     }
 
     @Test
-    fun `purgeRepository - handles exceptions gracefully`() = runTest {
-        // Arrange
+    fun `purgeRepository - rethrows a store failure after logging it`() = runTest {
         fakeDataStore.makeEditFail()
 
-        // Act - sollte nicht crashen
-        appUsageManager.purgeRepository()
-
-        // Assert
+        // The store's failure is rethrown (2b-4c, F1), so the factory reset reports a partial
+        // failure instead of a success; the attempt is still counted, and a cancellation passes.
+        assertFailsWith<IOException> { appUsageManager.purgeRepository() }
         assertThat(fakeDataStore.updateDataCallCount).isEqualTo(1)
+
+        fakeDataStore.resetErrorFlags()
+        fakeDataStore.makeCancellable()
+        assertFailsWith<CancellationException> { appUsageManager.purgeRepository() }
     }
 }

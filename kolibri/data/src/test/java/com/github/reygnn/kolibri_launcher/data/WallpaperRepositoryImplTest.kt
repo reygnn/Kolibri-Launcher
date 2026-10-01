@@ -1,4 +1,7 @@
 package com.github.reygnn.kolibri_launcher.data
+import kotlin.test.assertFailsWith
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
@@ -77,6 +80,9 @@ class WallpaperRepositoryImplTest {
         fileManager = mockk(relaxed = true)
         // Default: every file exists on disk. Individual tests override.
         every { fileManager.fileExists(any<Uri>()) } returns true
+        // Default: every wallpaper file deleted. A relaxed Boolean is false, which the purge would
+        // report as "files left" (2b-4c, F1).
+        every { fileManager.clearAll() } returns true
 
         manager = WallpaperRepositoryImpl(dataStore, fileManager, mainDispatcherRule.testDispatcher)
     }
@@ -344,6 +350,46 @@ class WallpaperRepositoryImplTest {
         verify(exactly = 1) { fileManager.clearAll() }
     }
 
+    // ---- an incomplete purge is reported, and every step still runs (2b-4c, F1) ----
+
+    @Test
+    fun `purgeRepository still deletes the files when removing the key fails, then throws`() = runTest {
+        dataStore.makeEditFail()
+
+        val error = assertFailsWith<IOException> { manager.purgeRepository() }
+
+        assertThat(error).hasMessageThat().contains("Simulated edit failure")
+        verify(exactly = 1) { fileManager.clearAll() } // the independent step ran anyway
+    }
+
+    @Test
+    fun `purgeRepository throws when wallpaper files are left`() = runTest {
+        every { fileManager.clearAll() } returns false
+
+        val error = assertFailsWith<IOException> { manager.purgeRepository() }
+
+        assertThat(error).hasMessageThat().isEqualTo("Not every wallpaper file could be deleted")
+        assertThat(dataStore.data.first()[KEY_LAYERS_JSON]).isNull() // the key went regardless
+    }
+
+    @Test
+    fun `purgeRepository keeps both failures, the first thrown and the second suppressed`() = runTest {
+        dataStore.makeEditFail()
+        every { fileManager.clearAll() } returns false
+
+        val error = assertFailsWith<IOException> { manager.purgeRepository() }
+
+        assertThat(error).hasMessageThat().contains("Simulated edit failure")
+        assertThat(error.suppressed.map { it.message }).containsExactly("Not every wallpaper file could be deleted")
+    }
+
+    @Test
+    fun `purgeRepository lets a cancellation through unchanged`() = runTest {
+        dataStore.makeCancellable()
+
+        assertFailsWith<CancellationException> { manager.purgeRepository() }
+    }
+
     @Test
     fun `single image roundtrip preserves all fields`() = runTest {
         val original = WallpaperState.single(
@@ -552,11 +598,28 @@ class WallpaperRepositoryImplTest {
 private class FakeDataStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
     private val state = MutableStateFlow(initial)
 
+    private var shouldFailEdit = false
+    private var shouldCancel = false
+
+    /** Next [updateData] throws an IOException, like a failed DataStore write. */
+    fun makeEditFail() {
+        shouldFailEdit = true
+    }
+
+    /** Next [updateData] throws a CancellationException, like a cancelled write. */
+    fun makeCancellable() {
+        shouldCancel = true
+    }
+
     override val data: Flow<Preferences> = state
 
     override suspend fun updateData(
         transform: suspend (t: Preferences) -> Preferences
     ): Preferences {
+        when {
+            shouldCancel -> throw kotlinx.coroutines.CancellationException("FakeDataStore: Simulated cancellation")
+            shouldFailEdit -> throw java.io.IOException("FakeDataStore: Simulated edit failure")
+        }
         val current = state.value
         val next = transform(current)
         state.value = next

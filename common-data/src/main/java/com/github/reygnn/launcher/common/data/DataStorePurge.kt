@@ -9,8 +9,11 @@ import kotlinx.coroutines.CancellationException
 
 /**
  * Purges DataStore-backed repository state with the standard Kolibri
- * try/catch envelope: rethrows `CancellationException`, routes any other
- * `Throwable` to `silentError`. The lambda runs inside the DataStore
+ * try/catch envelope: rethrows `CancellationException`, logs any other
+ * `Throwable` through `silentError` AND rethrows it (2b-4c, F1), so the reset
+ * that called the purge can report a partial failure instead of a success.
+ * Both resets isolate each store (`purgeAll` in Kolibri, the reset steps in
+ * Nyx), so one failing store never stops the others. The lambda runs inside the DataStore
  * transaction so callers can use `preferences[KEY] = …`,
  * `preferences.remove(KEY)`, or filter `preferences.asMap().keys`
  * exactly as if they had called `dataStore.edit { … }` directly.
@@ -38,5 +41,6 @@ suspend fun DataStore<Preferences>.safePurge(
         throw e
     } catch (e: Throwable) {
         TimberWrapper.silentError(e, "Failed to purge $repoName repository")
+        throw e
     }
 }
