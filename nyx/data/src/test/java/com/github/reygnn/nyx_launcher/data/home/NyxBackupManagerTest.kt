@@ -112,59 +112,6 @@ class NyxBackupManagerTest {
         reconcileHomeLayout, engine, mainDispatcherRule.testDispatcher,
     )
 
-
-    @Test
-    fun export_then_import_restores_layout_and_prefs() = runTest(mainDispatcherRule.testDispatcher) {
-        val out = ByteArrayOutputStream()
-        assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 42L)).isTrue()
-
-        // fresh manager for import with capturing mocks
-        val savedLayout = slot<HomeLayout>()
-        coEvery { homeLayoutRepository.save(capture(savedLayout)) } returns Unit
-
-        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
-
-        assertThat(result).isInstanceOf(com.github.reygnn.nyx_launcher.home.model.ImportResult.Success::class.java)
-        assertThat(savedLayout.captured.grid.columns).isEqualTo(4)
-        assertThat(savedLayout.captured.items).hasSize(1)
-        coVerify { preferences.setIconStyle(IconStyle.MONOCHROME) }
-        coVerify { preferences.setSearchAutoLaunch(false) }
-        coVerify { preferences.setNotificationDots(true) }
-        coVerify { preferences.setShowAlarm(false) }
-        coVerify { preferences.setShowCalendarEvent(true) }
-        coVerify { displaySettings.setWallpaperScrimAlpha(0.3f) }
-        coVerify { displaySettings.setWallpaperBackdrop(WallpaperBackdrop.BLACK) }
-        coVerify { displaySettings.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK) }
-        coVerify { fabPositionStore.saveFabPosition(FabPosition(0.8f, 0.7f)) }
-    }
-
-    @Test
-    fun export_then_import_restores_drawer_folders() = runTest(mainDispatcherRule.testDispatcher) {
-        drawerFoldersRepository.update {
-            DrawerFolders(
-                listOf(
-                    DrawerFolder(
-                        DrawerFolderId("f1"), "Work",
-                        listOf(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")),
-                    ),
-                ),
-            )
-        }
-        val out = ByteArrayOutputStream()
-        assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
-
-        // Wipe, then import must bring the folder back (separate DataStore blob, D-5).
-        drawerFoldersRepository.update { DrawerFolders.EMPTY }
-        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
-
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        val folders = drawerFoldersRepository.current.folders
-        assertThat(folders).hasSize(1)
-        assertThat(folders.single().title).isEqualTo("Work")
-        assertThat(folders.single().members)
-            .containsExactly(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")).inOrder()
-    }
-
     @Test
     fun import_sanitizes_malformed_drawer_folders_before_persisting() = runTest(mainDispatcherRule.testDispatcher) {
         // §Audit-2 N10: a crafted / cross-device backup can carry a sub-two-member folder; the
@@ -180,21 +127,6 @@ class NyxBackupManagerTest {
 
         assertThat(result).isInstanceOf(ImportResult.Success::class.java)
         assertThat(drawerFoldersRepository.current.folders).isEmpty() // the 1-member folder was dropped
-    }
-
-    @Test
-    fun export_then_import_restores_hidden_apps() = runTest(mainDispatcherRule.testDispatcher) {
-        hiddenAppsRepository.update { setOf(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M")) }
-        val out = ByteArrayOutputStream()
-        assertThat(manager.export(out, appVersion = "0.1.2-dev", timestamp = 7L)).isTrue()
-
-        // Wipe, then import must bring the hidden set back (separate DataStore blob).
-        hiddenAppsRepository.update { emptySet() }
-        val result = manager.import(ByteArrayInputStream(out.toByteArray()), NyxBackupOptions())
-
-        assertThat(result).isInstanceOf(ImportResult.Success::class.java)
-        assertThat(hiddenAppsRepository.current)
-            .containsExactly(ComponentKey.of("com.a", "com.a.M"), ComponentKey.of("com.b", "com.b.M"))
     }
 
     @Test
@@ -552,22 +484,8 @@ class NyxBackupManagerTest {
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
     }
 
-    @Test
-    fun import_with_empty_wallpaper_layers_keeps_the_current_wallpaper() = runTest(mainDispatcherRule.testDispatcher) {
-        // E2 (was: saved WallpaperState.NONE): a backup without wallpaper leaves the current one
-        // standing; the rest of the backup still imports.
-        val result = manager.import(
-            ByteArrayInputStream(containerOf(NyxBackup(layout = layout.toDto(), wallpaperLayers = emptyList()))),
-            NyxBackupOptions(),
-        )
-
-        assertThat(result).isEqualTo(ImportResult.Success)
-        coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
-        coVerify(exactly = 0) { wallpaperRepository.clearWallpaper() }
-        coVerify { homeLayoutRepository.save(any()) }
-    }
-
-    // ---- import semantics shared with Kolibri (2b-2: E1, B11, B14, U4) ----
+    // ---- B11 clamping and non-finite values (2b-2, 2b-2b). Round trip, E1, B14, U4 and E2
+    // run in the shared contracts: NyxBackupRoundTripTest, NyxImportKeepsMissingAppsTest. ----
 
     @Test
     fun imported_values_outside_their_range_are_clamped() = runTest(mainDispatcherRule.testDispatcher) {
@@ -597,57 +515,6 @@ class NyxBackupManagerTest {
         assertThat(result).isEqualTo(ImportResult.InvalidData)
         coVerify(exactly = 0) { displaySettings.setWallpaperScrimAlpha(any()) }
         coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
-    }
-
-    @Test
-    fun apps_that_are_not_installed_survive_and_short_forms_are_normalized() = runTest(mainDispatcherRule.testDispatcher) {
-        // E1: the import never filters by what is installed (nothing here is). B14: a stored
-        // short form `.Main` comes back as `pkg.Main` in layout, dock, hidden apps and folders.
-        val short = ComponentKeyDto("com.gone", ".Main")
-        val normalized = ComponentKey.of("com.gone", "com.gone.Main")
-        val other = ComponentKeyDto("com.also.gone", "com.also.gone.Main")
-        val backup = NyxBackup(
-            layout = HomeLayoutDto(
-                columns = 4, rows = 6, pages = 1,
-                items = listOf(PlacedItemDto(HomeItemDto.AppDto("a1", short), page = 0, x = 0, y = 0)),
-                dock = listOf(HomeItemDto.AppDto("d1", other)),
-            ),
-            hiddenApps = listOf(short),
-            drawerFolders = DrawerFoldersDto(folders = listOf(DrawerFolderDto("f1", "Gone", listOf(short, other)))),
-        )
-        val savedLayout = slot<HomeLayout>()
-        coEvery { homeLayoutRepository.save(capture(savedLayout)) } returns Unit
-
-        val result = manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
-
-        assertThat(result).isEqualTo(ImportResult.Success)
-        assertThat(savedLayout.captured.items.map { (it.item as HomeItem.App).key }).containsExactly(normalized)
-        assertThat(savedLayout.captured.dock.map { (it as HomeItem.App).key })
-            .containsExactly(ComponentKey.of("com.also.gone", "com.also.gone.Main"))
-        assertThat(hiddenAppsRepository.current).containsExactly(normalized)
-        assertThat(drawerFoldersRepository.current.folders.single().members)
-            .containsExactly(normalized, ComponentKey.of("com.also.gone", "com.also.gone.Main")).inOrder()
-    }
-
-    @Test
-    fun the_home_layout_is_written_last() = runTest(mainDispatcherRule.testDispatcher) {
-        // U4 "most valuable store last": settings, then wallpaper, then the drawer organisation,
-        // then the home layout — a failure part-way leaves the existing layout intact.
-        every { fileManager.copyFromInputStream(any()) } returns mockk<Uri>()
-        val backup = NyxBackup(
-            layout = layout.toDto(),
-            prefs = NyxBackupPrefs(iconStyle = "COLOR"),
-            wallpaperLayers = listOf(layerBackup(0)),
-        )
-
-        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
-
-        coVerifyOrder {
-            preferences.setIconStyle(IconStyle.COLOR)
-            wallpaperRepository.saveWallpaperState(any())
-            homeLayoutRepository.save(any())
-            reconcileHomeLayout()
-        }
     }
 
     @Test

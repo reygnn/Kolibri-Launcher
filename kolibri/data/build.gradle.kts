@@ -106,5 +106,6 @@ dependencies {
     // Fake*Repository, Contract abstract classes).
     testImplementation(testFixtures(project(":kolibri:domain")))
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
+    testImplementation(testFixtures(project(":feature-backup"))) // shared backup contracts (A2)
 }
 

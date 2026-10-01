@@ -59,4 +59,5 @@ dependencies {
     // Shared fixtures from :domain (MainDispatcherRule, Fakes, Contracts).
     testImplementation(testFixtures(project(":nyx:domain")))
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
+    testImplementation(testFixtures(project(":feature-backup"))) // shared backup contracts (A2)
 }
