@@ -8,6 +8,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
@@ -401,6 +402,7 @@ class NyxBackupManagerTest {
         section: JsonElement = serializer.toJson(NyxBackup()),
         blobEntries: Map<String, ByteArray> = emptyMap(),
         extraEntries: Map<String, ByteArray> = emptyMap(),
+        manifestText: (String) -> String = { it },
     ): ByteArray {
         val manifest = ContainerManifest(
             producer = ContainerManifest.Producer(NyxBackupSchema.APP_ID, "test", 1L),
@@ -411,7 +413,7 @@ class NyxBackupManagerTest {
         val bos = ByteArrayOutputStream()
         ZipOutputStream(bos).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))
-            zip.write(ContainerManifestCodec.encode(manifest))
+            zip.write(manifestText(ContainerManifestCodec.encode(manifest).toString(Charsets.UTF_8)).toByteArray(Charsets.UTF_8))
             zip.closeEntry()
             (blobEntries.mapKeys { "blobs/${it.key}" } + extraEntries).forEach { (name, bytes) ->
                 zip.putNextEntry(ZipEntry(name))
@@ -551,9 +553,101 @@ class NyxBackupManagerTest {
     }
 
     @Test
-    fun import_with_empty_wallpaper_layers_clears_the_current_wallpaper() = runTest(mainDispatcherRule.testDispatcher) {
-        manager.import(ByteArrayInputStream(containerOf(NyxBackup(wallpaperLayers = emptyList()))), NyxBackupOptions())
-        coVerify { wallpaperRepository.saveWallpaperState(WallpaperState.NONE) }
+    fun import_with_empty_wallpaper_layers_keeps_the_current_wallpaper() = runTest(mainDispatcherRule.testDispatcher) {
+        // E2 (was: saved WallpaperState.NONE): a backup without wallpaper leaves the current one
+        // standing; the rest of the backup still imports.
+        val result = manager.import(
+            ByteArrayInputStream(containerOf(NyxBackup(layout = layout.toDto(), wallpaperLayers = emptyList()))),
+            NyxBackupOptions(),
+        )
+
+        assertThat(result).isEqualTo(ImportResult.Success)
+        coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
+        coVerify(exactly = 0) { wallpaperRepository.clearWallpaper() }
+        coVerify { homeLayoutRepository.save(any()) }
+    }
+
+    // ---- import semantics shared with Kolibri (2b-2: E1, B11, B14, U4) ----
+
+    @Test
+    fun imported_values_outside_their_range_are_clamped() = runTest(mainDispatcherRule.testDispatcher) {
+        // B11: the scrim keeps to the app's range, the FAB centre to the parent's [0, 1].
+        val backup = NyxBackup(prefs = NyxBackupPrefs(scrimAlpha = 0.9f, fabXFraction = 1.7f, fabYFraction = -0.2f))
+
+        manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
+
+        coVerify { displaySettings.setWallpaperScrimAlpha(AppConstants.WALLPAPER_SCRIM_ALPHA_MAX) }
+        coVerify { fabPositionStore.saveFabPosition(FabPosition(1f, 0f)) }
+    }
+
+    @Test
+    fun a_non_finite_scrim_makes_the_backup_invalid_and_writes_nothing() = runTest(mainDispatcherRule.testDispatcher) {
+        // The app can never write NaN/Infinity (encode throws, NyxBackupSerializerTest). A crafted
+        // backup carrying one is rejected whole at decode, so it never reaches a store; the
+        // non-finite branch of coerceInSafe is defense in depth, not the live path.
+        val placeholder = "0.123456"
+        val backup = NyxBackup(layout = layout.toDto(), prefs = NyxBackupPrefs(scrimAlpha = placeholder.toFloat()))
+        val bytes = handMade(emptyList(), section = serializer.toJson(backup)) { manifest ->
+            check(manifest.contains(placeholder)) { "placeholder not in manifest" }
+            manifest.replace(placeholder, "1e309") // valid JSON number, Infinity as a Float
+        }
+
+        val result = manager.import(ByteArrayInputStream(bytes), NyxBackupOptions())
+
+        assertThat(result).isEqualTo(ImportResult.InvalidData)
+        coVerify(exactly = 0) { displaySettings.setWallpaperScrimAlpha(any()) }
+        coVerify(exactly = 0) { homeLayoutRepository.save(any()) }
+    }
+
+    @Test
+    fun apps_that_are_not_installed_survive_and_short_forms_are_normalized() = runTest(mainDispatcherRule.testDispatcher) {
+        // E1: the import never filters by what is installed (nothing here is). B14: a stored
+        // short form `.Main` comes back as `pkg.Main` in layout, dock, hidden apps and folders.
+        val short = ComponentKeyDto("com.gone", ".Main")
+        val normalized = ComponentKey.of("com.gone", "com.gone.Main")
+        val other = ComponentKeyDto("com.also.gone", "com.also.gone.Main")
+        val backup = NyxBackup(
+            layout = HomeLayoutDto(
+                columns = 4, rows = 6, pages = 1,
+                items = listOf(PlacedItemDto(HomeItemDto.AppDto("a1", short), page = 0, x = 0, y = 0)),
+                dock = listOf(HomeItemDto.AppDto("d1", other)),
+            ),
+            hiddenApps = listOf(short),
+            drawerFolders = DrawerFoldersDto(folders = listOf(DrawerFolderDto("f1", "Gone", listOf(short, other)))),
+        )
+        val savedLayout = slot<HomeLayout>()
+        coEvery { homeLayoutRepository.save(capture(savedLayout)) } returns Unit
+
+        val result = manager.import(ByteArrayInputStream(containerOf(backup)), NyxBackupOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success)
+        assertThat(savedLayout.captured.items.map { (it.item as HomeItem.App).key }).containsExactly(normalized)
+        assertThat(savedLayout.captured.dock.map { (it as HomeItem.App).key })
+            .containsExactly(ComponentKey.of("com.also.gone", "com.also.gone.Main"))
+        assertThat(hiddenAppsRepository.current).containsExactly(normalized)
+        assertThat(drawerFoldersRepository.current.folders.single().members)
+            .containsExactly(normalized, ComponentKey.of("com.also.gone", "com.also.gone.Main")).inOrder()
+    }
+
+    @Test
+    fun the_home_layout_is_written_last() = runTest(mainDispatcherRule.testDispatcher) {
+        // U4 "most valuable store last": settings, then wallpaper, then the drawer organisation,
+        // then the home layout — a failure part-way leaves the existing layout intact.
+        every { fileManager.copyFromInputStream(any()) } returns mockk<Uri>()
+        val backup = NyxBackup(
+            layout = layout.toDto(),
+            prefs = NyxBackupPrefs(iconStyle = "COLOR"),
+            wallpaperLayers = listOf(layerBackup(0)),
+        )
+
+        manager.import(ByteArrayInputStream(containerOf(backup, listOf(image(0)))), NyxBackupOptions())
+
+        coVerifyOrder {
+            preferences.setIconStyle(IconStyle.COLOR)
+            wallpaperRepository.saveWallpaperState(any())
+            homeLayoutRepository.save(any())
+            reconcileHomeLayout()
+        }
     }
 
     @Test

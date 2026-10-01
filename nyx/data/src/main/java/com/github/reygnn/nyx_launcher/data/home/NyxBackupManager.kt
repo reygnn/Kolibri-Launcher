@@ -2,12 +2,13 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
+import com.github.reygnn.launcher.core.coerceInSafe
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
-import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
@@ -246,11 +247,19 @@ class NyxBackupManager @Inject constructor(
         prefs.notificationDots?.let { preferences.setNotificationDots(it) }
         prefs.showAlarm?.let { preferences.setShowAlarm(it) }
         prefs.showCalendarEvent?.let { preferences.setShowCalendarEvent(it) }
-        prefs.scrimAlpha?.let { displaySettings.setWallpaperScrimAlpha(it) }
+        // B11: an imported value outside its valid range is clamped, never stored as is.
+        prefs.scrimAlpha?.let {
+            displaySettings.setWallpaperScrimAlpha(it.coerceInSafe(AppConstants.WALLPAPER_SCRIM_ALPHA_MIN, AppConstants.WALLPAPER_SCRIM_ALPHA_MAX))
+        }
         prefs.backdrop?.toEnumOrNull<WallpaperBackdrop>()?.let { displaySettings.setWallpaperBackdrop(it) }
         prefs.surfaceMode?.toEnumOrNull<WallpaperSurfaceMode>()?.let { displaySettings.setWallpaperSurfaceMode(it) }
         if (prefs.fabXFraction != null && prefs.fabYFraction != null) {
-            fabPositionStore.saveFabPosition(FabPosition(prefs.fabXFraction, prefs.fabYFraction))
+            fabPositionStore.saveFabPosition(
+                FabPosition(
+                    prefs.fabXFraction.coerceInSafe(FAB_FRACTION_MIN, FAB_FRACTION_MAX),
+                    prefs.fabYFraction.coerceInSafe(FAB_FRACTION_MIN, FAB_FRACTION_MAX),
+                ),
+            )
         }
     }
 
@@ -259,23 +268,15 @@ class NyxBackupManager @Inject constructor(
      * or null to keep the current wallpaper. The caller claims its file URIs and saves it.
      */
     private fun restoredWallpaperState(layers: List<WallpaperLayerBackup>, extracted: Map<Int, String>): WallpaperState? {
-        // Replace semantics: a backup with no wallpaper clears the current one.
-        if (layers.isEmpty()) return WallpaperState.NONE
+        // E2: a backup without wallpaper leaves the current one standing. Removing it is the
+        // wallpaper switch of the import options, not an empty list in a backup.
+        if (layers.isEmpty()) return null
         // Rebind each blob-backed layer to its freshly copied internal URI. A blob-backed
         // layer whose blob is missing/failed is DROPPED (its source file:// path is dead on
         // the restore target) — all-or-nothing per layer.
         val restored = layers.mapIndexedNotNull { index, layer ->
             val uri = if (layer.imageFileName != null) extracted[index] else layer.imageUri
-            uri?.let {
-                WallpaperLayerState(
-                    id = layer.id ?: WallpaperLayerState.newId(),
-                    imageUri = it,
-                    scale = layer.scale,
-                    translateX = layer.translateX,
-                    translateY = layer.translateY,
-                    captureSampleSize = layer.captureSampleSize,
-                )
-            }
+            uri?.let { layer.toLayerState().copy(imageUri = it) }
         }
         // Only overwrite when at least one layer survived; if every blob failed
         // (corrupt backup) keep the current wallpaper rather than wiping it.
@@ -296,5 +297,8 @@ class NyxBackupManager @Inject constructor(
 
     private companion object {
         const val IMAGE_MEDIA_TYPE = "image/*"
+        /** [FabPosition] stores the FAB centre as a fraction of the parent, both in `[0, 1]`. */
+        const val FAB_FRACTION_MIN = 0f
+        const val FAB_FRACTION_MAX = 1f
     }
 }

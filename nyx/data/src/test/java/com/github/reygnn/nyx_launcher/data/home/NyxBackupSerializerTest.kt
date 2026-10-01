@@ -2,9 +2,11 @@ package com.github.reygnn.nyx_launcher.data.home
 
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerBackup
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
+import kotlin.test.assertFailsWith
 
 /** Pure JVM: the `nyx.backup` section data round-trips, forward-compat, defaults. */
 class NyxBackupSerializerTest {
@@ -73,5 +75,24 @@ class NyxBackupSerializerTest {
     fun section_data_of_the_wrong_shape_returns_null() {
         assertThat(serializer.fromJson(JsonPrimitive("{ not valid json"))).isNull()
         assertThat(serializer.fromJson(Json.parseToJsonElement("""{ "layout": 7 }"""))).isNull()
+    }
+
+    // ---- non-finite floats: the backup is the gate, not the import (2b-2b) ----
+
+    @Test
+    fun encode_rejects_a_non_finite_float_so_the_app_can_never_write_one() {
+        // allowSpecialFloatingPointValues stays false: no Nyx-written backup carries NaN/Infinity.
+        assertFailsWith<SerializationException> { serializer.toJson(NyxBackup(prefs = NyxBackupPrefs(scrimAlpha = Float.NaN))) }
+        assertFailsWith<SerializationException> {
+            serializer.toJson(NyxBackup(prefs = NyxBackupPrefs(fabXFraction = Float.POSITIVE_INFINITY, fabYFraction = 0.5f)))
+        }
+    }
+
+    @Test
+    fun decode_rejects_a_non_finite_literal_by_returning_null() {
+        // 1e309 is a valid JSON number but Infinity as a Float: decode throws, the whole backup is
+        // invalid, the value never reaches the model.
+        assertThat(serializer.fromJson(Json.parseToJsonElement("""{ "prefs": { "scrimAlpha": 1e309 } }"""))).isNull()
+        assertThat(serializer.fromJson(Json.parseToJsonElement("""{ "prefs": { "fabXFraction": -1e309 } }"""))).isNull()
     }
 }
