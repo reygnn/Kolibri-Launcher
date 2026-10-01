@@ -41,7 +41,7 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Nyx's SAF path of [NyxBackupManager] (2b-3a): the [com.github.reygnn.nyx_launcher.home.repository.BackupRepository]
+ * Nyx's SAF path of [BackupRepositoryImpl] (2b-3a): the [com.github.reygnn.nyx_launcher.home.repository.BackupRepository]
  * operations on a real `file://` document. The first case is the fifth case of the old Nyx
  * `WriteOrDiscardTest` ("a reported failure discards the target"): a failed export now
  * throws out of the write — never a `false` — so the shared writeOrDiscard removes the
@@ -66,7 +66,7 @@ class NyxBackupSavePathTest {
 
     private val layout = HomeLayout(grid = GridSpec(columns = 4, rows = 6), pages = 1, items = emptyList(), dock = emptyList())
 
-    private fun manager(homeLayoutRepository: HomeLayoutRepository = FakeHomeLayoutRepository(layout)) = NyxBackupManager(
+    private fun manager(homeLayoutRepository: HomeLayoutRepository = FakeHomeLayoutRepository(layout)) = BackupRepositoryImpl(
         safDocuments = SafDocuments(context),
         homeLayoutRepository = homeLayoutRepository,
         drawerFoldersRepository = FakeDrawerFoldersRepository(),

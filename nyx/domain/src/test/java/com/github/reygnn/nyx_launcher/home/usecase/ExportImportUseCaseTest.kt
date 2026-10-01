@@ -16,7 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Export path only. The layout IMPORT path lives in `:nyx:data`'s NyxBackupManager (which
+ * Export path only. The layout IMPORT path lives in `:nyx:data`'s BackupRepositoryImpl (which
  * saves the restored layout then runs the structural-only [ReconcileHomeLayoutUseCase]); the
  * no-prune "keep uninstalled refs" property of that reconcile is pinned by
  * `ReconcileHomeLayoutUseCaseTest` and `NyxNoAutoPruneTest`.

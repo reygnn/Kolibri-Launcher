@@ -47,7 +47,7 @@ object HomeLayoutRegridder {
         // must be pulled back even when the grid is unchanged, or it stays unreachable.
         // "Off-grid" covers a stale page past the cap (a pre-cap build) AND a stale
         // x/y outside the grid bounds: the regridder itself never emits the latter on a
-        // matching grid, but an imported/restored/hand-edited blob (NyxBackupManager
+        // matching grid, but an imported/restored/hand-edited blob (BackupRepositoryImpl
         // restore) is saved verbatim with no coordinate clamp, so a blob whose
         // stored grid equals the measured device grid can carry a spatially off-grid
         // item — which pageCells would then silently alias onto another cell or drop

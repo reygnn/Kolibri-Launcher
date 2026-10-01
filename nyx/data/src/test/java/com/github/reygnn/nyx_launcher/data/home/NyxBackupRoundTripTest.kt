@@ -51,7 +51,7 @@ import java.io.File
 import java.io.InputStream
 
 /**
- * Nyx's run of the shared [BackupRoundTripContract] (2b-2c) through [NyxBackupManager] and
+ * Nyx's run of the shared [BackupRoundTripContract] (2b-2c) through [BackupRepositoryImpl] and
  * the real engine. Stores are the domain fakes plus small in-test fakes for the wallpaper,
  * the display settings and the FAB; each write is logged per part. Wallpaper images are real
  * files (Robolectric for `Uri`), so the image bytes survive the comparison while the import
@@ -147,7 +147,7 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
 
     // ---- harness ----
 
-    private fun manager() = NyxBackupManager(
+    private fun manager() = BackupRepositoryImpl(
         safDocuments = SafDocuments(mockk<Context>()), // the stream-level writeBackup/importFrom never touch it
         homeLayoutRepository = stores.recordingLayout,
         drawerFoldersRepository = stores.recordingFolders,

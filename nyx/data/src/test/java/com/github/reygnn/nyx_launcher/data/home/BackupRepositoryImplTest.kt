@@ -64,7 +64,7 @@ import kotlin.random.Random
  * written by the real engine ([containerOf]) or, for hostile archives, by hand. Uri is
  * mocked, not parsed (pure JVM).
  */
-class NyxBackupManagerTest {
+class BackupRepositoryImplTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -77,7 +77,7 @@ class NyxBackupManagerTest {
     )
 
     private val homeLayoutRepository = mockk<HomeLayoutRepository>(relaxed = true) {
-        every { layout() } returns flowOf(this@NyxBackupManagerTest.layout)
+        every { layout() } returns flowOf(this@BackupRepositoryImplTest.layout)
     }
     private val preferences = mockk<PreferencesRepository>(relaxed = true) {
         every { iconStyle() } returns flowOf(IconStyle.MONOCHROME)
@@ -112,7 +112,7 @@ class NyxBackupManagerTest {
 
     // The stream-level writeBackup/importFrom never touch the Context; the SAF path is
     // NyxBackupSavePathTest's.
-    private val manager = NyxBackupManager(
+    private val manager = BackupRepositoryImpl(
         SafDocuments(mockk<Context>()), homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
         wallpaperRepository, fabPositionStore, fileManager, serializer,
         reconcileHomeLayout, engine, appVersionName = "0.2.0", ioDispatcher = mainDispatcherRule.testDispatcher,

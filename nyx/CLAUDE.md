@@ -43,8 +43,9 @@ it into RUN; the parity gate fails the build if a check is left undecided.
   dormant: Nyx's repositories are cold flows; the UI StateFlows read via `.value`
   are collected under `repeatOnLifecycle(STARTED)` in the same component).
 - **SKIP until the named phase** (SPEC_NYX_REWRITE):
-  - `Manager`-naming in `data/` — `NyxBackupManager` / `NyxResetManager` disappear
-    in Phase 2b; then RUN. Do not add new `*Manager` classes.
+  - `Manager`-naming in `data/` — `NyxResetManager` disappears in 2b-4c
+    (`NyxBackupManager` became `BackupRepositoryImpl` in 2b-4b); then RUN. Do not add
+    new `*Manager` classes.
   - `purgeRepository()` completeness — Nyx stores become `Purgeable` in Phase 2b.
   - Settings-store keep-list — Nyx gets storage cleanup in Phase 4b (E5b).
 

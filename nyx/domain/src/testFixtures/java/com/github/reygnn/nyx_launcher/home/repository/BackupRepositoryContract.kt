@@ -13,9 +13,9 @@ import org.junit.Test
  * NO IMPL CONTRACT TEST (ADR) — marker read by `./gradlew checkConventions`
  * (tools/check-contract-triple.sh); exempts the impl half only. The fake is a configurable
  * stub with no logic that could drift from the implementation, and the implementation
- * (`NyxBackupManager`, a `BackupRepositoryImpl` from 2b-4) needs a ContentResolver, real
+ * (`BackupRepositoryImpl` in `:nyx:data`) needs a ContentResolver, real
  * documents and every store behind it. Its behaviour is covered where that is honest:
- * `NyxBackupManagerTest`, `NyxBackupSavePathTest` and the shared backup contracts
+ * `BackupRepositoryImplTest`, `NyxBackupSavePathTest` and the shared backup contracts
  * (`NyxBackupRoundTripTest`, `NyxImportKeepsMissingAppsTest`; refusals from 2b-3c).
  *
  * What this pins anyway: every operation returns without throwing on a default repository,

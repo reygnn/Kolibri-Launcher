@@ -238,7 +238,7 @@ follow-ups, the whole tree is green:
   subclasses), `HomeLayoutTransition.deleteFromFolder`, `FolderIconRendererTest` (complete-
   composite caching + `currentStyle` keying), `InstalledAppsHolderPumpTest` (FailedNoCache →
   ACRA, retryWhen restart, idempotent start, cancellation), `PackageEventCoordinatorTest`
-  (onTrimMemory gating, package-event refresh), `NyxBackupManagerTest` (save → structural
+  (onTrimMemory gating, package-event refresh), `BackupRepositoryImplTest` (save → structural
   reconcile order), `HomeContextMenuTest` / `HomeGridCellDiffTest` / `HomeViewModelTest`.
 - **Convention linters:** `./gradlew :nyx:app:checkConventions :kolibri:app:checkConventions`
   and `checkRule13` pass for both launchers.

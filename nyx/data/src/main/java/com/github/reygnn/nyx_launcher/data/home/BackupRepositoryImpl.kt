@@ -55,10 +55,10 @@ import javax.inject.Singleton
  * own [ImportResult], like Kolibri. The stream-level [writeBackup] / [importFrom] stay
  * internal for tests and the backup contracts. Blob restore reuses the shared
  * [WallpaperFileManager.copyFromInputStream] (staged blob → internal file), so imported
- * layers land in internal storage exactly like a fresh pick. Dissolved in 2b-4.
+ * layers land in internal storage exactly like a fresh pick. Named like Kolibri's since 2b-4b.
  */
 @Singleton
-class NyxBackupManager @Inject constructor(
+class BackupRepositoryImpl @Inject constructor(
     /** The Android half of SAF documents, shared with Kolibri (2b-4a). */
     private val safDocuments: SafDocuments,
     private val homeLayoutRepository: HomeLayoutRepository,

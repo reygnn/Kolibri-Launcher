@@ -28,7 +28,7 @@ import javax.inject.Inject
  * propagates a transient DataStore IOException rather than degrading to an empty
  * layout. [invoke] catches it and returns [ReconcileResult.Skipped]
  * ([SkipReason.STORE_FAILED]) with zero mutation, so [invoke] stays TOTAL — only
- * [CancellationException] escapes. Callers (PackageEventCoordinator; NyxBackupManager
+ * [CancellationException] escapes. Callers (PackageEventCoordinator; BackupRepositoryImpl
  * after a restore) therefore need no fault handling of their own.
  *
  * The structural passes are idempotent (RHL-INV-2), so running this on a package

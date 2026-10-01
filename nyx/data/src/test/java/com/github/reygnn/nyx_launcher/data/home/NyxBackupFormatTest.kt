@@ -41,7 +41,7 @@ import java.io.InputStream
 
 /**
  * Nyx's run of the shared [BackupFormatContract] (2b-3c) through the SAF path of
- * [NyxBackupManager] (`loadBackupFromFile`, `previewBackup`) on real `file://` documents.
+ * [BackupRepositoryImpl] (`loadBackupFromFile`, `previewBackup`) on real `file://` documents.
  * Nyx binds no legacy reader (E5a). Robolectric for `Uri`.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -104,7 +104,7 @@ class NyxBackupFormatTest : BackupFormatContract() {
     /** The document as a real file the resolver serves. */
     private fun write(document: ByteArray): String = Uri.fromFile(tmp.newFile().apply { writeBytes(document) }).toString()
 
-    private fun manager(): NyxBackupManager {
+    private fun manager(): BackupRepositoryImpl {
         val resolver = mockk<ContentResolver> {
             every { openInputStream(any()) } answers { File(firstArg<Uri>().path!!).inputStream() }
             every { openFileDescriptor(any(), any()) } answers {
@@ -116,7 +116,7 @@ class NyxBackupFormatTest : BackupFormatContract() {
                 }
             }
         }
-        return NyxBackupManager(
+        return BackupRepositoryImpl(
             safDocuments = SafDocuments(mockk<Context> { every { contentResolver } returns resolver }),
             homeLayoutRepository = layoutStore,
             drawerFoldersRepository = foldersStore,

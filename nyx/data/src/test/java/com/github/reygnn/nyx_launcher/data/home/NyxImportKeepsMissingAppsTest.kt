@@ -52,7 +52,7 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
         val layout = FakeHomeLayoutRepository(HomeLayout(GridSpec(4, 6), pages = 1, items = emptyList(), dock = emptyList()))
         val hidden = FakeHiddenAppsRepository()
         val folders = FakeDrawerFoldersRepository()
-        val manager = NyxBackupManager(
+        val manager = BackupRepositoryImpl(
             safDocuments = SafDocuments(mockk<Context>()), // the stream-level importFrom never touches it
             homeLayoutRepository = layout,
             drawerFoldersRepository = folders,
