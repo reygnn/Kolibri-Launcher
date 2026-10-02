@@ -8,15 +8,15 @@ import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -24,8 +24,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -588,48 +586,13 @@ class WallpaperRepositoryImplTest {
 }
 
 // ===========================================
-// FAKE IMPLEMENTATION
+// TEST HELPER
 // ===========================================
 
 /**
- * In-memory DataStore<Preferences> fake for unit tests. Supports edit() and
- * flow-based reads; no disk persistence.
+ * Seeds the shared [FakeDataStore] synchronously, bypassing `updateData` (the helper the former
+ * private fake of this file had). Since 2b cleanup the test uses the shared fake from
+ * testFixtures: a second class of the same name here had shadowed it.
  */
-private class FakeDataStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
-    private val state = MutableStateFlow(initial)
-
-    private var shouldFailEdit = false
-    private var shouldCancel = false
-
-    /** Next [updateData] throws an IOException, like a failed DataStore write. */
-    fun makeEditFail() {
-        shouldFailEdit = true
-    }
-
-    /** Next [updateData] throws a CancellationException, like a cancelled write. */
-    fun makeCancellable() {
-        shouldCancel = true
-    }
-
-    override val data: Flow<Preferences> = state
-
-    override suspend fun updateData(
-        transform: suspend (t: Preferences) -> Preferences
-    ): Preferences {
-        when {
-            shouldCancel -> throw kotlinx.coroutines.CancellationException("FakeDataStore: Simulated cancellation")
-            shouldFailEdit -> throw java.io.IOException("FakeDataStore: Simulated edit failure")
-        }
-        val current = state.value
-        val next = transform(current)
-        state.value = next
-        return next
-    }
-
-    /** Test helper: seed the store synchronously (bypasses updateData). */
-    fun seed(build: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
-        val prefs = mutablePreferencesOf()
-        build(prefs)
-        state.value = prefs
-    }
-}
+private fun FakeDataStore.seed(build: (MutablePreferences) -> Unit) =
+    setInitialData(mutablePreferencesOf().also(build))
