@@ -22,8 +22,8 @@
 #     apps).
 #
 # Scan scope: global checks cover the app's own modules AND every shared
-# module (core, common-ui, common-data, feature-crashreporting), so a shared
-# file is enforced by both apps.
+# module (core, common-ui, common-data, feature-crashreporting, feature-backup,
+# feature-wallpaper), so a shared file is enforced by both apps.
 #
 # Exit code: 0 all passed · 1 at least one rule violated · 2 environment/parity
 # =============================================================================
@@ -69,7 +69,7 @@ declare -A OWNS=(
 )
 
 SHARED_MODULES=("$MONO/core" "$MONO/common-ui" "$MONO/common-data" "$MONO/feature-crashreporting"
-                "$MONO/feature-backup" "$MONO/common-testing-android")
+                "$MONO/feature-backup" "$MONO/feature-wallpaper" "$MONO/common-testing-android")
 # Test-support libraries: their src/main IS test code, so the test-convention gates
 # (A7, A12) scan it too. Every module in settings.gradle.kts must be in one of the
 # lists or an app's own modules — see the module-coverage guard below.
