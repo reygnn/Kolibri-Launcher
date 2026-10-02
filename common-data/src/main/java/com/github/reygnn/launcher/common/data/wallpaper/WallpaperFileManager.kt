@@ -3,10 +3,11 @@ package com.github.reygnn.launcher.common.data.wallpaper
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -35,7 +36,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class WallpaperFileManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    // Injected since SPEC_NYX_REWRITE 3a-1 (W7); copyToInternal used a hard Dispatchers.IO.
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     companion object {
         private const val WALLPAPER_DIR = "wallpapers"
@@ -63,7 +66,7 @@ class WallpaperFileManager @Inject constructor(
      *
      * Wenn die URI bereits intern ist (isInternalUri), wird sie unverändert zurückgegeben.
      */
-    suspend fun copyToInternal(sourceUri: Uri): Uri? = withContext(Dispatchers.IO) {
+    suspend fun copyToInternal(sourceUri: Uri): Uri? = withContext(ioDispatcher) {
         try {
             if (isInternalUri(sourceUri)) {
                 return@withContext sourceUri

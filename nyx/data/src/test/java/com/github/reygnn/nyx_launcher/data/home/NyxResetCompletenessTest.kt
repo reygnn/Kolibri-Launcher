@@ -81,7 +81,7 @@ class NyxResetCompletenessTest : ResetCompletenessContract() {
         val scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()).also { storeScope = it }
         homeLayoutStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "home_layout.preferences_pb") }
         usageStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "nyx_usage.preferences_pb") }
-        val fileManager = WallpaperFileManager(context)
+        val fileManager = WallpaperFileManager(context, mainDispatcherRule.testDispatcher)
         val appUsage = AppUsageRepositoryImpl(usageStore)
 
         val app = ComponentKey.of("com.seed", "com.seed.Main")

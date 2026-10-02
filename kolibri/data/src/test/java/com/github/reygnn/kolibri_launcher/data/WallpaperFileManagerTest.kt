@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
+import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
@@ -30,6 +31,9 @@ class WallpaperFileManagerTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     private lateinit var context: Context
     private lateinit var manager: WallpaperFileManager
     private lateinit var wallpaperDir: File
@@ -38,7 +42,7 @@ class WallpaperFileManagerTest {
     fun setUp() {
         context = mockk()
         every { context.filesDir } returns tempFolder.root
-        manager = WallpaperFileManager(context)
+        manager = WallpaperFileManager(context, mainDispatcherRule.testDispatcher)
         // WallpaperFileManager creates this lazily; pre-create here so
         // individual tests can write files into it without racing.
         wallpaperDir = File(tempFolder.root, "wallpapers").also { it.mkdirs() }

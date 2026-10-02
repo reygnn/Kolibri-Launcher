@@ -71,7 +71,7 @@ class KolibriResetCompletenessTest : ResetCompletenessContract() {
         val scope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()).also { storeScope = it }
         settingsStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "settings.preferences_pb") }
         usageStore = PreferenceDataStoreFactory.create(scope = scope) { File(tmp.root, "usage.preferences_pb") }
-        val fileManager = WallpaperFileManager(context)
+        val fileManager = WallpaperFileManager(context, mainDispatcherRule.testDispatcher)
 
         val favorites = FavoritesRepositoryImpl(settingsStore)
         val order = FavoritesOrderRepositoryImpl(settingsStore)
