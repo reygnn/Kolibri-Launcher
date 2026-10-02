@@ -12,9 +12,10 @@ import com.github.reygnn.nyx_launcher.R
  * data key and its seed flag go in the same edit: a store whose purge failed still has its flag,
  * and seeding leaves it alone.
  *
- * @return the message to show: complete, or incomplete (S3).
+ * @return the message to show (a string resource id): complete, or incomplete (S3). Not annotated
+ *   `@StringRes`: a suspend function returns `Object` on the JVM, and Lint rejects the annotation
+ *   there (SupportAnnotationUsage); [factoryResetMessage] carries it.
  */
-@StringRes
 suspend fun performFactoryReset(reset: suspend () -> Boolean, seedDefaults: suspend () -> Unit): Int {
     val complete = reset()
     seedDefaults()
