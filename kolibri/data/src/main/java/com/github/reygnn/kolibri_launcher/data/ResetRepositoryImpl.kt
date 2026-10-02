@@ -1,6 +1,5 @@
 package com.github.reygnn.kolibri_launcher.data
 
-import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
@@ -8,13 +7,12 @@ import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderReposi
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository
 import com.github.reygnn.launcher.core.InstalledAppsStateRepository
-import com.github.reygnn.launcher.core.Purgeable
+import com.github.reygnn.launcher.core.purgeAll
 import com.github.reygnn.kolibri_launcher.domain.repository.ResetRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.SwipeActionsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
-import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -78,37 +76,5 @@ class ResetRepositoryImpl @Inject constructor(
     override suspend fun resetAppUsageData(): Boolean {
         Timber.d("Starting App Usage data reset")
         return purgeAll(listOf("app usage" to appUsageRepository))
-    }
-
-    /**
-     * Purges every [Purgeable] in [repos], in order, with per-item
-     * error isolation: a single failing purge logs via
-     * [TimberWrapper.silentError] but does not stop the remaining
-     * purges from running. Returns `true` only if every purge
-     * succeeded.
-     *
-     * Replaces eleven structurally identical try/catch blocks across
-     * `resetUserData` / `resetSettings` / `resetAppUsageData`. Adding
-     * a twelfth Purgeable to a reset path is now a one-line list
-     * entry rather than a copy-pasted nine-line catch block —
-     * nothing to forget.
-     *
-     * `CancellationException` propagates unchanged so coroutine
-     * cancellation still works correctly.
-     */
-    private suspend fun purgeAll(repos: List<Pair<String, Purgeable>>): Boolean {
-        var allSuccessful = true
-        for ((name, repo) in repos) {
-            try {
-                repo.purgeRepository()
-                Timber.d("$name purged successfully")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                TimberWrapper.silentError(e, "Error purging $name")
-                allSuccessful = false
-            }
-        }
-        return allSuccessful
     }
 }

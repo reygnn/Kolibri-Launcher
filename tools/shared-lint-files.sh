@@ -23,7 +23,15 @@ _shared_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Cancellation-rethrow whitelist — shared-module files (see CANCEL_FILES in each
 # orchestrator for the app-specific ones).
+# Rule 11: the four-category marker on a broad catch (2b cleanup; the shared list joins the
+# app's RULE11_FILES in tools/check-conventions.sh, like the lists below).
+SHARED_RULE11_FILES=(
+  # The factory-reset loop of both apps, moved from their ResetRepositoryImpl.
+  "$_shared_root/core/src/main/java/com/github/reygnn/launcher/core/PurgeAll.kt"
+)
+
 SHARED_CANCEL_FILES=(
+  "$_shared_root/core/src/main/java/com/github/reygnn/launcher/core/PurgeAll.kt"
   "$_shared_root/common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/WallpaperViewBinder.kt"
   "$_shared_root/common-ui/src/main/java/com/github/reygnn/launcher/common/ui/FlowCollection.kt"
   "$_shared_root/common-ui/src/main/java/com/github/reygnn/launcher/common/ui/base/BaseViewModel.kt"
@@ -38,6 +46,7 @@ SHARED_CANCEL_FILES=(
 
 # Exception-vs-Throwable breadth whitelist — shared-module allocation boundaries.
 SHARED_OOM_FILES=(
+  "$_shared_root/core/src/main/java/com/github/reygnn/launcher/core/PurgeAll.kt"
   "$_shared_root/common-ui/src/main/java/com/github/reygnn/launcher/common/ui/wallpaper/ZoomableImageView.kt"
   "$_shared_root/common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperFileManager.kt"
   "$_shared_root/common-data/src/main/java/com/github/reygnn/launcher/common/data/wallpaper/WallpaperRepositoryImpl.kt"

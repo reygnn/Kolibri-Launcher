@@ -176,7 +176,8 @@ if run naming; then
 fi
 
 run rule11 && awk_over_list "$det/check-rule11-annotation.awk" \
-  "Rule 11 — broad catch without four-category-frame annotation in whitelisted file" "${RULE11_FILES[@]}"
+  "Rule 11 — broad catch without four-category-frame annotation in whitelisted file" \
+  "${RULE11_FILES[@]}" "${SHARED_RULE11_FILES[@]}"
 run cancel && awk_over_list "$det/check-cancellation-rethrow.awk" \
   "Cancellation rethrow — broad catch without a CancellationException arm or a \`no suspension point\` marker" \
   "${CANCEL_FILES[@]}" "${SHARED_CANCEL_FILES[@]}"
