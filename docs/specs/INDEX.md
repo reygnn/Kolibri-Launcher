@@ -12,6 +12,14 @@ Stand-Übersicht der Zusammenführungs-Specs (Nyx erbt Kolibris battle-tested In
 | `HOME_CURATION_SPEC.md` | „Ist auf dem Home" — Lese-Port + Schreib-Callback + Kontextmenü | ENTWURF v1.4 |
 | `SHARED_INSTALLED_APPS_SPEC.md` | In-Memory-App-Store (Loader-`Flow<AppLoad>` + State-Halter) als Klasse A | ENTWURF v1.0 |
 | `NYX_SINGLE_USER_CLEANUP.md` | Einmalige Aufgabe: `userSerial`/Multi-User aus Nyx entfernen | Patch-Liste |
+| `SPEC_NYX_REWRITE.md` | Aktiver Rewrite: Nyx auf Kolibris geteilte Infra (Backup, Reset, Wallpaper, Storage-Cleanup) + Anti-Drift-Gates; Phase 0–5 | Revision 43 (aktiv) |
+| `ROADMAP_NYX_ANGLEICHUNG.md` | Begleit-Roadmap zu `SPEC_NYX_REWRITE`: die übrigen Angleichungen (Lazy-Verify, App-Start, Suche, Event-Indikatoren, Settings, Paket-Events), Pakete R1–R11 | Revision 3 (aktiv) |
+
+> `SPEC_NYX_REWRITE.md` ersetzt die nie umgesetzten Phasen C/D von `BACKUP_SCHEMA_PORT_SPEC`
+> und `WALLPAPER_RESTORE_SPEC` sowie WV5 von `WALLPAPER_SHARE_SPEC` (formale Markierung „ersetzt"
+> in dessen Phase 5). Die Bundle-`README.md` (Zip-Anwendungsanleitung + Patch-Tabelle) wird
+> bewusst nicht getrackt — sie beschreibt das ephemere Patch-Bundle und dupliziert Git-Historie
+> plus das Revisionslog oben im Spec.
 
 ## Leitprinzip
 „Architektur erben, nicht die Produkt-Philosophie" — geteilt wird die produktneutrale,
