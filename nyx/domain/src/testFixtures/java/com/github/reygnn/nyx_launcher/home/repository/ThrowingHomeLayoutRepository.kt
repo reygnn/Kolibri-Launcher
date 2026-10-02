@@ -34,4 +34,7 @@ class ThrowingHomeLayoutRepository(
         resolveDockApps: suspend () -> List<ComponentKey>,
         resolveGridApps: suspend () -> List<ComponentKey>,
     ): Boolean = throw error()
+
+    /** Every write fails here, the purge included. */
+    override suspend fun purgeRepository(): Unit = throw error()
 }

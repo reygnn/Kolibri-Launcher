@@ -45,7 +45,7 @@
     <string name="factory_reset_dialog_message">Alle deine Apps, Einstellungen und der Hintergrund werden unwiderruflich gelöscht.</string>
     <string name="factory_reset_confirm">Zurücksetzen</string>
     <string name="factory_reset_done">Zurücksetzen abgeschlossen</string>
-    <string name="factory_reset_failed">Zurücksetzen fehlgeschlagen</string>
+    <string name="factory_reset_incomplete">Zurücksetzen unvollständig – einige Daten konnten nicht gelöscht werden</string>
     <string name="menu_add_to_home">Aufs Home</string>
     <string name="menu_app_info">App-Info</string>
     <string name="menu_remove_from_home">Vom Home entfernen</string>

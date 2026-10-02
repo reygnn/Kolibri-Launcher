@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
@@ -95,6 +96,20 @@ class DrawerFoldersRepositoryImpl @Inject constructor(
 
     private suspend fun writeRaw(folders: DrawerFolders) {
         dataStore.edit { it[KEY] = serializer.serialize(folders) }
+    }
+
+    /**
+     * Factory reset (2b-4c): removes this store's keys from the shared `home_layout` DataStore.
+     * A failure is rethrown by `safePurge` (F1), so the reset reports it.
+     */
+    override suspend fun purgeRepository() {
+        writeMutex.withLock {
+            dataStore.safePurge("DrawerFoldersRepositoryImpl") { preferences ->
+                // The folders and their seed flag go in ONE edit (R2, 2b-4c), see HomeLayoutRepositoryImpl.
+                preferences.remove(KEY)
+                preferences.remove(SEEDED_KEY)
+            }
+        }
     }
 
     private companion object {

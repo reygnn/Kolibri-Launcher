@@ -35,7 +35,7 @@ import com.github.reygnn.nyx_launcher.R
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
-import com.github.reygnn.nyx_launcher.data.home.NyxResetManager
+import com.github.reygnn.nyx_launcher.home.repository.ResetRepository
 import com.github.reygnn.nyx_launcher.home.FirstRunSeeder
 import com.github.reygnn.nyx_launcher.home.model.HiddenAppsSelection
 import com.github.reygnn.nyx_launcher.home.model.displayName
@@ -61,7 +61,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 class SettingsFragment : PreferenceFragmentCompat() {
 
     private val backupViewModel: NyxBackupViewModel by viewModels()
-    @Inject lateinit var resetManager: NyxResetManager
+    @Inject lateinit var resetRepository: ResetRepository
     @Inject lateinit var firstRunSeeder: FirstRunSeeder
     @Inject lateinit var preferences: PreferencesRepository
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
@@ -456,19 +456,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun doFactoryReset() = lifecycleScope.launch {
-        val ok = resetManager.reset()
-        if (ok) {
-            // Reset clears the seed flags, but the first-run seed only fires in
-            // MainActivity.onCreate — which won't re-run on the way back to an already
-            // created home. So re-seed the defaults here, so "reset" lands on the default
-            // state (dock apps + Play Store on the grid, and the Google drawer folder),
-            // not an empty screen.
-            firstRunSeeder.seedHomeLayout()
-            firstRunSeeder.seedDrawerFolders()
-        }
-        toast(getString(if (ok) R.string.factory_reset_done else R.string.factory_reset_failed))
-        // Back to home, which re-renders from the re-seeded default state.
-        if (ok) requireActivity().finish()
+        // The first-run seed only fires in MainActivity.onCreate, which won't re-run on the way
+        // back to an already created home, so the defaults are seeded here — after every reset,
+        // also an incomplete one (R2, see performFactoryReset).
+        val message = performFactoryReset(
+            reset = { resetRepository.factoryReset() },
+            seedDefaults = {
+                firstRunSeeder.seedHomeLayout()
+                firstRunSeeder.seedDrawerFolders()
+            },
+        )
+        toast(getString(message))
+        // Back to home in both cases; it re-renders from the reset and re-seeded state.
+        requireActivity().finish()
     }
 
     private fun setWallpaperFromUri(uri: Uri) = lifecycleScope.launch {

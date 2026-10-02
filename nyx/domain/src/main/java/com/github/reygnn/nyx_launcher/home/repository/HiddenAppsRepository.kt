@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.launcher.core.ComponentKey
 import kotlinx.coroutines.flow.Flow
 
@@ -22,7 +23,7 @@ import kotlinx.coroutines.flow.Flow
  * `FakeHiddenAppsRepositoryContractTest`, `HiddenAppsRepositoryImplContractTest`
  * (CLAUDE.md rule 2).
  */
-interface HiddenAppsRepository {
+interface HiddenAppsRepository : Purgeable {
     fun hidden(): Flow<Set<ComponentKey>>
 
     /**

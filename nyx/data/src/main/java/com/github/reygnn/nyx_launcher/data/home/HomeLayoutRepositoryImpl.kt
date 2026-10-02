@@ -15,6 +15,7 @@ import com.github.reygnn.nyx_launcher.home.model.ItemIdFactory
 import com.github.reygnn.nyx_launcher.home.model.PlacedItem
 import com.github.reygnn.nyx_launcher.home.repository.HomeLayoutRepository
 import com.github.reygnn.nyx_launcher.home.repository.LayoutSerializer
+import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -127,6 +128,21 @@ class HomeLayoutRepositoryImpl @Inject constructor(
 
     private suspend fun writeRaw(layout: HomeLayout) {
         dataStore.edit { it[KEY] = serializer.serialize(layout) }
+    }
+
+    /**
+     * Factory reset (2b-4c): removes this store's keys from the shared `home_layout` DataStore.
+     * A failure is rethrown by `safePurge` (F1), so the reset reports it.
+     */
+    override suspend fun purgeRepository() {
+        writeMutex.withLock {
+            dataStore.safePurge("HomeLayoutRepositoryImpl") { preferences ->
+                // The layout and its seed flag go in ONE edit (R2, 2b-4c): either both are gone and the
+                // next seed fills the dock again, or neither is, and seeding leaves the layout alone.
+                preferences.remove(KEY)
+                preferences.remove(SEEDED_KEY)
+            }
+        }
     }
 
     private companion object {

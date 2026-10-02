@@ -31,13 +31,14 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 /**
- * Nyx's run of the shared [ResetCompletenessContract] (2b-4c), first against the reset as it is:
- * [NyxResetManager] with one `clear()` of `home_layout`, the usage purge and `clearAll()` of the
- * wallpaper files. Real file-backed DataStores, the real repositories and the real wallpaper
- * directory (Robolectric). Nyx keeps nothing across a reset — the seed flags go too and are
+ * Nyx's run of the shared [ResetCompletenessContract] (2b-4c). It first ran green against the
+ * former `NyxResetManager` (one `clear()` of `home_layout`, the usage purge, `clearAll()`); since
+ * step 3 it runs against [ResetRepositoryImpl] — per-store `Purgeable` purges — with the SAME
+ * [inventory], which proves the new reset deletes exactly as much as the old one. Real
+ * file-backed DataStores, the real repositories and the real wallpaper directory (Robolectric). Nyx keeps nothing across a reset — the seed flags go too and are
  * re-seeded afterwards (R2) — so [purgeExempt] stays empty and the check is "empty".
  *
- * [inventory] is the 2b-4c inventory of `NyxResetManager`: every key the reset has to remove,
+ * [inventory] is the 2b-4c inventory of the former `NyxResetManager`: every key the reset has to remove,
  * including the legacy `monochrome_icons` an upgraded user still has.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -51,7 +52,7 @@ class NyxResetCompletenessTest : ResetCompletenessContract() {
 
     private lateinit var homeLayoutStore: DataStore<Preferences>
     private lateinit var usageStore: DataStore<Preferences>
-    private lateinit var reset: NyxResetManager
+    private lateinit var reset: ResetRepositoryImpl
 
     /** Runs the DataStores; cancelled after each test so no store outlives it. */
     private var storeScope: CoroutineScope? = null
@@ -85,12 +86,14 @@ class NyxResetCompletenessTest : ResetCompletenessContract() {
 
         val app = ComponentKey.of("com.seed", "com.seed.Main")
         val other = ComponentKey.of("com.other", "com.other.Main")
-        HomeLayoutRepositoryImpl(homeLayoutStore, HomeLayoutSerializer(), UuidItemIdFactory())
-            .seedInitialLayout(resolveDockApps = { listOf(app) }, resolveGridApps = { listOf(other) })
-        DrawerFoldersRepositoryImpl(homeLayoutStore, DrawerFoldersSerializer())
-            .seedInitialFolders { listOf(DrawerFolder(DrawerFolderId("f1"), "Seed", listOf(app, other))) }
-        HiddenAppsRepositoryImpl(homeLayoutStore, HiddenAppsSerializer()).update { setOf(other) }
-        with(PreferencesRepositoryImpl(homeLayoutStore)) {
+        val homeLayout = HomeLayoutRepositoryImpl(homeLayoutStore, HomeLayoutSerializer(), UuidItemIdFactory())
+        homeLayout.seedInitialLayout(resolveDockApps = { listOf(app) }, resolveGridApps = { listOf(other) })
+        val drawerFolders = DrawerFoldersRepositoryImpl(homeLayoutStore, DrawerFoldersSerializer())
+        drawerFolders.seedInitialFolders { listOf(DrawerFolder(DrawerFolderId("f1"), "Seed", listOf(app, other))) }
+        val hidden = HiddenAppsRepositoryImpl(homeLayoutStore, HiddenAppsSerializer())
+        hidden.update { setOf(other) }
+        val preferences = PreferencesRepositoryImpl(homeLayoutStore)
+        with(preferences) {
             setIconStyle(IconStyle.GRAYSCALE)
             setSearchAutoLaunch(true)
             setUsageSortEnabled(true)
@@ -100,21 +103,33 @@ class NyxResetCompletenessTest : ResetCompletenessContract() {
         }
         // An upgraded user still carries the boolean from before the tri-state icon style.
         homeLayoutStore.edit { it[booleanPreferencesKey("monochrome_icons")] = true }
-        with(NyxWallpaperDisplaySettings(homeLayoutStore)) {
+        val displaySettings = NyxWallpaperDisplaySettings(homeLayoutStore)
+        with(displaySettings) {
             setWallpaperScrimAlpha(0.3f)
             setWallpaperBackdrop(WallpaperBackdrop.BLACK)
             setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
         }
-        NyxFabPositionStore(homeLayoutStore).saveFabPosition(FabPosition(0.2f, 0.3f))
+        val fab = NyxFabPositionStore(homeLayoutStore)
+        fab.saveFabPosition(FabPosition(0.2f, 0.3f))
         val image = checkNotNull(fileManager.copyFromInputStream(ByteArrayInputStream(ByteArray(256) { it.toByte() })))
-        WallpaperRepositoryImpl(homeLayoutStore, fileManager, mainDispatcherRule.testDispatcher)
-            .saveWallpaperState(WallpaperState.single(image.toString()))
+        val wallpaper = WallpaperRepositoryImpl(homeLayoutStore, fileManager, mainDispatcherRule.testDispatcher)
+        wallpaper.saveWallpaperState(WallpaperState.single(image.toString()))
         appUsage.recordPackageLaunch("com.used")
 
-        reset = NyxResetManager(homeLayoutStore, appUsage, fileManager, mainDispatcherRule.testDispatcher)
+        reset = ResetRepositoryImpl(
+            homeLayoutRepository = homeLayout,
+            drawerFoldersRepository = drawerFolders,
+            hiddenAppsRepository = hidden,
+            preferencesRepository = preferences,
+            wallpaperDisplaySettings = displaySettings,
+            fabPositionStore = fab,
+            wallpaperRepository = wallpaper,
+            appUsageRepository = appUsage,
+            ioDispatcher = mainDispatcherRule.testDispatcher,
+        )
     }
 
-    override suspend fun factoryReset(): Boolean = reset.reset()
+    override suspend fun factoryReset(): Boolean = reset.factoryReset()
 
     override suspend fun storedKeys(): Map<String, Set<String>> = mapOf(
         HOME_LAYOUT to homeLayoutStore.data.first().asMap().keys.mapTo(HashSet()) { it.name },

@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.model.HomeLayout
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.Flow
  * `FakeHomeLayoutRepositoryContractTest`, and — once `:data` lands —
  * `HomeLayoutRepositoryImplContractTest` (CLAUDE.md rule 2).
  */
-interface HomeLayoutRepository {
+interface HomeLayoutRepository : Purgeable {
     fun layout(): Flow<HomeLayout>
 
     /** Full replace, serialized against [update] and other [save] calls. */

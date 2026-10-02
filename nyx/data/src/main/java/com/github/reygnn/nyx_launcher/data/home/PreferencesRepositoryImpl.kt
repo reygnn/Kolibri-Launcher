@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import com.github.reygnn.nyx_launcher.home.repository.PreferencesRepository
@@ -70,6 +71,23 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun setShowCalendarEvent(enabled: Boolean) {
         dataStore.edit { it[SHOW_CALENDAR_EVENT] = enabled }
+    }
+
+    /**
+     * Factory reset (2b-4c): removes this store's keys from the shared `home_layout` DataStore.
+     * A failure is rethrown by `safePurge` (F1), so the reset reports it.
+     */
+    override suspend fun purgeRepository() {
+        dataStore.safePurge("PreferencesRepositoryImpl") { preferences ->
+            preferences.remove(ICON_STYLE)
+            // The pre-tri-state boolean an upgraded user may still carry (2b-4c inventory).
+            preferences.remove(MONOCHROME)
+            preferences.remove(SEARCH_AUTO_LAUNCH)
+            preferences.remove(USAGE_SORT)
+            preferences.remove(NOTIFICATION_DOTS)
+            preferences.remove(SHOW_ALARM)
+            preferences.remove(SHOW_CALENDAR_EVENT)
+        }
     }
 
     private companion object {

@@ -34,4 +34,8 @@ class FakeHiddenAppsRepository(
             }
             Unit
         }
+
+    override suspend fun purgeRepository() = writeMutex.withLock {
+        state.value = emptySet()
+    }
 }

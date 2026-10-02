@@ -32,7 +32,9 @@ import com.github.reygnn.launcher.common.data.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEventsRepository
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.nyx_launcher.data.home.BackupRepositoryImpl
+import com.github.reygnn.nyx_launcher.data.home.ResetRepositoryImpl
 import com.github.reygnn.nyx_launcher.home.repository.BackupRepository
+import com.github.reygnn.nyx_launcher.home.repository.ResetRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -81,6 +83,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
+
+    // Factory reset over the Purgeable stores (2b-4c; was NyxResetManager).
+    @Binds
+    @Singleton
+    abstract fun bindResetRepository(impl: ResetRepositoryImpl): ResetRepository
 
     // ── Shared installed-apps subsystem (:core port → :common-data impls, decision B) ──
     // The LauncherApps-backed motor (drawer loader) and the enumerator (read directly

@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.safePurge
+import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
@@ -27,7 +29,7 @@ import javax.inject.Singleton
 @Singleton
 class NyxWallpaperDisplaySettings @Inject constructor(
     private val dataStore: DataStore<Preferences>,
-) : WallpaperDisplaySettings {
+) : WallpaperDisplaySettings, Purgeable {
 
     override val wallpaperScrimAlphaStateFlow: Flow<Float> =
         dataStore.readFlowFailOpen("Error reading wallpaper scrim alpha") {
@@ -54,6 +56,18 @@ class NyxWallpaperDisplaySettings @Inject constructor(
 
     override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) {
         dataStore.edit { it[BACKDROP] = backdrop.name }
+    }
+
+    /**
+     * Factory reset (2b-4c): removes this store's keys from the shared `home_layout` DataStore.
+     * A failure is rethrown by `safePurge` (F1), so the reset reports it.
+     */
+    override suspend fun purgeRepository() {
+        dataStore.safePurge("NyxWallpaperDisplaySettings") { preferences ->
+            preferences.remove(SCRIM_ALPHA)
+            preferences.remove(BACKDROP)
+            preferences.remove(SURFACE_MODE)
+        }
     }
 
     private companion object {

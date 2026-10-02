@@ -56,4 +56,10 @@ class FakeDrawerFoldersRepository(
             }
             seedFolders.isNotEmpty()
         }
+
+    /** Like the impl's purge (2b-4c): folders and seed flag go together. */
+    override suspend fun purgeRepository() = writeMutex.withLock {
+        state.value = DrawerFolders.EMPTY
+        seeded = false
+    }
 }

@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.launcher.core.timeinfo.TimeInfoSettings
 import com.github.reygnn.nyx_launcher.home.model.IconStyle
 import kotlinx.coroutines.flow.Flow
@@ -10,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
  * the shared ObserveTimeBasedEventsUseCase reads Nyx's toggles without importing
  * this product interface.
  */
-interface PreferencesRepository : TimeInfoSettings {
+interface PreferencesRepository : TimeInfoSettings, Purgeable {
     /** How app icons are rendered (colour / monochrome / grayscale). Defaults to [IconStyle.COLOR]. */
     fun iconStyle(): Flow<IconStyle>
     suspend fun setIconStyle(style: IconStyle)

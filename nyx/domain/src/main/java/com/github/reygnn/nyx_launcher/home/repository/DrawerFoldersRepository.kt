@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.repository
 
+import com.github.reygnn.launcher.core.Purgeable
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolder
 import com.github.reygnn.nyx_launcher.home.model.DrawerFolders
 import kotlinx.coroutines.flow.Flow
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.Flow
  * `FakeDrawerFoldersRepositoryContractTest`, `DrawerFoldersRepositoryImplContractTest`
  * (CLAUDE.md rule 2).
  */
-interface DrawerFoldersRepository {
+interface DrawerFoldersRepository : Purgeable {
     fun folders(): Flow<DrawerFolders>
 
     /**

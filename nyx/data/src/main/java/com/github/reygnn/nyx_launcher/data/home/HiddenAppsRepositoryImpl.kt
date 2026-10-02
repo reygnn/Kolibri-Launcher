@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.nyx_launcher.home.repository.HiddenAppsRepository
@@ -51,6 +52,18 @@ class HiddenAppsRepositoryImpl @Inject constructor(
 
     private suspend fun writeRaw(hidden: Set<ComponentKey>) {
         dataStore.edit { it[KEY] = serializer.serialize(hidden) }
+    }
+
+    /**
+     * Factory reset (2b-4c): removes this store's keys from the shared `home_layout` DataStore.
+     * A failure is rethrown by `safePurge` (F1), so the reset reports it.
+     */
+    override suspend fun purgeRepository() {
+        writeMutex.withLock {
+            dataStore.safePurge("HiddenAppsRepositoryImpl") { preferences ->
+                preferences.remove(KEY)
+            }
+        }
     }
 
     private companion object {

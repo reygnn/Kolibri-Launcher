@@ -37,4 +37,14 @@ class FakePreferencesRepository(
 
     override val showCalendarEventFlow: Flow<Boolean> = showCalendarState
     override suspend fun setShowCalendarEvent(enabled: Boolean) { showCalendarState.value = enabled }
+
+    /** Back to the defaults a missing key reads as (2b-4c). */
+    override suspend fun purgeRepository() {
+        iconStyleState.value = IconStyle.COLOR
+        showAlarmState.value = false
+        showCalendarState.value = false
+        searchAutoLaunchState.value = false
+        usageSortState.value = false
+        notificationDotsState.value = false
+    }
 }

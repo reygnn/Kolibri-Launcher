@@ -85,4 +85,10 @@ class FakeHomeLayoutRepository(initial: HomeLayout) : HomeLayoutRepository {
             }
             dockApps.isNotEmpty() || gridApps.isNotEmpty()
         }
+
+    /** Like the impl's purge (2b-4c): content and seed flag go together; the grid stays. */
+    override suspend fun purgeRepository() = writeMutex.withLock {
+        state.value = state.value.copy(items = emptyList(), dock = emptyList())
+        seeded = false
+    }
 }
