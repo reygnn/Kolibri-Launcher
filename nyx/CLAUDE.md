@@ -42,11 +42,13 @@ it into RUN; the parity gate fails the build if a check is left undecided.
 - **TASK**: Rule 13 (`checkRule13`), stale-replay gate (`checkStaleReplayRead`,
   dormant: Nyx's repositories are cold flows; the UI StateFlows read via `.value`
   are collected under `repeatOnLifecycle(STARTED)` in the same component).
+- **RUN since 2b-4c**: `Manager`-naming in `data/` (`NyxBackupManager` became
+  `BackupRepositoryImpl`, `NyxResetManager` became `ResetRepositoryImpl`; do not add new
+  `*Manager` classes) and `purgeRepository()` completeness. The purge gate scans
+  `*RepositoryImpl.kt` only: `NyxWallpaperDisplaySettings` and `NyxFabPositionStore` are no
+  repositories and are covered by the `ResetCompletenessContract` alone — a new store of that
+  kind is not protected by the gate.
 - **SKIP until the named phase** (SPEC_NYX_REWRITE):
-  - `Manager`-naming in `data/` — `NyxResetManager` disappears in 2b-4c
-    (`NyxBackupManager` became `BackupRepositoryImpl` in 2b-4b); then RUN. Do not add
-    new `*Manager` classes.
-  - `purgeRepository()` completeness — Nyx stores become `Purgeable` in Phase 2b.
   - Settings-store keep-list — Nyx gets storage cleanup in Phase 4b (E5b).
 
 ---

@@ -115,7 +115,7 @@ class PackageEventCoordinator @Inject constructor(
                 // Guard the single long-lived collector: a throwing reconcile (e.g. a
                 // transient DataStore IOException) must not tear the collector down and
                 // silently stop all future reconciles. Log and continue; cancellation
-                // still propagates. Mirrors the house idiom (LaunchSafe, NyxResetManager).
+                // still propagates. Same idiom as `launchSafe` and the reset steps.
                 try {
                     reconcile()
                 } catch (e: CancellationException) {

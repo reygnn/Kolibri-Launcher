@@ -45,7 +45,7 @@ class NyxApplication : Application() {
     lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
 
     @Inject
-    @field:IoDispatcher
+    @IoDispatcher // without `field:` (Lint FieldSiteTargetOnQualifierAnnotation: redundant with KSP)
     lateinit var ioDispatcher: CoroutineDispatcher
 
     // Created on first use — after super.onCreate(), when Hilt has injected the dispatcher.

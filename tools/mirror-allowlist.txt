@@ -10,7 +10,6 @@ kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/G
 kolibri/domain/src/main/java/com/github/reygnn/kolibri_launcher/domain/usecase/ObserveInstalledAppsUseCase.kt	* [SyncInstalledAppsToHolder] (`:core`), used verbatim by nyx too — parity by
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/InstalledAppsHolderPump.kt	* Reporting + resilience (kolibri parity, plus a nyx-specific restart):
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/PackageEventCoordinator.kt	* bus→trigger step mirrors Kolibri's `AppManagementDelegate` collector, minus
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/PackageEventCoordinator.kt	// still propagates. Mirrors the house idiom (LaunchSafe, NyxResetManager).
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/di/AppLauncherModule.kt	* Own module (mirrors Kolibri's `AppLauncherModule`) so an instrumented test can replace just
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/di/AppLauncherModule.kt	* `startActivity(Intent(ACTION_MAIN/LAUNCHER))` — parity with Kolibri / Launcher3.
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeContextMenu.kt	* `contextMenuItemFor`. Mirrors Kolibri's `AppContextMenuAction` pattern (a
