@@ -12,6 +12,13 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.launcher.feature.wallpaper"
+
+    // Shared wallpaper contracts (A2) for both apps' subclasses, starting with
+    // WallpaperImageStoreContract (3a-2). Kotlin needs the AGP testFixtures flag in gradle.properties.
+    @Suppress("UnstableApiUsage")
+    testFixtures {
+        enable = true
+    }
 }
 
 dependencies {
@@ -22,6 +29,13 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // The contracts expose MainDispatcherRule to the app subclasses.
+    testFixturesApi(project(":core"))
+    testFixturesApi(testFixtures(project(":core")))
+    testFixturesImplementation(libs.junit)
+    testFixturesImplementation(libs.truth) // contracts assert with Truth (A12)
+    testFixturesImplementation(libs.kotlinx.coroutines.test)
 
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
     testImplementation(libs.junit)

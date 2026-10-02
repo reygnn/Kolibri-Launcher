@@ -146,6 +146,7 @@ dependencies {
     // history. The flag enables the otherwise-missing
     // `compileDebugTestFixturesKotlin` task for android-library modules.
     testImplementation(testFixtures(project(":kolibri:data")))
+    testImplementation(testFixtures(project(":feature-wallpaper"))) // shared wallpaper contracts (A2)
 
     // UI & Material  (MUST be loaded first or use resolutionStrategy below!)
     implementation(libs.material)  // MUSS VOR androidx.appcompat:appcompat !!!
