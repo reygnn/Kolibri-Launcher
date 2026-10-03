@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":common-ui"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences) // display-settings store (3a-4)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

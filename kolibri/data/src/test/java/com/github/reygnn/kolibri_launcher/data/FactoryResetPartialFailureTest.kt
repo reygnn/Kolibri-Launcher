@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
@@ -46,7 +47,7 @@ class FactoryResetPartialFailureTest {
             swipeActionsRepository = SwipeActionsRepositoryImpl(settingsStore),
             wallpaperRepository = FakeWallpaperRepository(),
             fabPositionRepository = FabPositionRepositoryImpl(settingsStore),
-            settingsRepository = SettingsRepositoryImpl(settingsStore),
+            settingsRepository = SettingsRepositoryImpl(settingsStore, WallpaperDisplaySettingsStore(settingsStore, KolibriWallpaperDisplayKeys)),
             installedAppsStateRepository = mockk<InstalledAppsStateRepository>(relaxed = true),
             timeBasedEventsRepository = mockk<TimeBasedEventsRepository>(relaxed = true),
         )
@@ -59,7 +60,7 @@ class FactoryResetPartialFailureTest {
         FavoritesOrderRepositoryImpl(settingsStore).saveOrder(listOf("com.a/com.a.Main"))
         SwipeActionsRepositoryImpl(settingsStore).setSwipeAction(SwipeSlot.SWIPE_FROM_LEFT_TO_RIGHT, "com.a/com.a.Main")
         FabPositionRepositoryImpl(settingsStore).saveFabPosition(FabPosition(0.2f, 0.3f))
-        with(SettingsRepositoryImpl(settingsStore)) {
+        with(SettingsRepositoryImpl(settingsStore, WallpaperDisplaySettingsStore(settingsStore, KolibriWallpaperDisplayKeys))) {
             setTextColor(0xFF123456.toInt())
             setOnboardingCompleted()
         }

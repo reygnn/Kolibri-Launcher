@@ -38,3 +38,14 @@ annotation class ApplicationScope
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class AppsUpdateTrigger
+
+/**
+ * The app's settings store (SPEC_NYX_REWRITE 3a-4): Kolibri's `settings`, Nyx's `home_layout`.
+ * The filename stays per app and unchanged; each app binds its existing unqualified
+ * `DataStore<Preferences>` to this qualifier with one `@Binds` line, so a shared module names
+ * the store explicitly instead of relying on "the unqualified one" (the convention 1c-1 removed
+ * for the ANR reporter).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SettingsStore

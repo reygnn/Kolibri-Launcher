@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import java.io.IOException
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
@@ -53,7 +54,7 @@ class SettingsRepositoryImplTest {
     @Before
     fun setup() {
         fakeDataStore = FakeDataStore()
-        settingsManager = SettingsRepositoryImpl(fakeDataStore)
+        settingsManager = SettingsRepositoryImpl(fakeDataStore, WallpaperDisplaySettingsStore(fakeDataStore, KolibriWallpaperDisplayKeys))
     }
 
     // ========== EXISTING TESTS ==========
@@ -429,7 +430,7 @@ class SettingsRepositoryImplTest {
             throw ClassCastException("Expected Boolean but got String")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, WallpaperDisplaySettingsStore(mockDataStore, KolibriWallpaperDisplayKeys))
 
         val result = doomsdayManager.showAlarmFlow.first()
 
@@ -443,7 +444,7 @@ class SettingsRepositoryImplTest {
             throw SecurityException("Read permission denied")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, WallpaperDisplaySettingsStore(mockDataStore, KolibriWallpaperDisplayKeys))
 
         val result = doomsdayManager.sortOrderFlow.first()
 
@@ -460,7 +461,7 @@ class SettingsRepositoryImplTest {
             throw OutOfMemoryError("simulated OOM during settings read")
         }
 
-        val doomsdayManager = SettingsRepositoryImpl(mockDataStore)
+        val doomsdayManager = SettingsRepositoryImpl(mockDataStore, WallpaperDisplaySettingsStore(mockDataStore, KolibriWallpaperDisplayKeys))
 
         assertFailsWith<OutOfMemoryError> {
             doomsdayManager.sortOrderFlow.first()

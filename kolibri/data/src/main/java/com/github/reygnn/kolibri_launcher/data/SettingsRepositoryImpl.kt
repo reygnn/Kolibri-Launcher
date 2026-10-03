@@ -13,11 +13,11 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
+import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.core.toEnumOrNull
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.coerceInSafe
-import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.github.reygnn.kolibri_launcher.domain.model.FavoritesAlignment
 import com.github.reygnn.kolibri_launcher.domain.model.SortOrder
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
@@ -31,8 +31,12 @@ import javax.inject.Singleton
 
 @Singleton
 class SettingsRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>
-) : SettingsRepository, OwnsSettingsStoreKeys {
+    private val dataStore: DataStore<Preferences>,
+    // Scrim, backdrop and surface mode live in the shared store since 3a-4 (D2): delegated, so
+    // every user of SettingsRepository stays unchanged; the store owns, reads, writes and purges
+    // those three keys.
+    private val displaySettings: WallpaperDisplaySettingsStore,
+) : SettingsRepository, OwnsSettingsStoreKeys, WallpaperDisplaySettings by displaySettings {
 
     /**
      * Definition der DataStore Keys.
@@ -42,8 +46,6 @@ class SettingsRepositoryImpl @Inject constructor(
         // String Keys
         val SORT_ORDER_KEY = stringPreferencesKey(AppConstants.PrefKeys.SORT_ORDER)
         val FAVORITES_ALIGNMENT = stringPreferencesKey(AppConstants.PrefKeys.FAVORITES_ALIGNMENT)
-        val APP_DRAWER_MODE = stringPreferencesKey(AppConstants.PrefKeys.APP_DRAWER_MODE)
-        val WALLPAPER_BACKDROP = stringPreferencesKey(AppConstants.PrefKeys.WALLPAPER_BACKDROP)
 
         // Boolean Keys
         val ONBOARDING_COMPLETED = booleanPreferencesKey(AppConstants.PrefKeys.ONBOARDING_COMPLETED)
@@ -61,8 +63,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
         // Float Keys
         val LAYOUT_SCALE = floatPreferencesKey(AppConstants.PrefKeys.LAYOUT_SCALE)
-        val WALLPAPER_SCRIM_ALPHA =
-            floatPreferencesKey(AppConstants.PrefKeys.WALLPAPER_SCRIM_ALPHA)
         val VERTICAL_PADDING_SCALE =
             floatPreferencesKey(AppConstants.PrefKeys.VERTICAL_PADDING_SCALE)
         val CONTENT_TOP_MARGIN_SCALE =
@@ -77,8 +77,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun ownedExactKeys(): Set<String> = setOf(
         PreferenceKeys.SORT_ORDER_KEY.name,
         PreferenceKeys.FAVORITES_ALIGNMENT.name,
-        PreferenceKeys.APP_DRAWER_MODE.name,
-        PreferenceKeys.WALLPAPER_BACKDROP.name,
         PreferenceKeys.ONBOARDING_COMPLETED.name,
         PreferenceKeys.TEXT_SHADOW_ENABLED.name,
         PreferenceKeys.IS_FONT_BOLD.name,
@@ -89,7 +87,6 @@ class SettingsRepositoryImpl @Inject constructor(
         PreferenceKeys.ROTATION_LOCKED.name,
         PreferenceKeys.TEXT_COLOR.name,
         PreferenceKeys.LAYOUT_SCALE.name,
-        PreferenceKeys.WALLPAPER_SCRIM_ALPHA.name,
         PreferenceKeys.VERTICAL_PADDING_SCALE.name,
         PreferenceKeys.CONTENT_TOP_MARGIN_SCALE.name,
     )
@@ -237,12 +234,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setLayoutScale(scale: Float) =
         putValue(PreferenceKeys.LAYOUT_SCALE, scale)
 
-    override val wallpaperScrimAlphaStateFlow: Flow<Float> =
-        valueFlow(PreferenceKeys.WALLPAPER_SCRIM_ALPHA, AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
-
-    override suspend fun setWallpaperScrimAlpha(alpha: Float) =
-        putValue(PreferenceKeys.WALLPAPER_SCRIM_ALPHA, alpha)
-
     override val verticalPaddingStateFlow: Flow<Float> =
         valueFlow(PreferenceKeys.VERTICAL_PADDING_SCALE, AppConstants.DEFAULT_VERTICAL_PADDING_FACTOR)
 
@@ -260,18 +251,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setFavoritesAlignment(alignment: FavoritesAlignment) =
         putValue(PreferenceKeys.FAVORITES_ALIGNMENT, alignment.name)
-
-    override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> =
-        enumFlow(PreferenceKeys.APP_DRAWER_MODE, SettingsDefaults.DEFAULT_WALLPAPER_SURFACE_MODE)
-
-    override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) =
-        putValue(PreferenceKeys.APP_DRAWER_MODE, mode.name)
-
-    override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
-        enumFlow(PreferenceKeys.WALLPAPER_BACKDROP, SettingsDefaults.DEFAULT_WALLPAPER_BACKDROP)
-
-    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) =
-        putValue(PreferenceKeys.WALLPAPER_BACKDROP, backdrop.name)
 
     override val contentTopMarginScaleFlow: Flow<Float> =
         valueFlow(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE, AppConstants.DEFAULT_TOP_MARGIN)
@@ -291,41 +270,55 @@ class SettingsRepositoryImpl @Inject constructor(
      * * AUSNAHME: Onboarding Status bleibt erhalten.
      */
     override suspend fun purgeRepository() {
-        purgeEdit { preferences ->
-            preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
-            preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
-            preferences.remove(PreferenceKeys.TEXT_COLOR)
-            preferences.remove(PreferenceKeys.LAYOUT_SCALE)
-            preferences.remove(PreferenceKeys.WALLPAPER_SCRIM_ALPHA)
-            preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
-            preferences.remove(PreferenceKeys.IS_FONT_BOLD)
-            preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)
-            preferences.remove(PreferenceKeys.FAVORITES_ALIGNMENT)
-            preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
-            preferences.remove(PreferenceKeys.SHOW_ALARM)
-            preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
-            preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
-            preferences.remove(PreferenceKeys.ROTATION_LOCKED)
-            // APP_DRAWER_MODE backs wallpaperSurfaceMode (legacy key name);
-            // it is a user-facing setting and must reset like the rest.
-            preferences.remove(PreferenceKeys.APP_DRAWER_MODE)
-            preferences.remove(PreferenceKeys.WALLPAPER_BACKDROP)
+        // Every independent step runs, then the first failure is reported (F1). The display
+        // settings (scrim, backdrop, surface — the old app_drawer_mode) reset with the rest, as
+        // before 3a-4: they are part of "settings" for the user and for the reset.
+        var failure: Throwable? = null
+        try {
+            purgeEdit { preferences ->
+                preferences.remove(PreferenceKeys.SORT_ORDER_KEY)
+                preferences.remove(PreferenceKeys.TEXT_SHADOW_ENABLED)
+                preferences.remove(PreferenceKeys.TEXT_COLOR)
+                preferences.remove(PreferenceKeys.LAYOUT_SCALE)
+                preferences.remove(PreferenceKeys.VERTICAL_PADDING_SCALE)
+                preferences.remove(PreferenceKeys.IS_FONT_BOLD)
+                preferences.remove(PreferenceKeys.CONTENT_TOP_MARGIN_SCALE)
+                preferences.remove(PreferenceKeys.FAVORITES_ALIGNMENT)
+                preferences.remove(PreferenceKeys.SHOW_CALENDAR_EVENT)
+                preferences.remove(PreferenceKeys.SHOW_ALARM)
+                preferences.remove(PreferenceKeys.AUTO_SHOW_KEYBOARD)
+                preferences.remove(PreferenceKeys.AUTO_LAUNCH_APP)
+                preferences.remove(PreferenceKeys.ROTATION_LOCKED)
 
-            // Legacy orphans: the double-tap-to-lock, swipe-down-to-notifications
-            // and secure-window features were removed along with their
-            // PrefKeys, so a pre-removal install may still carry the persisted
-            // values with no live key to remove them by. Clear them by literal
-            // key once here — otherwise a "reset all settings" would leave them
-            // behind forever. The keys are never read anymore; this only keeps
-            // purge a complete wipe. Safe to delete once no install predates
-            // the feature removals.
-            preferences.remove(booleanPreferencesKey("double_tap_to_lock_enabled"))
-            preferences.remove(booleanPreferencesKey("swipe_down_to_notifications_enabled"))
-            preferences.remove(booleanPreferencesKey("secure_window"))
+                // Legacy orphans: the double-tap-to-lock, swipe-down-to-notifications
+                // and secure-window features were removed along with their
+                // PrefKeys, so a pre-removal install may still carry the persisted
+                // values with no live key to remove them by. Clear them by literal
+                // key once here — otherwise a "reset all settings" would leave them
+                // behind forever. The keys are never read anymore; this only keeps
+                // purge a complete wipe. Safe to delete once no install predates
+                // the feature removals.
+                preferences.remove(booleanPreferencesKey("double_tap_to_lock_enabled"))
+                preferences.remove(booleanPreferencesKey("swipe_down_to_notifications_enabled"))
+                preferences.remove(booleanPreferencesKey("secure_window"))
 
-            // WICHTIG: Onboarding Status wird NICHT gelöscht
-            // purge-exempt: ONBOARDING_COMPLETED — kept intentionally across a
-            // reset (see the KDoc "AUSNAHME" above).
+                // IMPORTANT: the onboarding status is NOT removed
+                // purge-exempt: ONBOARDING_COMPLETED — kept intentionally across a
+                // reset (see the KDoc "AUSNAHME" above).
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            failure = e // Catch kept (Expected error, four-category frame): logged by purgeEdit; OOM extends Error → Throwable.
         }
+        try {
+            displaySettings.purgeRepository()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): logged by safePurge; OOM extends Error → Throwable.
+            failure?.addSuppressed(e) ?: run { failure = e }
+        }
+        failure?.let { throw it }
     }
 }

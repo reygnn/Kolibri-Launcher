@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import android.content.Context
 import com.github.reygnn.kolibri_launcher.domain.repository.SettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
@@ -23,6 +24,6 @@ class SettingsRepositoryImplContractTest : SettingsRepositoryContract() {
 
     override fun createRepository(): SettingsRepository {
         val fakeDataStore = FakeDataStore()
-        return SettingsRepositoryImpl(fakeDataStore)
+        return SettingsRepositoryImpl(fakeDataStore, WallpaperDisplaySettingsStore(fakeDataStore, KolibriWallpaperDisplayKeys))
     }
 }

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -78,7 +79,7 @@ class KolibriResetCompletenessTest : ResetCompletenessContract() {
         val hidden = HiddenAppsRepositoryImpl(settingsStore)
         val names = CustomNamesRepositoryImpl(settingsStore)
         val swipe = SwipeActionsRepositoryImpl(settingsStore)
-        val settings = SettingsRepositoryImpl(settingsStore)
+        val settings = SettingsRepositoryImpl(settingsStore, WallpaperDisplaySettingsStore(settingsStore, KolibriWallpaperDisplayKeys))
         val fab = FabPositionRepositoryImpl(settingsStore)
         val wallpaper = WallpaperRepositoryImpl(settingsStore, fileManager, mainDispatcherRule.testDispatcher)
         val usage = AppUsageRepositoryImpl(usageStore, context)

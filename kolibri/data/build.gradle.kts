@@ -50,6 +50,7 @@ dependencies {
     // TimeBasedEventsRepository port in RepositoryModule.
     implementation(project(":common-data"))
     implementation(project(":feature-backup")) // shared backup engine (SPEC_NYX_REWRITE 2a)
+    implementation(project(":feature-wallpaper")) // display-settings store (SPEC_NYX_REWRITE 3a-4)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)

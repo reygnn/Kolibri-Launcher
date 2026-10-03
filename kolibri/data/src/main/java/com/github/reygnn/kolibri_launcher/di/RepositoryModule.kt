@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.di
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.BackupRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.CustomNamesRepositoryImpl
@@ -73,9 +74,10 @@ abstract class RepositoryModule {
     abstract fun bindTimeInfoSettings(repo: SettingsRepository): TimeInfoSettings
 
     // The shared wallpaper render layer depends only on the narrow
-    // WallpaperDisplaySettings port (WSS-INV-4); SettingsRepository implements it.
+    // WallpaperDisplaySettings port (WSS-INV-4). Since 3a-4 the shared store implements it; it
+    // is a singleton, and SettingsRepository delegates its members to the same instance.
     @Binds
-    abstract fun bindWallpaperDisplaySettings(repo: SettingsRepository): WallpaperDisplaySettings
+    abstract fun bindWallpaperDisplaySettings(store: WallpaperDisplaySettingsStore): WallpaperDisplaySettings
 
     @Binds
     @Singleton
@@ -211,6 +213,12 @@ abstract class RepositoryModule {
     @Binds
     @IntoSet
     abstract fun bindWallpaperKeysOwner(impl: WallpaperRepositoryImpl): OwnsSettingsStoreKeys
+
+    // Scrim, backdrop and surface mode (3a-4): owned by the shared store since they left
+    // SettingsRepositoryImpl. Without this line the storage cleanup would delete them.
+    @Binds
+    @IntoSet
+    abstract fun bindWallpaperDisplayKeysOwner(impl: WallpaperDisplaySettingsStore): OwnsSettingsStoreKeys
 
     @Binds
     @IntoSet

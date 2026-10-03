@@ -1,5 +1,8 @@
 package com.github.reygnn.kolibri_launcher.di
 
+import com.github.reygnn.kolibri_launcher.data.KolibriWallpaperDisplayKeys
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplayKeys
+import com.github.reygnn.launcher.core.SettingsStore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -59,6 +62,18 @@ object DataStoreModule {
     fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.settingsDataStore
     }
+
+    /**
+     * The same `settings` store under the shared [SettingsStore] qualifier (3a-4, D7), for the
+     * stores in `:feature-wallpaper`; the file name on disk is unchanged.
+     */
+    @Provides
+    @SettingsStore
+    fun provideQualifiedSettingsDataStore(store: DataStore<Preferences>): DataStore<Preferences> = store
+
+    /** Kolibri's key names for the wallpaper display settings (3a-4, D3). */
+    @Provides
+    fun provideWallpaperDisplayKeys(): WallpaperDisplayKeys = KolibriWallpaperDisplayKeys
 
     /**
      * The usage [usageDataStore], qualified with [UsageDataStore] so it does
