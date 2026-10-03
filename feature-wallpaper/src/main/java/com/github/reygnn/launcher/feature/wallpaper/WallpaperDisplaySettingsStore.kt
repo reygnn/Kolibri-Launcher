@@ -47,7 +47,9 @@ data class WallpaperDisplayKeys(
  *    3b (type history of the keys first, `app_drawer_mode` especially).
  *  - **Writes** swallow their failure after logging (D4); whether Nyx keeps throwing is decided
  *    in 3b.
- *  - **Purge** rethrows (F1), so the reset reports a partial failure.
+ *  - **Purge** rethrows (F1), so the reset reports a partial failure. Who purges it differs per
+ *    app: Kolibri through `SettingsRepositoryImpl`, Nyx directly in its `ResetRepositoryImpl`
+ *    (Nyx has no `SettingsRepository`). Never both — the store would be purged twice.
  *
  * Keep-list (D6): the store owns its three keys ([ownedExactKeys]). The key properties are
  * UPPER_CASE on purpose, so the keep-list gate checks each of them for registration like a
