@@ -1,5 +1,4 @@
-package com.github.reygnn.kolibri_launcher.ui.util
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+package com.github.reygnn.launcher.feature.wallpaper
 
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContract
@@ -34,7 +33,7 @@ import androidx.activity.result.contract.ActivityResultContracts
  *   - Users who only want the modern photo-picker UX get it automatically on
  *     Android 13+ when Google Photos is set as the default content picker.
  *   - Wallpapers are copied to internal storage immediately via
- *     [com.github.reygnn.kolibri_launcher.data.WallpaperFileManager.copyToInternal],
+ *     [WallpaperImageStore.copyIn], and only the internal copy is persisted,
  *     so the source URI's long-term accessibility doesn't matter — the privacy
  *     advantage of PickVisualMedia (no persistable read permission granted)
  *     does not buy us anything here.
@@ -58,6 +57,8 @@ import androidx.activity.result.contract.ActivityResultContracts
  * // later:
  * WallpaperImagePicker.launch(picker)
  * ```
+ * Shared since 3a-6 (moved from Kolibri's `ui.util`, behaviour unchanged); Nyx switches its
+ * remaining `PickVisualMedia` paths to it in 3b. [WallpaperImagePickerTest] pins the choice.
  * =====================================================================================
  */
 object WallpaperImagePicker {

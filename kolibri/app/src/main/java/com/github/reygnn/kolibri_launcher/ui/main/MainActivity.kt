@@ -45,7 +45,7 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.home.WallpaperEditController
-import com.github.reygnn.kolibri_launcher.ui.util.WallpaperImagePicker
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
