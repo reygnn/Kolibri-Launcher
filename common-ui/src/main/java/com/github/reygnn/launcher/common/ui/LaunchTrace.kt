@@ -151,6 +151,18 @@ object LaunchTrace {
         /** Just the flatten (SOFTWARE decode of N layers + compose) — the dominant part of
          * [WALLPAPER_WARM]. */
         const val WALLPAPER_FLATTEN = "wallpaper_flatten"
+
+        // --- Wallpaper paint (SPEC_NYX_REWRITE F4: the 3a-8 before/after measurement) ---
+        // ASYNC sections, ended in a pre-draw callback one frame after the wallpaper view
+        // applied a state (the thread-local sync `section` would mis-report). Measured by the
+        // `:macrobenchmark` WallpaperPaintBenchmark in the benchmark build.
+        /** Cold start: from `MainActivity.onCreate` to the first frame that draws a wallpaper.
+         * Once per process. */
+        const val WALLPAPER_FIRST_PAINT = "wallpaper_first_paint"
+
+        /** After a change: from the editor's save tap to the first frame that draws the next
+         * wallpaper state the view applied (for a multi-layer wallpaper, the composite attach). */
+        const val WALLPAPER_CHANGE_PAINT = "wallpaper_change_paint"
     }
 
     /**

@@ -116,6 +116,8 @@ class WallpaperCompositeBenchmark {
         const val SECTION_WARM = "wallpaper_warm"     // LaunchTrace.Names.WALLPAPER_WARM
         const val SECTION_FLATTEN = "wallpaper_flatten" // LaunchTrace.Names.WALLPAPER_FLATTEN
         const val DRAWER_LIST_ID = "apps_recycler_view"
-        const val WALLPAPER_VIEW_ID = "wallpaperView" // home wallpaper ImageView
+        // The wallpaper view lives in activity_main.xml since §25 (the old fragment id
+        // "wallpaperView" no longer exists, so the waits silently timed out; fixed in 3a-8a).
+        const val WALLPAPER_VIEW_ID = "wallpaper_view"
     }
 }

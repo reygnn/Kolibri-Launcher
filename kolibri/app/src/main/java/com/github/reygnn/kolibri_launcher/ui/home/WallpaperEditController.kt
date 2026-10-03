@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
+import com.github.reygnn.kolibri_launcher.ui.main.WallpaperPaintTrace
 import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
@@ -245,6 +246,8 @@ internal class WallpaperEditController(
                     singleTransform = readSingleTransform(wallpaperView),
                 )
                 dispatchSaveAction(action)
+                // Measurement point only (3a-8, F4): save tap to the next drawn wallpaper.
+                WallpaperPaintTrace.beginChangePaint()
                 viewModel.onCommitWallpaperEditMode()
             }
         }

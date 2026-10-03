@@ -539,6 +539,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Measurement point only (3a-8, F4): cold start to the first drawn wallpaper.
+        WallpaperPaintTrace.beginFirstPaint()
         installSplashScreen()
         setupWindow()
 
@@ -710,6 +712,8 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
                 target = displayTargetFor(state),
                 preferredActiveLayerId = focusHint,
                 onRebuildComplete = {
+                    // Measurement point only (3a-8, F4): closes the paint spans a frame later.
+                    WallpaperPaintTrace.onWallpaperApplied(wallpaperView, state.hasWallpaper)
                     if (wallpaperView.isEditMode) {
                         wallpaperEditController?.applyLayerButtonsState()
                         wallpaperEditController?.updateLayerIndicator()
