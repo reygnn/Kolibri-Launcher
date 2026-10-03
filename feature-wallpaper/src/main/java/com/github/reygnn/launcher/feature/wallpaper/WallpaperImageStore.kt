@@ -65,6 +65,17 @@ class WallpaperImageStore @Inject constructor(
         return true
     }
 
-    /** Deletes every wallpaper image file ("remove wallpaper"); true when none is left. */
-    suspend fun deleteAll(): Boolean = withContext(ioDispatcher) { fileManager.clearAll() }
+    /**
+     * "Remove wallpaper" (3a-2d): deletes every image file — but only if the persisted state
+     * references nothing anymore, so the caller must have emptied the state FIRST. Returns whether
+     * the removal took effect (the persisted state is empty); false when it still references files
+     * or can't be read, and then nothing is deleted: the wallpaper stays, which is the honest
+     * outcome of a failed removal. A file that fails to delete is only an orphan for the GC.
+     */
+    suspend fun deleteAllIfNothingPersisted(): Boolean {
+        val referenced = repository.readPersistedImageUris() ?: return false // fail closed
+        if (referenced.isNotEmpty()) return false
+        withContext(ioDispatcher) { fileManager.clearAll() }
+        return true
+    }
 }

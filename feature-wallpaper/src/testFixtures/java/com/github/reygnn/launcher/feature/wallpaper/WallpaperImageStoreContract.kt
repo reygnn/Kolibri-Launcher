@@ -31,7 +31,8 @@ import java.nio.file.Files
  *  - a file is deleted only once no layer references it anymore (O2 safeguard);
  *  - deletions check against what is actually PERSISTED and fail closed (3a-2c): a save that
  *    fails silently (as the real repository does in a release build) keeps the old file, and an
- *    unreadable persisted state deletes nothing and stops the GC;
+ *    unreadable persisted state deletes nothing and stops the GC; "remove wallpaper" empties the
+ *    state first and deletes the files only once nothing persisted references them (3a-2d);
  *  - "an export never reads a file an edit session is changing" is checked through a PROXY: an
  *    export reads the persisted state, so during an open session the persisted state must
  *    reference only existing files and no layer the session removed. That the export reads that
@@ -81,6 +82,9 @@ abstract class WallpaperImageStoreContract {
     /** Removes the layer at [index] (inside an edit session). */
     protected abstract suspend fun removeLayer(index: Int)
 
+    /** "Remove wallpaper": the whole wallpaper goes. */
+    protected abstract suspend fun removeWallpaper()
+
     /** Triggers the launcher's orphan GC now, as it does it (e.g. on start). */
     protected abstract suspend fun runOrphanGc()
 
@@ -93,7 +97,7 @@ abstract class WallpaperImageStoreContract {
     /** Names of the files the persisted state's layers reference, in layer order. */
     protected abstract suspend fun savedLayerFiles(): List<String>
 
-    /** From now on saves fail silently: the call returns, nothing is persisted (release behaviour). */
+    /** From now on writes (save, clear) fail silently: the call returns, nothing is persisted (release behaviour). */
     protected abstract fun failSavesSilently()
 
     /** From now on the persisted state can't be read by the store (its read reports failure). */
@@ -277,6 +281,22 @@ abstract class WallpaperImageStoreContract {
 
         assertWithMessage("a replace deletes nothing it can't check").that(storedFiles()).contains(old)
         assertWithMessage("the GC does not run on an unreadable state").that(orphan.exists()).isTrue()
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `a removal whose clear fails silently keeps the files`() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3a-2d: state first, files second, and only against what is persisted. A clear that is
+        // swallowed leaves the old state on disk — its files must stay with it.
+        step { startStore() }
+        step { setWallpaper(image("a")) }
+        val file = savedLayerFiles().single()
+        failSavesSilently()
+
+        step { removeWallpaper() }
+
+        assertWithMessage("the old state is still on disk").that(savedLayerFiles()).containsExactly(file)
+        assertWithMessage("so its file stays").that(storedFiles()).contains(file)
         assertNoDanglingReference()
     }
 

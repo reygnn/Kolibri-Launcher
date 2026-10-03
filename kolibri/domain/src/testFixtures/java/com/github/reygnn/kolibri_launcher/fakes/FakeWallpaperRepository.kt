@@ -26,8 +26,8 @@ class FakeWallpaperRepository : WallpaperRepository {
         }
 
     /**
-     * Saves are swallowed like the real repository does in a release build (3a-2c): the call
-     * returns normally, nothing is persisted.
+     * Writes (save and clear) are swallowed like the real repository does in a release build
+     * (3a-2c, 3a-2d): the call returns normally, nothing is persisted.
      */
     var failSavesSilently = false
 
@@ -45,6 +45,7 @@ class FakeWallpaperRepository : WallpaperRepository {
     }
 
     override suspend fun clearWallpaper() {
+        if (failSavesSilently) return
         _wallpaperState.value = WallpaperState.NONE
     }
 

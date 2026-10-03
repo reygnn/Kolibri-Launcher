@@ -106,6 +106,10 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
         delegate.onRemoveWallpaperLayer(index)
     }
 
+    override suspend fun removeWallpaper() {
+        delegate.onClearWallpaper()
+    }
+
     /** Kolibri's GC runs on the first emission of a `start()`, unless an edit session is open. */
     override suspend fun runOrphanGc() = delegate.start()
 

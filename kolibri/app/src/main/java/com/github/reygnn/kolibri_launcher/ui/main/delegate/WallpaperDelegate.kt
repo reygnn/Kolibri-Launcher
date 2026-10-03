@@ -647,11 +647,12 @@ class WallpaperDelegate(
         // exclusive; the optimistic NONE below makes a regen still queued on the lock
         // fail its latest-wins guard and drop its own file (F7) rather than resurrect
         // the removed wallpaper with an orphaned composite.
-        compositeRegenLock.withLock {
-            // The store hops its blocking disk I/O off the main dispatcher.
-            imageStore.deleteAll()
-            // Removes the DataStore wallpaper keys.
+        val removed = compositeRegenLock.withLock {
+            // State first, files second (3a-2d): the store deletes the files only once the
+            // persisted state references nothing — a silently failed clear keeps them, and the
+            // wallpaper with them, instead of leaving a dangling reference on disk.
             clearWallpaperUseCase()
+            if (!imageStore.deleteAllIfNothingPersisted()) return@withLock false
             // Drop the in-memory composite (v4 §3, was AUDIT-20 F3): nothing displays a
             // composite after a clear, so the ~10 MB HARDWARE bitmap would otherwise stay
             // resident. invalidate() only drops the reference (never recycles).
@@ -664,6 +665,12 @@ class WallpaperDelegate(
             // closes the window in which a warm resuming right after this lock releases would
             // still read the pre-clear state (its key-gated put then fails on NONE).
             _wallpaperState.value = WallpaperState.NONE
+            true
+        }
+        if (!removed) {
+            // The removal did not take effect; the wallpaper stays as it is on disk.
+            scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
+            return@launchSafe
         }
         scope.sendEvent(UiEvent.ShowToast(R.string.wallpaper_removed))
         // The image content is gone → offer a scrim reset (so a leftover dim doesn't
