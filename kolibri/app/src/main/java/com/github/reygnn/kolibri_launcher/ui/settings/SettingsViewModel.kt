@@ -9,6 +9,7 @@ import com.github.reygnn.kolibri_launcher.domain.repository.DataStoreMaintenance
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
+import com.github.reygnn.kolibri_launcher.domain.usecase.SeedDefaultFavoritesUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetInstalledAppsUseCase
 import com.github.reygnn.launcher.common.ui.base.BaseViewModel
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -28,6 +29,7 @@ class SettingsViewModel @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val favoritesOrderRepository: FavoritesOrderRepository,
     private val dataStoreMaintenanceRepository: DataStoreMaintenanceRepository,
+    private val seedDefaultFavoritesUseCase: SeedDefaultFavoritesUseCase,
     @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -192,6 +194,10 @@ class SettingsViewModel @Inject constructor(
                     sendEvent(UiEvent.ShowToast(R.string.reset_failed))
                 }
             }
+            // Reset first, then seed, as a separate step (2b/29): the curated default favorites
+            // come back after a success and after a partial failure — the seed itself skips when
+            // favorites survived a failed purge.
+            if (result !is FactoryResetUseCase.Result.Error) seedDefaultFavoritesUseCase()
         }
     }
 

@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui
 
+import com.github.reygnn.kolibri_launcher.domain.usecase.SeedDefaultFavoritesUseCase
 import app.cash.turbine.test
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.AppInfo
@@ -44,6 +45,7 @@ class SettingsViewModelTest {
     private lateinit var favoritesRepository: FavoritesRepository
     private lateinit var favoritesOrderRepository: FavoritesOrderRepository
     private lateinit var dataStoreMaintenanceRepository: DataStoreMaintenanceRepository
+    private lateinit var seedDefaultFavoritesUseCase: SeedDefaultFavoritesUseCase
 
     private lateinit var viewModel: SettingsViewModel
     private lateinit var rawAppsFlow: MutableStateFlow<List<AppInfo>>
@@ -59,6 +61,7 @@ class SettingsViewModelTest {
         favoritesRepository = mockk(relaxed = true)
         favoritesOrderRepository = mockk(relaxed = true)
         dataStoreMaintenanceRepository = mockk(relaxed = true)
+        seedDefaultFavoritesUseCase = mockk(relaxed = true)
 
         rawAppsFlow = MutableStateFlow(emptyList())
 
@@ -76,6 +79,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -90,6 +94,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -125,6 +130,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -149,6 +155,7 @@ class SettingsViewModelTest {
                 favoritesRepository,
                 favoritesOrderRepository,
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -171,6 +178,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -190,6 +198,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -219,6 +228,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -239,6 +249,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -258,6 +269,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -285,6 +297,7 @@ class SettingsViewModelTest {
                 favoritesRepository,
                 favoritesOrderRepository,
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
             val viewModel2 = SettingsViewModel(
@@ -293,6 +306,7 @@ class SettingsViewModelTest {
                 favoritesRepository,
                 favoritesOrderRepository,
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
 
@@ -315,6 +329,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -338,6 +353,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -367,6 +383,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -387,6 +404,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -410,6 +428,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -433,6 +452,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -458,6 +478,7 @@ class SettingsViewModelTest {
                 favoritesRepository,
                 favoritesOrderRepository,
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
             coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
@@ -482,6 +503,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
         coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
@@ -506,6 +528,7 @@ class SettingsViewModelTest {
                 favoritesRepository,
                 favoritesOrderRepository,
                 dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+                seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
                 mainDispatcher = mainDispatcherRule.testDispatcher
             )
             coEvery { dataStoreMaintenanceRepository.removeOrphanKeys() } returns
@@ -520,6 +543,42 @@ class SettingsViewModelTest {
                 assertThat(event.messageResId).isEqualTo(com.github.reygnn.kolibri_launcher.R.string.cleanup_storage_error)
             }
         }
+
+    // ========== RESEED AFTER RESET (2b/29) ==========
+
+    @Test
+    fun `onFactoryResetConfirmed - success - reseeds the default favorites`() = runTest {
+        coEvery { factoryResetUseCase(any()) } returns FactoryResetUseCase.Result.Success
+        viewModel = createViewModel()
+
+        viewModel.onFactoryResetConfirmed(includeUsageData = true)
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { seedDefaultFavoritesUseCase() }
+    }
+
+    @Test
+    fun `onFactoryResetConfirmed - partial failure - still runs the guarded reseed`() = runTest {
+        // The seed itself skips when favorites survived a failed purge (SeedDefaultFavoritesUseCaseTest).
+        coEvery { factoryResetUseCase(any()) } returns FactoryResetUseCase.Result.PartialFailure
+        viewModel = createViewModel()
+
+        viewModel.onFactoryResetConfirmed(includeUsageData = true)
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { seedDefaultFavoritesUseCase() }
+    }
+
+    @Test
+    fun `onFactoryResetConfirmed - error - does not reseed`() = runTest {
+        coEvery { factoryResetUseCase(any()) } returns FactoryResetUseCase.Result.Error
+        viewModel = createViewModel()
+
+        viewModel.onFactoryResetConfirmed(includeUsageData = true)
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { seedDefaultFavoritesUseCase() }
+    }
 
     // ========== DOOMSDAY TESTS - ROCKY BALBOA EDITION ==========
 
@@ -536,6 +595,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -561,6 +621,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -586,6 +647,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -615,6 +677,7 @@ class SettingsViewModelTest {
             favoritesRepository,
             favoritesOrderRepository,
             dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+            seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
             mainDispatcher = mainDispatcherRule.testDispatcher
         )
 
@@ -637,6 +700,7 @@ class SettingsViewModelTest {
         favoritesRepository,
         favoritesOrderRepository,
         dataStoreMaintenanceRepository = dataStoreMaintenanceRepository,
+        seedDefaultFavoritesUseCase = seedDefaultFavoritesUseCase,
         mainDispatcher = mainDispatcherRule.testDispatcher
     )
 
