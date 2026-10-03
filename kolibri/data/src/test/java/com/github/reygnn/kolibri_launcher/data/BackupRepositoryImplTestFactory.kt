@@ -1,4 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
@@ -69,6 +71,12 @@ internal object BackupRepositoryImplTestFactory {
             engine = BackupEngine(Dispatchers.IO, emptySet()),
             safDocuments = SafDocuments(context),
             ioDispatcher = Dispatchers.IO,
+            // The shared wallpaper half (3a-7); cleanup goes through the store against what the
+            // wallpaper repository has persisted.
+            wallpaperBlobs = WallpaperBackupBlobs(
+                wallpaperFileManager,
+                WallpaperImageStore(wallpaperFileManager, wallpaperRepository, Dispatchers.IO),
+            ),
         )
     }
 }

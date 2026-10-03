@@ -5,7 +5,6 @@ import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 
 import android.content.Context
-import android.net.Uri
 import androidx.core.net.toUri
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.IoDispatcher
@@ -21,6 +20,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.repository.BackupRepository
 import com.github.reygnn.launcher.feature.backup.container.BlobSource
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.feature.backup.container.ContainerManifest
 import com.github.reygnn.launcher.feature.backup.engine.BackupEngine
 import com.github.reygnn.launcher.feature.backup.engine.BackupRead
@@ -114,6 +114,8 @@ class BackupRepositoryImpl @Inject constructor(
     // Injected since 2a-7b: changing previewBackup's signature would otherwise have meant a new
     // A13 entry; all three file operations now use it (A13: -3).
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    /** The wallpaper half of a backup since 3a-7: collect, bind back, O2, cleanup through the store. */
+    private val wallpaperBlobs: WallpaperBackupBlobs,
 ) : BackupRepository {
 
     /**
@@ -235,8 +237,8 @@ class BackupRepositoryImpl @Inject constructor(
         onClaim: (Collection<String>) -> Unit,
     ): Int {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
-        // Internal files already given to a restored layer (see ownFileFor).
-        val taken = HashSet<String>()
+        // Layers whose image reached internal storage, before O2 gives each its own file.
+        val copied = mutableListOf<Pair<WallpaperLayerBackup, String>>()
 
         for ((index, layerBackup) in layerBackups.withIndex()) {
             val uriString = layerBackup.imageUri
@@ -256,12 +258,9 @@ class BackupRepositoryImpl @Inject constructor(
                 }
 
                 if (canAccess) {
-                    val internalUri = wallpaperFileManager.copyToInternal(sourceUri)?.let { ownFileFor(it, taken) }
+                    val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                     if (internalUri != null) {
-                        taken += internalUri.toString()
-                        validLayerStates.add(
-                            layerBackup.toLayerState().copy(imageUri = internalUri.toString())
-                        )
+                        copied += layerBackup to internalUri.toString()
                     } else {
                         Timber.w("Failed to copy layer $index to internal storage, skipping")
                     }
@@ -283,6 +282,21 @@ class BackupRepositoryImpl @Inject constructor(
             }
         }
 
+        // O2 (3a-7, one place for both apps): the container stores equal content once, so layers of
+        // the same image resolve to the same extracted file, and copyToInternal hands an internal
+        // file back unchanged — a file an earlier layer already got is copied for this one.
+        val ownFiles = wallpaperBlobs.assignOwnFiles(copied.map { it.second }) { uri ->
+            context.contentResolver.openInputStream(uri.toUri())
+        }
+        copied.forEachIndexed { i, (layerBackup, _) ->
+            val own = ownFiles[i]
+            if (own != null) {
+                validLayerStates.add(layerBackup.toLayerState().copy(imageUri = own))
+            } else {
+                Timber.w("Failed to give wallpaper layer ${layerBackup.id} its own file, skipping")
+            }
+        }
+
         if (validLayerStates.isNotEmpty()) {
             val wallpaperState = WallpaperState.multiLayer(validLayerStates)
             onClaim(validLayerStates.mapNotNull { it.imageUri })
@@ -298,20 +312,6 @@ class BackupRepositoryImpl @Inject constructor(
         // so this difference is exactly the image-bearing layers that failed.
         val layersWithImage = layerBackups.count { !it.imageUri.isNullOrBlank() }
         return layersWithImage - validLayerStates.size
-    }
-
-    /**
-     * One internal file per restored layer (SPEC_NYX_REWRITE O2). The container stores equal
-     * content once, so every layer of the same image resolves to the same extracted file,
-     * and copyToInternal hands an internal file back unchanged. Removing a layer deletes its
-     * file right away (WallpaperDelegate), which would take the other layer's image with it —
-     * so a file that an earlier layer already got is copied for this one.
-     *
-     * @return [internalUri] when no earlier layer has it, else a fresh copy (null if that fails).
-     */
-    private fun ownFileFor(internalUri: Uri, taken: Set<String>): Uri? {
-        if (internalUri.toString() !in taken) return internalUri
-        return context.contentResolver.openInputStream(internalUri)?.use { wallpaperFileManager.copyFromInputStream(it) }
     }
 
     /**
@@ -542,13 +542,13 @@ class BackupRepositoryImpl @Inject constructor(
      */
     private suspend fun exportContainer(output: OutputStream, backupData: BackupData) {
         val settings = backupData.settings
+        // The layer images come from the shared collector (3a-7); the app turns them into blobs.
+        val collected = wallpaperBlobs.collect(settings.wallpaperLayers) { uri -> resolveToLocalFile(uri)?.takeIf { it.exists() } }
         val sources = ArrayList<BlobSource>()
+        collected.files.forEach { file -> sources += BlobSource(IMAGE_MEDIA_TYPE) { file.inputStream() } }
         fun blobOf(file: File): Int {
             sources += BlobSource(IMAGE_MEDIA_TYPE) { file.inputStream() }
             return sources.size - 1
-        }
-        val layerSource = settings.wallpaperLayers.map { layer ->
-            layer.imageUri?.let(::resolveToLocalFile)?.takeIf { it.exists() }?.let(::blobOf)
         }
         val singleSource = if (settings.wallpaperLayers.isEmpty()) {
             settings.wallpaperUri?.let(::resolveToLocalFile)?.takeIf { it.exists() }?.let(::blobOf)
@@ -561,10 +561,7 @@ class BackupRepositoryImpl @Inject constructor(
             schemaVersion = KolibriBackupSchema.SCHEMA_VERSION,
             blobs = sources,
         ) { hashes ->
-            val layers = settings.wallpaperLayers.mapIndexed { index, layer ->
-                val source = layerSource[index]
-                if (source != null) layer.copy(imageUri = null, imageFileName = hashes[source]) else layer.copy(imageFileName = null)
-            }
+            val layers = collected.rebind(settings.wallpaperLayers, hashes)
             val single = singleSource?.let { hashes[it] } ?: layers.firstNotNullOfOrNull { it.imageFileName }
             val sectionSettings = settings.copy(wallpaperLayers = layers, wallpaperImageFileName = single)
             mapOf(KolibriBackupSchema.SECTION_BACKUP to ContainerManifest.Section(KolibriBackupSchema.SECTION_VERSION, serializer.settingsToJson(sectionSettings)))
@@ -591,12 +588,7 @@ class BackupRepositoryImpl @Inject constructor(
             if (options.importWallpaper) {
                 val referenced = settings.wallpaperLayers.mapNotNull { it.imageFileName } +
                     listOfNotNull(settings.wallpaperImageFileName)
-                for (hash in referenced.toSet()) {
-                    val file = blobs.claim(hash, File(staging, "claimed-$hash")) ?: continue
-                    val internal = file.inputStream().use { wallpaperFileManager.copyFromInputStream(it) }
-                    file.delete()
-                    if (internal != null) extracted[hash] = internal.toString()
-                }
+                wallpaperBlobs.extract(referenced, blobs::claim, staging, into = extracted)
             }
             val resolved = serializer.resolveZipImages(backup, extracted)
             val restorer = object : WallpaperRestorer {
@@ -617,7 +609,9 @@ class BackupRepositoryImpl @Inject constructor(
                 result
             }
         } finally {
-            (extracted.values - claimed).forEach { wallpaperFileManager.deleteFile(it) }
+            // Only the UNCLAIMED copies, through the store (3a-7): claimed ones may be missing
+            // from the persisted state after a silently failed save and must never be passed in.
+            wallpaperBlobs.release(extracted.values - claimed)
         }
     }
 

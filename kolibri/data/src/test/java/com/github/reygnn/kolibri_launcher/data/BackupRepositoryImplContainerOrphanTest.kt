@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import kotlin.test.assertFailsWith
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -200,6 +201,42 @@ class BackupRepositoryImplContainerOrphanTest {
         coEvery { interrupted.saveWallpaperState(any()) } throws CancellationException("left the screen")
         runCatching { repository(interrupted).loadBackupFromFile(backupUri.toString(), ImportOptions()) }
         verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
+    }
+
+    // ---- cleanup through the store: only unclaimed copies (3a-7) ----
+
+    /** One layer on the first blob; the old single-image field names the second, which no layer restores. */
+    private fun layerPlusUnusedSingle(hashes: List<String>) = LauncherSettings(
+        wallpaperLayers = listOf(WallpaperLayerBackup(id = "l0", imageFileName = hashes[0])),
+        wallpaperImageFileName = hashes[1],
+    )
+
+    @Test
+    fun `a silently failed wallpaper save keeps the claimed copy and drops only the unclaimed one`() = runTest {
+        // The claimed copy is not in the persisted state after the swallowed save; handing it to
+        // the cleanup would delete it. Only the unclaimed copy may go.
+        serve(container(imageA, imageB, settings = ::layerPlusUnusedSingle))
+        val wallpaperRepository = FakeWallpaperRepository().apply { failSavesSilently = true }
+
+        repository(wallpaperRepository).loadBackupFromFile(backupUri.toString(), ImportOptions())
+
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) } // claimed: orphan for the GC at worst
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(extracted1) } // unclaimed: through the store
+    }
+
+    @Test
+    fun `an interrupted import still cleans up and the cancellation propagates`() = runTest {
+        serve(container(imageA, imageB, settings = ::layerPlusUnusedSingle))
+        val interrupted = mockk<WallpaperRepository>(relaxed = true)
+        coEvery { interrupted.saveWallpaperState(any()) } throws CancellationException("left the screen")
+        coEvery { interrupted.readPersistedImageUris() } returns emptySet()
+
+        assertFailsWith<CancellationException> {
+            repository(interrupted).loadBackupFromFile(backupUri.toString(), ImportOptions())
+        }
+
+        verify(exactly = 0) { wallpaperFileManager.deleteFile(extracted0) }
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(extracted1) } // NonCancellable cleanup ran
     }
 
     // ---- one file per layer (SPEC_NYX_REWRITE O2) ----
