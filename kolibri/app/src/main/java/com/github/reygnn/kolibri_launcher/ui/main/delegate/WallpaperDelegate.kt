@@ -30,35 +30,36 @@
  * whatever layers remained, producing wrong visual assignments. Even worse, the
  * deleted layer's file was gone — Cancel could never truly restore it.
  *
- * **The Contract Now:**
+ * **The Contract Now** (since 3a-3 the bookkeeping lives in [WallpaperEditSession];
+ * this delegate executes its effects):
  *
  * 1. **Enter** — onEnterWallpaperEditMode:
- *    - Takes a snapshot of the current [WallpaperState] in [editSnapshot].
+ *    - Takes a snapshot of the current [WallpaperState] in the session snapshot.
  *    - Clears both pending-removal sets.
  *    - Sets [isWallpaperEditMode] to true.
  *    - Fragment uses this signal to switch into edit UX (snap handles, toolbar, etc.).
  *
  * 2. **Mutations during session** — onAddWallpaperLayer, onRemoveWallpaperLayer,
  *    [onSaveLayerTransform], [onSwapWallpaperLayers], etc:
- *    - All update [_wallpaperState] AND persist via [saveWallpaperStateUseCase] normally.
+ *    - All update the displayed state AND persist via [saveWallpaperStateUseCase] normally.
  *    - **BUT file deletions are deferred**: [onRemoveWallpaperLayer] in edit mode adds
- *      the URI to [pendingRemovalsOnCommit] instead of deleting the file. This
+ *      the URI to the commit marks instead of deleting the file. This
  *      preserves the disk copy so Cancel can restore it.
  *    - **AND file additions are tracked**: [onAddWallpaperLayer] in edit mode adds
- *      the new internal URI to [pendingRemovalsOnCancel], so these orphan files get
+ *      the new internal URI to the cancel marks, so these orphan files get
  *      cleaned up if the user backs out.
  *
  * 3. **Commit** — onCommitWallpaperEditMode:
- *    - Processes [pendingRemovalsOnCommit]: actually deletes those files now.
- *    - Discards [pendingRemovalsOnCancel]: added layers survive.
- *    - Clears [editSnapshot] and sets [isWallpaperEditMode] to false.
+ *    - Processes the commit marks: actually deletes those files now.
+ *    - Discards the cancel marks: added layers survive.
+ *    - Clears the session snapshot and sets [isWallpaperEditMode] to false.
  *
  * 4. **Cancel** — onCancelWallpaperEditMode:
- *    - **Synchronously** restores [_wallpaperState] to the snapshot. This is critical
+ *    - **Synchronously** restores the displayed state to the snapshot. This is critical
  *      — see below.
  *    - Asynchronously persists the restored snapshot and processes
- *      [pendingRemovalsOnCancel] (cleaning up files from added-then-cancelled layers).
- *    - Discards [pendingRemovalsOnCommit]: deleted layers' files survive because they're
+ *      the cancel marks (cleaning up files from added-then-cancelled layers).
+ *    - Discards the commit marks: deleted layers' files survive because they're
  *      referenced again by the restored snapshot.
  *    - Clears [pendingFocusLayerId] so that a stale add-layer focus hint doesn't
  *      point at a layer that no longer exists in the restored snapshot.
@@ -82,8 +83,8 @@
  * **Invariants A Maintainer Must Preserve:**
  * - An edit session always ends via EXACTLY ONE of: Commit, Cancel, or the legacy
  *   `onSetWallpaperEditMode(false)` (which routes to Commit).
- * - Never delete a file inline when _isWallpaperEditMode is true — always route
- *   through pendingRemovalsOnCommit so Cancel can restore.
+ * - Never delete a file inline while a session is open — always route
+ *   through the commit marks so Cancel can restore.
  * - Never skip the pending-removal bookkeeping on add — dangling files will
  *   eventually be caught by `gcOrphans`, but relying on that instead of explicit
  *   tracking is fragile and makes the cancel path slower.
@@ -92,15 +93,15 @@
  * - A layer add must survive a Commit but not a Cancel. [onAddWallpaperLayer] copies
  *   the picked file on a suspending IO hop that releases the main dispatcher, so a
  *   synchronous Cancel can restore the snapshot mid-copy. The add captures
- *   [editRollbackGeneration] before the copy and re-checks it after; if a rollback
+ *   the rollback generation before the copy and re-checks it after; if a rollback
  *   happened, the add discards itself (deletes its orphan file, persists nothing)
  *   instead of reviving a layer onto the restored state. Commit does NOT bump the
  *   generation — it keeps state, so a resuming add is applied normally (appended to
  *   the committed state). Never bypass this re-check, and never bump the generation on
  *   Commit — synchronous restore only protects the read path, not a resuming add.
- * - Never suspend between reading and writing [_wallpaperState]. Every mutation
- *   is expressed as a pure `Mutation` and applied through the synchronous
- *   `applyState` critical section (see STATE MUTATION CORE below); suspending
+ * - Never suspend between reading and writing the displayed state. Every mutation
+ *   is a synchronous [WallpaperEditSession] transition (since 3a-3; it holds the
+ *   snapshot, the marks and the generation); suspending
  *   work — the file copy, the DataStore persist — is placed strictly BEFORE or
  *   AFTER it, never in the middle. The reverted `deleteFile -> withContext(IO)`
  *   change (AUDIT-6 addendum) violated exactly this and reintroduced a
@@ -133,10 +134,10 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.AppConstants
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperEditSession
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
@@ -163,12 +164,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -211,18 +211,29 @@ class WallpaperDelegate(
 
     // --- Exposed State ---
 
-    private val _wallpaperState = MutableStateFlow(WallpaperState.NONE)
-    val wallpaperState: StateFlow<WallpaperState> = _wallpaperState.asStateFlow()
+    /**
+     * The edit session and the displayed state (3a-3): pure and synchronous, main-thread confined
+     * like this delegate. It decides, this delegate executes (persist through the use cases, files
+     * through [imageStore], composite, signals).
+     */
+    private val session = WallpaperEditSession()
 
-    private val _isWallpaperEditMode = MutableStateFlow(false)
-    val isWallpaperEditMode: StateFlow<Boolean> = _isWallpaperEditMode.asStateFlow()
+    val wallpaperState: StateFlow<WallpaperState> = session.state
+
+    val isWallpaperEditMode: StateFlow<Boolean> = session.isEditMode
+
+    /**
+     * Serializes every wallpaper write of this delegate (3a-3): saves land in the order they were
+     * issued, and the re-sync after a session end reads only after all of them.
+     */
+    private val persistLock = Mutex()
 
     /**
      * Fires when the wallpaper IMAGE content changed — a new/replaced image
      * ([onSetWallpaperImage]), an added layer ([onAddWallpaperLayer]), or a full
      * clear ([onClearWallpaper]). A pan/zoom-only edit ([onSaveWallpaperTransform])
      * and a cancelled session do NOT fire. A change made inside an edit session is
-     * DEFERRED to commit (see [signalImageChanged] / [sessionImageChanged]); a
+     * DEFERRED to commit (see [signalImageChanged] / [WallpaperEditSession.noteImageChanged]); a
      * standalone change (the picker path, no session) fires immediately. Neutral
      * signal: the ViewModel decides what to do with it (offer to reset the wallpaper
      * scrim when it is non-zero, so a leftover dim doesn't silently darken a fresh,
@@ -247,17 +258,14 @@ class WallpaperDelegate(
      *
      * Null when nothing new is pending focus.
      */
-    private val _pendingFocusLayerId = MutableStateFlow<String?>(null)
-    val pendingFocusLayerId: StateFlow<String?> = _pendingFocusLayerId.asStateFlow()
+    val pendingFocusLayerId: StateFlow<String?> = session.pendingFocusLayerId
 
     /**
      * Clears the pending-focus signal. The consumer must call this after
      * applying the focus, otherwise the next unrelated state emission
      * would spuriously re-focus the same layer.
      */
-    fun consumePendingFocusLayerId() {
-        _pendingFocusLayerId.value = null
-    }
+    fun consumePendingFocusLayerId() = session.consumePendingFocusLayerId()
 
     /**
      * Persisted position of the wallpaper-edit speed-dial FAB. Emits
@@ -330,23 +338,6 @@ class WallpaperDelegate(
     // --- Edit Session State ---
 
     /**
-     * Snapshot of the wallpaper state at the moment edit mode was entered.
-     * Used by [onCancelWallpaperEditMode] to roll back all changes made
-     * during the edit session (transforms, adds, removes, swaps).
-     * null when not in an edit session.
-     */
-    private var editSnapshot: WallpaperState? = null
-
-    /**
-     * Set when an image mutation (set/add) happens DURING an edit session, so the
-     * scrim-reset offer is deferred to [onCommitWallpaperEditMode] instead of popping
-     * over the edit UI (where the scrim is hidden anyway). Reset on enter/commit/cancel.
-     * A standalone (non-edit) image change emits immediately instead — see
-     * [signalImageChanged].
-     */
-    private var sessionImageChanged = false
-
-    /**
      * Guards the lazy cache refill ([refillCache]) against CONCURRENT runs: true
      * while a background fill (single-layer decode or multi-layer flatten) is in
      * flight, reset when it finishes. NOT once-per-process — a launcher runs for
@@ -372,37 +363,6 @@ class WallpaperDelegate(
      * gone (the store was deleted); this lock now guards only the single in-memory resource.
      */
     private val compositeRegenLock = Mutex()
-
-    /**
-     * Monotonic counter bumped ONLY when an edit session is rolled back
-     * ([onCancelWallpaperEditMode]). [onAddWallpaperLayer] captures it
-     * before its suspending file copy and re-checks it after:
-     * `copyToInternal` hops to `Dispatchers.IO` and releases the
-     * single-threaded main dispatcher, so a synchronous Cancel can restore
-     * the snapshot mid-copy. An add that resumes across a rollback must NOT
-     * persist its layer — that would revive it onto the restored state and
-     * race the snapshot save (the bug this guards).
-     *
-     * Only Cancel bumps this, deliberately: Commit keeps the current state
-     * and does NOT restore, so an add resuming after a Commit is applied
-     * normally (appended to the committed state and persisted) — exactly
-     * the pre-guard behavior. See the ARCHITECTURAL NOTE above.
-     */
-    private var editRollbackGeneration = 0L
-
-    /**
-     * URIs of layers removed during the current edit session.
-     * The physical file deletion is deferred until commit so that a
-     * cancel can fully restore the state – including the file on disk.
-     */
-    private val pendingRemovalsOnCommit = mutableSetOf<String>()
-
-    /**
-     * URIs of internal files created by layers added during the current
-     * edit session. If the session is canceled, these orphan files are
-     * cleaned up; if committed, they are kept.
-     */
-    private val pendingRemovalsOnCancel = mutableSetOf<String>()
 
     // --- Init ---
 
@@ -454,8 +414,8 @@ class WallpaperDelegate(
             // **Why The Edit-Mode Check:**
             // If the user enters edit mode BEFORE the first state emission (unusual but
             // possible during configuration changes), we defer the GC. Pending-removal files
-            // tracked in pendingRemovalsOnCommit/pendingRemovalsOnCancel are only referenced
-            // by the in-memory editSnapshot, NOT by state.referencedUris — a GC here would
+            // marked by the session are only referenced by its in-memory snapshot, NOT by the
+            // persisted state — a GC here would
             // destroy them. The GC will run on the first post-edit-mode emission instead.
             //
             // **Regression Guards:**
@@ -465,10 +425,11 @@ class WallpaperDelegate(
             // =================================================================================
             var gcHasRun = false
             observeWallpaperStateUseCase().collect { state ->
-                _wallpaperState.value = state
+                // Ignored while a session is open (3a-3, E4); the session end re-syncs.
+                session.onPersistedState(state)
 
                 if (!gcHasRun) {
-                    val sessionOpen = _isWallpaperEditMode.value
+                    val sessionOpen = session.isEditMode.value
                     // Once per process, as before — also when the GC fails; while a session is
                     // open the store refuses (edit guard) and the next emission tries again.
                     if (!sessionOpen) gcHasRun = true
@@ -491,71 +452,29 @@ class WallpaperDelegate(
     // STATE MUTATION CORE  (functional core / imperative shell)
     // ===========================================
     //
-    // Every wallpaper-state change is expressed as a pure [Mutation] value —
-    // the resulting state plus any file side-effects — computed WITHOUT touching
-    // the world. [applyState] is then the single place that writes
-    // [_wallpaperState] and the edit-session bookkeeping, and it is SYNCHRONOUS
-    // and non-suspending by construction: there is no way to await between
-    // reading `.value` and writing it back, so a mutation's read-modify-write
-    // can never be split by a suspension point and clobbered by a concurrent
-    // mutation on the single-threaded main dispatcher.
-    //
-    // This is the structural guard the AUDIT-6 addendum is about: the reverted
-    // `deleteFile -> withContext(IO)` change inserted a suspend point INTO such a
-    // read-modify-write and reintroduced a lost-update race. With the transition
-    // pre-computed as data, that class of bug is gone by construction. The only
-    // suspension left is the file copy in [onAddWallpaperLayer] (BEFORE the
-    // transition, re-validated via [editRollbackGeneration]) and the persist
-    // epilogue in [persist] (AFTER the atomic write).
+    // Since 3a-3 every wallpaper-state change is a synchronous transition of [session]
+    // ([WallpaperEditSession]): the read-modify-write of the displayed state and the session
+    // bookkeeping happen in one non-suspending step, so no suspension point can split it (the
+    // AUDIT-6 lost-update race stays unrepresentable). The transition returns its effect as
+    // data; suspending work — the file copy BEFORE (re-validated through the rollback
+    // generation), the persist and the deletion AFTER — runs here.
 
     /**
-     * Pure description of a single state change: the resulting [newState] plus
-     * the file side-effects it implies. No I/O, no suspension — built by the
-     * caller, executed by [applyState] + [persist].
+     * Persist epilogue for a session change ([WallpaperEditSession.Effect]): save, then let the
+     * store delete what no persisted layer references (copy → save → delete, 3a-2c). Under
+     * [persistLock], so saves land in the order they were issued.
      */
-    private data class Mutation(
-        val newState: WallpaperState,
-        /** Internal files to delete now (outside an edit session). */
-        val deleteNow: List<String> = emptyList(),
-        /** Removed-layer URIs whose physical deletion is deferred until commit. */
-        val deferToCommit: List<String> = emptyList(),
-        /** Added-layer URIs to clean up if the session is cancelled. */
-        val trackForCancel: List<String> = emptyList(),
-        /** Layer id to focus (activate) after the imminent view rebuild, if any. */
-        val focusLayerId: String? = null,
-    )
-
-    /**
-     * THE synchronous critical section. Applies [m] to [_wallpaperState] and the
-     * edit-session bookkeeping atomically. Non-suspending by construction: the
-     * read-modify-write that produced [m] and this write cannot be interleaved
-     * by another main-dispatcher coroutine.
-     *
-     * The state write happens LAST so that consumers reacting to the state
-     * emission already see the focus hint and bookkeeping in place.
-     */
-    private fun applyState(m: Mutation) {
-        m.focusLayerId?.let { _pendingFocusLayerId.value = it }
-        pendingRemovalsOnCommit.addAll(m.deferToCommit)
-        pendingRemovalsOnCancel.addAll(m.trackForCancel)
-        _wallpaperState.value = m.newState
+    private suspend fun persist(effect: WallpaperEditSession.Effect) {
+        persistLock.withLock {
+            saveWallpaperStateUseCase(effect.persist)
+            imageStore.deleteUnreferenced(effect.deleteNow)
+        }
     }
 
-    /** Persist epilogue — runs AFTER the atomic [applyState] write. */
-    private suspend fun persist(m: Mutation) {
-        saveWallpaperStateUseCase(m.newState)
-        // Copy → save → delete; the store checks against what is actually persisted (3a-2c).
-        imageStore.deleteUnreferenced(m.deleteNow)
-    }
-
-    /**
-     * Synchronous apply + scheduled persist. For the non-suspending mutations
-     * (remove, swap, layer properties, batch transforms): the state transition
-     * lands immediately and the DataStore write is fired off afterwards.
-     */
-    private fun commit(errorMessage: String, m: Mutation) {
-        applyState(m)
-        scope.launchSafe(errorMessage) { persist(m) }
+    /** A synchronous session change (already applied) plus its scheduled persist. */
+    private fun persistLater(errorMessage: String, effect: WallpaperEditSession.Effect?) {
+        if (effect == null) return
+        scope.launchSafe(errorMessage) { persist(effect) }
     }
 
     // ===========================================
@@ -563,9 +482,9 @@ class WallpaperDelegate(
     // ===========================================
 
     fun onSetWallpaperImage(imageUri: Uri) {
-        // Like onAddWallpaperLayer: a Cancel during the copy or the save restores the snapshot
-        // synchronously, so the deletion below must not act on the pre-cancel picture.
-        val rollbackGenAtStart = editRollbackGeneration
+        // Like onAddWallpaperLayer: a Cancel during the copy restores the snapshot synchronously,
+        // so the replace must then discard itself (the session compares the generation).
+        val rollbackGenAtStart = session.rollbackGeneration
         setWallpaperImage(imageUri, rollbackGenAtStart)
     }
 
@@ -579,21 +498,16 @@ class WallpaperDelegate(
             scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
             return@launchSafe
         }
-        val replaced = _wallpaperState.value.referencedUris
         val newUri = internalUri.toString()
-        setWallpaperImageUseCase(newUri)
-        // Replacing deletes the old files (3a-2, W1) — copy → save → delete. Inside an edit
-        // session they are deferred to commit (cancel restores them), and the new copy is
-        // tracked so a cancel removes it again. If a Cancel landed meanwhile, delete nothing:
-        // the restored snapshot may reference the "replaced" files; at worst an orphan is left
-        // for the GC.
-        if (editRollbackGeneration != rollbackGenAtStart) {
-            // nothing to delete
-        } else if (_isWallpaperEditMode.value) {
-            pendingRemovalsOnCommit.addAll(replaced)
-            pendingRemovalsOnCancel.add(newUri)
-        } else {
-            imageStore.deleteUnreferenced(replaced)
+        // Replace is a session change (3a-3, E4): applied to the displayed state right away, also
+        // inside a session — the edit no longer waits for the repository emission. Outside a
+        // session the old files go once the new state is saved; inside, at commit (cancel restores
+        // them), and the new copy goes again on cancel. A cancel during the copy discards the
+        // replace; the copy is then an orphan for the GC.
+        val effect = session.replace(newUri, rollbackGenAtStart) ?: return@launchSafe
+        persistLock.withLock {
+            setWallpaperImageUseCase(newUri)
+            imageStore.deleteUnreferenced(effect.deleteNow)
         }
         // A new/replaced image → offer a scrim reset (deferred to commit if in a session).
         signalImageChanged()
@@ -610,30 +524,14 @@ class WallpaperDelegate(
         translateY: Float,
         captureSampleSize: Int? = null
     ) {
-        val currentState = _wallpaperState.value
-        if (!currentState.hasWallpaper) return
-        // A single-image wallpaper is the one-element layer list, so the SaveSingle
-        // path (view single-mode) writes the transform back into layer 0 — the same
-        // shape as onSaveLayerTransform.
-        //
-        // Update _wallpaperState SYNCHRONOUSLY via the commit core. Persisting only to
-        // DataStore (the old path) left _wallpaperState holding the OLD transform
-        // until the async write round-tripped, so the commit-triggered re-render
-        // (HomeFragment Observer 8, fired by the edit-mode flag flip) read the stale
-        // state and briefly regressed the display to the old scale/position before
-        // the DataStore emission corrected it. commit() applies synchronously first.
-        commit(
+        // A single-image wallpaper is the one-element layer list, so the SaveSingle path (view
+        // single-mode) writes the transform back into layer 0. The session applies it
+        // SYNCHRONOUSLY: persisting only to DataStore (the old path) left the displayed state
+        // holding the OLD transform until the write round-tripped, and the commit-triggered
+        // re-render briefly regressed the display.
+        persistLater(
             "Error saving wallpaper transform",
-            Mutation(
-                currentState.withUpdatedLayer(0) {
-                    it.copy(
-                        scale = scale,
-                        translateX = translateX,
-                        translateY = translateY,
-                        captureSampleSize = captureSampleSize,
-                    )
-                }
-            ),
+            session.saveSingleTransform(scale, translateX, translateY, captureSampleSize),
         )
     }
 
@@ -664,7 +562,7 @@ class WallpaperDelegate(
             // restore: the observe flow re-emits NONE shortly (idempotent), but setting it now
             // closes the window in which a warm resuming right after this lock releases would
             // still read the pre-clear state (its key-gated put then fails on NONE).
-            _wallpaperState.value = WallpaperState.NONE
+            session.onPersistedState(WallpaperState.NONE)
             true
         }
         if (!removed) {
@@ -686,30 +584,15 @@ class WallpaperDelegate(
      * re-evaluate the current state at the new metrics and refill on a miss. (Single-layer is
      * resolution-independent — its `file://` key is unchanged — so this is a no-op for it.)
      */
-    fun onDisplayConfigChanged() = refillCache(_wallpaperState.value)
+    fun onDisplayConfigChanged() = refillCache(session.state.value)
 
     // ===========================================
     // EDIT MODE
     // ===========================================
 
-    /**
-     * Enters edit mode and snapshots the current wallpaper state.
-     *
-     * While in edit mode:
-     * - Layer removals are persisted in state, but the underlying file
-     *   on disk is kept alive (tracked in [pendingRemovalsOnCommit]).
-     * - Added layers are tracked in [pendingRemovalsOnCancel] so their
-     *   files can be cleaned up if the session is canceled.
-     *
-     * The session ends with either [onCommitWallpaperEditMode] (confirm)
-     * or [onCancelWallpaperEditMode] (roll back all changes).
-     */
+    /** Opens the session; ignored while one is open (3a-3, E3: the snapshot must not be overwritten). */
     fun onEnterWallpaperEditMode() {
-        editSnapshot = _wallpaperState.value
-        pendingRemovalsOnCommit.clear()
-        pendingRemovalsOnCancel.clear()
-        sessionImageChanged = false
-        _isWallpaperEditMode.value = true
+        session.enter()
     }
 
     /**
@@ -719,11 +602,7 @@ class WallpaperDelegate(
      * offer doesn't cover the edit UI (where the scrim is hidden anyway).
      */
     private fun signalImageChanged() {
-        if (_isWallpaperEditMode.value) {
-            sessionImageChanged = true
-        } else {
-            _wallpaperImageChanged.tryEmit(Unit)
-        }
+        if (session.noteImageChanged()) _wallpaperImageChanged.tryEmit(Unit)
     }
 
     /**
@@ -732,18 +611,12 @@ class WallpaperDelegate(
      * is discarded, and in-memory state stays as-is (already persisted).
      */
     fun onCommitWallpaperEditMode() {
-        val filesToDelete = pendingRemovalsOnCommit.toSet()
-        pendingRemovalsOnCommit.clear()
-        pendingRemovalsOnCancel.clear()
-        editSnapshot = null
+        val end = session.commit()
 
         // An image mutation during the session (deferred by [signalImageChanged] so
         // the offer doesn't pop mid-edit, where the scrim is hidden anyway) surfaces
         // now that the user is back on the settled home screen.
-        if (sessionImageChanged) {
-            sessionImageChanged = false
-            _wallpaperImageChanged.tryEmit(Unit)
-        }
+        if (end.imageChanged) _wallpaperImageChanged.tryEmit(Unit)
 
         // No representation collapse needed anymore (was AUDIT-20 F13): a wallpaper
         // edited down to one layer already IS the canonical single-image form, so
@@ -751,16 +624,17 @@ class WallpaperDelegate(
         // layerCount == 1 without any state rewrite. The old toSingleLayer() collapse
         // existed only because a lone image had a separate flat representation.
 
-        if (filesToDelete.isNotEmpty()) {
+        if (end.deleteCandidates.isNotEmpty()) {
             scope.launchSafe("Error committing wallpaper edit") {
-                // The store deletes only files no persisted layer still references (3a-2c).
-                imageStore.deleteUnreferenced(filesToDelete)
+                // After the session's saves; the store deletes only files no persisted layer
+                // still references (3a-2c).
+                persistLock.withLock { imageStore.deleteUnreferenced(end.deleteCandidates) }
             }
         }
 
         // Exit edit mode + warm the display cache for the committed state through the
         // single funnel (AUDIT-20 F11).
-        leaveEditMode(_wallpaperState.value)
+        leaveEditMode(end.finalState)
     }
 
     /**
@@ -785,7 +659,7 @@ class WallpaperDelegate(
      */
     private fun refillCache(state: WallpaperState) {
         if (refillInProgress) return
-        if (_isWallpaperEditMode.value) return
+        if (session.isEditMode.value) return
         val key = cacheKeyOrNull(state)
         if (key == null) {
             // Single-layer / no wallpaper: nothing is cached under a null key (§25 P4), so a
@@ -798,7 +672,7 @@ class WallpaperDelegate(
             // composite's luminance (the composite signal is only ever read for multi-layer, so
             // the stale value is inert while single-layer but wrong on a later single->multi
             // re-entry until the new warm emits).
-            if (cacheKeyOrNull(_wallpaperState.value) == null) {
+            if (cacheKeyOrNull(session.state.value) == null) {
                 compositeCache.invalidate()
                 compositeLuminanceSignal.emit(null)
             }
@@ -824,8 +698,8 @@ class WallpaperDelegate(
                 refillInProgress = false
                 // Self-reschedule (S5): only if the current state is a DIFFERENT miss — never the
                 // same key, so a failed/incomplete fill does not loop.
-                val current = _wallpaperState.value
-                if (!_isWallpaperEditMode.value) {
+                val current = session.state.value
+                if (!session.isEditMode.value) {
                     val currentKey = cacheKeyOrNull(current)
                     if (currentKey != null && currentKey != key && compositeCache.get(currentKey) == null) {
                         refillCache(current)
@@ -917,7 +791,7 @@ class WallpaperDelegate(
         // Key-gated put (spec §1): only cache if this key is still the current wallpaper's key.
         // A warm that finishes after a clear (NONE, not multi-layer) or a supersede drops its
         // bitmap (uncached -> GC) rather than stranding a stale ~10 MB entry.
-        val current = _wallpaperState.value
+        val current = session.state.value
         if (current.layerCount >= 2 && compositeKey(current) == key) {
             compositeCache.put(
                 key,
@@ -960,7 +834,7 @@ class WallpaperDelegate(
      * wallpaper's own `layers[0]` heuristic instead.
      */
     private fun dropLuminanceIfCurrent(key: String) {
-        val current = _wallpaperState.value
+        val current = session.state.value
         if (current.layerCount >= 2 && compositeKey(current) == key) {
             compositeLuminanceSignal.emit(null)
         }
@@ -977,32 +851,20 @@ class WallpaperDelegate(
      * - Files of layers added during the session are deleted.
      */
     fun onCancelWallpaperEditMode() {
-        editRollbackGeneration++
-        val snapshot = editSnapshot
-        val filesToDelete = pendingRemovalsOnCancel.toSet()
-
-        if (snapshot != null) {
-            _wallpaperState.value = snapshot
-        }
-        // Any pending-focus hint from a mid-session add now points to a
-        // layer that no longer exists in the restored snapshot.
-        _pendingFocusLayerId.value = null
-        pendingRemovalsOnCancel.clear()
-        pendingRemovalsOnCommit.clear()
-        editSnapshot = null
-        // Rolled back → any in-session image change is void, no offer.
-        sessionImageChanged = false
+        // The session restores the snapshot synchronously and bumps the generation, so an add or
+        // replace still copying discards itself.
+        val end = session.cancel()
 
         // Persist the restored snapshot / delete session-added files only when there is
         // something to do; the exit + cache warm below runs unconditionally (AUDIT-20 F11).
-        if (snapshot != null || filesToDelete.isNotEmpty()) {
+        if (end.persist != null || end.deleteCandidates.isNotEmpty()) {
             scope.launchSafe("Error canceling wallpaper edit") {
-                if (snapshot != null) {
-                    saveWallpaperStateUseCase(snapshot)
+                persistLock.withLock {
+                    end.persist?.let { saveWallpaperStateUseCase(it) }
+                    // After the restored snapshot is persisted: the session-added files no
+                    // persisted layer references (3a-2c).
+                    imageStore.deleteUnreferenced(end.deleteCandidates)
                 }
-                // After the restored snapshot is persisted: the session-added files no persisted
-                // layer references (3a-2c).
-                imageStore.deleteUnreferenced(filesToDelete)
             }
         }
 
@@ -1010,7 +872,7 @@ class WallpaperDelegate(
         // funnel (AUDIT-20 F11). A no-op cancel (unchanged snapshot) produces no DataStore
         // emission, so this is the only trigger that re-warms after a config change
         // (rotate/fold) that was deferred while editing.
-        leaveEditMode(_wallpaperState.value)
+        leaveEditMode(end.finalState)
     }
 
     /**
@@ -1024,8 +886,28 @@ class WallpaperDelegate(
      * commit/cancel (which also emits) costs nothing.
      */
     private fun leaveEditMode(finalState: WallpaperState) {
-        _isWallpaperEditMode.value = false
         refillCache(finalState)
+        resyncWithPersisted()
+    }
+
+    /**
+     * After a session end (3a-3, E4): the session ignored repository emissions while it was open
+     * (and keeps ignoring them until this re-sync), so the latest PERSISTED state is applied now —
+     * not just the next emission, which may never come. Runs after all writes issued so far
+     * ([persistLock]), so it never reads a state older than the session's own saves (a removed
+     * layer must not come back). If the persisted state
+     * differs — a save swallowed in a release build — the display shows the truth.
+     */
+    private fun resyncWithPersisted() = scope.launchSafe("Error re-syncing the wallpaper after an edit") {
+        var persisted: WallpaperState? = null
+        try {
+            persistLock.withLock { persisted = observeWallpaperStateUseCase().firstOrNull() }
+        } finally {
+            // Always end the re-sync, also when the read fails: until then the session ignores
+            // emissions, and a pending re-sync must never freeze the display.
+            val latest = persisted
+            if (session.resync(latest) && latest != null) refillCache(latest)
+        }
     }
 
     /**
@@ -1039,7 +921,7 @@ class WallpaperDelegate(
     }
 
     fun onToggleWallpaperEditMode() {
-        if (_isWallpaperEditMode.value) onCommitWallpaperEditMode() else onEnterWallpaperEditMode()
+        if (session.isEditMode.value) onCommitWallpaperEditMode() else onEnterWallpaperEditMode()
     }
 
     // ===========================================
@@ -1047,13 +929,11 @@ class WallpaperDelegate(
     // ===========================================
 
     fun onAddWallpaperLayer(imageUri: Uri) {
-        // Capture the rollback generation synchronously, at invocation time.
-        // The copy below hops to Dispatchers.IO and releases the main
-        // dispatcher, so a synchronous Cancel can restore the snapshot
-        // before the add resumes — the re-check inside guards against it.
-        // A Commit does NOT restore state, so it deliberately does not bump
-        // the generation: an add resuming after Commit is applied normally.
-        val rollbackGenAtStart = editRollbackGeneration
+        // Capture the rollback generation synchronously, at invocation time. The copy below
+        // releases the main dispatcher, so a synchronous Cancel can restore the snapshot before
+        // the add resumes — the session compares the generation and discards the add then. A
+        // Commit does NOT bump it (3a-3, E2): an add resuming after Commit is applied normally.
+        val rollbackGenAtStart = session.rollbackGeneration
 
         scope.launchSafe("Error adding wallpaper layer") {
             val internalUri = imageStore.copyIn(imageUri)
@@ -1063,91 +943,35 @@ class WallpaperDelegate(
             }
             val internalUriString = internalUri.toString()
 
-            // From here to applyState there is NO suspension: the rollback
-            // re-check and the state write are atomic. If the edit session was
-            // rolled back during the copy (the user hit Cancel mid-copy),
-            // persisting now would revive a layer onto the already-restored
-            // state and race the snapshot save. Discard the add and clean up its
-            // orphaned file instead.
-            if (editRollbackGeneration != rollbackGenAtStart) {
-                // Rollback branch: discard the add and clean up its orphan file.
-                // Suspending here is safe — this branch returns without touching
-                // _wallpaperState, so it never enters the atomic section below.
-                // Nothing persisted references the new copy, so the store removes it (3a-2c).
+            // The session's add is synchronous: re-check and state write are one step. A
+            // single-image wallpaper is already the one-element layer list, so adding appends;
+            // the new layer is tracked for cancel inside a session and gets the focus hint.
+            val effect = session.addLayer(internalUriString, rollbackGenAtStart)
+            if (effect == null) {
+                // Rolled back during the copy: nothing persisted references the new copy, so the
+                // store removes it (3a-2c).
                 imageStore.deleteUnreferenced(listOf(internalUriString))
                 return@launchSafe
             }
-
-            val current = _wallpaperState.value
-
-            // No Single → Multi migration needed: a single-image wallpaper is
-            // already the one-element layer list, so adding a layer just appends.
-            // An existing lone image thus becomes a 2-layer composite naturally.
-            val newLayer = WallpaperLayerState(
-                imageUri = internalUriString,
-            )
-
-            val mutation = Mutation(
-                newState = current.withAddedLayer(newLayer),
-                // While in edit mode, track this file so its orphan copy on disk
-                // gets cleaned up if the user cancels the session.
-                trackForCancel = if (_isWallpaperEditMode.value) listOf(internalUriString) else emptyList(),
-                // Signal the view to focus (activate) the new layer after the
-                // imminent rebuild. Consumer calls consumePendingFocusLayerId().
-                focusLayerId = newLayer.id,
-            )
-            applyState(mutation)
-            persist(mutation)
+            persist(effect)
             // Added a layer → image content changed (deferred to commit in a session).
             signalImageChanged()
         }
     }
 
     fun onRemoveWallpaperLayer(layerIndex: Int) {
-        val current = _wallpaperState.value
-        val layerUri = current.getLayer(layerIndex)?.imageUri
-        val inEdit = _isWallpaperEditMode.value
-
-        // In edit mode: defer the physical delete until commit so that a cancel
-        // can restore the snapshot including the file on disk. Outside edit mode:
-        // delete immediately (in the persist epilogue).
-        //
-        // Unified persist path: WallpaperRepositoryImpl.saveWallpaperState handles
-        // the "no wallpaper" case by wiping all keys, so removing the last layer
-        // needs no separate clearWallpaperUseCase call (avoids a brief UI flicker).
-        commit(
-            errorMessage = "Error removing wallpaper layer",
-            m = Mutation(
-                newState = current.withRemovedLayer(layerIndex),
-                deleteNow = if (!inEdit && layerUri != null) listOf(layerUri) else emptyList(),
-                deferToCommit = if (inEdit && layerUri != null) listOf(layerUri) else emptyList(),
-            )
-        )
+        // In edit mode the physical delete waits for commit, so a cancel can restore the snapshot
+        // including the file; outside edit mode it happens after the save. Removing the last layer
+        // needs no separate clear: saving a state without wallpaper wipes all keys.
+        persistLater("Error removing wallpaper layer", session.removeLayer(layerIndex))
     }
 
     fun onSwapWallpaperLayers(indexA: Int, indexB: Int) =
-        commit(
-            "Error swapping wallpaper layers",
-            Mutation(_wallpaperState.value.withSwappedLayers(indexA, indexB))
-        )
+        persistLater("Error swapping wallpaper layers", session.swapLayers(indexA, indexB))
 
     // ===========================================
     // MULTI-LAYER: TRANSFORMS
     // ===========================================
-
-    /**
-     * Applies [transform] to the layer at [layerIndex], mirrors the result
-     * into [_wallpaperState] and persists it — the shared body of the
-     * single-layer mutate-and-save operations.
-     */
-    private fun mutateLayerAndPersist(
-        errorMessage: String,
-        layerIndex: Int,
-        transform: (WallpaperLayerState) -> WallpaperLayerState,
-    ) = commit(
-        errorMessage,
-        Mutation(_wallpaperState.value.withUpdatedLayer(layerIndex, transform))
-    )
 
     fun onSaveLayerTransform(
         layerIndex: Int,
@@ -1155,33 +979,17 @@ class WallpaperDelegate(
         translateX: Float,
         translateY: Float,
         captureSampleSize: Int? = null
-    ) = mutateLayerAndPersist("Error saving layer transform", layerIndex) {
-        it.copy(
-            scale = scale,
-            translateX = translateX,
-            translateY = translateY,
-            captureSampleSize = captureSampleSize
-        )
-    }
+    ) = persistLater(
+        "Error saving layer transform",
+        session.saveLayerTransform(layerIndex, scale, translateX, translateY, captureSampleSize),
+    )
 
     fun onSaveAllLayerTransforms(
         transforms: List<LayerTransform>
     ) {
-        var state = _wallpaperState.value
-        transforms.forEachIndexed { index, t ->
-            state = state.withUpdatedLayer(index) {
-                // Store the view scale RAW + tag captureSampleSize (Ansatz Y is
-                // tag-only, spec §4-Y): no ÷S on save, the load side multiplies
-                // the S_render/S_captured ratio.
-                it.copy(
-                    scale = t.scale,
-                    translateX = t.translateX,
-                    translateY = t.translateY,
-                    captureSampleSize = t.sampleSize
-                )
-            }
-        }
-        commit("Error saving all layer transforms", Mutation(state))
+        // The view scale is stored RAW and captureSampleSize tagged (Ansatz Y is tag-only, spec
+        // §4-Y): no ÷S on save, the load side multiplies the S_render/S_captured ratio.
+        persistLater("Error saving all layer transforms", session.saveAllLayerTransforms(transforms))
     }
 
 }

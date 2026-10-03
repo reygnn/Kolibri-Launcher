@@ -2135,6 +2135,79 @@ class WallpaperDelegateTest {
         coVerify(exactly = 2) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
         coVerify(exactly = 0) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
     }
+
+    // ===========================================
+    // EDIT SESSION (3a-3): emissions during a session, re-sync after it, re-entering
+    // ===========================================
+
+    private fun twoLayers() = WallpaperState.multiLayer(
+        listOf(
+            WallpaperLayerState(id = "first", imageUri = "file:///data/wallpapers/a"),
+            WallpaperLayerState(id = "second", imageUri = "file:///data/wallpapers/b"),
+        ),
+    )
+
+    @Test
+    fun `an emission during an edit session is ignored and the session end re-syncs with the persisted state`() = runTest {
+        // E4: the session ignores emissions; after it, the latest PERSISTED state is applied —
+        // not just a next emission that may never come.
+        val start = WallpaperState.single("file:///data/wallpapers/a")
+        val stateFlow = MutableStateFlow(start)
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+        delegate.onEnterWallpaperEditMode()
+
+        val elsewhere = WallpaperState.single("file:///data/wallpapers/z")
+        stateFlow.value = elsewhere
+        advanceUntilIdle()
+        assertThat(delegate.wallpaperState.value).isEqualTo(start)
+
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+        assertThat(delegate.wallpaperState.value).isEqualTo(elsewhere)
+    }
+
+    @Test
+    fun `a layer removed in a session and committed right away does not come back`() = runTest {
+        // E4: a stale emission (an older save landing late) must not revive the removed layer,
+        // neither during the session nor through the re-sync after it.
+        val stateFlow = MutableStateFlow(twoLayers())
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        coEvery { saveWallpaperStateUseCase.invoke(any()) } coAnswers { stateFlow.value = firstArg() }
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        stateFlow.value = twoLayers() // the stale emission
+        delegate.onCommitWallpaperEditMode()
+        advanceUntilIdle()
+
+        assertThat(delegate.wallpaperState.value.layers.map { it.id }).containsExactly("second")
+    }
+
+    @Test
+    fun `entering a running session again keeps its snapshot`() = runTest {
+        // E3: re-entering used to overwrite the snapshot, so a cancel restored the edited state.
+        val stateFlow = MutableStateFlow(twoLayers())
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onRemoveWallpaperLayer(0)
+        delegate.onEnterWallpaperEditMode()
+        delegate.onCancelWallpaperEditMode()
+
+        assertThat(delegate.wallpaperState.value).isEqualTo(twoLayers())
+    }
 }
 
 /**
