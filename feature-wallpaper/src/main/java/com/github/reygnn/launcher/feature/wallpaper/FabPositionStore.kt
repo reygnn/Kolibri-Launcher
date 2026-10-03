@@ -1,4 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.feature.wallpaper
 import com.github.reygnn.launcher.common.data.safePurge
 import com.github.reygnn.launcher.common.data.readFlowFailOpen
 
@@ -7,9 +7,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import com.github.reygnn.launcher.core.OwnsSettingsStoreKeys
+import com.github.reygnn.launcher.core.SettingsStore
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
-import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -33,10 +34,17 @@ import javax.inject.Singleton
  * hot share bought nothing here and only carried the stale-replay hazard.
  * The constructor takes just the [DataStore] — no `externalScope` /
  * `sharingStrategy`, no dual constructor, no test factory.
+ *
+ * **Shared since 3a-5** (was Kolibri's `FabPositionRepositoryImpl`): in `:feature-wallpaper`, on
+ * the app's settings store ([SettingsStore]), behaviour unchanged — a missing value falls back
+ * per coordinate, a failed save is logged and rethrown, reads fail open on `IOException`.
+ * Unifying with Nyx's "both or default" rule is open for 3b. The key names are the same in both
+ * apps, so they stay literals (the keep-list gate sees them). It is purged exactly once — in both
+ * apps by `ResetRepositoryImpl` (Kolibri always, Nyx since 2b-4c) — never additionally elsewhere.
  */
 @Singleton
-class FabPositionRepositoryImpl @Inject constructor(
-    private val dataStore: DataStore<Preferences>,
+class FabPositionStore @Inject constructor(
+    @param:SettingsStore private val dataStore: DataStore<Preferences>,
 ) : FabPositionRepository, OwnsSettingsStoreKeys {
 
     private object PreferencesKeys {
@@ -74,7 +82,7 @@ class FabPositionRepositoryImpl @Inject constructor(
     }
 
     override suspend fun purgeRepository() {
-        dataStore.safePurge("FabPositionRepositoryImpl") { preferences ->
+        dataStore.safePurge("FabPositionStore") { preferences ->
             preferences.remove(PreferencesKeys.FAB_X_FRACTION)
             preferences.remove(PreferencesKeys.FAB_Y_FRACTION)
         }

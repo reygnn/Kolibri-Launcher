@@ -1,7 +1,5 @@
-package com.github.reygnn.kolibri_launcher.fakes
+package com.github.reygnn.launcher.core.wallpaper
 
-import com.github.reygnn.launcher.core.wallpaper.FabPosition
-import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeFabPositionRepository : FabPositionRepository {

@@ -1,9 +1,6 @@
-package com.github.reygnn.kolibri_launcher.data
+package com.github.reygnn.launcher.core.wallpaper
 
-import com.github.reygnn.launcher.core.wallpaper.FabPosition
-import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
-import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -35,7 +32,7 @@ import org.junit.Test
  *     observable-starvation / stale-replay case a ShareInTest would cover.
  *
  * @see FakeFabPositionRepositoryContractTest
- * @see FabPositionRepositoryImplContractTest
+ * @see com.github.reygnn.launcher.feature.wallpaper.FabPositionStoreContractTest
  * ============================================================================
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -43,9 +40,6 @@ abstract class FabPositionRepositoryContract {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
-    @get:Rule
-    val timberRule = TimberRule()
 
     protected abstract fun createRepository(): FabPositionRepository
 

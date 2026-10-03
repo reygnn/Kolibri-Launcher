@@ -2,7 +2,7 @@ package com.github.reygnn.kolibri_launcher.data
 
 import com.github.reygnn.kolibri_launcher.domain.repository.AppUsageRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.CustomNamesRepository
-import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesOrderRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.FavoritesRepository
 import com.github.reygnn.kolibri_launcher.domain.repository.HiddenAppsRepository

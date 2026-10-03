@@ -1,8 +1,5 @@
 package com.github.reygnn.launcher.feature.wallpaper
 
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.preferencesOf
@@ -12,10 +9,7 @@ import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -33,21 +27,6 @@ class WallpaperDisplaySettingsStoreTest {
 
     // Kolibri's names, the old surface name included (D3).
     private val keys = WallpaperDisplayKeys(scrimAlpha = "wallpaper_scrim_alpha", backdrop = "wallpaper_backdrop", surfaceMode = "app_drawer_mode")
-
-    /** An in-memory preferences store; [readFailure] / [writeFailure] make reads or writes fail. */
-    private class InMemoryPreferencesStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
-        val state = MutableStateFlow(initial)
-        var readFailure: Throwable? = null
-        var writeFailure: Throwable? = null
-        override val data: Flow<Preferences> = flow {
-            readFailure?.let { throw it }
-            state.collect { emit(it) }
-        }
-        override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
-            writeFailure?.let { throw it }
-            return transform(state.value).also { state.value = it }
-        }
-    }
 
     @Test
     fun a_fresh_store_reads_the_defaults() = runTest(mainDispatcherRule.testDispatcher) {

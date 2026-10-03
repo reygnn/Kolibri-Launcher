@@ -1,7 +1,4 @@
-package com.github.reygnn.kolibri_launcher.data
-
-import com.github.reygnn.kolibri_launcher.domain.repository.FabPositionRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeFabPositionRepository
+package com.github.reygnn.launcher.core.wallpaper
 
 /**
  * Contract-Test-Ausführung gegen das Unit-Test-Fake
