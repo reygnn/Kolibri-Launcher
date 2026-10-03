@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
@@ -145,7 +146,7 @@ class WallpaperDelegateTest {
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
-        wallpaperFileManager = wallpaperFileManager,
+        imageStore = WallpaperImageStore(wallpaperFileManager, ioDispatcher),
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = compositeCache,
         bitmapLuminance = bitmapLuminance,

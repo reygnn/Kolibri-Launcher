@@ -2,6 +2,7 @@ package com.github.reygnn.launcher.feature.wallpaper
 
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -42,6 +43,7 @@ import java.nio.file.Files
  * coroutines). Standard project contract shape (`NoAutoPruneContract`): `MainDispatcherRule` +
  * `runTest(testDispatcher)`; the subclass wires the SAME dispatcher into its store.
  */
+@OptIn(ExperimentalCoroutinesApi::class) // advanceUntilIdle
 abstract class WallpaperImageStoreContract {
 
     @get:Rule

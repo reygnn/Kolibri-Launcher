@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
 import android.content.Context
@@ -168,7 +169,7 @@ class LauncherViewModelDoomsdayTest {
         saveFabPositionUseCase = mockk(relaxed = true),
         observeWallpaperBackdropUseCase = mockk(relaxed = true),
         setWallpaperBackdropUseCase = mockk(relaxed = true),
-        wallpaperFileManager = mockk(relaxed = true),
+        wallpaperImageStore = WallpaperImageStore(mockk(relaxed = true), mainDispatcherRule.testDispatcher),
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeCache = mockk(relaxed = true),
             wallpaperBitmapLuminance = mockk(relaxed = true),

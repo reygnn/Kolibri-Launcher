@@ -20,7 +20,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.core.CompositeLuminanceSignal
@@ -146,7 +146,7 @@ class LauncherViewModel @Inject constructor(
     saveFabPositionUseCase: SaveFabPositionUseCase,
     observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
     setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
-    wallpaperFileManager: WallpaperFileManager,
+    wallpaperImageStore: WallpaperImageStore,
     wallpaperFlattener: WallpaperFlattener,
     wallpaperCompositeCache: WallpaperCompositeCache,
     wallpaperBitmapLuminance: WallpaperBitmapLuminanceImpl,
@@ -247,7 +247,7 @@ class LauncherViewModel @Inject constructor(
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
-        wallpaperFileManager = wallpaperFileManager,
+        imageStore = wallpaperImageStore,
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = wallpaperCompositeCache,
         bitmapLuminance = wallpaperBitmapLuminance,

@@ -133,7 +133,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.AppConstants
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
@@ -199,7 +199,8 @@ class WallpaperDelegate(
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
     private val setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
-    private val wallpaperFileManager: WallpaperFileManager,
+    /** Every file decision: copy in, delete what no layer needs, orphan GC (3a-2). */
+    private val imageStore: WallpaperImageStore,
     private val wallpaperFlattener: WallpaperFlattener,
     private val compositeCache: WallpaperCompositeCache,
     private val bitmapLuminance: WallpaperBitmapLuminanceImpl,
@@ -466,14 +467,14 @@ class WallpaperDelegate(
             observeWallpaperStateUseCase().collect { state ->
                 _wallpaperState.value = state
 
-                if (!gcHasRun && !_isWallpaperEditMode.value) {
-                    gcHasRun = true
+                if (!gcHasRun) {
+                    val sessionOpen = _isWallpaperEditMode.value
+                    // Once per process, as before — also when the GC fails; while a session is
+                    // open the store refuses (edit guard) and the next emission tries again.
+                    if (!sessionOpen) gcHasRun = true
                     try {
-                        // gcOrphans does blocking disk I/O (listFiles + delete);
-                        // hop off the main dispatcher (this collect runs on it).
-                        withContext(ioDispatcher) {
-                            wallpaperFileManager.gcOrphans(state.referencedUris)
-                        }
+                        // The store hops its disk I/O off the main dispatcher (this collect runs on it).
+                        imageStore.collectOrphans(state, editSessionOpen = sessionOpen)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
@@ -543,13 +544,9 @@ class WallpaperDelegate(
     /** Persist epilogue — runs AFTER the atomic [applyState] write. */
     private suspend fun persist(m: Mutation) {
         saveWallpaperStateUseCase(m.newState)
-        // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
-        // internally guarded (never throws), so no per-file try/catch is needed.
-        if (m.deleteNow.isNotEmpty()) {
-            withContext(ioDispatcher) {
-                m.deleteNow.forEach { wallpaperFileManager.deleteFile(it) }
-            }
-        }
+        // Copy → save → delete: only now that the new state is persisted, and only files no
+        // layer of it references (3a-2).
+        imageStore.deleteUnreferenced(m.deleteNow, m.newState)
     }
 
     /**
@@ -566,17 +563,39 @@ class WallpaperDelegate(
     // SINGLE-LAYER WALLPAPER
     // ===========================================
 
-    fun onSetWallpaperImage(imageUri: Uri) = scope.launchSafe(
+    fun onSetWallpaperImage(imageUri: Uri) {
+        // Like onAddWallpaperLayer: a Cancel during the copy or the save restores the snapshot
+        // synchronously, so the deletion below must not act on the pre-cancel picture.
+        val rollbackGenAtStart = editRollbackGeneration
+        setWallpaperImage(imageUri, rollbackGenAtStart)
+    }
+
+    private fun setWallpaperImage(imageUri: Uri, rollbackGenAtStart: Long) = scope.launchSafe(
         errorMessage = "Error setting wallpaper image",
         defaultErrorToast = R.string.error_generic
     ) {
-        val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+        val internalUri = imageStore.copyIn(imageUri)
         if (internalUri == null) {
             TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
             scope.sendEvent(UiEvent.ShowToast(R.string.error_generic))
             return@launchSafe
         }
-        setWallpaperImageUseCase(internalUri.toString())
+        val replaced = _wallpaperState.value.referencedUris
+        val newUri = internalUri.toString()
+        setWallpaperImageUseCase(newUri)
+        // Replacing deletes the old files (3a-2, W1) — copy → save → delete. Inside an edit
+        // session they are deferred to commit (cancel restores them), and the new copy is
+        // tracked so a cancel removes it again. If a Cancel landed meanwhile, delete nothing:
+        // the restored snapshot may reference the "replaced" files; at worst an orphan is left
+        // for the GC.
+        if (editRollbackGeneration != rollbackGenAtStart) {
+            // nothing to delete
+        } else if (_isWallpaperEditMode.value) {
+            pendingRemovalsOnCommit.addAll(replaced)
+            pendingRemovalsOnCancel.add(newUri)
+        } else {
+            imageStore.deleteUnreferenced(replaced, WallpaperState.single(uri = newUri))
+        }
         // A new/replaced image → offer a scrim reset (deferred to commit if in a session).
         signalImageChanged()
         // No success toast: the new wallpaper IS the confirmation — it is on screen
@@ -630,8 +649,8 @@ class WallpaperDelegate(
         // fail its latest-wins guard and drop its own file (F7) rather than resurrect
         // the removed wallpaper with an orphaned composite.
         compositeRegenLock.withLock {
-            // clearAll does blocking disk I/O — hop off the main dispatcher.
-            withContext(ioDispatcher) { wallpaperFileManager.clearAll() }
+            // The store hops its blocking disk I/O off the main dispatcher.
+            imageStore.deleteAll()
             // Removes the DataStore wallpaper keys.
             clearWallpaperUseCase()
             // Drop the in-memory composite (v4 §3, was AUDIT-20 F3): nothing displays a
@@ -727,13 +746,11 @@ class WallpaperDelegate(
         // existed only because a lone image had a separate flat representation.
 
         if (filesToDelete.isNotEmpty()) {
+            val committed = _wallpaperState.value
             scope.launchSafe("Error committing wallpaper edit") {
-                // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
-                // internally guarded (never throws), so a bad delete can't abort the
-                // batch and no per-file wrapper is needed (Rule 11).
-                withContext(ioDispatcher) {
-                    filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
-                }
+                // The committed state is already persisted; the store deletes only files no
+                // layer of it still references (3a-2).
+                imageStore.deleteUnreferenced(filesToDelete, committed)
             }
         }
 
@@ -979,13 +996,9 @@ class WallpaperDelegate(
                 if (snapshot != null) {
                     saveWallpaperStateUseCase(snapshot)
                 }
-                // deleteFile is blocking disk I/O — hop off the main dispatcher. It is
-                // internally guarded (never throws) — no per-file wrapper (Rule 11).
-                if (filesToDelete.isNotEmpty()) {
-                    withContext(ioDispatcher) {
-                        filesToDelete.forEach { wallpaperFileManager.deleteFile(it) }
-                    }
-                }
+                // After the restored snapshot is persisted: delete the session-added files the
+                // restored state does not reference (3a-2).
+                imageStore.deleteUnreferenced(filesToDelete, snapshot ?: _wallpaperState.value)
             }
         }
 
@@ -1039,7 +1052,7 @@ class WallpaperDelegate(
         val rollbackGenAtStart = editRollbackGeneration
 
         scope.launchSafe("Error adding wallpaper layer") {
-            val internalUri = wallpaperFileManager.copyToInternal(imageUri)
+            val internalUri = imageStore.copyIn(imageUri)
             if (internalUri == null) {
                 TimberWrapper.silentError("Failed to copy layer image to internal storage")
                 return@launchSafe
@@ -1056,10 +1069,8 @@ class WallpaperDelegate(
                 // Rollback branch: discard the add and clean up its orphan file.
                 // Suspending here is safe — this branch returns without touching
                 // _wallpaperState, so it never enters the atomic section below.
-                // deleteFile is blocking disk I/O → hop off the main dispatcher.
-                withContext(ioDispatcher) {
-                    wallpaperFileManager.deleteFile(internalUriString)
-                }
+                // The rolled-back state does not reference the new copy, so the store removes it.
+                imageStore.deleteUnreferenced(listOf(internalUriString), _wallpaperState.value)
                 return@launchSafe
             }
 

@@ -8,6 +8,7 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
 import android.content.Context
@@ -284,7 +285,7 @@ class MonolithicLauncherViewModelTest {
             saveFabPositionUseCase,
             mockk(relaxed = true), // observeWallpaperBackdropUseCase
             mockk(relaxed = true), // setWallpaperBackdropUseCase
-            wallpaperFileManager,
+            WallpaperImageStore(wallpaperFileManager, mainDispatcherRule.testDispatcher),
             mockk(relaxed = true), // wallpaperFlattener
             mockk(relaxed = true), // wallpaperCompositeCache
             mockk(relaxed = true), // wallpaperBitmapLuminance
