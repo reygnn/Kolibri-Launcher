@@ -29,6 +29,11 @@ class SeedDefaultFavoritesUseCase @Inject constructor(
      * Seeds the default set — only if the favorites are empty. After a partial failure the
      * favorites purge may have failed; the remaining favorites must not be overwritten, and
      * "favorites empty" plays the role Nyx's seed flags play. Returns whether it seeded.
+     *
+     * Kolibri deliberately has no seed flag: it seeds only right after a reset, where empty
+     * favorites are unambiguous. Moving the seeding to any other trigger (e.g. a startup
+     * self-heal) needs a flag like Nyx's `home_dock_seeded_v1` — an empty home screen is a
+     * legitimate choice in a minimal launcher.
      */
     suspend operator fun invoke(): Boolean {
         if (favoritesRepository.getFavoriteComponentsSnapshot().isNotEmpty()) return false

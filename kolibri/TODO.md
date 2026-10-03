@@ -33,6 +33,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 21 | Favoriten-Ausrichtung (Start / Center / End) konfigurierbar machen | **erledigt** — Phase 1 (2026-05-08, commit `9828def`) + Phase 2 (Backup-Schema, 2026-05-08). Tabellen-Status hing hinterher; die Detail-Sektion §21 unten stand längst auf ✅, und der Code ist verdrahtet (BackupDataAssembler Export/Import + BackupSerializer). Verifiziert 2026-08-14. | — |
 | 22 | Coverage-Threshold im Wallpaper-Classifier (`huggie.png`-Anker) | **offen (trigger-basiert zurückgestellt)** — `MIN_OPAQUE_COVERAGE = 0.5f`-Gate; `huggie.png` sitzt mit 48.7 % direkt auf dem Routing-Zaun, beide Pfade konvergieren aber zufällig. Erst angehen, wenn ein 40–60-%-Borderline-Bild AUTO falsch klassifiziert oder eine Asset-Pipeline-Änderung Coverage verschiebt. Detail-Sektion §22 unten. | klein-mittel, empirisch |
 | 26 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, **auf A17 verifiziert (2026-09-27):** SettingsActivity + Backup-Sub-Screen rendern edge-to-edge mit MaterialToolbar korrekt (Top-Inset ok, kein Clipping/Crash). | klein-mittel |
+| 27 | Wartelogik „erste befüllte App-Liste“ doppelt (Onboarding + Reset-Seeding) | **offen (trigger-basiert)** — beim nächsten Anfassen des Onboardings aus einem anderen Grund an eine Stelle ziehen. Detail-Sektion §27. | klein |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1755,3 +1756,25 @@ AUTO-Luminanz). Entstehungs-Notiz + GPU-Spike-Daten:
 `docs/specs/WALLPAPER_ACTIVITY_HOSTING_EXPLORATION.md`.
 
 ---
+
+---
+
+## 27. (offen, trigger-basiert) Wartelogik „erste befüllte App-Liste“ an eine Stelle ziehen
+
+Seit dem Bundle-Patch `phase2b/29` (Reseeding der kuratierten Default-Favoriten nach einem
+Werksreset, 2026-10-03) steht dieselbe kleine Wartelogik zweimal:
+
+- `OnboardingViewModel` (INITIAL_SETUP-Vorauswahl): `withTimeoutOrNull(APPS_LOAD_TIMEOUT_MS) {
+  onboardingAppsUseCase.onboardingAppsFlow.first { it.isNotEmpty() } }.orEmpty()`, Konstante 5 s.
+- `SeedDefaultFavoritesUseCase` (`:domain`): dieselben drei Zeilen, eigene Konstante mit 5 s und
+  KDoc-Verweis auf das Gegenstück.
+
+Grund: Der installierte-Apps-Flow spielt vor der Aufzählung eine leere Liste nach; ohne das
+Warten sähe beides „keine Apps“ und setzte nichts. Die Doppelung ist bewusst stehen geblieben
+(Review zu 2b/29): das Onboarding in einen Kolibri-Fix zu ziehen, wäre mehr Risiko als drei
+doppelte Zeilen mit Verweis — seine Tests mocken den App-Flow direkt.
+
+**Trigger:** Wird das Onboarding aus einem anderen Grund angefasst, das Warten an eine Stelle
+ziehen, z. B. als `suspend fun firstPopulatedApps(): List<AppInfo>` in
+`GetOnboardingAppsUseCase` mit der einen Konstante, und beide Aufrufer darauf umstellen
+(Onboarding-Tests dabei auf die neue Funktion anpassen).
