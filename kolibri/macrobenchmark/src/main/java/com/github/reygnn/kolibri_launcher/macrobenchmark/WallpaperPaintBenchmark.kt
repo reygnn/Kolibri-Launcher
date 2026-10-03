@@ -75,6 +75,9 @@ class WallpaperPaintBenchmark {
             pressHome()
             startActivityAndWait()
             awaitWallpaperView()
+            // A consent dialog still pending would block the editor steps: decline it here, in
+            // the unmeasured setup (no-op when consent is already stored).
+            declineConsentDialogIfItAppears(CONSENT_CHECK_MS)
             // Restore the starting order (unmeasured): swap back and save, then let the warm and
             // the composite attach settle so the measured block starts from a quiet state.
             if (swapped) {
@@ -127,6 +130,7 @@ class WallpaperPaintBenchmark {
         // A 2-layer flatten + HARDWARE copy is well under a second on the A17; 2 s keeps the async
         // span (and, after a change, the composite warm and attach) inside the traced window.
         const val PAINT_SETTLE_MS = 2_000L
+        const val CONSENT_CHECK_MS = 2_000L
         const val SECTION_FIRST_PAINT = "wallpaper_first_paint"   // LaunchTrace.Names.WALLPAPER_FIRST_PAINT
         const val SECTION_CHANGE_PAINT = "wallpaper_change_paint" // LaunchTrace.Names.WALLPAPER_CHANGE_PAINT
         const val WALLPAPER_VIEW_ID = "wallpaper_view"            // activity_main.xml
