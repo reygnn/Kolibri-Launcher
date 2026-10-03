@@ -474,7 +474,7 @@ class WallpaperDelegate(
                     if (!sessionOpen) gcHasRun = true
                     try {
                         // The store hops its disk I/O off the main dispatcher (this collect runs on it).
-                        imageStore.collectOrphans(state, editSessionOpen = sessionOpen)
+                        imageStore.collectOrphans(editSessionOpen = sessionOpen)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
@@ -544,9 +544,8 @@ class WallpaperDelegate(
     /** Persist epilogue — runs AFTER the atomic [applyState] write. */
     private suspend fun persist(m: Mutation) {
         saveWallpaperStateUseCase(m.newState)
-        // Copy → save → delete: only now that the new state is persisted, and only files no
-        // layer of it references (3a-2).
-        imageStore.deleteUnreferenced(m.deleteNow, m.newState)
+        // Copy → save → delete; the store checks against what is actually persisted (3a-2c).
+        imageStore.deleteUnreferenced(m.deleteNow)
     }
 
     /**
@@ -594,7 +593,7 @@ class WallpaperDelegate(
             pendingRemovalsOnCommit.addAll(replaced)
             pendingRemovalsOnCancel.add(newUri)
         } else {
-            imageStore.deleteUnreferenced(replaced, WallpaperState.single(uri = newUri))
+            imageStore.deleteUnreferenced(replaced)
         }
         // A new/replaced image → offer a scrim reset (deferred to commit if in a session).
         signalImageChanged()
@@ -746,11 +745,9 @@ class WallpaperDelegate(
         // existed only because a lone image had a separate flat representation.
 
         if (filesToDelete.isNotEmpty()) {
-            val committed = _wallpaperState.value
             scope.launchSafe("Error committing wallpaper edit") {
-                // The committed state is already persisted; the store deletes only files no
-                // layer of it still references (3a-2).
-                imageStore.deleteUnreferenced(filesToDelete, committed)
+                // The store deletes only files no persisted layer still references (3a-2c).
+                imageStore.deleteUnreferenced(filesToDelete)
             }
         }
 
@@ -996,9 +993,9 @@ class WallpaperDelegate(
                 if (snapshot != null) {
                     saveWallpaperStateUseCase(snapshot)
                 }
-                // After the restored snapshot is persisted: delete the session-added files the
-                // restored state does not reference (3a-2).
-                imageStore.deleteUnreferenced(filesToDelete, snapshot ?: _wallpaperState.value)
+                // After the restored snapshot is persisted: the session-added files no persisted
+                // layer references (3a-2c).
+                imageStore.deleteUnreferenced(filesToDelete)
             }
         }
 
@@ -1069,8 +1066,8 @@ class WallpaperDelegate(
                 // Rollback branch: discard the add and clean up its orphan file.
                 // Suspending here is safe — this branch returns without touching
                 // _wallpaperState, so it never enters the atomic section below.
-                // The rolled-back state does not reference the new copy, so the store removes it.
-                imageStore.deleteUnreferenced(listOf(internalUriString), _wallpaperState.value)
+                // Nothing persisted references the new copy, so the store removes it (3a-2c).
+                imageStore.deleteUnreferenced(listOf(internalUriString))
                 return@launchSafe
             }
 

@@ -33,4 +33,15 @@ interface WallpaperRepository : Purgeable {
      * Nutzen: Initial-Load beim Fragment-Start.
      */
     suspend fun getWallpaperStateSync(): WallpaperState
+
+    /**
+     * The image URIs the PERSISTED state references, read with failure reporting (3a-2c): null when
+     * the store can't be read or holds something unreadable. Unlike [getWallpaperStateSync] it never
+     * falls back to [WallpaperState.NONE] — "nothing referenced" would let a caller that deletes
+     * unreferenced files delete everything. Callers that delete must delete NOTHING on null.
+     *
+     * The default is null ("can't tell"), so an implementation without a real read fails closed:
+     * nothing is ever deleted through it, at worst orphans remain.
+     */
+    suspend fun readPersistedImageUris(): Set<String>? = null
 }

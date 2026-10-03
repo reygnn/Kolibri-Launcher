@@ -29,6 +29,9 @@ import java.nio.file.Files
  *    session (Kolibri's edit guard), and removes a real orphan;
  *  - a copy without the following save (process death in between) leaves at most an orphan;
  *  - a file is deleted only once no layer references it anymore (O2 safeguard);
+ *  - deletions check against what is actually PERSISTED and fail closed (3a-2c): a save that
+ *    fails silently (as the real repository does in a release build) keeps the old file, and an
+ *    unreadable persisted state deletes nothing and stops the GC;
  *  - "an export never reads a file an edit session is changing" is checked through a PROXY: an
  *    export reads the persisted state, so during an open session the persisted state must
  *    reference only existing files and no layer the session removed. That the export reads that
@@ -89,6 +92,12 @@ abstract class WallpaperImageStoreContract {
 
     /** Names of the files the persisted state's layers reference, in layer order. */
     protected abstract suspend fun savedLayerFiles(): List<String>
+
+    /** From now on saves fail silently: the call returns, nothing is persisted (release behaviour). */
+    protected abstract fun failSavesSilently()
+
+    /** From now on the persisted state can't be read by the store (its read reports failure). */
+    protected abstract fun makePersistedStateUnreadable()
 
     // ---- the cases ----
 
@@ -236,6 +245,38 @@ abstract class WallpaperImageStoreContract {
 
         assertWithMessage("the other layer still references the file").that(savedLayerFiles()).containsExactly(shared)
         assertWithMessage("so it stays").that(storedFiles()).contains(shared)
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `a save that fails silently keeps the old file`() = runTest(mainDispatcherRule.testDispatcher) {
+        // The release case of 3a-2c: the save swallows its failure and returns normally.
+        step { startStore() }
+        step { setWallpaper(image("a")) }
+        val old = savedLayerFiles().single()
+        failSavesSilently()
+
+        step { setWallpaper(image("b")) }
+
+        assertWithMessage("the old state is still on disk").that(savedLayerFiles()).containsExactly(old)
+        assertWithMessage("so its file must stay").that(storedFiles()).contains(old)
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `an unreadable persisted state deletes nothing and stops the GC`() = runTest(mainDispatcherRule.testDispatcher) {
+        step { startStore() }
+        step { setWallpaper(image("a")) }
+        val old = savedLayerFiles().single()
+        val orphan = File(wallpaperDir, "orphan_left_behind").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        makePersistedStateUnreadable()
+
+        step { setWallpaper(image("b")) }
+        ageAllFiles()
+        step { runOrphanGc() }
+
+        assertWithMessage("a replace deletes nothing it can't check").that(storedFiles()).contains(old)
+        assertWithMessage("the GC does not run on an unreadable state").that(orphan.exists()).isTrue()
         assertNoDanglingReference()
     }
 

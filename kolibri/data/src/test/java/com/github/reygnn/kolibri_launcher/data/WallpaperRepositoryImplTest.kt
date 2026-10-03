@@ -240,6 +240,41 @@ class WallpaperRepositoryImplTest {
         assertThat(state).isEqualTo(WallpaperState.NONE)
     }
 
+    // ---- readPersistedImageUris fails closed (3a-2c) ----
+
+    @Test
+    fun `readPersistedImageUris is null for corrupt JSON, never an empty set`() = runTest {
+        // The flow collapses corrupt JSON to NONE; this read must not, or the image store would
+        // treat every file as unreferenced and delete it.
+        dataStore.seed { it[KEY_LAYERS_JSON] = "{not json" }
+
+        assertThat(manager.readPersistedImageUris()).isNull()
+    }
+
+    @Test
+    fun `readPersistedImageUris is null when one layer entry is unreadable`() = runTest {
+        // The flow skips a bad entry; dropping its URI here would make its file look unreferenced.
+        dataStore.seed { it[KEY_LAYERS_JSON] = """[{"id":"one","imageUri":"file:///data/a.jpg"}, 42]""" }
+
+        assertThat(manager.readPersistedImageUris()).isNull()
+    }
+
+    @Test
+    fun `readPersistedImageUris is null when the store can't be read`() = runTest {
+        dataStore.makeReadFail()
+
+        assertThat(manager.readPersistedImageUris()).isNull()
+    }
+
+    @Test
+    fun `readPersistedImageUris reports raw URIs, also of files missing on disk`() = runTest {
+        // No existence filter: deleting a missing file is harmless, overlooking a reference is not.
+        every { fileManager.fileExists(any<Uri>()) } returns false
+        dataStore.seed { it[KEY_LAYERS_JSON] = """[{"id":"one","imageUri":"file:///data/a.jpg"}]""" }
+
+        assertThat(manager.readPersistedImageUris()).containsExactly("file:///data/a.jpg")
+    }
+
     @Test
     fun `parseWallpaperState with corrupt JSON yields NONE (no legacy fallback)`() = runTest {
         // Even with legacy keys still lying around, an unparsable JSON collapses

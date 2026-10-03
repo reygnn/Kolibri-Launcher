@@ -73,7 +73,7 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
             saveFabPositionUseCase = mockk(relaxed = true),
             observeWallpaperBackdropUseCase = mockk(relaxed = true) { every { this@mockk.invoke() } returns emptyFlow() },
             setWallpaperBackdropUseCase = mockk(relaxed = true),
-            imageStore = WallpaperImageStore(fileManager, mainDispatcherRule.testDispatcher),
+            imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
             wallpaperFlattener = mockk(relaxed = true),
             compositeCache = mockk(relaxed = true),
             bitmapLuminance = mockk(relaxed = true),
@@ -120,6 +120,14 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
                 listOf(WallpaperLayerState(id = "first", imageUri = copy), WallpaperLayerState(id = "second", imageUri = copy)),
             ),
         )
+    }
+
+    override fun failSavesSilently() {
+        repository.failSavesSilently = true
+    }
+
+    override fun makePersistedStateUnreadable() {
+        repository.persistedStateUnreadable = true
     }
 
     override suspend fun savedLayerFiles(): List<String> =

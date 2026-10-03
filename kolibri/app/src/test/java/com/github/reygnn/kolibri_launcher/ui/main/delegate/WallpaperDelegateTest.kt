@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
 
@@ -146,7 +147,7 @@ class WallpaperDelegateTest {
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
-        imageStore = WallpaperImageStore(wallpaperFileManager, ioDispatcher),
+        imageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), ioDispatcher),
         wallpaperFlattener = wallpaperFlattener,
         compositeCache = compositeCache,
         bitmapLuminance = bitmapLuminance,
@@ -2134,4 +2135,12 @@ class WallpaperDelegateTest {
         coVerify(exactly = 2) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
         coVerify(exactly = 0) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
     }
+}
+
+/**
+ * A repository for [WallpaperImageStore] whose persisted state references nothing (3a-2c): every
+ * delete candidate counts as unreferenced, as before the store read the persisted state itself.
+ */
+private fun persistedNothing(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
+    io.mockk.coEvery { readPersistedImageUris() } returns emptySet()
 }

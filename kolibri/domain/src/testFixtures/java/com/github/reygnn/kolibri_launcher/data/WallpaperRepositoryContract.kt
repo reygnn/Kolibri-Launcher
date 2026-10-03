@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
@@ -217,5 +218,36 @@ abstract class WallpaperRepositoryContract {
         val repo = createRepository()
         repo.purgeRepository()
         assertThat(repo.wallpaperState.first()).isEqualTo(WallpaperState.NONE)
+    }
+
+    // ---------- readPersistedImageUris (3a-2c) ----------
+    // The image store deletes only what no persisted layer references and reads that itself, so
+    // fake and impl must agree here: a real "nothing saved" is an empty set, never null.
+
+    @Test
+    fun `readPersistedImageUris on a fresh repository is empty, not unreadable`() = runTest {
+        assertThat(createRepository().readPersistedImageUris()).isEmpty()
+    }
+
+    @Test
+    fun `readPersistedImageUris reports every layer the saved state references`() = runTest {
+        val repo = createRepository()
+        repo.saveWallpaperState(
+            WallpaperState.multiLayer(
+                listOf(
+                    WallpaperLayerState(id = "one", imageUri = testUri),
+                    WallpaperLayerState(id = "two", imageUri = testUri2),
+                ),
+            ),
+        )
+        assertThat(repo.readPersistedImageUris()).containsExactly(testUri, testUri2)
+    }
+
+    @Test
+    fun `readPersistedImageUris is empty after clearWallpaper`() = runTest {
+        val repo = createRepository()
+        repo.saveWallpaperState(WallpaperState.single(testUri))
+        repo.clearWallpaper()
+        assertThat(repo.readPersistedImageUris()).isEmpty()
     }
 }

@@ -187,6 +187,31 @@ class WallpaperRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * The URIs in the persisted layers JSON, raw (3a-2c): no file-existence filter, no fallback.
+     * Absent or blank JSON is a real "nothing saved" (empty set); a failing read, unparsable JSON or
+     * any unparsable layer entry is null — the image store then deletes nothing.
+     */
+    override suspend fun readPersistedImageUris(): Set<String>? {
+        return try {
+            val json = dataStore.data.first()[KEY_LAYERS_JSON]
+            if (json.isNullOrBlank()) return emptySet()
+            val array = JSONArray(json)
+            buildSet {
+                for (i in 0 until array.length()) {
+                    array.getJSONObject(i).optString("imageUri", "").takeIf { it.isNotBlank() }?.let { add(it) }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): a store that can't be read fails
+            // closed (null → the image store deletes nothing); OOM extends Error → Throwable.
+            TimberWrapper.silentError(e, "Error reading the persisted wallpaper URIs")
+            null
+        }
+    }
+
     // ===========================================
     // WRITE: Save
     // ===========================================

@@ -25,9 +25,22 @@ class FakeWallpaperRepository : WallpaperRepository {
             _wallpaperState.value = value
         }
 
+    /**
+     * Saves are swallowed like the real repository does in a release build (3a-2c): the call
+     * returns normally, nothing is persisted.
+     */
+    var failSavesSilently = false
+
+    /** The persisted state can't be read: [readPersistedImageUris] reports null (3a-2c). */
+    var persistedStateUnreadable = false
+
     override suspend fun getWallpaperStateSync(): WallpaperState = _wallpaperState.value
 
+    override suspend fun readPersistedImageUris(): Set<String>? =
+        if (persistedStateUnreadable) null else _wallpaperState.value.referencedUris
+
     override suspend fun saveWallpaperState(state: WallpaperState) {
+        if (failSavesSilently) return
         _wallpaperState.value = state
     }
 
@@ -44,5 +57,7 @@ class FakeWallpaperRepository : WallpaperRepository {
      */
     fun reset() {
         _wallpaperState.value = WallpaperState.NONE
+        failSavesSilently = false
+        persistedStateUnreadable = false
     }
 }

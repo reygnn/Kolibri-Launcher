@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
 
@@ -169,7 +170,7 @@ class LauncherViewModelDoomsdayTest {
         saveFabPositionUseCase = mockk(relaxed = true),
         observeWallpaperBackdropUseCase = mockk(relaxed = true),
         setWallpaperBackdropUseCase = mockk(relaxed = true),
-        wallpaperImageStore = WallpaperImageStore(mockk(relaxed = true), mainDispatcherRule.testDispatcher),
+        wallpaperImageStore = WallpaperImageStore(mockk(relaxed = true), persistedNothing(), mainDispatcherRule.testDispatcher),
         wallpaperFlattener = mockk(relaxed = true),
         wallpaperCompositeCache = mockk(relaxed = true),
             wallpaperBitmapLuminance = mockk(relaxed = true),
@@ -275,4 +276,12 @@ class LauncherViewModelDoomsdayTest {
         // Der Search-Query hat den Prozess-Tod überlebt
         assertThat(vm.appDrawerSearchQuery.value).isEqualTo("Vor dem Crash")
     }
+}
+
+/**
+ * A repository for [WallpaperImageStore] whose persisted state references nothing (3a-2c): every
+ * delete candidate counts as unreferenced, as before the store read the persisted state itself.
+ */
+private fun persistedNothing(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
+    io.mockk.coEvery { readPersistedImageUris() } returns emptySet()
 }
