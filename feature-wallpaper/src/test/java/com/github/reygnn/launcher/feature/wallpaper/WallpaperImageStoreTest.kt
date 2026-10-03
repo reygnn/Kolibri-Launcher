@@ -44,6 +44,18 @@ class WallpaperImageStoreTest {
     }
 
     @Test
+    fun byte_identical_files_are_decided_by_reference_only() = runTest(mainDispatcherRule.testDispatcher) {
+        // 08c: a and b hold the same bytes (two copies of one picked image). The store decides on
+        // URIs, never on content: only the unreferenced candidate goes, the twin stays.
+        persisted(setOf(b))
+
+        store.deleteUnreferenced(listOf(a))
+
+        verify(exactly = 1) { fileManager.deleteFile(a) }
+        verify(exactly = 0) { fileManager.deleteFile(b) }
+    }
+
+    @Test
     fun an_unreadable_persisted_state_deletes_nothing() = runTest(mainDispatcherRule.testDispatcher) {
         // Fail closed (3a-2c): without the persisted references there is no safe delete.
         persisted(null)

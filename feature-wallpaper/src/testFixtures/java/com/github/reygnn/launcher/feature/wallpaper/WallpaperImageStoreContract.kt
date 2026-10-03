@@ -29,6 +29,9 @@ import java.nio.file.Files
  *    session (Kolibri's edit guard), and removes a real orphan;
  *  - a copy without the following save (process death in between) leaves at most an orphan;
  *  - a file is deleted only once no layer references it anymore (O2 safeguard);
+ *  - identical image CONTENT never shares a file: every copy is its own file, decisions are made
+ *    on file references only — so a future "optimization" that deduplicates identical bytes
+ *    cannot silently delete the file another layer, or the new state, points to;
  *  - deletions check against what is actually PERSISTED and fail closed (3a-2c): a save that
  *    fails silently (as the real repository does in a release build) keeps the old file, and an
  *    unreadable persisted state deletes nothing and stops the GC; "remove wallpaper" empties the
@@ -299,6 +302,78 @@ abstract class WallpaperImageStoreContract {
         assertWithMessage("so its file stays").that(storedFiles()).contains(file)
         assertNoDanglingReference()
     }
+
+    // ---- identical content (08c): every copy is its own file ----
+
+    @Test
+    fun `two layers from the same source bytes get two files`() = runTest(mainDispatcherRule.testDispatcher) {
+        step { startStore() }
+        val source = image("same")
+        step { setWallpaper(source) }
+        step { enterEditSession() }
+        step { addLayer(source) }
+        step { commitEditSession() }
+
+        val files = savedLayerFiles()
+        assertWithMessage("two layers").that(files).hasSize(2)
+        assertWithMessage("on two different files").that(files.toSet()).hasSize(2)
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `removing one of two identical layers keeps the other ones file`() = runTest(mainDispatcherRule.testDispatcher) {
+        step { startStore() }
+        val source = image("same")
+        step { setWallpaper(source) }
+        step { enterEditSession() }
+        step { addLayer(source) }
+        step { commitEditSession() }
+        val (removed, kept) = savedLayerFiles()
+
+        step { enterEditSession() }
+        step { removeLayer(0) }
+        step { commitEditSession() }
+
+        assertWithMessage("the removed layer's file is gone").that(storedFiles()).doesNotContain(removed)
+        assertWithMessage("the other layer still has its file").that(savedLayerFiles()).containsExactly(kept)
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `adding an identical layer and cancelling removes only the added copy`() = runTest(mainDispatcherRule.testDispatcher) {
+        step { startStore() }
+        val source = image("same")
+        step { setWallpaper(source) }
+        val original = savedLayerFiles().single()
+
+        step { enterEditSession() }
+        step { addLayer(source) }
+        step { cancelEditSession() }
+
+        assertWithMessage("the original layer is back").that(savedLayerFiles()).containsExactly(original)
+        assertWithMessage("only its file is left").that(storedFiles()).containsExactly(original)
+        assertNoDanglingReference()
+    }
+
+    @Test
+    fun `replacing with the identical image gets a new file and deletes only the old one`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // The most dangerous variant of a future deduplication: "delete the old file" would hit
+            // exactly the file the new state points to.
+            assumeTrue("W1 immediate deletion comes with 3a-2", deletesReplacedImageImmediately)
+            step { startStore() }
+            val source = image("same")
+            step { setWallpaper(source) }
+            val old = savedLayerFiles().single()
+
+            step { setWallpaper(source) }
+
+            val new = savedLayerFiles().single()
+            assertWithMessage("the identical image is copied to its own file").that(new).isNotEqualTo(old)
+            assertWithMessage("the old file is gone").that(storedFiles()).doesNotContain(old)
+            assertWithMessage("the new state's file exists").that(storedFiles()).containsExactly(new)
+            assertNoDanglingReference()
+        }
 
     // ---- helpers ----
 
