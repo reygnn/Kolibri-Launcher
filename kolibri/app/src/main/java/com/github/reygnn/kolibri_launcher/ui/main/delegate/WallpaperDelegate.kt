@@ -224,7 +224,12 @@ class WallpaperDelegate(
 
     /**
      * Serializes every wallpaper write of this delegate (3a-3): saves land in the order they were
-     * issued, and the re-sync after a session end reads only after all of them.
+     * issued, the re-sync after a session end reads only after all of them, and removing the
+     * wallpaper waits for every earlier save (3a-3b).
+     *
+     * **Lock order: [compositeRegenLock] before [persistLock], never the reverse** — a reversed
+     * order on any path would deadlock. kotlinx `Mutex` is not reentrant either: nothing inside
+     * [persistLock] may take it again (the store and the use cases never do).
      */
     private val persistLock = Mutex()
 
@@ -549,8 +554,14 @@ class WallpaperDelegate(
             // State first, files second (3a-2d): the store deletes the files only once the
             // persisted state references nothing — a silently failed clear keeps them, and the
             // wallpaper with them, instead of leaving a dangling reference on disk.
-            clearWallpaperUseCase()
-            if (!imageStore.deleteAllIfNothingPersisted()) return@withLock false
+            // Under persistLock too (3a-3b; order: compositeRegenLock, then persistLock): a save
+            // still pending from a session just committed lands BEFORE the clear, so it can never
+            // write layers whose files the clear has already deleted.
+            val removalTookEffect = persistLock.withLock {
+                clearWallpaperUseCase()
+                imageStore.deleteAllIfNothingPersisted()
+            }
+            if (!removalTookEffect) return@withLock false
             // Drop the in-memory composite (v4 §3, was AUDIT-20 F3): nothing displays a
             // composite after a clear, so the ~10 MB HARDWARE bitmap would otherwise stay
             // resident. invalidate() only drops the reference (never recycles).

@@ -2192,6 +2192,41 @@ class WallpaperDelegateTest {
     }
 
     @Test
+    fun `removing the wallpaper waits for a session save that is still pending`() = runTest {
+        // 3a-3b: removing is a write too. If the clear overtook a pending save, that save would
+        // write layers whose files the clear had just deleted — a dangling reference on disk.
+        val stateFlow = MutableStateFlow(twoLayers())
+        val useCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
+        every { useCase.invoke() } returns stateFlow
+        val saveGate = CompletableDeferred<Unit>()
+        coEvery { saveWallpaperStateUseCase.invoke(any()) } coAnswers {
+            saveGate.await()
+            stateFlow.value = firstArg()
+        }
+        coEvery { clearWallpaperUseCase.invoke() } coAnswers { stateFlow.value = WallpaperState.NONE }
+        val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
+        delegate.start()
+        advanceUntilIdle()
+
+        delegate.onEnterWallpaperEditMode()
+        delegate.onSaveLayerTransform(0, scale = 2f, translateX = 0f, translateY = 0f)
+        delegate.onCommitWallpaperEditMode()
+        delegate.onClearWallpaper()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { clearWallpaperUseCase.invoke() } // waits for the pending save
+
+        saveGate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerifyOrder {
+            saveWallpaperStateUseCase.invoke(any())
+            clearWallpaperUseCase.invoke()
+        }
+        assertThat(stateFlow.value).isEqualTo(WallpaperState.NONE) // nothing references a deleted file
+        verify { wallpaperFileManager.clearAll() }
+    }
+
+    @Test
     fun `entering a running session again keeps its snapshot`() = runTest {
         // E3: re-entering used to overwrite the snapshot, so a cancel restored the edited state.
         val stateFlow = MutableStateFlow(twoLayers())
