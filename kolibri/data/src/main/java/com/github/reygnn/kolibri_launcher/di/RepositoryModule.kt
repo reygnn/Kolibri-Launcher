@@ -1,5 +1,7 @@
 package com.github.reygnn.kolibri_launcher.di
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.kolibri_launcher.data.AppUsageRepositoryImpl
 import com.github.reygnn.kolibri_launcher.data.BackupRepositoryImpl
@@ -165,6 +167,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWallpaperBitmapLuminance(impl: WallpaperBitmapLuminanceImpl): WallpaperBitmapLuminance
+
+    // The display composite (3a-8): one singleton for the delegate's write side and the
+    // Activity's read side.
+    @Binds
+    abstract fun bindWallpaperComposite(impl: CachedWallpaperComposite): WallpaperComposite
 
     @Binds
     @Singleton

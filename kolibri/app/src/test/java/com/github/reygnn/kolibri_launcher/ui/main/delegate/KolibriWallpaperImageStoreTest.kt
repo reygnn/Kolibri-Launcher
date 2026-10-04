@@ -12,6 +12,7 @@ import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStoreContract
 import io.mockk.every
@@ -74,11 +75,7 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
             observeWallpaperBackdropUseCase = mockk(relaxed = true) { every { this@mockk.invoke() } returns emptyFlow() },
             setWallpaperBackdropUseCase = mockk(relaxed = true),
             imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
-            wallpaperFlattener = mockk(relaxed = true),
-            compositeCache = mockk(relaxed = true),
-            bitmapLuminance = mockk(relaxed = true),
-            compositeLuminanceSignal = mockk(relaxed = true),
-            ioDispatcher = mainDispatcherRule.testDispatcher,
+            composite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
             scope = DelegateScope(
                 coroutineScope = delegateScope,
                 mainDispatcher = mainDispatcherRule.testDispatcher,

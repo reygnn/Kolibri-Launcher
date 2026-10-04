@@ -1,4 +1,5 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
@@ -148,11 +149,9 @@ class WallpaperDelegateTest {
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         imageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), ioDispatcher),
-        wallpaperFlattener = wallpaperFlattener,
-        compositeCache = compositeCache,
-        bitmapLuminance = bitmapLuminance,
-        compositeLuminanceSignal = compositeLuminanceSignal,
-        ioDispatcher = ioDispatcher,
+        // The composite since 3a-8: the real implementation around the same mocks, so every
+        // composite expectation below (cache, flattener, luminance, IO hop) stays as it was.
+        composite = CachedWallpaperComposite(compositeCache, wallpaperFlattener, bitmapLuminance, compositeLuminanceSignal, ioDispatcher),
         scope = scope
     )
 

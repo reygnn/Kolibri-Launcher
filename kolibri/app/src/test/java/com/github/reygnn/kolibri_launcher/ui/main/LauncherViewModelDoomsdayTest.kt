@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
@@ -171,16 +172,12 @@ class LauncherViewModelDoomsdayTest {
         observeWallpaperBackdropUseCase = mockk(relaxed = true),
         setWallpaperBackdropUseCase = mockk(relaxed = true),
         wallpaperImageStore = WallpaperImageStore(mockk(relaxed = true), persistedNothing(), mainDispatcherRule.testDispatcher),
-        wallpaperFlattener = mockk(relaxed = true),
-        wallpaperCompositeCache = mockk(relaxed = true),
-            wallpaperBitmapLuminance = mockk(relaxed = true),
-            compositeLuminanceSignal = mockk(relaxed = true),
+        wallpaperComposite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
         appUpdateSignal = appUpdateSignal,
         monotonicClock = neverThrottlingClock(),
         savedStateHandle = savedStateHandle,
         context = context,
         mainDispatcher = mainDispatcherRule.testDispatcher,
-        ioDispatcher = mainDispatcherRule.testDispatcher,
         testMode = TestMode(isEnabled = enableTestMode)
     )
 

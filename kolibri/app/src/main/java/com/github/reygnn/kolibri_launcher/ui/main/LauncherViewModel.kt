@@ -20,11 +20,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
-import com.github.reygnn.launcher.core.CompositeLuminanceSignal
-import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.wallpaper.FabPosition
@@ -36,7 +33,6 @@ import com.github.reygnn.kolibri_launcher.domain.model.UiColorsState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.kolibri_launcher.domain.usecase.CheckAppUsageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.GetAutoLaunchSettingUseCase
@@ -147,16 +143,12 @@ class LauncherViewModel @Inject constructor(
     observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
     setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     wallpaperImageStore: WallpaperImageStore,
-    wallpaperFlattener: WallpaperFlattener,
-    wallpaperCompositeCache: WallpaperCompositeCache,
-    wallpaperBitmapLuminance: WallpaperBitmapLuminanceImpl,
-    compositeLuminanceSignal: CompositeLuminanceSignal,
+    wallpaperComposite: WallpaperComposite,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
     @param:ApplicationContext private val context: Context,
     @MainDispatcher mainDispatcher: CoroutineDispatcher,
-    @IoDispatcher ioDispatcher: CoroutineDispatcher,
     private val testMode: TestMode
 ) : BaseViewModel<UiEvent>(mainDispatcher) {
 
@@ -248,11 +240,7 @@ class LauncherViewModel @Inject constructor(
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         imageStore = wallpaperImageStore,
-        wallpaperFlattener = wallpaperFlattener,
-        compositeCache = wallpaperCompositeCache,
-        bitmapLuminance = wallpaperBitmapLuminance,
-        compositeLuminanceSignal = compositeLuminanceSignal,
-        ioDispatcher = ioDispatcher,
+        composite = wallpaperComposite,
         scope = delegateScope
     )
 

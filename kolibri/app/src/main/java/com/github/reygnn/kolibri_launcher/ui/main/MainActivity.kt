@@ -45,9 +45,9 @@ import com.github.reygnn.kolibri_launcher.ui.layoutcustomization.LayoutCustomiza
 import com.github.reygnn.kolibri_launcher.ui.onboarding.OnboardingActivity
 import com.github.reygnn.kolibri_launcher.ui.settings.SettingsActivity
 import com.github.reygnn.kolibri_launcher.ui.home.WallpaperEditController
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
@@ -388,11 +388,11 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
     @Inject
     lateinit var crashReportingHealthNotifier: CrashReportingHealthNotifier
 
-    /** In-memory cache of the decoded display composite (Option D §9.4). Relocated from
-     *  HomeFragment (WALLPAPER_ACTIVITY_HOSTING_SPEC §25 P3) — its benefit is the per-frame
-     *  single-texture flatten (DISPLAY mode), independent of the fragment view lifecycle. */
+    /** The display composite (Option D §9.4), read side: the cached single-texture flatten for
+     *  DISPLAY mode. Since 3a-8 behind [WallpaperComposite] — the same singleton the delegate
+     *  warms through, so read and write share one cache (relocated from HomeFragment, §25 P3). */
     @Inject
-    lateinit var compositeCache: WallpaperCompositeCache
+    lateinit var wallpaperComposite: WallpaperComposite
 
     // ---- Activity-hosted wallpaper render surface (WALLPAPER_ACTIVITY_HOSTING_SPEC §25 P3) ----
     // Relocated from HomeFragment so the wallpaper surface persists across the (fragment) view
@@ -691,7 +691,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // Wallpaper removed / reset (AUDIT-20 F3): drop the cached ~10 MB composite bitmap.
         // Nothing on screen queries the cache again, so it would otherwise stay resident.
         if (!state.hasWallpaper) {
-            compositeCache.invalidate()
+            wallpaperComposite.invalidate(dropLuminance = false)
         }
 
         // Read-and-consume the one-shot focus hint (before the async render): a just-added layer
@@ -748,8 +748,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         if (viewModel.isWallpaperEditMode.value) return null
         if (state.layerCount < 2) return null
         val m = resources.displayMetrics
-        val key = WallpaperCompositeKey.of(state, m.widthPixels, m.heightPixels)
-        return if (compositeCache.get(key) != null) key else null
+        return wallpaperComposite.cachedKeyFor(state, m.widthPixels, m.heightPixels)
     }
 
     private fun loadBitmapFromUri(uri: android.net.Uri): DecodedWallpaperBitmap? {
@@ -757,7 +756,7 @@ class MainActivity : BaseActivity<UiEvent, LauncherViewModel>(), AppDrawerFragme
         // A composite:// key is SYNTHETIC (not a file) — resolve from the in-memory cache only,
         // never openInputStream it. A miss means "not warm yet"; the caller is on the per-layer path.
         if (key.startsWith(WallpaperCompositeKey.SCHEME)) {
-            return compositeCache.get(key)
+            return wallpaperComposite.cachedBitmap(key)
         }
         // Single-layer / per-layer file:// image: decode live (bounded). Since §25 P4 single-layer
         // wallpapers are no longer proactively cached (the Activity-hosted surface makes the

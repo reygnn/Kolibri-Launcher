@@ -8,6 +8,7 @@
 
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.kolibri_launcher.domain.model.SettingsDefaults
@@ -287,16 +288,12 @@ class MonolithicLauncherViewModelTest {
             mockk(relaxed = true), // observeWallpaperBackdropUseCase
             mockk(relaxed = true), // setWallpaperBackdropUseCase
             WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
-            mockk(relaxed = true), // wallpaperFlattener
-            mockk(relaxed = true), // wallpaperCompositeCache
-            mockk(relaxed = true), // wallpaperBitmapLuminance
-            mockk(relaxed = true), // compositeLuminanceSignal
+            CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher), // wallpaperComposite
             appUpdateSignal,
             neverThrottlingClock(),
             SavedStateHandle(),
             context,
             mainDispatcher = mainDispatcherRule.testDispatcher,
-            ioDispatcher = mainDispatcherRule.testDispatcher,
             testMode = TestMode(isEnabled = enableTestMode)
         )
     }
