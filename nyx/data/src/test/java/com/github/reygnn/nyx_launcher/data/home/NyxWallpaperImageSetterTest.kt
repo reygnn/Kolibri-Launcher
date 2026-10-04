@@ -156,6 +156,22 @@ class NyxWallpaperImageSetterTest {
     }
 
     @Test
+    fun setFromUri_during_an_open_edit_session_saves_but_deletes_nothing() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3b-1b-b: the open session's layers may still reference the previous file and write it
+        // back on commit — it stays as an orphan for a GC with the session closed.
+        editState.sessionOpen = true
+        coEvery { repository.getWallpaperStateSync() } returns WallpaperState.single("file:///old")
+        coEvery { fileManager.copyToInternal(any()) } returns internalUri("file:///new")
+        persisted("file:///new")
+
+        val ok = setter.setFromUri(sourceUri)
+
+        assertThat(ok).isTrue()
+        coVerify(exactly = 1) { repository.saveWallpaperState(match { it.layers.singleOrNull()?.imageUri == "file:///new" }) }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    @Test
     fun clear_that_did_not_land_reports_false_and_keeps_the_files() = runTest(mainDispatcherRule.testDispatcher) {
         // The clear was swallowed: the old state is still persisted, so its files stay (3a-2d).
         persisted("file:///a")

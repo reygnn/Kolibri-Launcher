@@ -17,8 +17,13 @@ import javax.inject.Singleton
  * deleted directly — the old files even when a swallowed save left them referenced, the files on
  * "remove" even when the clear did not land, and the orphan GC read the references through
  * `getWallpaperStateSync()`, which falls back to "nothing" on a read error. The edit session's
- * locks come with 3b-3; until then [editState] keeps "remove" and the GC away from the files of
- * an open session.
+ * locks come with 3b-3; until then [editState] keeps choose, remove and the GC away from the files
+ * of an open session (3b-1b-b).
+ *
+ * Interim, until 3b-3 — a known side effect: a choose or remove from outside (Settings, the sheet)
+ * while an edit session is open is overwritten again when that session commits or cancels, because
+ * the session writes its own state back. That is no data loss — the files stay (orphans for a GC
+ * with the session closed) — and it goes away with 3b-3 (shared session, locks, re-sync).
  */
 @Singleton
 class NyxWallpaperImageSetter @Inject constructor(
@@ -31,13 +36,16 @@ class NyxWallpaperImageSetter @Inject constructor(
      * Returns true on success, false if the copy failed (e.g. revoked permission / decode
      * failure) — the caller can surface a toast. Copy → save → delete: the previously referenced
      * files go once the new state is saved, and only those no persisted layer references.
+     *
+     * While an edit session is open nothing is deleted (3b-1b-b): its layers may still reference
+     * the previous files and would write them back on commit. They stay as orphans for the GC.
      */
     suspend fun setFromUri(sourceUri: Uri): Boolean {
         val internalUri = imageStore.copyIn(sourceUri) ?: return false
         val newUri = internalUri.toString()
         val previous = referencedUris()
         repository.saveWallpaperState(WallpaperState.single(newUri))
-        imageStore.deleteUnreferenced(previous.filter { it != newUri })
+        if (!editState.sessionOpen) imageStore.deleteUnreferenced(previous.filter { it != newUri })
         return true
     }
 
