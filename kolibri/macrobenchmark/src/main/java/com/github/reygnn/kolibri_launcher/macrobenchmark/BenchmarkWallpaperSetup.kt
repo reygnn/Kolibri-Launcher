@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.macrobenchmark
 
+import android.os.SystemClock
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
@@ -26,12 +27,22 @@ fun MacrobenchmarkScope.restoreBenchmarkWallpaperIfNeeded() {
         restore.click()
         pickDocument(BENCHMARK_BACKUP_FILE)
     }
-    // The restore copies two photos, then onboarding hands over to Home — wait for that EVENT,
-    // not a fixed time; only then can the consent dialog appear.
-    check(device.wait(Until.hasObject(By.res(KOLIBRI_PACKAGE, "wallpaper_view")), RESTORE_MS)) {
-        "Kolibri did not reach Home after restoring $BENCHMARK_BACKUP_FILE"
+    // The consent dialog appears over Home AFTER the restore copies the photos, and it hides
+    // wallpaper_view from UiAutomator — so "first Home, then the dialog" (12b) could never see
+    // Home. Both conditions are polled in one loop instead (3a-8a-d): decline the dialog as soon
+    // as it shows WHILE waiting for Home, in short event-wait slices, up to RESTORE_MS.
+    val wallpaper = By.res(KOLIBRI_PACKAGE, "wallpaper_view")
+    val deadline = SystemClock.uptimeMillis() + RESTORE_MS
+    var reached = false
+    while (SystemClock.uptimeMillis() < deadline) {
+        if (device.hasObject(wallpaper)) {
+            reached = true
+            break
+        }
+        if (device.hasObject(consentDecline)) declineConsentDialog()
+        device.wait(Until.hasObject(wallpaper), POLL_SLICE_MS) // short slice; the loop re-checks the dialog
     }
-    declineConsentDialogIfItAppears(CONSENT_AFTER_RESTORE_MS)
+    check(reached) { "Kolibri did not reach Home after restoring $BENCHMARK_BACKUP_FILE" }
     benchmarkWallpaperRestored = true
 }
 
@@ -43,14 +54,24 @@ fun MacrobenchmarkScope.restoreBenchmarkWallpaperIfNeeded() {
  * after declining, the setup stops with a clear message.
  */
 fun MacrobenchmarkScope.declineConsentDialogIfItAppears(timeoutMs: Long) {
-    val decline = By.res(ANDROID_PACKAGE, DIALOG_NEGATIVE_BUTTON_ID).pkg(KOLIBRI_PACKAGE)
-    if (!device.wait(Until.hasObject(decline), timeoutMs)) return
-    device.findObject(decline)?.click()
-    check(device.wait(Until.gone(decline), CONSENT_GONE_MS)) {
+    if (!device.wait(Until.hasObject(consentDecline), timeoutMs)) return
+    declineConsentDialog()
+}
+
+/**
+ * Taps "decline" on the showing consent dialog and insists it goes: a stuck dialog is reported as
+ * such, separately from a missing Home. Null-safe against the dialog vanishing before the tap.
+ */
+private fun MacrobenchmarkScope.declineConsentDialog() {
+    device.findObject(consentDecline)?.click()
+    check(device.wait(Until.gone(consentDecline), CONSENT_GONE_MS)) {
         "The consent dialog is still showing after declining — the benchmark setup cannot go on"
     }
     device.waitForIdle()
 }
+
+/** The consent dialog's decline button: the AlertDialog negative button, in Kolibri's package. */
+private val consentDecline = By.res(ANDROID_PACKAGE, DIALOG_NEGATIVE_BUTTON_ID).pkg(KOLIBRI_PACKAGE)
 
 /** Picks [fileName] in the system document picker, opening its Downloads root if needed. */
 private fun MacrobenchmarkScope.pickDocument(fileName: String) {
@@ -73,8 +94,8 @@ private const val RESTORE_BACKUP_BUTTON_ID = "restore_backup_button" // activity
 private const val GATE_MS = 10_000L // event wait: returns as soon as onboarding shows its restore button
 private const val PICKER_MS = 5_000L
 private const val RESTORE_MS = 30_000L // two 12-MP photos are copied before Home shows
-private const val CONSENT_AFTER_RESTORE_MS = 10_000L
-private const val CONSENT_GONE_MS = 5_000L
+private const val CONSENT_GONE_MS = 5_000L  // how long the dialog may take to go after declining
+private const val POLL_SLICE_MS = 500L      // one slice of the Home/consent poll loop
 private const val ANDROID_PACKAGE = "android"
 private const val DIALOG_NEGATIVE_BUTTON_ID = "button2" // AlertDialog negative button, locale-independent
 // DocumentsUI labels, English and German (the A17 runs German).
