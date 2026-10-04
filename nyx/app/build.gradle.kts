@@ -102,6 +102,7 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit.ktx)
     testImplementation(testFixtures(project(":nyx:domain")))
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
+    testImplementation(testFixtures(project(":feature-wallpaper"))) // WallpaperImageStoreContract (3b-1)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

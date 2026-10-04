@@ -59,6 +59,8 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
     }
 
     override val deletesReplacedImageImmediately = true // since 3a-2: the lifecycle class in :feature-wallpaper
+    override val decidesDeletesThroughTheStore = true // since 3a-2c/2d
+    override val editsThroughSharedOperations = true // since 3a-3 / 3a-9
 
     override val wallpaperDir: File get() = File(context.filesDir, "wallpapers")
 
