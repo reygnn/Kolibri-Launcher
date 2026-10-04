@@ -11,6 +11,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,8 +27,9 @@ import org.robolectric.annotation.Config
 
 /**
  * [CachedWallpaperComposite] (3a-8): warm and publish, the J2 rule (published only if the host's
- * current state still has the key after the flatten), single-flight, the edit guard and the read
- * side. No session involved — the host is plain functions.
+ * current state still has the key after the flatten) together with the follow-up refill for the
+ * new state, single-flight, the edit guard and the read side. No session involved — the host is
+ * plain functions.
  */
 @RunWith(RobolectricTestRunner::class) // Bitmap.Config
 @Config(sdk = [36])
@@ -81,22 +83,30 @@ class CachedWallpaperCompositeTest {
     }
 
     @Test
-    fun nothing_is_published_when_the_state_moved_on_during_the_flatten() = runTest(mainDispatcherRule.testDispatcher) {
-        // J2: the host's current state is asked again AFTER the flatten; a different key there
-        // means the composite is stale and must not be published.
-        val host = TestHost(this, current = twoLayers)
-        coEvery { flattener.flatten(any(), any(), any()) } answers {
-            host.current = otherTwoLayers
-            software
+    fun a_state_change_during_the_flatten_discards_the_stale_composite_and_refills_for_the_new_state() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            // J2: the host's current state is asked again AFTER the flatten; its key differs (the
+            // composite key hashes every layer in order), so the stale composite is NOT published.
+            // The follow-up in refill's finally then warms the new state once and publishes it —
+            // Kolibri's behaviour before 3a-8, pinned here together with J2.
+            val host = TestHost(this, current = twoLayers)
+            coEvery { flattener.flatten(any(), any(), any()) } answers {
+                host.current = otherTwoLayers
+                software
+            }
+
+            composite.refill(twoLayers, host)
+            advanceUntilIdle()
+
+            assertThat(composite.cachedKeyFor(twoLayers, 1080, 2340)).isNull()
+            assertThat(composite.cachedKeyFor(otherTwoLayers, 1080, 2340)).isNotNull()
+            verify(exactly = 1) { signal.emit(0.3f) }
+            assertThat(host.filled).containsExactly(1080 to 2340)
+            coVerifyOrder {
+                flattener.flatten(twoLayers, 1080, 2340)
+                flattener.flatten(otherTwoLayers, 1080, 2340)
+            }
         }
-
-        composite.refill(twoLayers, host)
-        advanceUntilIdle()
-
-        assertThat(composite.cachedKeyFor(twoLayers, 1080, 2340)).isNull()
-        verify(exactly = 0) { signal.emit(0.3f) }
-        assertThat(host.filled).isEmpty()
-    }
 
     @Test
     fun one_warm_at_a_time() = runTest(mainDispatcherRule.testDispatcher) {

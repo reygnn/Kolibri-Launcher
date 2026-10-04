@@ -638,14 +638,17 @@ class WallpaperDelegate(
         }
         override fun onCompositeFilled(widthPx: Int, heightPx: Int) {
             // Debug toast (SHOW_CACHE_TOASTS = true only in debug buildTypes): confirms the
-            // composite cache was filled at this resolution.
+            // composite cache was filled at this resolution. The callback is not suspending,
+            // sendEvent is — so the toast is dispatched in its own coroutine (3a-8b).
             if (BuildConfig.SHOW_CACHE_TOASTS) {
-                scope.sendEvent(
-                    UiEvent.ShowToastFromString(
-                        "Composite cache filled (${widthPx}x$heightPx)",
-                        Toast.LENGTH_SHORT,
+                scope.launchSafe("Error showing the composite cache toast") {
+                    scope.sendEvent(
+                        UiEvent.ShowToastFromString(
+                            "Composite cache filled (${widthPx}x$heightPx)",
+                            Toast.LENGTH_SHORT,
+                        )
                     )
-                )
+                }
             }
         }
     }
