@@ -1,7 +1,5 @@
-package com.github.reygnn.kolibri_launcher.fakes
+package com.github.reygnn.launcher.core.wallpaper
 
-import com.github.reygnn.launcher.core.wallpaper.WallpaperState
-import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +32,10 @@ class FakeWallpaperRepository : WallpaperRepository {
     /** The persisted state can't be read: [readPersistedImageUris] reports null (3a-2c). */
     var persistedStateUnreadable = false
 
-    override suspend fun getWallpaperStateSync(): WallpaperState = _wallpaperState.value
+    // Like the real repository's read path: an unreadable store falls back to "nothing saved"
+    // (3b-02, shared by both apps' contract runs — Nyx's GC used to rely on exactly this read).
+    override suspend fun getWallpaperStateSync(): WallpaperState =
+        if (persistedStateUnreadable) WallpaperState.NONE else _wallpaperState.value
 
     override suspend fun readPersistedImageUris(): Set<String>? =
         if (persistedStateUnreadable) null else _wallpaperState.value.referencedUris

@@ -22,7 +22,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.AppInfo
 import com.github.reygnn.launcher.core.installedapps.FakeInstalledAppsRepository

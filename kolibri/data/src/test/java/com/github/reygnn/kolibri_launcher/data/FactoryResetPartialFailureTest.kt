@@ -5,7 +5,7 @@ import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStor
 import com.github.reygnn.kolibri_launcher.domain.model.SwipeSlot
 import com.github.reygnn.kolibri_launcher.domain.usecase.FactoryResetUseCase
 import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
-import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.InstalledAppsRepository

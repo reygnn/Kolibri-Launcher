@@ -14,7 +14,7 @@ import com.github.reygnn.kolibri_launcher.fakes.FakeFavoritesRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeHiddenAppsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSettingsRepository
 import com.github.reygnn.kolibri_launcher.fakes.FakeSwipeActionsRepository
-import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager

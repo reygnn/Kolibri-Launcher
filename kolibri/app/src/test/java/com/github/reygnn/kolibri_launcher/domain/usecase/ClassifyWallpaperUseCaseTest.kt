@@ -7,7 +7,7 @@ import com.github.reygnn.launcher.core.wallpaper.DomainWallpaperColors
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBitmapLuminance
-import com.github.reygnn.kolibri_launcher.fakes.FakeWallpaperRepository
+import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
