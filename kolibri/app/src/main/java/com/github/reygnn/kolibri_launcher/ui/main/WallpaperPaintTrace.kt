@@ -12,8 +12,9 @@ import com.github.reygnn.launcher.common.ui.LaunchTrace
  *    process, closed in the pre-draw of the first frame after the view applied a state WITH a
  *    wallpaper.
  *  - [LaunchTrace.Names.WALLPAPER_CHANGE_PAINT]: opened on the editor's save tap, closed in the
- *    pre-draw after the next applied wallpaper state. A commit whose view needs no rebuild ends
- *    it at the following apply — for a multi-layer wallpaper the composite attach.
+ *    pre-draw after the next applied wallpaper state — the first frame with the committed
+ *    wallpaper, i.e. what the user sees. The composite is built afterwards in the background and
+ *    is not part of this span (the composite path is measured by `wallpaper_warm`/`_flatten`).
  *
  * Main-thread only (begin/end and the pre-draw callbacks all run there), so the state needs no
  * synchronisation. A span whose frame never comes stays open on purpose: an unclosed async slice

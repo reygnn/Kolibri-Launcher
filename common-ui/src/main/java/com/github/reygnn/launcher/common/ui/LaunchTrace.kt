@@ -160,8 +160,9 @@ object LaunchTrace {
          * Once per process. */
         const val WALLPAPER_FIRST_PAINT = "wallpaper_first_paint"
 
-        /** After a change: from the editor's save tap to the first frame that draws the next
-         * wallpaper state the view applied (for a multi-layer wallpaper, the composite attach). */
+        /** After a change: from the editor's save tap to the first frame after the view applied the
+         * next state — the first frame with the committed wallpaper (e.g. the new layer order).
+         * The composite is built afterwards in the background and is NOT part of this span. */
         const val WALLPAPER_CHANGE_PAINT = "wallpaper_change_paint"
     }
 
