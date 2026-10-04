@@ -60,6 +60,7 @@ import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditState
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
@@ -153,6 +154,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     @Inject lateinit var wallpaperRepository: WallpaperRepository
     @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
+    @Inject lateinit var wallpaperEditState: NyxWallpaperEditState
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
     @Inject lateinit var fabPositionStore: NyxFabPositionStore
 
@@ -452,6 +454,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             scope = lifecycleScope,
             ioDispatcher = ioDispatcher,
         )
+        // 3b-1: mirror the edit mode process-wide, so "remove wallpaper" (also from Settings)
+        // and the orphan GC leave the files of an open session alone.
+        lifecycleScope.launch { wallpaperEditCoordinator.isEditMode.collect { wallpaperEditState.sessionOpen = it } }
         wallpaperEditCoordinator.start()
 
         wallpaperEditController = NyxWallpaperEditController(
@@ -828,6 +833,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         consentDialog = null
         currentDialog?.dismiss()
         currentDialog = null
+        // The edit session lives with this activity; it ends here (3b-1).
+        wallpaperEditState.sessionOpen = false
         super.onDestroy()
     }
 

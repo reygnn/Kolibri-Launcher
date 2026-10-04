@@ -33,6 +33,3 @@ kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/Setting
 kolibri/app/src/main/java/com/github/reygnn/kolibri_launcher/ui/settings/SettingsFragment.kt	withContext(Dispatchers.Main) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	override suspend fun saveToFile(uriString: String): Boolean = withContext(Dispatchers.IO) {
 kolibri/data/src/main/java/com/github/reygnn/kolibri_launcher/data/UsageExportRepositoryImpl.kt	withContext(Dispatchers.IO) {
-nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) {
-nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) { fileManager.gcOrphans(referenced) }
-nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	withContext(Dispatchers.IO) { previous.forEach { fileManager.deleteFile(it) } }

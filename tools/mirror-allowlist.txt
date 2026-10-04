@@ -40,7 +40,6 @@ nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.k
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* Factory reset (mirrors Kolibri): confirm, then wipe all state. The positive
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	// Dismiss any still-tracked dialog before showing a new one (mirrors Kolibri):
 nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/di/UsageDataStore.kt	* (mirrors kolibri's AUDIT-19 F1 split).
-nyx/data/src/main/java/com/github/reygnn/nyx_launcher/data/home/NyxWallpaperImageSetter.kt	* startup sweep (mirroring Kolibri's WallpaperDelegate) to catch any file stranded
 nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/model/DrawerAppSearch.kt	* PURE LOGIC — the drawer-search decision engine (mirrors kolibri's
 nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/model/LauncherAppSearch.kt	* Mirrors kolibri's `List<AppInfo>.filterByName`: the single pure home for the
 nyx/domain/src/main/java/com/github/reygnn/nyx_launcher/home/repository/AppUsageRepository.kt	* order loose apps by "most used" (mirrors kolibri's AppUsageRepository, over Nyx's

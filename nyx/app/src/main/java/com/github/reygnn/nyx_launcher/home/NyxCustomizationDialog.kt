@@ -130,9 +130,14 @@ class NyxCustomizationDialog : DialogFragment() {
         view.findViewById<MaterialButton>(R.id.btn_clear_wallpaper).setOnClickListener {
             // Activity scope + dismiss after (like choose): the sheet closes so its
             // Edit entry can't linger stale over a now-empty wallpaper.
-            requireActivity().lifecycleScope.launchSafe("Error clearing wallpaper") {
-                wallpaperImageSetter.clear()
-                if (isAdded) dismissAllowingStateLoss()
+            val activity = requireActivity()
+            activity.lifecycleScope.launchSafe("Error clearing wallpaper") {
+                if (wallpaperImageSetter.clear()) {
+                    if (isAdded) dismissAllowingStateLoss()
+                } else {
+                    // 3b-1: the removal did not take effect — say so and keep the sheet open.
+                    activity.showToastSafe(R.string.wallpaper_clear_failed_toast)
+                }
             }
         }
         val host = activity as? MainActivity

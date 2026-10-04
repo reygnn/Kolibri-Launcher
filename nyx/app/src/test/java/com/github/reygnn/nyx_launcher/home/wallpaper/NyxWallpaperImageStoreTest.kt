@@ -4,17 +4,17 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
-import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStoreContract
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditState
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,12 +26,14 @@ import java.io.File
  * image setter (choose / remove wallpaper, orphan GC as MainActivity calls it) and the edit
  * coordinator, with the real [WallpaperFileManager] on Robolectric's files dir.
  *
- * Today's gaps are switched off visibly (the contract skips those cases), each to be switched on
- * by its fix:
- *  - [decidesDeletesThroughTheStore] = false until 3b-1: the setter deletes the previous files
- *    directly even when the save was swallowed, `clear()` deletes them even when the clear was
- *    swallowed, and the GC reads the referenced files through `getWallpaperStateSync()`, which
- *    falls back to "nothing" on a read error — and it has no edit guard.
+ * The repository is the shared [FakeWallpaperRepository] (3b-02), which behaves like the real one
+ * in a release build: writes swallowed when told to, and an unreadable store reads as NONE through
+ * `getWallpaperStateSync()` and as "can't tell" through `readPersistedImageUris()`.
+ *
+ * Gaps are switched off visibly (the contract skips those cases), each switched on by its fix:
+ *  - [decidesDeletesThroughTheStore]: on since 3b-1 — the setter and the GC decide every delete
+ *    through the shared store (against what is persisted, fail closed, edit guard). Before, they
+ *    deleted directly and the GC read "nothing referenced" on a read error.
  *  - [editsThroughSharedOperations] = false until 3b-3: a replace is not a session change, and the
  *    coordinator's commit deletes removed files without a reference check.
  * W1 (replace deletes the old file right away) Nyx has always done.
@@ -41,9 +43,14 @@ import java.io.File
 class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val repository = ContractWallpaperRepository()
+    private val repository = FakeWallpaperRepository()
     private val fileManager = WallpaperFileManager(context, mainDispatcherRule.testDispatcher)
-    private val setter = NyxWallpaperImageSetter(fileManager, repository)
+    private val editState = NyxWallpaperEditState()
+    private val setter = NyxWallpaperImageSetter(
+        repository = repository,
+        imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+        editState = editState,
+    )
 
     // Not backgroundScope: the contract drives every step with advanceUntilIdle(), which would
     // never run backgroundScope work (3a-9c). A separate scope on the test dispatcher, cancelled after.
@@ -56,7 +63,7 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
     }
 
     override val deletesReplacedImageImmediately = true // Nyx's setter always did (W1)
-    override val decidesDeletesThroughTheStore = false // switched on by 3b-1
+    override val decidesDeletesThroughTheStore = true // since 3b-1
     override val editsThroughSharedOperations = false // switched on by 3b-3
 
     override val wallpaperDir: File get() = File(context.filesDir, "wallpapers")
@@ -72,7 +79,13 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
             ioDispatcher = mainDispatcherRule.testDispatcher,
         )
         coordinator.start()
+        mirrorEditMode()
         setter.reclaimOrphans()
+    }
+
+    /** What MainActivity does continuously: the coordinator's edit mode into the shared flag. */
+    private fun mirrorEditMode() {
+        editState.sessionOpen = coordinator.isEditMode.value
     }
 
     override suspend fun setWallpaper(image: File) {
@@ -94,11 +107,15 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
     }
 
     override suspend fun removeWallpaper() {
+        mirrorEditMode()
         setter.clear()
     }
 
     /** Nyx's GC: what MainActivity calls at start. */
-    override suspend fun runOrphanGc() = setter.reclaimOrphans()
+    override suspend fun runOrphanGc() {
+        mirrorEditMode()
+        setter.reclaimOrphans()
+    }
 
     override suspend fun copyWithoutSave(image: File) {
         fileManager.copyToInternal(Uri.fromFile(image))
@@ -114,47 +131,13 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
     }
 
     override fun failSavesSilently() {
-        repository.failWritesSilently = true
+        repository.failSavesSilently = true
     }
 
     override fun makePersistedStateUnreadable() {
-        repository.unreadable = true
+        repository.persistedStateUnreadable = true
     }
 
     override suspend fun savedLayerFiles(): List<String> =
-        repository.state.value.layers.mapNotNull { layer -> layer.imageUri?.let { File(Uri.parse(it).path!!).name } }
-
-    /**
-     * The persisted wallpaper state for this contract run, behaving like the real repository in a
-     * release build: writes are swallowed when [failWritesSilently]; when [unreadable],
-     * `getWallpaperStateSync()` falls back to NONE (the real read path does) and
-     * `readPersistedImageUris()` reports "can't tell" (null).
-     */
-    private class ContractWallpaperRepository : WallpaperRepository {
-        val state = MutableStateFlow(WallpaperState.NONE)
-        var failWritesSilently = false
-        var unreadable = false
-
-        override val wallpaperState: Flow<WallpaperState> = state
-
-        override suspend fun saveWallpaperState(state: WallpaperState) {
-            if (failWritesSilently) return
-            this.state.value = state
-        }
-
-        override suspend fun clearWallpaper() {
-            if (failWritesSilently) return
-            state.value = WallpaperState.NONE
-        }
-
-        override suspend fun getWallpaperStateSync(): WallpaperState =
-            if (unreadable) WallpaperState.NONE else state.value
-
-        override suspend fun readPersistedImageUris(): Set<String>? =
-            if (unreadable) null else state.value.referencedUris
-
-        override suspend fun purgeRepository() {
-            state.value = WallpaperState.NONE
-        }
-    }
+        repository.currentState.layers.mapNotNull { layer -> layer.imageUri?.let { File(Uri.parse(it).path!!).name } }
 }

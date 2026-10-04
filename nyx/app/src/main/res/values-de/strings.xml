@@ -78,6 +78,7 @@
     <string name="wallpaper_set_toast">Hintergrund gesetzt</string>
     <string name="wallpaper_set_failed_toast">Hintergrund konnte nicht gesetzt werden</string>
     <string name="wallpaper_cleared_toast">Hintergrund entfernt</string>
+    <string name="wallpaper_clear_failed_toast">Hintergrund konnte nicht entfernt werden</string>
 
     <!-- Live-preview customization sheet -->
     <string name="customize_title">Anpassen</string>

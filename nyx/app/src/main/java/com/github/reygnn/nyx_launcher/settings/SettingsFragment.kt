@@ -176,8 +176,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
         findPreference<Preference>("clear_wallpaper")?.setOnPreferenceClickListener {
             lifecycleScope.launch {
-                wallpaperImageSetter.clear()
-                toast(getString(R.string.wallpaper_cleared_toast))
+                // 3b-1: the removal reports whether it took effect; if not, the wallpaper stays.
+                val removed = wallpaperImageSetter.clear()
+                toast(getString(if (removed) R.string.wallpaper_cleared_toast else R.string.wallpaper_clear_failed_toast))
             }
             true
         }

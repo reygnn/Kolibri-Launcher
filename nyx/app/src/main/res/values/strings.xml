@@ -83,6 +83,7 @@
     <string name="wallpaper_set_toast">Wallpaper set</string>
     <string name="wallpaper_set_failed_toast">Could not set wallpaper</string>
     <string name="wallpaper_cleared_toast">Wallpaper removed</string>
+    <string name="wallpaper_clear_failed_toast">Couldn't remove the wallpaper</string>
 
     <!-- Live-preview customization sheet -->
     <string name="customize_title">Customize</string>
