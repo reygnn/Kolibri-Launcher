@@ -44,7 +44,7 @@ conf="$det/conventions/$app.conf"
 # ── Registry: check id → detector files it owns (order = report order) ───────
 CHECK_IDS=(rule9 rule12 toast naming rule11 cancel initorder flowcatch sharedflow
            purge arresult adapter oom parity triple keeplist whilesub mirror
-           harddisp buildparity legacysunset testconv stalereplay rule13)
+           harddisp buildparity legacysunset testconv stalereplay rule13 apostrophe)
 declare -A OWNS=(
   [rule9]="check-intent-gate.awk"
   [rule11]="check-rule11-annotation.awk"
@@ -66,6 +66,7 @@ declare -A OWNS=(
   [testconv]="check-test-conventions.sh check-test-dispatcher.awk check-test-assertions.awk"
   [stalereplay]="check-stale-replay-read.awk check-stale-replay-read.sh"
   [rule13]="check-rule13-german-comments.awk check-rule13-german-comments.sh"
+  [apostrophe]="check-strings-apostrophe.awk"
 )
 
 SHARED_MODULES=("$MONO/core" "$MONO/common-ui" "$MONO/common-data" "$MONO/feature-crashreporting"
@@ -213,6 +214,15 @@ if run parity; then
     [ -n "$h" ] && ph="${ph}${h}"$'\n'
   done
   [ -n "$ph" ] && report "Localization parity — key present in only one locale (values/ vs values-de/)" "${ph%$'\n'}"
+fi
+
+# AAPT2 apostrophes in string resources (3b, after the 3b-1b-c finding): this app's res and
+# every shared module's res. A plain XML parse accepts an unescaped apostrophe; AAPT2 does not.
+if run apostrophe; then
+  res_roots=("$APP_RES_DIR"); for m in "${SHARED_MODULES[@]}"; do [ -d "$m/src/main/res" ] && res_roots+=("$m/src/main/res"); done
+  awk_over_find "$det/check-strings-apostrophe.awk" \
+    "AAPT2 — unescaped apostrophe in a string resource (write \\' or wrap the value in double quotes)" \
+    "${res_roots[@]}" -path '*/values*/*' \( -name 'strings.xml' -o -name 'arrays.xml' \)
 fi
 
 # Rule 2 — contract-test triple.
