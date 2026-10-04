@@ -34,6 +34,7 @@ konkreten Anker im Repo gehören in Issues, nicht hierher.
 | 22 | Coverage-Threshold im Wallpaper-Classifier (`huggie.png`-Anker) | **offen (trigger-basiert zurückgestellt)** — `MIN_OPAQUE_COVERAGE = 0.5f`-Gate; `huggie.png` sitzt mit 48.7 % direkt auf dem Routing-Zaun, beide Pfade konvergieren aber zufällig. Erst angehen, wenn ein 40–60-%-Borderline-Bild AUTO falsch klassifiziert oder eine Asset-Pipeline-Änderung Coverage verschiebt. Detail-Sektion §22 unten. | klein-mittel, empirisch |
 | 26 | `SettingsActivity` auf Edge-to-Edge + `MaterialToolbar` modernisieren | **erledigt 2026-09-13** — expliziter `MaterialToolbar` in `activity_settings.xml` (über `settings_container`-FrameLayout, `fitsSystemWindows` + `colorSurface`), Activity auf `WindowCompat.setDecorFitsSystemWindows(window, false)` + `setSupportActionBar(toolbar)` umgestellt (ViewBinding, crash-safe Struktur bleibt), die drei `SettingsFragment`-Sub-Screens (Backup/Usage/Sort) zeigen jetzt auf `R.id.settings_container` statt `android.R.id.content`, leeres `SettingsTheme` entfernt und Activity im Manifest auf `@style/AppTheme`. Portiert aus dem Standalone-Repo (`reygnn/Kolibri-Launcher`, Commits `ac982b29`+`ae5e76dd`); `:kolibri:app:assembleDebug` + `checkConventions` grün, **auf A17 verifiziert (2026-09-27):** SettingsActivity + Backup-Sub-Screen rendern edge-to-edge mit MaterialToolbar korrekt (Top-Inset ok, kein Clipping/Crash). | klein-mittel |
 | 27 | Wartelogik „erste befüllte App-Liste“ doppelt (Onboarding + Reset-Seeding) | **offen (trigger-basiert)** — beim nächsten Anfassen des Onboardings aus einem anderen Grund an eine Stelle ziehen. Detail-Sektion §27. | klein |
+| 28 | Landscape-Deckung mehrschichtiger Wallpaper (O5) | **offen (trigger-basiert)** — nach Abschluss von 3b, oder früher, falls Querformat an Bedeutung gewinnt. Detail-Sektion §28. | mittel |
 
 **Empfohlene Reihenfolge bei freier Wahl:** Keine großen Brocken mehr offen.
 Alle drei aus dem Audit-Snapshot sind durch — A (HomeFragment-Restructure,
@@ -1778,3 +1779,23 @@ doppelte Zeilen mit Verweis — seine Tests mocken den App-Flow direkt.
 ziehen, z. B. als `suspend fun firstPopulatedApps(): List<AppInfo>` in
 `GetOnboardingAppsUseCase` mit der einen Konstante, und beide Aufrufer darauf umstellen
 (Onboarding-Tests dabei auf die neue Funktion anpassen).
+
+---
+
+## 28. (offen, trigger-basiert) Landscape-Deckung mehrschichtiger Wallpaper
+
+Offene Designfrage **O5** in `SPEC_NYX_REWRITE.md` (dort Reproduktion, Ursache, Randbedingungen
+und Testidee). Kurz: Die gespeicherten `scale`/`translate` einer Ebene sind absolute Pixel der
+Hochformat-Ansicht; beim Drehen rechnet `ZoomableImageView` das Cover neu, der Transform bleibt.
+Im Querformat entsteht rechts eine Lücke von rund 13 %: Bei nicht deckungsgleichen Ebenen füllt
+sie die untere Ebene, bei deckungsgleichen scheint der Backdrop durch. Auf dem A17 am 03.10.2026
+belegt, älter als Phase 3a.
+
+**Randbedingungen:** keine Migration der gespeicherten Transforms (Rule 5); Ebenen, die
+absichtlich nur teilweise decken (Collage), dürfen nicht auf Cover gezwungen werden.
+
+**Priorität:** niedrig (Kolibri wird hauptsächlich im fest eingestellten Hochformat genutzt).
+
+**Trigger:** nach Abschluss von Phase 3b (dann für Kolibri und Nyx, mit Designvorschlag vor dem
+Code), oder früher, falls Querformat an Bedeutung gewinnt. In 3b wird geprüft, ob Nyx dieselbe
+Lücke hat.
