@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -219,13 +220,16 @@ class WallpaperOperationsTest {
     fun start_feeds_the_session_runs_the_gc_once_and_refills_on_each_emission() = runTest(mainDispatcherRule.testDispatcher) {
         val persistence = FakePersistence(WallpaperState.single(uri = a))
         val composite = FakeComposite()
-        // The observation never ends on its own: run it in the background scope.
+        // The observation never ends on its own: run it in the background scope. Drive it with
+        // runCurrent(), NOT advanceUntilIdle(): advanceUntilIdle() stops as soon as only
+        // backgroundScope work is left, so the collector would never start and this test would
+        // check nothing (3a-9c). There are no delays on the way, so runCurrent() suffices.
         val ops = operations(backgroundScope, persistence, composite)
 
         ops.start()
-        advanceUntilIdle()
+        runCurrent()
         persistence.state.value = WallpaperState.single(uri = b)
-        advanceUntilIdle()
+        runCurrent()
 
         assertThat(ops.session.state.value.referencedUris).containsExactly(b)
         verify(exactly = 1) { fileManager.gcOrphans(any<Set<String>>()) }
