@@ -31,9 +31,12 @@ import org.junit.runner.RunWith
  *    NO re-flatten (`wallpaper_flatten` never fires). [FrameTimingMetric] measures that
  *    transition — the cache's payoff.
  *
- * REQUIRES a MULTI-LAYER wallpaper set on the device — with none/single-layer no
- * composite is flattened and [compositeFlattenOnRotate]'s trace section never appears.
- * No cold start, so Kolibri may stay the default home. Local device only.
+ * Each run restores the fixed TWO-layer test wallpaper itself in the UNMEASURED setup
+ * ([restoreBenchmarkWallpaperIfNeeded]) — a single-layer state flattens no composite, so
+ * [compositeFlattenOnRotate]'s trace section would never appear. Driven as its own
+ * `am instrument` invocation after a `pm clear` (fresh process → the restore latch resets,
+ * fresh onboarding → the restore flow appears). No cold start, so Kolibri may stay the
+ * default home. Local device only.
  */
 @RunWith(AndroidJUnit4::class)
 class WallpaperCompositeBenchmark {
@@ -56,6 +59,10 @@ class WallpaperCompositeBenchmark {
         iterations = ITERATIONS,
         compilationMode = CompilationMode.Partial(),
         setupBlock = {
+            // Establish the fixed two-layer wallpaper (no-op after the first iteration's
+            // restore; a fresh process + pm clear per run re-arms it). Handles onboarding
+            // restore AND the consent decline internally.
+            restoreBenchmarkWallpaperIfNeeded()
             pressHome()
             startActivityAndWait()
         },
@@ -85,6 +92,9 @@ class WallpaperCompositeBenchmark {
         iterations = ITERATIONS,
         compilationMode = CompilationMode.Partial(),
         setupBlock = {
+            // Same two-layer restore as the miss arm, so a cache hit has a real composite
+            // to re-attach (no-op after the first iteration).
+            restoreBenchmarkWallpaperIfNeeded()
             pressHome()
             startActivityAndWait()
         },
@@ -107,7 +117,7 @@ class WallpaperCompositeBenchmark {
 
     private companion object {
         const val TARGET_PACKAGE = "com.github.reygnn.kolibri_launcher"
-        const val ITERATIONS = 15 // a re-flatten is heavy; 15 keeps the rotate run's wall-clock sane
+        const val ITERATIONS = 10 // F4 fixes 10, aligned with WallpaperPaintBenchmark
         const val FIND_TIMEOUT_MS = 5_000L
         // A 4-layer software flatten + HARDWARE copy is tens–hundreds of ms; 1.5 s is generous
         // headroom so the async warm always lands inside the traced window.

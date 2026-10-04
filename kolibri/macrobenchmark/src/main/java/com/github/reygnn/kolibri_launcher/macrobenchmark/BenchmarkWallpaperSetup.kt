@@ -6,14 +6,17 @@ import androidx.test.uiautomator.Until
 import java.util.regex.Pattern
 
 /**
- * The fixed test wallpaper for [WallpaperPaintBenchmark] (SPEC_NYX_REWRITE F4): TWO layers with
+ * The fixed test wallpaper for [WallpaperPaintBenchmark] and [WallpaperCompositeBenchmark]
+ * (SPEC_NYX_REWRITE F4) — one restore flow for both, no second copy: TWO layers with
  * different images, from one backup file that is pushed to the device once
  * (`adb push <file> /sdcard/Download/`). `connectedBenchmarkAndroidTest` reinstalls the target
  * fresh, so the wallpaper is restored on the first setup of each run through onboarding's
  * "Restore backup" button and the system document picker. No seam ships in the app.
  *
  * A no-op once restored (the restore persists across the cold kills), and when the install is
- * already past onboarding (the run's second test shares the install).
+ * already past onboarding (the run's second test shares the install). The latch lives in the
+ * test process: each benchmark class runs as its own `am instrument` invocation after a
+ * `pm clear`, so a fresh process re-arms it and a fresh onboarding shows the restore button.
  */
 fun MacrobenchmarkScope.restoreBenchmarkWallpaperIfNeeded() {
     if (benchmarkWallpaperRestored) return
