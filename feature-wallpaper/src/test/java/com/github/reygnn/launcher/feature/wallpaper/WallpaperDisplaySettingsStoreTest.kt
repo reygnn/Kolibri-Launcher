@@ -138,6 +138,47 @@ class WallpaperDisplaySettingsStoreTest {
         assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
     }
 
+    // ---- the toggle's memory stays in step with every writer (3a-9d) ----
+
+    @Test
+    fun a_setter_write_between_toggles_is_respected() = runTest(mainDispatcherRule.testDispatcher) {
+        // Toggle to BLACK, then settings (or a restore) write SYSTEM_WALLPAPER through the setter:
+        // the next toggle flips from SYSTEM_WALLPAPER, i.e. to BLACK — visible on the FIRST tap.
+        val store = WallpaperDisplaySettingsStore(InMemoryPreferencesStore(), keys)
+        store.toggleBackdrop()
+
+        store.setWallpaperBackdrop(WallpaperBackdrop.SYSTEM_WALLPAPER)
+        store.toggleBackdrop()
+
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun a_purge_between_toggles_starts_again_from_the_default() = runTest(mainDispatcherRule.testDispatcher) {
+        val store = WallpaperDisplaySettingsStore(InMemoryPreferencesStore(), keys)
+        store.toggleBackdrop() // BLACK
+
+        store.purgeRepository() // back to the default SYSTEM_WALLPAPER
+        store.toggleBackdrop()
+
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun a_failed_setter_write_forgets_the_memory_and_the_next_toggle_reads_the_persisted_value() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val data = InMemoryPreferencesStore()
+            val store = WallpaperDisplaySettingsStore(data, keys)
+            store.toggleBackdrop() // persisted BLACK, memory BLACK
+
+            data.writeFailure = java.io.IOException("disk full")
+            store.setWallpaperBackdrop(WallpaperBackdrop.SYSTEM_WALLPAPER) // swallowed, memory → unknown
+            data.writeFailure = null
+            store.toggleBackdrop() // reads the persisted BLACK → SYSTEM_WALLPAPER
+
+            assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+        }
+
     @Test
     fun it_owns_exactly_its_three_configured_names() {
         // The keep-list gate sees that the store writes keys, not each name (they come from the

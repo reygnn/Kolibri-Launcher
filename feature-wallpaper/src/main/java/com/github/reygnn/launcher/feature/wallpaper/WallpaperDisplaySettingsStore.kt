@@ -83,16 +83,36 @@ class WallpaperDisplaySettingsStore @Inject constructor(
     override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
         safeData.map { it[BACKDROP].toEnumOr(WallpaperBackdrop.SYSTEM_WALLPAPER) }
 
-    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) = safeEdit { it[BACKDROP] = backdrop.name }
+    /**
+     * Writes the backdrop (settings, restore, any other writer) — and keeps the toggle's memory
+     * honest (3a-9d): under [backdropToggleLock], [lastWrittenBackdrop] becomes the written value
+     * if the write landed, else null ("unknown — read the persisted value on the next toggle").
+     * Outward error behaviour unchanged: swallowed after `silentError` (D4).
+     */
+    override suspend fun setWallpaperBackdrop(backdrop: WallpaperBackdrop) {
+        backdropToggleLock.withLock {
+            lastWrittenBackdrop = if (tryEdit { it[BACKDROP] = backdrop.name }) backdrop else null
+        }
+    }
 
     override fun ownedExactKeys(): Set<String> = setOf(SCRIM_ALPHA.name, BACKDROP.name, SURFACE_MODE.name)
 
-    /** Factory reset: removes the three keys; a failure is rethrown by `safePurge` (F1). */
+    /**
+     * Factory reset: removes the three keys; a failure is rethrown by `safePurge` (F1). The
+     * toggle's memory is forgotten under [backdropToggleLock] in any case (3a-9d), also when the
+     * purge throws — the next toggle reads the persisted value.
+     */
     override suspend fun purgeRepository() {
-        dataStore.safePurge("WallpaperDisplaySettingsStore") { preferences ->
-            preferences.remove(SCRIM_ALPHA)
-            preferences.remove(BACKDROP)
-            preferences.remove(SURFACE_MODE)
+        backdropToggleLock.withLock {
+            try {
+                dataStore.safePurge("WallpaperDisplaySettingsStore") { preferences ->
+                    preferences.remove(SCRIM_ALPHA)
+                    preferences.remove(BACKDROP)
+                    preferences.remove(SURFACE_MODE)
+                }
+            } finally {
+                lastWrittenBackdrop = null
+            }
         }
     }
 
@@ -128,13 +148,20 @@ class WallpaperDisplaySettingsStore @Inject constructor(
 
     // ---- backdrop toggle (3a-9b, K3) ----
 
-    /** Serializes [toggleBackdrop]: a read-modify-write under one lock, in the one singleton. */
+    /**
+     * Serializes every touch of the backdrop memory: [toggleBackdrop] (read-modify-write),
+     * [setWallpaperBackdrop] and [purgeRepository]. **Never taken together with any other lock**
+     * (no lock inside it, and it is not taken under another one); kotlinx `Mutex` is not
+     * reentrant, so nothing inside it calls those three again.
+     */
     private val backdropToggleLock = Mutex()
 
     /**
-     * The value the last toggle actually PERSISTED. A rapid double-tap flips from it instead of
-     * the write→read-lagged flow, so two taps net to a no-op. Advanced only after a write that
-     * landed, so a failed write leaves the next toggle aiming at the same target again.
+     * The backdrop value last actually PERSISTED by this store (toggle or setter), or null when
+     * unknown (nothing written yet, a failed setter write, a purge). A rapid double-tap flips from
+     * it instead of the write→read-lagged flow, so two taps net to a no-op. The toggle advances it
+     * only after a write that landed, so a failed toggle leaves the next one aiming at the same
+     * target again; every other writer keeps it in step (3a-9d), so it never goes stale.
      */
     private var lastWrittenBackdrop: WallpaperBackdrop? = null
 
@@ -142,8 +169,9 @@ class WallpaperDisplaySettingsStore @Inject constructor(
      * Flips the backdrop between the system wallpaper and black and persists it (3a-9b, moved from
      * Kolibri's delegate; Nyx's coordinator follows in 3b). Reads the PERSISTED value
      * (`lastWritten ?: first()`), not a `stateIn` value that is the default while nobody
-     * subscribes. Error behaviour as the setters: a failed write is logged, never thrown — but
-     * unlike a plain setter it does not advance [lastWrittenBackdrop]. Before 3a-9b that
+     * subscribes. Error behaviour as the setters: a failed write is logged, never thrown — and a
+     * failed toggle leaves [lastWrittenBackdrop] as it was, so the next tap aims at the same
+     * target again (a failed setter write resets it instead, see [setWallpaperBackdrop]). Before 3a-9b that
      * "only after a successful write" rule relied on a throw that never came in production (the
      * setters have swallowed since before 3a-4), so it silently did not hold.
      */
