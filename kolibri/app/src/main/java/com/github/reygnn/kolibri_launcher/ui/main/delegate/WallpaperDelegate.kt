@@ -42,6 +42,7 @@ import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperEditSession
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperOperations
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperPersistence
@@ -60,8 +61,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCas
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import android.widget.Toast
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -93,11 +92,15 @@ class WallpaperDelegate(
     private val getFabPositionUseCase: GetFabPositionUseCase,
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
-    private val setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
+    // Unused since 3a-9b (the toggle lives in the display-settings store). Kept until its removal
+    // is approved (README cleanup list).
+    @Suppress("UNUSED_PARAMETER") setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     /** Every file decision: copy in, delete what no layer needs, orphan GC (3a-2). */
     private val imageStore: WallpaperImageStore,
     /** The display composite since 3a-8: warm, cache, luminance, lock — behind one interface. */
     private val composite: WallpaperComposite,
+    /** The display settings (3a-4); since 3a-9b also the backdrop toggle. */
+    private val displaySettings: WallpaperDisplaySettingsStore,
     private val scope: DelegateScope
 ) {
 
@@ -185,7 +188,7 @@ class WallpaperDelegate(
      * write can never leave the icon showing a value that was never stored.
      * DataStore stays the single source of truth.
      *
-     * Double-tap correctness is handled on the WRITE side ([onToggleWallpaperBackdrop]),
+     * Double-tap correctness is handled on the WRITE side ([WallpaperDisplaySettingsStore.toggleBackdrop]),
      * not by making this value optimistic — keeping display strictly = persisted.
      */
     val wallpaperBackdrop: StateFlow<WallpaperBackdrop> = observeWallpaperBackdropUseCase()
@@ -196,28 +199,12 @@ class WallpaperDelegate(
         )
 
     /**
-     * Serializes backdrop toggles and remembers the value we last *successfully*
-     * persisted. A rapid double-tap thus flips from that intended value rather
-     * than the write→read-lagged [wallpaperBackdrop] (which only updates after
-     * the DataStore round-trip), so two taps net to a no-op instead of both
-     * reading the same stale value. Advanced ONLY after a successful write, so a
-     * failed persist leaves the next toggle computing from the last stored value.
+     * Flips the backdrop between system-wallpaper and black (3a-9b): the read-modify-write with its
+     * lock and "advance only after a write that landed" lives in the display-settings store.
      */
-    private val backdropToggleMutex = Mutex()
-    private var lastWrittenBackdrop: WallpaperBackdrop? = null
-
-    /** Flips the backdrop between system-wallpaper and black and persists it. */
     fun onToggleWallpaperBackdrop() =
         scope.launchSafe("Error toggling wallpaper backdrop") {
-            backdropToggleMutex.withLock {
-                val current = lastWrittenBackdrop ?: wallpaperBackdrop.value
-                val next = when (current) {
-                    WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
-                    WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
-                }
-                setWallpaperBackdropUseCase(next)
-                lastWrittenBackdrop = next
-            }
+            displaySettings.toggleBackdrop()
         }
 
     // --- Edit Session State ---

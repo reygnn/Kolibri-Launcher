@@ -255,6 +255,7 @@ class LauncherViewModelContractTest {
             setWallpaperBackdropUseCase = mockk(relaxed = true),
             wallpaperImageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
             wallpaperComposite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
+            wallpaperDisplaySettingsStore = mockk(relaxed = true),
             appUpdateSignal = appUpdateSignal,
             monotonicClock = neverThrottlingClock(),
             savedStateHandle = SavedStateHandle(),

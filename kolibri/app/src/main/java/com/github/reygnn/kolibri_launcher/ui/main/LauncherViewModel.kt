@@ -21,6 +21,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.AppInfo
@@ -144,6 +145,7 @@ class LauncherViewModel @Inject constructor(
     setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     wallpaperImageStore: WallpaperImageStore,
     wallpaperComposite: WallpaperComposite,
+    wallpaperDisplaySettingsStore: WallpaperDisplaySettingsStore,
     appUpdateSignal: AppUpdateSignal,
     monotonicClock: MonotonicClock,
     private val savedStateHandle: SavedStateHandle,
@@ -241,6 +243,7 @@ class LauncherViewModel @Inject constructor(
         setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         imageStore = wallpaperImageStore,
         composite = wallpaperComposite,
+        displaySettings = wallpaperDisplaySettingsStore,
         scope = delegateScope
     )
 

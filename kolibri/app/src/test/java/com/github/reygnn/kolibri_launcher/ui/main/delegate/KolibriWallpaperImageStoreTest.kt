@@ -76,6 +76,7 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
             setWallpaperBackdropUseCase = mockk(relaxed = true),
             imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
             composite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
+            displaySettings = mockk(relaxed = true),
             scope = DelegateScope(
                 coroutineScope = delegateScope,
                 mainDispatcher = mainDispatcherRule.testDispatcher,

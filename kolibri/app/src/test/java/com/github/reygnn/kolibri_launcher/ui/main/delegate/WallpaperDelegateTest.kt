@@ -1,4 +1,10 @@
 package com.github.reygnn.kolibri_launcher.ui.main.delegate
+import kotlinx.coroutines.flow.first
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
+import com.github.reygnn.kolibri_launcher.data.KolibriWallpaperDisplayKeys
+import com.github.reygnn.kolibri_launcher.fakes.FakeDataStore
 import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
@@ -106,6 +112,13 @@ class WallpaperDelegateTest {
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
     }
 
+    /** The in-memory DataStore behind the display-settings store (3a-9b backdrop tests). */
+    private val backdropDataStore = FakeDataStore()
+
+    private val backdropKey = stringPreferencesKey("wallpaper_backdrop")
+
+    private suspend fun persistedBackdrop(): String? = backdropDataStore.data.first()[backdropKey]
+
     private fun createDelegateScope() = DelegateScope(
         coroutineScope = CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob()),
         mainDispatcher = mainDispatcherRule.testDispatcher,
@@ -138,6 +151,9 @@ class WallpaperDelegateTest {
         compositeCache: WallpaperCompositeCache = mockk(relaxed = true),
         bitmapLuminance: com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl = mockk(relaxed = true),
         compositeLuminanceSignal: com.github.reygnn.launcher.core.CompositeLuminanceSignal = mockk(relaxed = true),
+        // The real display-settings store over an in-memory DataStore (3a-9b): the backdrop
+        // toggle lives there now, and its tests check what lands in the store.
+        displaySettings: WallpaperDisplaySettingsStore = WallpaperDisplaySettingsStore(backdropDataStore, KolibriWallpaperDisplayKeys),
     ) = WallpaperDelegate(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
@@ -152,6 +168,7 @@ class WallpaperDelegateTest {
         // The composite since 3a-8: the real implementation around the same mocks, so every
         // composite expectation below (cache, flattener, luminance, IO hop) stays as it was.
         composite = CachedWallpaperComposite(compositeCache, wallpaperFlattener, bitmapLuminance, compositeLuminanceSignal, ioDispatcher),
+        displaySettings = displaySettings,
         scope = scope
     )
 
@@ -2065,76 +2082,57 @@ class WallpaperDelegateTest {
         assertThat(delegate.wallpaperBackdrop.value).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
     }
 
+    // 3a-9b: the toggle runs in the display-settings store; these tests check what lands there.
+
     @Test
     fun `onToggleWallpaperBackdrop flips SYSTEM_WALLPAPER to BLACK`() = runTest {
-        // Current value is the SYSTEM_WALLPAPER default (no emission, no collector).
+        // Nothing persisted yet: the store reads its default, SYSTEM_WALLPAPER.
         val delegate = createDelegate()
         delegate.onToggleWallpaperBackdrop()
         advanceUntilIdle()
-        coVerify { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
+        assertThat(persistedBackdrop()).isEqualTo(WallpaperBackdrop.BLACK.name)
     }
 
     @Test
     fun `onToggleWallpaperBackdrop flips BLACK to SYSTEM_WALLPAPER`() = runTest {
-        every { observeWallpaperBackdropUseCase.invoke() } returns
-            MutableStateFlow(WallpaperBackdrop.BLACK)
-
+        // The toggle reads the PERSISTED value — no collector on wallpaperBackdrop is needed
+        // anymore (a stateIn value without subscribers would be the default, not BLACK).
+        backdropDataStore.setInitialData(preferencesOf(backdropKey to WallpaperBackdrop.BLACK.name))
         val delegate = createDelegate()
-        // Drive the StateFlow past its initialValue so the toggle reads BLACK.
-        backgroundScope.launch { delegate.wallpaperBackdrop.collect { } }
-        advanceUntilIdle()
-
         delegate.onToggleWallpaperBackdrop()
         advanceUntilIdle()
-        coVerify { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
+        assertThat(persistedBackdrop()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER.name)
     }
 
     @Test
     fun `onToggleWallpaperBackdrop double-tap nets to a no-op`() = runTest {
-        // Default is SYSTEM_WALLPAPER and the store never emits between taps —
-        // the exact lost-update scenario: a stale read of the write→read-lagged
-        // wallpaperBackdrop would flip BOTH taps to BLACK. The serialized toggle
-        // must flip the second tap from the first tap's last-written target
-        // (BLACK) back to SYSTEM_WALLPAPER, so the persisted writes are BLACK
-        // then SYSTEM_WALLPAPER (net no-op).
+        // The second tap flips from the first tap's last-written target (BLACK), not from a
+        // write→read-lagged value — two writes, net back to SYSTEM_WALLPAPER.
         val delegate = createDelegate()
-
         delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK
         delegate.onToggleWallpaperBackdrop() // BLACK -> SYSTEM_WALLPAPER
         advanceUntilIdle()
-
-        coVerifyOrder {
-            setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK)
-            setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER)
-        }
+        assertThat(backdropDataStore.updateDataCallCount).isEqualTo(2)
+        assertThat(persistedBackdrop()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER.name)
     }
 
     @Test
     fun `onToggleWallpaperBackdrop retries the same target after a failed persist`() = runTest {
-        // lastWrittenBackdrop advances ONLY after a successful write (KDoc), so a
-        // failed persist must leave the NEXT toggle computing from the last STORED
-        // value, not the never-persisted one. Default is SYSTEM_WALLPAPER; the first
-        // toggle targets BLACK but its persist throws (DataStore write failure), so the
-        // tracker stays put. The retry must therefore target BLACK AGAIN — never
-        // SYSTEM_WALLPAPER, which is what it would flip to if the failed write had
-        // wrongly advanced the tracker to BLACK (a lost, un-retryable toggle).
-        var attempts = 0
-        coEvery { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) } answers {
-            attempts++
-            if (attempts == 1) throw RuntimeException("simulated persist failure")
-            // second attempt: succeeds (returns Unit)
-        }
-
+        // Against the real store over a DataStore that refuses the first write: the failed write
+        // does not advance lastWritten, so the next tap aims at BLACK again — and no error reaches
+        // the caller (no error toast; the store logs and does not throw).
+        backdropDataStore.makeEditFail()
         val delegate = createDelegate()
-
-        delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK, persist throws
+        delegate.onToggleWallpaperBackdrop() // SYSTEM_WALLPAPER -> BLACK, the write fails
         advanceUntilIdle()
-        delegate.onToggleWallpaperBackdrop() // must recompute BLACK, not flip to SYSTEM
+        assertThat(persistedBackdrop()).isNull()
+
+        backdropDataStore.resetErrorFlags()
+        delegate.onToggleWallpaperBackdrop() // must aim at BLACK again, not flip to SYSTEM
         advanceUntilIdle()
 
-        // Both taps targeted BLACK (fail, then succeed); SYSTEM_WALLPAPER never written.
-        coVerify(exactly = 2) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.BLACK) }
-        coVerify(exactly = 0) { setWallpaperBackdropUseCase.invoke(WallpaperBackdrop.SYSTEM_WALLPAPER) }
+        assertThat(persistedBackdrop()).isEqualTo(WallpaperBackdrop.BLACK.name)
+        assertThat(sentEvents.none { it is UiEvent.ShowToast }).isTrue()
     }
 
     // ===========================================

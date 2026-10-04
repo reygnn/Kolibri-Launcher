@@ -289,6 +289,7 @@ class MonolithicLauncherViewModelTest {
             mockk(relaxed = true), // setWallpaperBackdropUseCase
             WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
             CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher), // wallpaperComposite
+            mockk(relaxed = true), // wallpaperDisplaySettingsStore
             appUpdateSignal,
             neverThrottlingClock(),
             SavedStateHandle(),

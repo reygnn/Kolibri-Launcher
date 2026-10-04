@@ -100,6 +100,44 @@ class WallpaperDisplaySettingsStoreTest {
         assertFailsWith<IOException> { WallpaperDisplaySettingsStore(data, keys).purgeRepository() }
     }
 
+    // ---- backdrop toggle (3a-9b) ----
+
+    @Test
+    fun toggle_flips_the_persisted_backdrop() = runTest(mainDispatcherRule.testDispatcher) {
+        val data = InMemoryPreferencesStore(preferencesOf(stringPreferencesKey("wallpaper_backdrop") to "BLACK"))
+        val store = WallpaperDisplaySettingsStore(data, keys)
+
+        store.toggleBackdrop()
+
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+    }
+
+    @Test
+    fun a_double_toggle_nets_to_a_no_op() = runTest(mainDispatcherRule.testDispatcher) {
+        val store = WallpaperDisplaySettingsStore(InMemoryPreferencesStore(), keys)
+
+        store.toggleBackdrop()
+        store.toggleBackdrop()
+
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+    }
+
+    @Test
+    fun a_failed_write_is_retried_with_the_same_target_and_never_thrown() = runTest(mainDispatcherRule.testDispatcher) {
+        // The setters swallow failures (D4); the toggle does too, but it does not advance its
+        // last-written value — so the next tap aims at the same target again.
+        val data = InMemoryPreferencesStore().apply { writeFailure = java.io.IOException("disk full") }
+        val store = WallpaperDisplaySettingsStore(data, keys)
+
+        store.toggleBackdrop() // no exception reaches the caller
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+
+        data.writeFailure = null
+        store.toggleBackdrop()
+
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
     @Test
     fun it_owns_exactly_its_three_configured_names() {
         // The keep-list gate sees that the store writes keys, not each name (they come from the

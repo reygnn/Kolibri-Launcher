@@ -20,6 +20,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -101,15 +104,57 @@ class WallpaperDisplaySettingsStore @Inject constructor(
             emit(emptyPreferences())
         }
 
+    /** The setters' write: swallows its failure after logging (D4). */
     private suspend fun safeEdit(block: (MutablePreferences) -> Unit) {
+        tryEdit(block)
+    }
+
+    /**
+     * A write that also reports whether it landed (3a-9b), for [toggleBackdrop]. Same outward
+     * error behaviour as [safeEdit]: logged with `silentError`, never thrown.
+     */
+    private suspend fun tryEdit(block: (MutablePreferences) -> Unit): Boolean =
         try {
             dataStore.edit(block)
+            true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             // Catch kept (Expected error, four-category frame): a setter swallows its failure like
             // Kolibri's settings did (D4); OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Wallpaper display settings: write error")
+            false
+        }
+
+    // ---- backdrop toggle (3a-9b, K3) ----
+
+    /** Serializes [toggleBackdrop]: a read-modify-write under one lock, in the one singleton. */
+    private val backdropToggleLock = Mutex()
+
+    /**
+     * The value the last toggle actually PERSISTED. A rapid double-tap flips from it instead of
+     * the write→read-lagged flow, so two taps net to a no-op. Advanced only after a write that
+     * landed, so a failed write leaves the next toggle aiming at the same target again.
+     */
+    private var lastWrittenBackdrop: WallpaperBackdrop? = null
+
+    /**
+     * Flips the backdrop between the system wallpaper and black and persists it (3a-9b, moved from
+     * Kolibri's delegate; Nyx's coordinator follows in 3b). Reads the PERSISTED value
+     * (`lastWritten ?: first()`), not a `stateIn` value that is the default while nobody
+     * subscribes. Error behaviour as the setters: a failed write is logged, never thrown — but
+     * unlike a plain setter it does not advance [lastWrittenBackdrop]. Before 3a-9b that
+     * "only after a successful write" rule relied on a throw that never came in production (the
+     * setters have swallowed since before 3a-4), so it silently did not hold.
+     */
+    suspend fun toggleBackdrop() {
+        backdropToggleLock.withLock {
+            val current = lastWrittenBackdrop ?: wallpaperBackdropFlow.first()
+            val next = when (current) {
+                WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
+                WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
+            }
+            if (tryEdit { it[BACKDROP] = next.name }) lastWrittenBackdrop = next
         }
     }
 }
