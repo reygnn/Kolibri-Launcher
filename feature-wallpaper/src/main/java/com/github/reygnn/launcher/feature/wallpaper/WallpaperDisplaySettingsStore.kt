@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.flow.first
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,11 +44,17 @@ data class WallpaperDisplayKeys(
  * app (`@Singleton`): Kolibri binds `WallpaperDisplaySettings` to it AND delegates its
  * `SettingsRepository` members to it, so both reach the same object.
  *
- * Behaviour-neutral for Kolibri, deliberately (02.10.):
- *  - **Reads** fail open the way Kolibri's settings did: an upstream read error that is an
- *    [Exception] (not a cancellation) is logged with `silentError` (crashes in DEBUG) and falls
- *    back to the defaults. Unifying reads under the house standard `readFlowFailOpen` is open for
- *    3b (type history of the keys first, `app_drawer_mode` especially).
+ * Reads (D5, decided 03.10. for both apps — values on Home's start path, the named exception in
+ * DATASTORE_READ_SPEC): no read of a display value can throw into a collector.
+ *  - **Upstream:** a read error that is an [Exception] (not a cancellation) is logged with
+ *    `silentError` and falls back to the defaults (Kolibri's policy, now for both apps).
+ *  - **Per value:** each value is read TYPED with a safe cast (`asMap()[key] as? T`), never through
+ *    the unchecked `prefs[key]`, whose `ClassCastException` would only surface wherever the value
+ *    is used. A value of a foreign type under a key (an old install, say) is reported once with
+ *    `silentError` and read as the default. `silentError` is loud in DEBUG — an old value of the
+ *    wrong type crashes a debug build on purpose (house rule); release reads the default.
+ *  Why: these flows are collected via `stateIn` on Home's start path; an exception there would
+ *  end the process on every start (O6 tracks that wider question).
  *  - **Writes** swallow their failure after logging (D4); whether Nyx keeps throwing is decided
  *    in 3b.
  *  - **Purge** rethrows (F1), so the reset reports a partial failure. Who purges it differs per
@@ -71,17 +78,17 @@ class WallpaperDisplaySettingsStore @Inject constructor(
     private val SURFACE_MODE = stringPreferencesKey(keys.surfaceMode)
 
     override val wallpaperScrimAlphaStateFlow: Flow<Float> =
-        safeData.map { it[SCRIM_ALPHA] ?: AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA }
+        safeData.map { it.typedOrNull<Float>(SCRIM_ALPHA) ?: AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA }
 
     override suspend fun setWallpaperScrimAlpha(alpha: Float) = safeEdit { it[SCRIM_ALPHA] = alpha }
 
     override val wallpaperSurfaceModeFlow: Flow<WallpaperSurfaceMode> =
-        safeData.map { it[SURFACE_MODE].toEnumOr(WallpaperSurfaceMode.AUTO) }
+        safeData.map { it.typedOrNull<String>(SURFACE_MODE).toEnumOr(WallpaperSurfaceMode.AUTO) }
 
     override suspend fun setWallpaperSurfaceMode(mode: WallpaperSurfaceMode) = safeEdit { it[SURFACE_MODE] = mode.name }
 
     override val wallpaperBackdropFlow: Flow<WallpaperBackdrop> =
-        safeData.map { it[BACKDROP].toEnumOr(WallpaperBackdrop.SYSTEM_WALLPAPER) }
+        safeData.map { it.typedOrNull<String>(BACKDROP).toEnumOr(WallpaperBackdrop.SYSTEM_WALLPAPER) }
 
     /**
      * Writes the backdrop (settings, restore, any other writer) — and keeps the toggle's memory
@@ -116,7 +123,26 @@ class WallpaperDisplaySettingsStore @Inject constructor(
         }
     }
 
-    /** Kolibri's read policy: an upstream [Exception] falls back to the defaults (see the KDoc). */
+    /**
+     * The value under [key] if it has the expected type [T]; null when absent — and null, reported
+     * once per key, when a value of a foreign type sits there (D5, see the class KDoc).
+     */
+    private inline fun <reified T : Any> Preferences.typedOrNull(key: Preferences.Key<T>): T? {
+        val raw = asMap()[key] ?: return null
+        val typed = raw as? T
+        if (typed == null && reportedForeignTypes.add(key.name)) {
+            TimberWrapper.silentError(
+                IllegalStateException("${key.name} holds a ${raw::class.java.simpleName}"),
+                "Wallpaper display settings: value of a foreign type, reading the default",
+            )
+        }
+        return typed
+    }
+
+    /** Keys already reported for a foreign type — once per key and process, not per emission. */
+    private val reportedForeignTypes: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** The upstream read policy for both apps: an upstream [Exception] falls back to the defaults. */
     private val safeData: Flow<Preferences>
         get() = dataStore.data.catch { e ->
             if (e is CancellationException || e !is Exception) throw e

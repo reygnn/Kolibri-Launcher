@@ -1,6 +1,7 @@
 package com.github.reygnn.launcher.feature.wallpaper
 
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -178,6 +179,56 @@ class WallpaperDisplaySettingsStoreTest {
 
             assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
         }
+
+    // ---- D5: no read of a display value throws (values on Home's start path) ----
+
+    // Nyx's names, next to Kolibri's [keys]: the guard must hold for both apps.
+    private val nyxKeys = WallpaperDisplayKeys(scrimAlpha = "wallpaper_scrim_alpha", backdrop = "wallpaper_backdrop", surfaceMode = "wallpaper_surface_mode")
+
+    private fun foreignTypes(keys: WallpaperDisplayKeys) = preferencesOf(
+        intPreferencesKey(keys.surfaceMode) to 2, // an Int where a String enum name belongs
+        stringPreferencesKey(keys.scrimAlpha) to "0.4", // a String where a Float belongs
+        floatPreferencesKey(keys.backdrop) to 1f, // a Float where a String enum name belongs
+    )
+
+    @Test
+    fun foreign_types_read_as_the_defaults_with_kolibris_names() = runTest(mainDispatcherRule.testDispatcher) {
+        val store = WallpaperDisplaySettingsStore(InMemoryPreferencesStore(foreignTypes(keys)), keys)
+
+        assertThat(store.wallpaperSurfaceModeFlow.first()).isEqualTo(WallpaperSurfaceMode.AUTO)
+        assertThat(store.wallpaperScrimAlphaStateFlow.first()).isEqualTo(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+    }
+
+    @Test
+    fun foreign_types_read_as_the_defaults_with_nyxs_names() = runTest(mainDispatcherRule.testDispatcher) {
+        val store = WallpaperDisplaySettingsStore(InMemoryPreferencesStore(foreignTypes(nyxKeys)), nyxKeys)
+
+        assertThat(store.wallpaperSurfaceModeFlow.first()).isEqualTo(WallpaperSurfaceMode.AUTO)
+        assertThat(store.wallpaperScrimAlphaStateFlow.first()).isEqualTo(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+    }
+
+    @Test
+    fun a_read_error_other_than_io_reads_the_defaults() = runTest(mainDispatcherRule.testDispatcher) {
+        // Kolibri's upstream policy, now for both apps: not only IOException falls back.
+        val data = InMemoryPreferencesStore().apply { readFailure = IllegalStateException("corrupt") }
+        val store = WallpaperDisplaySettingsStore(data, nyxKeys)
+
+        assertThat(store.wallpaperScrimAlphaStateFlow.first()).isEqualTo(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
+    }
+
+    @Test
+    fun a_foreign_type_does_not_hide_a_valid_neighbour() = runTest(mainDispatcherRule.testDispatcher) {
+        val data = InMemoryPreferencesStore(
+            preferencesOf(intPreferencesKey("wallpaper_surface_mode") to 2, stringPreferencesKey("wallpaper_backdrop") to "BLACK"),
+        )
+        val store = WallpaperDisplaySettingsStore(data, nyxKeys)
+
+        assertThat(store.wallpaperSurfaceModeFlow.first()).isEqualTo(WallpaperSurfaceMode.AUTO)
+        assertThat(store.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
+    }
 
     @Test
     fun it_owns_exactly_its_three_configured_names() {

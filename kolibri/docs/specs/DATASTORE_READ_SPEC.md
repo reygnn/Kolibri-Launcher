@@ -600,3 +600,29 @@ Fixbares zeigen.
 **Umgesetzt und nach `main` gemergt (2026-08-08)** — Commit-Liste im Review-Log
 oben. Der AUDIT-13-Anhang „Flows mit `replay` im Repo" ist um die Auflösung der
 drei DataStore-Hot-Shares ergänzt (sonst wäre die Tabelle dort stale).
+
+## 13. Benannte Ausnahme: Werte im Startpfad von Home (SPEC_NYX_REWRITE 3b-2, D5, 03.10.2026)
+
+`readFlowFailOpen` (nur `IOException` fällt auf den Default zurück, alles andere läuft durch) bleibt
+der Standard für jeden DataStore-Lesepfad. Eine Kategorie ist davon ausgenommen:
+
+**Werte im Startpfad von Home** — heute genau die Display-Settings des Wallpapers: Scrim, Backdrop,
+Surface-Modus (`WallpaperDisplaySettingsStore` in `:feature-wallpaper`, für beide Apps).
+
+- **Upstream:** Ein Lesefehler, der eine `Exception` ist (keine Cancellation), wird mit
+  `silentError` gemeldet und fällt auf die Defaults zurück.
+- **Je Wert typisiert:** gelesen wird per sicherem Cast (`asMap()[key] as? T`), nie über das
+  ungeprüfte `prefs[key]`. Dessen `ClassCastException` entstünde erst dort, wo der Wert benutzt
+  wird, und ließe sich nicht verlässlich fangen. Ein Wert fremden Typs wird einmal je Schlüssel mit
+  `silentError` gemeldet (in DEBUG laut, ein Debug-Build stürzt dann bewusst ab) und als Default
+  gelesen.
+
+**Begründung:** Diese Flows werden per `stateIn` im Startpfad von Home gesammelt, in Kolibri im
+`DelegateScope` auf `viewModelScope` ohne `CoroutineExceptionHandler`. Eine durchlaufende Exception
+würde den Prozess bei jedem Start beenden — eine Absturzschleife auf dem Home-Bildschirm. Die
+weitere Frage, welche Sammler im Startpfad eine Exception überhaupt erreichen darf, ist als offene
+Designfrage O6 in SPEC_NYX_REWRITE festgehalten.
+
+**Aufnahme weiterer Werte:** Wer einen Wert in diese Kategorie aufnehmen will, braucht dieselbe
+Begründung (der Wert liegt im Startpfad von Home, und eine Exception dort führte zur
+Absturzschleife) und dieselben zwei Regeln. Ohne diese Begründung gilt `readFlowFailOpen`.
