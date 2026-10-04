@@ -669,14 +669,16 @@ class WallpaperDelegateTest {
     // ===========================================
 
     @Test
-    fun `onSetWallpaperImage copies file and calls setUseCase`() = runTest {
+    fun `onSetWallpaperImage copies file and saves the single-image state`() = runTest {
+        // 3a-9 (K2): the replace saves through the persistence port — the single-image state,
+        // exactly what SetWallpaperImageUseCase did.
         val delegate = createDelegate()
 
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.copyToInternal(testUri) }
-        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.layerCount == 1 && it.layers.single().imageUri == internalUriString }) }
     }
 
     /**
@@ -693,7 +695,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
-        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.layerCount == 1 && it.layers.single().imageUri == internalUriString }) }
         assertThat(sentEvents.isEmpty()).isTrue()
     }
 
@@ -706,7 +708,7 @@ class WallpaperDelegateTest {
         delegate.onSetWallpaperImage(testUri)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { setWallpaperImageUseCase.invoke(any()) }
+        coVerify(exactly = 0) { saveWallpaperStateUseCase.invoke(any()) }
         assertThat(sentEvents.any { it is UiEvent.ShowToast }).isTrue()
     }
 

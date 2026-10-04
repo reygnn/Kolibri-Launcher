@@ -702,7 +702,8 @@ class LauncherViewModelTest {
         advanceUntilIdle()
 
         coVerify { wallpaperFileManager.copyToInternal(uri) }
-        coVerify { setWallpaperImageUseCase.invoke(internalUriString) }
+        // 3a-9 (K2): the replace saves the single-image state through the persistence port.
+        coVerify { saveWallpaperStateUseCase.invoke(match { it.layerCount == 1 && it.layers.single().imageUri == internalUriString }) }
     }
 
     // ===========================================
