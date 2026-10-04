@@ -1,5 +1,8 @@
 package com.github.reygnn.nyx_launcher.data.di
 
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplayKeys
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplayKeys
+import com.github.reygnn.launcher.core.SettingsStore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -31,6 +34,18 @@ object DataStoreModule {
     fun provideHomeLayoutDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.homeLayoutDataStore
+
+    /**
+     * The same home_layout store under the shared qualifier (3b-2): the display-settings store and
+     * the FAB store in :feature-wallpaper read it as [SettingsStore], like Kolibri's settings store.
+     */
+    @Provides
+    @SettingsStore
+    fun provideQualifiedSettingsDataStore(store: DataStore<Preferences>): DataStore<Preferences> = store
+
+    /** Nyx's key names for the wallpaper display settings (3b-2, unchanged on disk). */
+    @Provides
+    fun provideWallpaperDisplayKeys(): WallpaperDisplayKeys = NyxWallpaperDisplayKeys
 
     @Provides
     @Singleton

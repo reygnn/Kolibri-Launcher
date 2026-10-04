@@ -1,5 +1,8 @@
 package com.github.reygnn.nyx_launcher.data.di
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
+import com.github.reygnn.launcher.feature.wallpaper.FabPositionStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.nyx_launcher.data.home.AppUsageRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.DrawerFoldersRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.HiddenAppsRepositoryImpl
@@ -14,7 +17,6 @@ import com.github.reygnn.launcher.core.InstalledAppsStateRepository
 import com.github.reygnn.launcher.common.data.installedapps.LauncherAppsEnumerator
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsRepositoryImpl
 import com.github.reygnn.launcher.common.data.installedapps.InstalledAppsStateRepositoryImpl
-import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplaySettings
 import com.github.reygnn.nyx_launcher.data.home.PreferencesRepositoryImpl
 import com.github.reygnn.nyx_launcher.data.home.UuidItemIdFactory
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperRepositoryImpl
@@ -130,7 +132,11 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindWallpaperDisplaySettings(impl: NyxWallpaperDisplaySettings): WallpaperDisplaySettings
+    abstract fun bindWallpaperDisplaySettings(impl: WallpaperDisplaySettingsStore): WallpaperDisplaySettings
+
+    // The FAB position of the wallpaper editor (3b-2): the shared store in :feature-wallpaper.
+    @Binds
+    abstract fun bindFabPositionRepository(impl: FabPositionStore): FabPositionRepository
 
     @Binds
     abstract fun bindItemIdFactory(impl: UuidItemIdFactory): ItemIdFactory

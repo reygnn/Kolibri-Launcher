@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -81,7 +82,7 @@ class NyxBackupSavePathTest {
         wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
             coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
         },
-        fabPositionStore = mockk<NyxFabPositionStore>(relaxed = true) {
+        fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
             every { fabPositionFlow } returns flowOf(FabPosition.DEFAULT)
         },
         fileManager = mockk<WallpaperFileManager>(relaxed = true),

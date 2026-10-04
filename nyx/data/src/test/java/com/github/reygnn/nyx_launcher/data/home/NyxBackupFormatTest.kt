@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -130,7 +131,7 @@ class NyxBackupFormatTest : BackupFormatContract() {
             wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
                 coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
             },
-            fabPositionStore = mockk<NyxFabPositionStore>(relaxed = true) {
+            fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
                 every { fabPositionFlow } returns flowOf(FabPosition.DEFAULT)
             },
             // Imported images would land here, like the production file manager's directory.

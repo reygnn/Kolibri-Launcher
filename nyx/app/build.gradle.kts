@@ -103,6 +103,7 @@ dependencies {
     testImplementation(testFixtures(project(":nyx:domain")))
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
     testImplementation(testFixtures(project(":feature-wallpaper"))) // WallpaperImageStoreContract (3b-1)
+    testImplementation(testFixtures(project(":nyx:data"))) // FakeDataStore for the display-settings store (3b-2)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

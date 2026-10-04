@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.core.wallpaper.WallpaperSurfaceMode
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
@@ -15,9 +16,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Pure JVM over [FakeDataStore]: defaults on an empty store, per-field
- * save→read round-trips, and the defensive enum decode — a corrupt / unknown
- * persisted enum name must fall back to the default instead of throwing.
+ * Pure JVM over [FakeDataStore]: Nyx's display settings on the shared
+ * [WallpaperDisplaySettingsStore] with Nyx's key names (3b-2) — defaults on an empty store,
+ * per-field save→read round-trips, and the defensive enum decode: a corrupt / unknown persisted
+ * enum name must fall back to the default instead of throwing.
  */
 class NyxWallpaperDisplaySettingsTest {
 
@@ -27,7 +29,7 @@ class NyxWallpaperDisplaySettingsTest {
     // ---------------------------------------------------------------- defaults
     @Test
     fun empty_store_yields_all_defaults() = runTest(mainDispatcherRule.testDispatcher) {
-        val settings = NyxWallpaperDisplaySettings(FakeDataStore())
+        val settings = WallpaperDisplaySettingsStore(FakeDataStore(), NyxWallpaperDisplayKeys)
 
         assertThat(settings.wallpaperScrimAlphaStateFlow.first())
             .isEqualTo(AppConstants.DEFAULT_WALLPAPER_SCRIM_ALPHA)
@@ -38,7 +40,7 @@ class NyxWallpaperDisplaySettingsTest {
     // ---------------------------------------------------------------- round-trips
     @Test
     fun scrim_alpha_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
-        val settings = NyxWallpaperDisplaySettings(FakeDataStore())
+        val settings = WallpaperDisplaySettingsStore(FakeDataStore(), NyxWallpaperDisplayKeys)
 
         settings.setWallpaperScrimAlpha(0.42f)
 
@@ -47,7 +49,7 @@ class NyxWallpaperDisplaySettingsTest {
 
     @Test
     fun surface_mode_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
-        val settings = NyxWallpaperDisplaySettings(FakeDataStore())
+        val settings = WallpaperDisplaySettingsStore(FakeDataStore(), NyxWallpaperDisplayKeys)
 
         settings.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
 
@@ -56,7 +58,7 @@ class NyxWallpaperDisplaySettingsTest {
 
     @Test
     fun backdrop_is_read_back() = runTest(mainDispatcherRule.testDispatcher) {
-        val settings = NyxWallpaperDisplaySettings(FakeDataStore())
+        val settings = WallpaperDisplaySettingsStore(FakeDataStore(), NyxWallpaperDisplayKeys)
 
         settings.setWallpaperBackdrop(WallpaperBackdrop.BLACK)
 
@@ -68,7 +70,7 @@ class NyxWallpaperDisplaySettingsTest {
     fun corrupt_surface_mode_falls_back_to_default() = runTest(mainDispatcherRule.testDispatcher) {
         val store = FakeDataStore()
         store.edit { it[stringPreferencesKey("wallpaper_surface_mode")] = "NOT_A_MODE" }
-        val settings = NyxWallpaperDisplaySettings(store)
+        val settings = WallpaperDisplaySettingsStore(store, NyxWallpaperDisplayKeys)
 
         assertThat(settings.wallpaperSurfaceModeFlow.first()).isEqualTo(WallpaperSurfaceMode.AUTO)
     }
@@ -77,7 +79,7 @@ class NyxWallpaperDisplaySettingsTest {
     fun corrupt_backdrop_falls_back_to_default() = runTest(mainDispatcherRule.testDispatcher) {
         val store = FakeDataStore()
         store.edit { it[stringPreferencesKey("wallpaper_backdrop")] = "" }
-        val settings = NyxWallpaperDisplaySettings(store)
+        val settings = WallpaperDisplaySettingsStore(store, NyxWallpaperDisplayKeys)
 
         assertThat(settings.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.SYSTEM_WALLPAPER)
     }
@@ -89,7 +91,7 @@ class NyxWallpaperDisplaySettingsTest {
             it[stringPreferencesKey("wallpaper_surface_mode")] = WallpaperSurfaceMode.LIGHT.name
             it[floatPreferencesKey("wallpaper_scrim_alpha")] = 1.0f
         }
-        val settings = NyxWallpaperDisplaySettings(store)
+        val settings = WallpaperDisplaySettingsStore(store, NyxWallpaperDisplayKeys)
 
         assertThat(settings.wallpaperSurfaceModeFlow.first()).isEqualTo(WallpaperSurfaceMode.LIGHT)
         assertThat(settings.wallpaperScrimAlphaStateFlow.first()).isEqualTo(1.0f)

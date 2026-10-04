@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
@@ -192,7 +193,7 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
         val display = RecordingDisplaySettings(scrim, backdrop, surface)
         val wallpaper = RecordingWallpaperRepository(wallpaper)
         val fab = MutableStateFlow(fab)
-        val fabStore = mockk<NyxFabPositionStore> {
+        val fabStore = mockk<FabPositionRepository> {
             every { fabPositionFlow } returns this@Stores.fab
             coEvery { saveFabPosition(any()) } answers { log += SETTINGS; this@Stores.fab.value = firstArg() }
         }

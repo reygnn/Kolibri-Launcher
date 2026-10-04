@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
@@ -95,7 +96,7 @@ class BackupRepositoryImplTest {
     private val wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
         coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
     }
-    private val fabPositionStore = mockk<NyxFabPositionStore>(relaxed = true) {
+    private val fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
         every { fabPositionFlow } returns flowOf(FabPosition(0.8f, 0.7f))
     }
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)

@@ -2,10 +2,9 @@ package com.github.reygnn.nyx_launcher.home.wallpaper
 
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
-import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
@@ -15,10 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -43,7 +39,7 @@ import kotlinx.coroutines.withContext
 class NyxWallpaperEditCoordinator(
     private val repository: WallpaperRepository,
     private val fileManager: WallpaperFileManager,
-    private val displaySettings: WallpaperDisplaySettings,
+    private val displaySettings: WallpaperDisplaySettingsStore,
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
 ) {
@@ -68,9 +64,6 @@ class NyxWallpaperEditCoordinator(
     private var editRollbackGeneration = 0L
     private val pendingRemovalsOnCommit = mutableSetOf<String>()
     private val pendingRemovalsOnCancel = mutableSetOf<String>()
-
-    private val backdropToggleMutex = Mutex()
-    private var lastWrittenBackdrop: WallpaperBackdrop? = null
 
     /**
      * Mirror the repository's persisted state into the live state (external
@@ -240,17 +233,12 @@ class NyxWallpaperEditCoordinator(
 
     // ---- backdrop ----
 
-    /** Flip system-wallpaper ↔ black; serialized + double-tap-safe off the last written value. */
+    /**
+     * Flip system-wallpaper ↔ black (3b-2): the read-modify-write, its lock and the memory that
+     * follows every writer live in the shared display-settings store (`toggleBackdrop`, 14b/14d).
+     */
     fun onToggleBackdrop() = launchSafe("Error toggling wallpaper backdrop") {
-        backdropToggleMutex.withLock {
-            val current = lastWrittenBackdrop ?: displaySettings.wallpaperBackdropFlow.first()
-            val next = when (current) {
-                WallpaperBackdrop.SYSTEM_WALLPAPER -> WallpaperBackdrop.BLACK
-                WallpaperBackdrop.BLACK -> WallpaperBackdrop.SYSTEM_WALLPAPER
-            }
-            displaySettings.setWallpaperBackdrop(next)
-            lastWrittenBackdrop = next
-        }
+        displaySettings.toggleBackdrop()
     }
 
     private inline fun launchSafe(errorMessage: String, crossinline block: suspend () -> Unit) {

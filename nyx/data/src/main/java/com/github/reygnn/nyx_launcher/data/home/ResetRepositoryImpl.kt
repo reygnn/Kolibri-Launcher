@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.purgeAll
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
@@ -32,8 +34,8 @@ class ResetRepositoryImpl @Inject constructor(
     private val drawerFoldersRepository: DrawerFoldersRepository,
     private val hiddenAppsRepository: HiddenAppsRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val wallpaperDisplaySettings: NyxWallpaperDisplaySettings,
-    private val fabPositionStore: NyxFabPositionStore,
+    private val wallpaperDisplaySettings: WallpaperDisplaySettingsStore,
+    private val fabPositionStore: FabPositionRepository,
     private val wallpaperRepository: WallpaperRepository,
     private val appUsageRepository: AppUsageRepository,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,

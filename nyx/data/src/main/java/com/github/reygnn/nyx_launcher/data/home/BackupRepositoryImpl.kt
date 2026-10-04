@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
@@ -67,7 +68,7 @@ class BackupRepositoryImpl @Inject constructor(
     private val preferences: PreferencesRepository,
     private val displaySettings: WallpaperDisplaySettings,
     private val wallpaperRepository: WallpaperRepository,
-    private val fabPositionStore: NyxFabPositionStore,
+    private val fabPositionStore: FabPositionRepository,
     private val fileManager: WallpaperFileManager,
     private val serializer: NyxBackupSerializer,
     private val reconcileHomeLayout: ReconcileHomeLayoutUseCase,

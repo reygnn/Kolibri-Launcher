@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.FabPositionStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -103,7 +105,7 @@ class NyxStorePurgeTest {
     @Test
     fun wallpaper_display_settings_purge_removes_its_keys() = runTest(mainDispatcherRule.testDispatcher) {
         withForeignKey {
-            val settings = NyxWallpaperDisplaySettings(store)
+            val settings = WallpaperDisplaySettingsStore(store, NyxWallpaperDisplayKeys)
             settings.setWallpaperScrimAlpha(0.3f)
             settings.setWallpaperBackdrop(WallpaperBackdrop.BLACK)
             settings.setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
@@ -117,7 +119,7 @@ class NyxStorePurgeTest {
     @Test
     fun fab_position_purge_removes_its_keys() = runTest(mainDispatcherRule.testDispatcher) {
         withForeignKey {
-            val fab = NyxFabPositionStore(store)
+            val fab = FabPositionStore(store)
             fab.saveFabPosition(FabPosition(0.2f, 0.3f))
 
             fab.purgeRepository()

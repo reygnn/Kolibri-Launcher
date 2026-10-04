@@ -1,20 +1,21 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import kotlinx.coroutines.flow.first
+import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplayKeys
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -42,7 +43,10 @@ class NyxWallpaperEditCoordinatorTest {
         override suspend fun purgeRepository() { repoState.value = WallpaperState.NONE }
     }
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
-    private val displaySettings = mockk<WallpaperDisplaySettings>(relaxed = true)
+    // The real display-settings store over Nyx's in-memory home_layout store (3b-2): the backdrop
+    // toggle lives there, so the toggle tests check what lands in the store.
+    private val homeLayoutStore = FakeDataStore()
+    private val displaySettings = WallpaperDisplaySettingsStore(homeLayoutStore, NyxWallpaperDisplayKeys)
 
     private fun coordinator() =
         NyxWallpaperEditCoordinator(
@@ -246,13 +250,29 @@ class NyxWallpaperEditCoordinatorTest {
 
     @Test
     fun `toggle backdrop flips and persists`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { displaySettings.wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.SYSTEM_WALLPAPER)
+        // Nothing persisted: the default SYSTEM_WALLPAPER flips to BLACK, in the store.
         val c = coordinator()
         advanceUntilIdle()
 
         c.onToggleBackdrop()
         advanceUntilIdle()
 
-        coVerify { displaySettings.setWallpaperBackdrop(WallpaperBackdrop.BLACK) }
+        assertThat(displaySettings.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
+    }
+
+    @Test
+    fun `toggle after a setter write flips from the setter's value`() = runTest(mainDispatcherRule.testDispatcher) {
+        // The 14d case for Nyx: toggle to BLACK, then settings / a restore write SYSTEM_WALLPAPER
+        // through the setter — the next toggle flips from that, visible on the FIRST tap.
+        val c = coordinator()
+        advanceUntilIdle()
+        c.onToggleBackdrop()
+        advanceUntilIdle()
+
+        displaySettings.setWallpaperBackdrop(WallpaperBackdrop.SYSTEM_WALLPAPER)
+        c.onToggleBackdrop()
+        advanceUntilIdle()
+
+        assertThat(displaySettings.wallpaperBackdropFlow.first()).isEqualTo(WallpaperBackdrop.BLACK)
     }
 }

@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.FabPositionStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -74,8 +76,8 @@ class ResetRepositoryImplTest {
         drawerFoldersRepository = DrawerFoldersRepositoryImpl(foldersStore, DrawerFoldersSerializer()),
         hiddenAppsRepository = HiddenAppsRepositoryImpl(store, HiddenAppsSerializer()),
         preferencesRepository = PreferencesRepositoryImpl(store),
-        wallpaperDisplaySettings = NyxWallpaperDisplaySettings(store),
-        fabPositionStore = NyxFabPositionStore(store),
+        wallpaperDisplaySettings = WallpaperDisplaySettingsStore(store, NyxWallpaperDisplayKeys),
+        fabPositionStore = FabPositionStore(store),
         wallpaperRepository = WallpaperRepositoryImpl(store, fileManager, mainDispatcherRule.testDispatcher),
         appUsageRepository = usage,
         ioDispatcher = mainDispatcherRule.testDispatcher,

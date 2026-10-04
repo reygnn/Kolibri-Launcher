@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.FabPositionStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -103,13 +105,13 @@ class NyxResetCompletenessTest : ResetCompletenessContract() {
         }
         // An upgraded user still carries the boolean from before the tri-state icon style.
         homeLayoutStore.edit { it[booleanPreferencesKey("monochrome_icons")] = true }
-        val displaySettings = NyxWallpaperDisplaySettings(homeLayoutStore)
+        val displaySettings = WallpaperDisplaySettingsStore(homeLayoutStore, NyxWallpaperDisplayKeys)
         with(displaySettings) {
             setWallpaperScrimAlpha(0.3f)
             setWallpaperBackdrop(WallpaperBackdrop.BLACK)
             setWallpaperSurfaceMode(WallpaperSurfaceMode.DARK)
         }
-        val fab = NyxFabPositionStore(homeLayoutStore)
+        val fab = FabPositionStore(homeLayoutStore)
         fab.saveFabPosition(FabPosition(0.2f, 0.3f))
         val image = checkNotNull(fileManager.copyFromInputStream(ByteArrayInputStream(ByteArray(256) { it.toByte() })))
         val wallpaper = WallpaperRepositoryImpl(homeLayoutStore, fileManager, mainDispatcherRule.testDispatcher)

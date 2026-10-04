@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
@@ -60,7 +61,7 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
             preferences = FakePreferencesRepository(),
             displaySettings = mockk<WallpaperDisplaySettings>(relaxed = true),
             wallpaperRepository = mockk<WallpaperRepository>(relaxed = true),
-            fabPositionStore = mockk<NyxFabPositionStore>(relaxed = true),
+            fabPositionStore = mockk<FabPositionRepository>(relaxed = true),
             fileManager = mockk<WallpaperFileManager>(relaxed = true),
             serializer = NyxBackupSerializer(),
             reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),

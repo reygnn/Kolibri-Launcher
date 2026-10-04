@@ -59,7 +59,7 @@ import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentControll
 import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
-import com.github.reygnn.nyx_launcher.data.home.NyxFabPositionStore
+import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditState
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
@@ -90,7 +90,7 @@ import com.github.reygnn.nyx_launcher.home.wallpaper.WallpaperLayerBitmapCache
 import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
-import com.github.reygnn.launcher.core.wallpaper.WallpaperDisplaySettings
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
@@ -152,11 +152,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // machinery (binder, view) is held here directly — Nyx has no home ViewModel,
     // mirroring the ClockDelegate pattern.
     @Inject lateinit var wallpaperRepository: WallpaperRepository
-    @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettings
+    @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettingsStore
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
     @Inject lateinit var wallpaperEditState: NyxWallpaperEditState
     @Inject lateinit var wallpaperFileManager: WallpaperFileManager
-    @Inject lateinit var fabPositionStore: NyxFabPositionStore
+    @Inject lateinit var fabPositionStore: FabPositionRepository
 
     // App-scoped per-layer decode cache (@Singleton): survives MainActivity
     // re-creation, so returning to a recreated home skips re-decoding the collage;
