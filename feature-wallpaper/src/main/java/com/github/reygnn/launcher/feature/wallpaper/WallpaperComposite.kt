@@ -73,6 +73,28 @@ interface WallpaperComposite {
      * nothing inside [block] may call [exclusive] again.
      */
     suspend fun <T> exclusive(block: suspend () -> T): T
+
+    /**
+     * "No composite yet" (3b-3, M2): for an app whose display path does not draw a composite —
+     * Nyx until it switches to [CachedWallpaperComposite] in 3b-6. [refill] and [invalidate] do
+     * nothing, the read side finds nothing, so no flatten runs in the background for a result
+     * nobody draws (and the measurement before 3b-6 stays clean). [exclusive] is a REAL lock, so
+     * the lock order of 3a-3b (this lock before the persist lock) holds in such an app as well.
+     * One instance per [WallpaperOperations].
+     */
+    class None : WallpaperComposite {
+        private val lock = Mutex()
+
+        override fun refill(target: WallpaperState, host: Host) = Unit
+
+        override fun cachedKeyFor(state: WallpaperState, widthPx: Int, heightPx: Int): String? = null
+
+        override fun cachedBitmap(key: String): DecodedWallpaperBitmap? = null
+
+        override fun invalidate(dropLuminance: Boolean) = Unit
+
+        override suspend fun <T> exclusive(block: suspend () -> T): T = lock.withLock { block() }
+    }
 }
 
 /**
