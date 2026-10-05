@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
@@ -184,10 +185,10 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private lateinit var wallpaperEditCoordinator: NyxWallpaperEditCoordinator
     private lateinit var wallpaperEditController: NyxWallpaperEditController
 
-    // Layer-add image picker (edit mode). GetContent grants a transient read;
-    // the coordinator copies the image to internal storage immediately.
+    // Layer-add image picker (edit mode), the shared picker since 3b-4 (GetContent, "image/*").
+    // It grants a transient read; the coordinator copies the image to internal storage immediately.
     private val layerPickerLauncher =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        registerForActivityResult(WallpaperImagePicker.contract()) { uri ->
             uri?.let { wallpaperEditCoordinator.onAddLayer(it) }
         }
 
@@ -455,7 +456,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             dimTarget = findViewById(R.id.home_content),
             coordinator = wallpaperEditCoordinator,
             onFabPositionChanged = { pos -> lifecycleScope.launchSafe("Error saving FAB position") { fabPositionStore.saveFabPosition(pos) } },
-            launchLayerPicker = { layerPickerLauncher.launch("image/*") },
+            launchLayerPicker = { WallpaperImagePicker.launch(layerPickerLauncher) },
             rerenderWallpaper = { renderWallpaper(wallpaperEditCoordinator.wallpaperState.value) },
         )
 

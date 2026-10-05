@@ -1,13 +1,12 @@
 package com.github.reygnn.nyx_launcher.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.content.Intent
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -53,7 +52,8 @@ class NyxCustomizationDialog : DialogFragment() {
     @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
 
     private val pickWallpaperImage =
-        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        // 3b-4: the shared picker (GetContent, "image/*") — Downloads and file managers reachable.
+        registerForActivityResult(WallpaperImagePicker.contract()) { uri ->
             // Persist on the ACTIVITY scope (survives this dialog's dismiss), then
             // dismiss. Using the fragment scope would abort the save if the sheet is
             // dismissed externally (tap-outside/back) mid-copy. (The activity isn't
@@ -123,9 +123,7 @@ class NyxCustomizationDialog : DialogFragment() {
         }
 
         view.findViewById<MaterialButton>(R.id.btn_choose_wallpaper).setOnClickListener {
-            pickWallpaperImage.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-            )
+            WallpaperImagePicker.launch(pickWallpaperImage)
         }
         view.findViewById<MaterialButton>(R.id.btn_clear_wallpaper).setOnClickListener {
             // Activity scope + dismiss after (like choose): the sheet closes so its

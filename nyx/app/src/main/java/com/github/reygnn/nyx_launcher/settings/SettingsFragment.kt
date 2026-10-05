@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.settings
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,7 +9,6 @@ import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import android.os.Bundle
 import android.view.View
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
@@ -95,7 +95,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     // single image. The multi-image gallery path (READ_MEDIA_IMAGES) comes with
     // the reduced edit mode (WV5d).
     private val pickWallpaperImage =
-        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        // 3b-4: the shared picker (GetContent, "image/*") — Downloads and file managers reachable.
+        registerForActivityResult(WallpaperImagePicker.contract()) { uri ->
             uri?.let { setWallpaperFromUri(it) }
         }
 
@@ -169,9 +170,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         findPreference<Preference>("choose_wallpaper")?.setOnPreferenceClickListener {
-            pickWallpaperImage.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-            )
+            WallpaperImagePicker.launch(pickWallpaperImage)
             true
         }
         findPreference<Preference>("clear_wallpaper")?.setOnPreferenceClickListener {
