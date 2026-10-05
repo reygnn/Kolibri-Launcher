@@ -168,10 +168,31 @@ class WallpaperOperations(
      * (3a-2d), under the composite lock and then [persistLock] (3a-3b) — a save still pending from
      * a session just committed lands BEFORE the clear. Returns whether the removal took effect;
      * if not, the wallpaper stays as it is on disk.
+     *
+     * **Refused while an edit session is open (3b-3)** — checked first, before any lock: the
+     * session and its snapshot still reference the files, emissions are ignored during it (E4),
+     * and its commit or cancel would write those references back after the files were deleted —
+     * a dangling reference. Not "cancel the session, then remove": that would silently drop the
+     * user's edit; not a session change either (no "remove everything" session operation for a
+     * path no UI offers). Neither app's UI reaches this today; the rule makes the code guarantee
+     * it. The caller maps the `false` onto its "couldn't remove" message.
+     *
+     * Checked TWICE (3b-3b-b): the check here is only the fast path that saves the wait. The
+     * deciding one sits inside [persistLock], right before the clear — while this call waits for a
+     * save still running from a just-committed session, a new session can open on Main
+     * (`enter` is synchronous and takes no lock), and only the check under the lock sees it.
      */
-    suspend fun clear(): Boolean = composite.exclusive {
+    suspend fun clear(): Boolean {
+        if (session.isEditMode.value) return false
+        return clearUnderLocks()
+    }
+
+    private suspend fun clearUnderLocks(): Boolean = composite.exclusive {
         // Lock order: the composite lock (this block), then persistLock — never the reverse.
         val removalTookEffect = persistLock.withLock {
+            // The deciding check (see clear()): a session opened while this call waited for the
+            // lock refuses the removal — nothing cleared, nothing deleted.
+            if (session.isEditMode.value) return@exclusive false
             persistence.clear()
             imageStore.deleteAllIfNothingPersisted()
         }

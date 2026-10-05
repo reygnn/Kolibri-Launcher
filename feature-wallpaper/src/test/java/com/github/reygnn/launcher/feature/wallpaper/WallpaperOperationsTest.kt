@@ -171,6 +171,52 @@ class WallpaperOperationsTest {
     }
 
     @Test
+    fun remove_during_an_open_session_is_refused() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3b-3: the open session still references the files and would write them back on commit
+        // or cancel — so nothing is cleared, nothing deleted, and the session stays as it was.
+        val twoLayers = WallpaperState.multiLayer(listOf(WallpaperLayerState(id = "1", imageUri = a), WallpaperLayerState(id = "2", imageUri = b)))
+        val persistence = FakePersistence(twoLayers)
+        val composite = FakeComposite()
+        val ops = operations(this, persistence, composite)
+        ops.session.enter()
+
+        val removed = ops.clear()
+        advanceUntilIdle()
+
+        assertThat(removed).isFalse()
+        assertThat(persistence.writes).isEmpty()
+        verify(exactly = 0) { fileManager.clearAll() }
+        assertThat(composite.invalidated).isEqualTo(0)
+        assertThat(ops.session.isEditMode.value).isTrue()
+        assertThat(ops.session.state.value.referencedUris).containsExactly(a, b)
+    }
+
+    @Test
+    fun a_session_opened_while_remove_waits_for_the_lock_refuses_it() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3b-3b-b: the outer check passed (no session yet); remove then waits for a gated save
+        // holding the persist lock, and a session opens meanwhile. The check under the lock decides.
+        val twoLayers = WallpaperState.multiLayer(listOf(WallpaperLayerState(id = "1", imageUri = a), WallpaperLayerState(id = "2", imageUri = b)))
+        val persistence = FakePersistence(twoLayers)
+        val composite = FakeComposite()
+        val ops = operations(this, persistence, composite)
+        persistence.saveGate = CompletableDeferred()
+        ops.persistLater("save", ops.session.swapLayers(0, 1))
+        var removed: Boolean? = null
+        launch { removed = ops.clear() }
+        advanceUntilIdle() // remove waits for the gated save
+
+        ops.session.enter()
+        persistence.saveGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(removed).isFalse()
+        assertThat(persistence.writes).containsExactly("save") // no "clear"
+        verify(exactly = 0) { fileManager.clearAll() }
+        assertThat(composite.invalidated).isEqualTo(0)
+        assertThat(ops.session.isEditMode.value).isTrue()
+    }
+
+    @Test
     fun a_remove_that_did_not_take_effect_keeps_everything() = runTest(mainDispatcherRule.testDispatcher) {
         // 3a-2d: the clear was swallowed, the persisted state still references its file.
         val persistence = FakePersistence(WallpaperState.single(uri = a)).apply { clearSwallowed = true }
