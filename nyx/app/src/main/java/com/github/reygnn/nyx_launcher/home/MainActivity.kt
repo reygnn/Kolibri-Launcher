@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home
 
+import com.github.reygnn.launcher.common.ui.WallpaperPaintTrace
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -311,6 +312,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     private var gridIconPx = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Measurement point only (3b-0, E3): cold start to the first drawn wallpaper.
+        WallpaperPaintTrace.beginFirstPaint()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -644,7 +647,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
                     wallpaperView,
                     state,
                     preferredActiveLayerId = focusId,
-                    onRebuildComplete = { wallpaperEditController.onWallpaperRebuilt() },
+                    onRebuildComplete = {
+                        // Measurement point only (3b-0, E3): closes the paint spans a frame later —
+                        // the binder's callback after it applied this state, as in Kolibri.
+                        WallpaperPaintTrace.onWallpaperApplied(wallpaperView, state.hasWallpaper)
+                        wallpaperEditController.onWallpaperRebuilt()
+                    },
                 )
             } catch (e: CancellationException) {
                 throw e

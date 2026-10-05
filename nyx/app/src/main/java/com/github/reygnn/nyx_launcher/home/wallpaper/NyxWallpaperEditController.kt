@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import com.github.reygnn.launcher.common.ui.WallpaperPaintTrace
 import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
 
 import android.view.View
@@ -236,6 +237,8 @@ class NyxWallpaperEditController(
             singleTransform = readSingleTransform(),
         )
         dispatchSaveAction(action)
+        // Measurement point only (3b-0, E3): save to the next drawn wallpaper, as in Kolibri.
+        WallpaperPaintTrace.beginChangePaint()
         coordinator.onCommitEditMode()
     }
 

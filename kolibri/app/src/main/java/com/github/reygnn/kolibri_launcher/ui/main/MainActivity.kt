@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.main
 
+import com.github.reygnn.launcher.common.ui.WallpaperPaintTrace
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent

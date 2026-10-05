@@ -1,15 +1,15 @@
-package com.github.reygnn.kolibri_launcher.ui.main
+package com.github.reygnn.launcher.common.ui
 
 import android.view.View
 import androidx.core.view.doOnPreDraw
-import com.github.reygnn.launcher.common.ui.LaunchTrace
 
 /**
- * The two wallpaper paint spans for the 3a-8 before/after measurement (SPEC_NYX_REWRITE F4),
- * after the pattern of `favorites_first_paint`: measurement points only, no behaviour.
+ * The two wallpaper paint spans for before/after measurements (SPEC_NYX_REWRITE F4 in 3a-8, E3
+ * in 3b), after the pattern of `favorites_first_paint`: measurement points only, no behaviour.
+ * Shared by both apps since 3b-0 (moved from Kolibri unchanged: names, sections, boundaries).
  *
- *  - [LaunchTrace.Names.WALLPAPER_FIRST_PAINT]: opened in `MainActivity.onCreate` once per
- *    process, closed in the pre-draw of the first frame after the view applied a state WITH a
+ *  - [LaunchTrace.Names.WALLPAPER_FIRST_PAINT]: opened in the app's `MainActivity.onCreate` once
+ *    per process, closed in the pre-draw of the first frame after the view applied a state WITH a
  *    wallpaper.
  *  - [LaunchTrace.Names.WALLPAPER_CHANGE_PAINT]: opened on the editor's save tap, closed in the
  *    pre-draw after the next applied wallpaper state — the first frame with the committed
@@ -21,7 +21,7 @@ import com.github.reygnn.launcher.common.ui.LaunchTrace
  * does not match in the benchmark, which is the right signal. Trace calls are near-free with no
  * tracer attached, so this is present in release — what lets the benchmark measure the ship build.
  */
-internal object WallpaperPaintTrace {
+object WallpaperPaintTrace {
 
     private enum class Span { IDLE, STARTED, AWAITING_DRAW, DONE }
 

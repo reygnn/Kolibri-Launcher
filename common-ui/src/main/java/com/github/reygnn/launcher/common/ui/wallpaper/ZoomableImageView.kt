@@ -864,6 +864,8 @@ class ZoomableImageView @JvmOverloads constructor(
         // invalidate (during gestures / rebuilds, not when idle), so it
         // measures the Main-thread draw-command recording cost of a gesture
         // redraw — distinct from the GPU texture sampling on the RenderThread.
+        // Measurement point only (3b-0, E3): counts frames drawn with a layer still missing.
+        WallpaperFlickerTrace.onMultiLayerFrame(layers)
         LaunchTrace.section(LaunchTrace.Names.GESTURE_ONDRAW) {
             drawLayers(
                 canvas = canvas,

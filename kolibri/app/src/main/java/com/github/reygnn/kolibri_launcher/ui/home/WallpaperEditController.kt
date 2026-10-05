@@ -1,6 +1,6 @@
 package com.github.reygnn.kolibri_launcher.ui.home
 
-import com.github.reygnn.kolibri_launcher.ui.main.WallpaperPaintTrace
+import com.github.reygnn.launcher.common.ui.WallpaperPaintTrace
 import com.github.reygnn.launcher.common.ui.wallpaperfab.LayerButtonsState
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 
