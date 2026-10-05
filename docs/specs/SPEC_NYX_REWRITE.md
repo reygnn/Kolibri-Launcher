@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 103: 3b-4 – Nyx auf den geteilten Bildpicker; Nachweis der drei Wege (Code-Lesen plus Contract-Invariante).
+Stand: 03.10.2026 (Revision 104: 3b-0 – `WallpaperPaintTrace` geteilt, Nyx-Messpunkte, Flacker-Zähler, profileable.
+Revision 103: 3b-4 – Nyx auf den geteilten Bildpicker; Nachweis der drei Wege (Code-Lesen plus Contract-Invariante).
 Revision 102: Formatierung – reiner Reflow (satzweise Zeilen, eine Revision je Stand-Zeile), Absatz „Formatierung“.
 Revision 101: 3b-3 abgeschlossen – korrigierte Kill-Erwartung, Transform-Verlust akzeptiert (gemeinsames Verhalten), GC-Schonfrist belegt, Coordinator-Test 12.
 Revision 100: 3b-3c – Nyx auf die geteilte Session (NyxWallpaperEditing), drei Nutzersichtbare Zeilen, Nebeneffekt erledigt.
@@ -1059,6 +1060,32 @@ Zeile unter „Nutzersichtbare Änderungen“ (Nyx, 3b-4); wie die Auswahl genau
 Geräteprüfung: in Einstellungen und Sheet je ein Bild aus Downloads und aus der Galerie bzw. einem Cloud-Anbieter
 (dort verfallen die Rechte am schnellsten), dazu eine Ebene im Editor;
 nach dem Neustart bleiben die Bilder, `ls files/wallpapers` passt zum gespeicherten Zustand.
+
+Verifikation 3b-4: Gates grün, Nyx-Geräteprüfung grün (Picker erreicht Downloads und Google Fotos,
+alle Bilder als file:// kopiert, kein content:// im gespeicherten Zustand, Neustart passt); gepusht.
+**3b-4 ist abgeschlossen.**
+
+**3b-0 – Messpunkte für Nyx (Urteil Senior: P1–P7 frei):**
+Reine Instrumentierung, gemessen wird erst direkt vor und nach 3b-6.
+P1 (Patch phase3b/11): `WallpaperPaintTrace` zieht per `git mv` unverändert von Kolibri nach `:common-ui`
+(öffentlich, KDoc spricht von „der App“); Namen, Sektionen und Grenzen bleiben – Kolibris Benchmarks unberührt.
+P2–P4 (Patch phase3b/12): Nyx ruft `beginFirstPaint()` am Anfang von `MainActivity.onCreate`,
+`beginChangePaint()` in `NyxWallpaperEditController.commitEdit()` (Speichern und Zurück),
+`onWallpaperApplied(...)` im `onRebuildComplete`-Rückruf des geteilten `WallpaperViewBinder` –
+dieselbe Stelle und Bedeutung wie bei Kolibri: der erste Frame nach dem Anwenden eines Zustands auf die Ansicht.
+Flacker-Zähler `wallpaper_layer_missing_frames` (`WallpaperFlickerTrace`, in der geteilten `ZoomableImageView.onDraw`):
+ein **betroffener Frame** ist ein im Mehr-Ebenen-Modus gezeichneter Frame, in dem mindestens eine Ebene des angezeigten
+Zustands keine zeichenbare Bitmap hat (nicht geladen oder recycelt) – einmal je Frame, nicht je fehlender Ebene.
+Der Zähler ist ein monotoner Wert je Prozess, gemeldet per `Trace.setCounter` (das SETZT einen Wert);
+ausgewertet wird die Differenz zwischen Anfang und Ende des Messfensters, nie eine Summe.
+Nur bei `Trace.isEnabled()`, im Alltag ohne Kosten; für Kolibri reine Instrumentierung.
+Nach 3b-6 zählen die Frames des Ebenen-Wegs, bis das Composite fertig ist – der Vergleich bleibt fair.
+Nyx' Manifest bekommt `<profileable android:shell="true">` wie Kolibri (Perfetto-Sektionen im Release-Build).
+Test der reinen Hilfsfunktion `hasLayerWithoutBitmap` (3 Fälle).
+P5 (Patch C, folgt): Messskript `tools/nyx-flicker-measure.sh` mit vollständigen Voraussetzungen im Kopf;
+ein Probelauf ohne Bewertung (alle drei Werte erscheinen) gehört zur Abnahme.
+P6: Kriterien wie L10 – Median von first_paint und change_paint (mehr als 10 % schlechter ist ein Rückschritt),
+Flacker-Zähler auf der Differenz je Lauf (nachher nicht mehr als vorher, plus eins als Rauschen).
 
 **Offene Punkte für 3b (Nyx zieht nach), gesammelt:**
 - *Edit-Session/Operations:* `NyxWallpaperEditCoordinator` auf `WallpaperEditSession` + `WallpaperOperations` (Port aufs Repository);
