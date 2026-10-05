@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 102: Formatierung – reiner Reflow (satzweise Zeilen, eine Revision je Stand-Zeile), Absatz „Formatierung“.
+Stand: 03.10.2026 (Revision 103: 3b-4 – Nyx auf den geteilten Bildpicker; Nachweis der drei Wege (Code-Lesen plus Contract-Invariante).
+Revision 102: Formatierung – reiner Reflow (satzweise Zeilen, eine Revision je Stand-Zeile), Absatz „Formatierung“.
 Revision 101: 3b-3 abgeschlossen – korrigierte Kill-Erwartung, Transform-Verlust akzeptiert (gemeinsames Verhalten), GC-Schonfrist belegt, Coordinator-Test 12.
 Revision 100: 3b-3c – Nyx auf die geteilte Session (NyxWallpaperEditing), drei Nutzersichtbare Zeilen, Nebeneffekt erledigt.
 Revision 99: 3b-3b-b – maßgebliche Prüfung unter der Sperre.
@@ -254,6 +255,7 @@ Diese Liste ist die Grundlage für die Golden-Soll-Zustände und für die Releas
 | Nyx | Harte ANRs werden beim nächsten Start gemeldet (vorher No-op-Drainer, keine ANR-Reports) | 1c-1 |
 | Nyx | Beim Wiederherstellen sind versteckte Apps ein eigener Schalter (nur angeboten, wenn das Backup mindestens eine enthält); an: die Menge wird ersetzt, ein Backup ohne das Feld lässt sie stehen | 2b-3b, B13 |
 | Nyx | Abgelehnte Backup-Dateien melden ihren Grund sofort (andere App, ältere Version, nicht unterstützte Version, ungültig); ein Wiederherstellen meldet verworfene Wallpaper-Ebenen | 2b-3b |
+| Nyx | Beim Wählen eines Hintergrunds in den Einstellungen und im Anpassen-Sheet öffnet sich die Dateiauswahl des Systems statt des reinen Foto-Pickers; Downloads, Dateimanager und Cloud-Anbieter werden erreichbar | 3b-4 |
 | Nyx | Ein Bild, das im Wallpaper-Editor kurz vor „Speichern“ als Ebene gewählt wurde und noch kopiert wird, erscheint nach dem Speichern (bisher wurde es verworfen); nur „Abbrechen“ verwirft es (wie Kolibri, E2) | 3b-3 |
 | Nyx | Wird der Hintergrund von außen (Einstellungen, Anpassen-Sheet) gewählt, während der Editor offen ist, bleibt das nach dem Speichern erhalten (bisher überschrieb der Editor es wieder); „Abbrechen“ macht es rückgängig | 3b-3 |
 | Nyx | Wird Nyx beendet, während der Wallpaper-Editor offen ist, gilt das wie „Editor ohne Speichern verlassen“: die Zwischenstände werden auf den Stand vor dem Editor zurückgesetzt | 3b-3 |
@@ -1039,6 +1041,24 @@ kein Weg über die Oberfläche, entfällt. **GC-Schonfrist auf dem Gerät belegt
 eine gealterte (mtime 2020) geht beim nächsten Start, die referenzierten Dateien bleiben.
 Keine FATAL-, SILENT_ERROR- oder ACRA-Einträge.
 **3b-3 ist abgeschlossen.**
+
+**3b-4 – Bildauswahl (Patch phase3b/10):**
+Nachweis zuerst, wie bei Kolibri in 3a-6: Alle drei Wege, auf denen Nyx ein Bild wählt
+(Einstellungen, Anpassen-Sheet, Ebene im Editor), kopieren als ersten Schritt per `copyIn`
+in das eigene Wallpaper-Verzeichnis; gespeichert wird nur die interne file://-URI, nirgends eine Content-URI.
+Beleg: Code-Lesen (Einstellungen → `setFromUri` → `operations.replace`, Sheet ebenso im Activity-Scope,
+Ebene → `onAddLayer` → `operations.addLayer`) plus die Contract-Invariante:
+Der `WallpaperImageStoreContract` prüft nach jedem seiner 17 Fälle, dass jede gespeicherte Referenz
+eine Datei im Wallpaper-Verzeichnis ist – eine gespeicherte Content-URI fiele dort durch, seit 3b-1 auch für Nyx.
+Ein eigener Test „nicht `content://`“ ist deshalb nicht nötig (Urteil Senior).
+Umstellung: Alle drei Wege laufen über `WallpaperImagePicker.contract()` bzw. `launch()`
+(GetContent, `"image/*"`) – eine Quelle, `PickVisualMedia` entfällt; die Rückwege (`setFromUri`, `onAddLayer`) bleiben.
+Keine Berechtigungen (vorübergehendes Leserecht, sofort kopiert), keine geänderten Testerwartungen
+(den Vertrag schreibt `WallpaperImagePickerTest` im Modul fest).
+Zeile unter „Nutzersichtbare Änderungen“ (Nyx, 3b-4); wie die Auswahl genau aussieht, hängt von Android-Version und Gerät ab.
+Geräteprüfung: in Einstellungen und Sheet je ein Bild aus Downloads und aus der Galerie bzw. einem Cloud-Anbieter
+(dort verfallen die Rechte am schnellsten), dazu eine Ebene im Editor;
+nach dem Neustart bleiben die Bilder, `ls files/wallpapers` passt zum gespeicherten Zustand.
 
 **Offene Punkte für 3b (Nyx zieht nach), gesammelt:**
 - *Edit-Session/Operations:* `NyxWallpaperEditCoordinator` auf `WallpaperEditSession` + `WallpaperOperations` (Port aufs Repository);
