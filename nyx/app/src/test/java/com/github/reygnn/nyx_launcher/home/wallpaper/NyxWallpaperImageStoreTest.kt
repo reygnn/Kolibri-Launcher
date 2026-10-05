@@ -9,7 +9,7 @@ import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStoreContract
-import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditState
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -22,9 +22,9 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 /**
- * Nyx's run of the [WallpaperImageStoreContract] (3b-1a), FIRST against today's Nyx code: the
- * image setter (choose / remove wallpaper, orphan GC as MainActivity calls it) and the edit
- * coordinator, with the real [WallpaperFileManager] on Robolectric's files dir.
+ * Nyx's run of the [WallpaperImageStoreContract] (3b-1a, first against the old Nyx code): the image
+ * setter (choose / remove wallpaper) and the edit coordinator — since 3b-3 both on the ONE shared
+ * session of [NyxWallpaperEditing] — with the real [WallpaperFileManager] on Robolectric's files dir.
  *
  * The repository is the shared [FakeWallpaperRepository] (3b-02), which behaves like the real one
  * in a release build: writes swallowed when told to, and an unreadable store reads as NONE through
@@ -34,8 +34,8 @@ import java.io.File
  *  - [decidesDeletesThroughTheStore]: on since 3b-1 — the setter and the GC decide every delete
  *    through the shared store (against what is persisted, fail closed, edit guard). Before, they
  *    deleted directly and the GC read "nothing referenced" on a read error.
- *  - [editsThroughSharedOperations] = false until 3b-3: a replace is not a session change, and the
- *    coordinator's commit deletes removed files without a reference check.
+ *  - [editsThroughSharedOperations]: on since 3b-3 — replace is a session change, and a commit
+ *    deletes only what no persisted layer references (before: Nyx's own session code).
  * W1 (replace deletes the old file right away) Nyx has always done.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -45,12 +45,8 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val repository = FakeWallpaperRepository()
     private val fileManager = WallpaperFileManager(context, mainDispatcherRule.testDispatcher)
-    private val editState = NyxWallpaperEditState()
-    private val setter = NyxWallpaperImageSetter(
-        repository = repository,
-        imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
-        editState = editState,
-    )
+    private lateinit var editing: NyxWallpaperEditing
+    private lateinit var setter: NyxWallpaperImageSetter
 
     // Not backgroundScope: the contract drives every step with advanceUntilIdle(), which would
     // never run backgroundScope work (3a-9c). A separate scope on the test dispatcher, cancelled after.
@@ -64,28 +60,28 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
 
     override val deletesReplacedImageImmediately = true // Nyx's setter always did (W1)
     override val decidesDeletesThroughTheStore = true // since 3b-1
-    override val editsThroughSharedOperations = false // switched on by 3b-3
+    override val editsThroughSharedOperations = true // since 3b-3
 
     override val wallpaperDir: File get() = File(context.filesDir, "wallpapers")
 
     /** Like Nyx's start: the coordinator observes the state, MainActivity reclaims orphans. */
     override suspend fun startStore() {
         wallpaperDir.deleteRecursively()
-        coordinator = NyxWallpaperEditCoordinator(
+        // Since 3b-3 one shared session for the editor and the setter; its start-up observes the
+        // persisted state and runs the orphan GC (what MainActivity's start does).
+        editing = NyxWallpaperEditing(
             repository = repository,
-            fileManager = fileManager,
+            imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+            appScope = coordinatorScope,
+            mainDispatcher = mainDispatcherRule.testDispatcher,
+        )
+        setter = NyxWallpaperImageSetter(editing)
+        coordinator = NyxWallpaperEditCoordinator(
+            editing = editing,
             displaySettings = mockk(relaxed = true),
             scope = coordinatorScope,
-            ioDispatcher = mainDispatcherRule.testDispatcher,
         )
         coordinator.start()
-        mirrorEditMode()
-        setter.reclaimOrphans()
-    }
-
-    /** What MainActivity does continuously: the coordinator's edit mode into the shared flag. */
-    private fun mirrorEditMode() {
-        editState.sessionOpen = coordinator.isEditMode.value
     }
 
     override suspend fun setWallpaper(image: File) {
@@ -107,15 +103,12 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
     }
 
     override suspend fun removeWallpaper() {
-        mirrorEditMode()
         setter.clear()
     }
 
     /** Nyx's GC: what MainActivity calls at start. */
-    override suspend fun runOrphanGc() {
-        mirrorEditMode()
-        setter.reclaimOrphans()
-    }
+    /** Like Kolibri's run: another start-up of the operations, whose first emission runs the GC unless a session is open. */
+    override suspend fun runOrphanGc() = editing.operations.start()
 
     override suspend fun copyWithoutSave(image: File) {
         fileManager.copyToInternal(Uri.fromFile(image))

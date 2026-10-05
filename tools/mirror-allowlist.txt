@@ -33,7 +33,6 @@ nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/drawer/AppDrawerFragme
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	* (mirrors Kolibri's HomeFragment.updateWallpaper edit-mode refresh). No-op
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	* Owns Nyx's wallpaper-edit-mode UI surface — a faithful port of Kolibri's
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditController.kt	// Orchestration boundary for edit-mode entry/exit (mirrors Kolibri).
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/wallpaper/NyxWallpaperEditCoordinator.kt	* (ClockDelegate pattern), a faithful port of Kolibri's WallpaperDelegate edit
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* (mirrors Kolibri's SettingsFragment). Preferences are NOT auto-persisted to
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* ACRA dev commands (mirrors Kolibri's), gated by BuildConfig.SHOW_DEV_COMMANDS
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/settings/SettingsFragment.kt	* Crash-report consent (Settings entry, mirrors Kolibri): the shared [ConsentDialog]

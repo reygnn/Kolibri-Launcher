@@ -60,8 +60,7 @@ import com.github.reygnn.launcher.feature.crashreporting.consent.ConsentDialog
 import com.github.reygnn.nyx_launcher.data.icon.FolderIconRenderer
 import com.github.reygnn.nyx_launcher.data.icon.IconLoader
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
-import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditState
-import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
 import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperEditController
 import com.github.reygnn.nyx_launcher.home.drag.DragLayer
 import com.github.reygnn.nyx_launcher.home.drag.DropZone
@@ -79,7 +78,6 @@ import com.github.reygnn.launcher.common.ui.timeinfo.ClockDelegate
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperViewBinder
 import com.github.reygnn.launcher.common.ui.wallpaper.ZoomableImageView
 import com.github.reygnn.launcher.common.ui.wallpaper.decodeBoundedWallpaperBitmap
-import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.wallpaper.WallpaperRenderScheduler
 import com.github.reygnn.launcher.core.ComponentKey
 import com.github.reygnn.launcher.core.LazySlotMembership
@@ -91,7 +89,6 @@ import com.github.reygnn.nyx_launcher.home.wallpaper.launchSafe
 import com.github.reygnn.launcher.core.wallpaper.ScrimRender
 import com.github.reygnn.launcher.core.wallpaper.WallpaperBackdrop
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperDisplaySettingsStore
-import com.github.reygnn.launcher.core.wallpaper.WallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.core.timeinfo.ObserveTimeBasedEventsUseCase
 import com.github.reygnn.launcher.core.timeinfo.TimeBasedEvent
@@ -151,11 +148,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // Wallpaper (WV5): state source + narrow display-settings port. The render
     // machinery (binder, view) is held here directly — Nyx has no home ViewModel,
     // mirroring the ClockDelegate pattern.
-    @Inject lateinit var wallpaperRepository: WallpaperRepository
     @Inject lateinit var wallpaperDisplaySettings: WallpaperDisplaySettingsStore
-    @Inject lateinit var wallpaperImageSetter: NyxWallpaperImageSetter
-    @Inject lateinit var wallpaperEditState: NyxWallpaperEditState
-    @Inject lateinit var wallpaperFileManager: WallpaperFileManager
+    @Inject lateinit var wallpaperEditing: NyxWallpaperEditing
     @Inject lateinit var fabPositionStore: FabPositionRepository
 
     // App-scoped per-layer decode cache (@Singleton): survives MainActivity
@@ -448,15 +442,11 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         clockDelegate.start()
 
         wallpaperEditCoordinator = NyxWallpaperEditCoordinator(
-            repository = wallpaperRepository,
-            fileManager = wallpaperFileManager,
+            editing = wallpaperEditing,
             displaySettings = wallpaperDisplaySettings,
             scope = lifecycleScope,
-            ioDispatcher = ioDispatcher,
         )
-        // 3b-1: mirror the edit mode process-wide, so "remove wallpaper" (also from Settings)
-        // and the orphan GC leave the files of an open session alone.
-        lifecycleScope.launch { wallpaperEditCoordinator.isEditMode.collect { wallpaperEditState.sessionOpen = it } }
+
         wallpaperEditCoordinator.start()
 
         wallpaperEditController = NyxWallpaperEditController(
@@ -481,9 +471,8 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         // the stored decision → show the dialog once / re-affirm ACRA / skip on unreadable.
         lifecycleScope.launch { showCrashReportConsentIfNeeded() }
 
-        // One-shot on startup: reclaim wallpaper files stranded by a crash between
-        // copy and save (the shared repo/file-manager split doesn't self-clean).
-        lifecycleScope.launch { wallpaperImageSetter.reclaimOrphans() }
+        // The orphan GC (files stranded by a crash between copy and save) runs once per process
+        // in the shared session's start-up (wallpaperEditCoordinator.start(), 3b-3).
 
         // One-shot on startup: seed the first-run defaults. Each seed gates on its own
         // flag and resolves apps (PackageManager IPCs) only on a real first run, so a
@@ -833,8 +822,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         consentDialog = null
         currentDialog?.dismiss()
         currentDialog = null
-        // The edit session lives with this activity; it ends here (3b-1).
-        wallpaperEditState.sessionOpen = false
+        // The edit session stays bound to this activity (3b-3): an open one is cancelled here,
+        // like leaving the editor without saving.
+        wallpaperEditing.onHostDestroyed()
         super.onDestroy()
     }
 

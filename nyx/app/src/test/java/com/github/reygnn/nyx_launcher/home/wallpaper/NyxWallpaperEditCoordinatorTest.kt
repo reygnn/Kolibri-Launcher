@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import kotlinx.coroutines.flow.first
 import com.github.reygnn.nyx_launcher.data.testing.FakeDataStore
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperDisplayKeys
@@ -40,6 +42,8 @@ class NyxWallpaperEditCoordinatorTest {
         override suspend fun saveWallpaperState(state: WallpaperState) { repoState.value = state }
         override suspend fun clearWallpaper() { repoState.value = WallpaperState.NONE }
         override suspend fun getWallpaperStateSync(): WallpaperState = repoState.value
+        // Since 3b-3 every delete goes through the store, which decides against what is persisted.
+        override suspend fun readPersistedImageUris(): Set<String> = repoState.value.referencedUris
         override suspend fun purgeRepository() { repoState.value = WallpaperState.NONE }
     }
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
@@ -48,13 +52,20 @@ class NyxWallpaperEditCoordinatorTest {
     private val homeLayoutStore = FakeDataStore()
     private val displaySettings = WallpaperDisplaySettingsStore(homeLayoutStore, NyxWallpaperDisplayKeys)
 
-    private fun coordinator() =
+    // Since 3b-3 the coordinator drives the shared session of NyxWallpaperEditing. Its app scope
+    // runs on the test dispatcher (not backgroundScope: advanceUntilIdle must drive it, 3a-9c).
+    private fun editing() = NyxWallpaperEditing(
+        repository = repository,
+        imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+        appScope = kotlinx.coroutines.CoroutineScope(mainDispatcherRule.testDispatcher),
+        mainDispatcher = mainDispatcherRule.testDispatcher,
+    )
+
+    private fun coordinator(editing: NyxWallpaperEditing = editing()) =
         NyxWallpaperEditCoordinator(
-            repository = repository,
-            fileManager = fileManager,
+            editing = editing,
             displaySettings = displaySettings,
             scope = kotlinx.coroutines.CoroutineScope(mainDispatcherRule.testDispatcher),
-            ioDispatcher = mainDispatcherRule.testDispatcher,
         ).also { it.start() }
 
     private fun uri(s: String): Uri = Uri.parse(s)
@@ -92,11 +103,11 @@ class NyxWallpaperEditCoordinatorTest {
     }
 
     @Test
-    fun `committing while an add copy is still in flight discards the add`() = runTest(mainDispatcherRule.testDispatcher) {
-        // §Audit-3 A3-02: the copy coroutine only runs on advanceUntilIdle, so here the user
-        // commits BEFORE it resumes. The resuming add must discard (delete the copied file) rather
-        // than append + persist a layer that was never in the committed preview. WITHOUT the
-        // generation bump in onCommitEditMode this appended the layer (layerCount 1, no delete).
+    fun `committing while an add copy is still in flight applies the add (E2)`() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3b-3, E2 as in Kolibri: the copy coroutine only runs on advanceUntilIdle, so here the
+        // user commits BEFORE it resumes. A commit does not bump the rollback generation any more,
+        // so the resuming add is applied after the commit and its file kept. (Before 3b-3 Nyx
+        // discarded it — §Audit-3 A3-02.) Only a Cancel discards an add still copying.
         coEvery { fileManager.copyToInternal(any()) } returns uri("file:///internal/wp_late")
         val c = coordinator()
         advanceUntilIdle()
@@ -107,8 +118,8 @@ class NyxWallpaperEditCoordinatorTest {
         advanceUntilIdle()                        // copy resumes → generation changed → discard
 
         assertThat(c.isEditMode.value).isFalse()
-        assertThat(repoState.value.layerCount).isEqualTo(0) // the unpreviewed layer was NOT persisted
-        verify { fileManager.deleteFile("file:///internal/wp_late") } // its copied file is discarded
+        assertThat(repoState.value.layerCount).isEqualTo(1) // the late layer is applied and persisted
+        verify(exactly = 0) { fileManager.deleteFile("file:///internal/wp_late") } // its file is kept
     }
 
     @Test
