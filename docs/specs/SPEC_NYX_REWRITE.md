@@ -1,6 +1,9 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 104: 3b-0 – `WallpaperPaintTrace` geteilt, Nyx-Messpunkte, Flacker-Zähler, profileable.
+Stand: 03.10.2026 (Revision 107: 3b-0 – 12c, Ausgangslage vor dem Erhöhen melden (Kaltstart-Frame zählt mit); 13b freigegeben.
+Revision 106: 3b-0 – Zähler bei jedem Mehr-Ebenen-Frame (12b), Auswertung je Prozess (13b), SHA-256 des Nyx-Test-Backups.
+Revision 105: 3b-0 Patch C – Messskript und Perfetto-Konfiguration; offener Punkt lintRelease NotificationPermission.
+Revision 104: 3b-0 – `WallpaperPaintTrace` geteilt, Nyx-Messpunkte, Flacker-Zähler, profileable.
 Revision 103: 3b-4 – Nyx auf den geteilten Bildpicker; Nachweis der drei Wege (Code-Lesen plus Contract-Invariante).
 Revision 102: Formatierung – reiner Reflow (satzweise Zeilen, eine Revision je Stand-Zeile), Absatz „Formatierung“.
 Revision 101: 3b-3 abgeschlossen – korrigierte Kill-Erwartung, Transform-Verlust akzeptiert (gemeinsames Verhalten), GC-Schonfrist belegt, Coordinator-Test 12.
@@ -1082,8 +1085,29 @@ Nur bei `Trace.isEnabled()`, im Alltag ohne Kosten; für Kolibri reine Instrumen
 Nach 3b-6 zählen die Frames des Ebenen-Wegs, bis das Composite fertig ist – der Vergleich bleibt fair.
 Nyx' Manifest bekommt `<profileable android:shell="true">` wie Kolibri (Perfetto-Sektionen im Release-Build).
 Test der reinen Hilfsfunktion `hasLayerWithoutBitmap` (3 Fälle).
-P5 (Patch C, folgt): Messskript `tools/nyx-flicker-measure.sh` mit vollständigen Voraussetzungen im Kopf;
-ein Probelauf ohne Bewertung (alle drei Werte erscheinen) gehört zur Abnahme.
+P5 (Patch phase3b/13): Messskript `tools/nyx-flicker-measure.sh`, Auswertung `tools/nyx-flicker-eval.py`,
+Konfiguration `tools/perfetto/nyx-wallpaper.pbtx`; Voraussetzungen vollständig im Kopf des Skripts (perfetto==0.58.2, A17,
+family-signierter Release-Build, einmalig angelegtes Nyx-Backup `nyx-benchmark-wallpaper.zip` mit den zwei Fotos aus 3a-8 –
+Kolibris Benchmark-Backup kann Nyx nicht lesen). Je Lauf: Kaltstart (automatisch), Ebene entfernen und speichern,
+Ebene hinzufügen und speichern, Drawer → Home (von Hand, das Skript fordert die Schritte an); Ausgabe je Lauf:
+first_paint_ms, change_paint_ms (Median der Speichervorgänge), missing_frames (Differenz des Zählers je Prozess, siehe 13b) und
+counter_track (present/absent, siehe 12b/13b).
+`--summary` gibt Median, Minimum und Maximum je Stand aus; `--dry-run` ist der Probelauf ohne Bewertung (Abnahme von Patch C).
+Ergänzung nach dem Urteil zu Patch C (zwei Lücken vor dem Probelauf):
+12b (Patch phase3b/12b): Bei aktivem Tracing meldet `WallpaperFlickerTrace` den aktuellen Wert bei JEDEM Mehr-Ebenen-Frame,
+erhöht wird nur bei betroffenen Frames – die Spur existiert, sobald im Mehr-Ebenen-Modus gezeichnet wird;
+„absent“ heißt damit eindeutig „Instrumentierung fehlt bzw. kein Mehr-Ebenen-Frame“, nie „nichts geflackert“.
+12c (Patch phase3b/12c, Befund des Seniors – Fehler um eins beim Kaltstart): Ein betroffener Frame meldet zuerst
+den alten Wert, dann den erhöhten. Ohne das begänne die Spur eines frischen Prozesses bei 1 (der erste Mehr-Ebenen-Frame
+nach dem Kaltstart ist meist betroffen, die Bitmaps laden noch), und `max − min` zählte genau das Kaltstart-Flackern
+nicht mit, das E3 mit dem Composite beheben soll – der Vergleich wäre zugunsten von „vorher“ verzerrt.
+Der erste gemeldete Wert jedes Prozesses ist damit immer die Ausgangslage; die Auswertung (13b) bleibt unverändert.
+13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
+(jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
+`counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
+(atrace_apps zeichnet nur Nyx auf, die Sektionen entstehen nur im neu gestarteten Prozess).
+Das einmal angelegte `nyx-benchmark-wallpaper.zip` wird hier mit SHA-256 festgehalten, damit vorher und nachher
+nachweislich dieselbe Datei nutzen: SHA-256 = (wird bei der Anlage durch die Repo-Session eingetragen).
 P6: Kriterien wie L10 – Median von first_paint und change_paint (mehr als 10 % schlechter ist ein Rückschritt),
 Flacker-Zähler auf der Differenz je Lauf (nachher nicht mehr als vorher, plus eins als Rauschen).
 
@@ -1112,6 +1136,12 @@ Flacker-Zähler auf der Differenz je Lauf (nachher nicht mehr als vorher, plus e
 - *Composite (3a-8, E3):* Nyx ersetzt `WallpaperLayerBitmapCache` durch `WallpaperComposite`;
   **Flacker-Messpunkt vor 3b**; O5-Prüfung für Nyx.
 - *Messung:* je 3 Läufe vorher/nachher in einer Sitzung, Reihenfolge innerhalb und zwischen den Runden wechseln.
+- *Außerhalb von 3b, Priorität niedrig, nicht blockierend (Befund Repo-Session, 3b-0):* `lintRelease` meldet
+  `NotificationPermission` für `CrashReportingHealthNotifier` (`POST_NOTIFICATIONS`, `:feature-crashreporting`);
+  nicht in der Release-Baseline, in `lintDebug` baseline-gefiltert, älter als 3b-0 (per Stash belegt), betrifft potenziell beide Apps.
+  Zu klären: Ist das Berechtigungs-Handling für die Benachrichtigung bei kaputtem Crash-Reporting korrekt
+  (Laufzeitanfrage ab Android 13, Verhalten bei Ablehnung), oder gehört der Eintrag begründet in die Baseline?
+  Prüfen und entscheiden später, mit Vorlage. Lint-Gate bleibt `lintDebug`, außer ein Urteil verlangt `lintRelease`.
 - *Nach 3b, Priorität niedrig (Entscheidung des Users 03.10.):* Nyx-Backdrop-Umschalter auffindbar machen, analog Kolibri.
   Heute ein reiner Icon-Button im CommandsPanel (Weg:
   Speed-Dial → Befehle → `btnBackdropToggle`, nur contentDescription).
