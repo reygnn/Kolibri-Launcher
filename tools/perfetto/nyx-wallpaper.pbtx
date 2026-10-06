@@ -1,0 +1,25 @@
+# Perfetto trace config for tools/nyx-flicker-measure.sh (SPEC_NYX_REWRITE 3b-0, E3).
+# Records the app's own trace sections and counters (android.os.Trace via atrace for the Nyx
+# package: wallpaper_first_paint, wallpaper_change_paint, wallpaper_layer_missing_frames) plus the
+# gfx/view categories for context. The script stops the trace with SIGTERM after the steps; the
+# duration below is only the upper bound if it is never stopped.
+buffers {
+  size_kb: 65536
+  fill_policy: RING_BUFFER
+}
+data_sources {
+  config {
+    name: "linux.ftrace"
+    ftrace_config {
+      atrace_categories: "gfx"
+      atrace_categories: "view"
+      atrace_apps: "com.github.reygnn.nyx_launcher"
+    }
+  }
+}
+data_sources {
+  config {
+    name: "linux.process_stats"
+  }
+}
+duration_ms: 180000
