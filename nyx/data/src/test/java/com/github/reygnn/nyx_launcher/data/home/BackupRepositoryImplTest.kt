@@ -533,6 +533,30 @@ class BackupRepositoryImplTest {
     }
 
     @Test
+    fun two_layers_without_blob_on_one_internal_file_get_one_file_each() = runTest(mainDispatcherRule.testDispatcher) {
+        // 3b-5b, O2 on the copy-in path too: a backup with paths of THIS device — copyIn hands an
+        // internal source back unchanged (early exit), so both layers would share one file; the one
+        // assignOwnFiles over all layers gives the second its own copy.
+        val internal = Uri.fromFile(File.createTempFile("internal", ".img").apply { writeBytes(image(0)); deleteOnExit() })
+        val own = Uri.fromFile(File.createTempFile("own", ".img").apply { deleteOnExit() })
+        coEvery { fileManager.copyToInternal(any()) } returns internal // the early exit: the same URI back
+        every { fileManager.copyFromInputStream(any()) } returns own
+        val saved = slot<WallpaperState>()
+        coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
+        val backup = NyxBackup(
+            wallpaperLayers = listOf(
+                WallpaperLayerBackup(id = "L-a", imageUri = internal.toString()),
+                WallpaperLayerBackup(id = "L-b", imageUri = internal.toString()),
+            ),
+        )
+
+        val result = manager.importFrom(opener(containerOf(backup, emptyList())), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success(droppedWallpaperLayers = 0))
+        assertThat(saved.captured.layers.map { it.imageUri }).containsExactly(internal.toString(), own.toString()).inOrder()
+    }
+
+    @Test
     fun the_cleanup_deletes_nothing_when_the_persisted_state_cannot_be_read() = runTest(mainDispatcherRule.testDispatcher) {
         // Fail closed (3b-5): an unclaimed copy goes to the store, which deletes nothing it cannot check.
         every { fileManager.copyFromInputStream(any()) } returns mockk<Uri>()

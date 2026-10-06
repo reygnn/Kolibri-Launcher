@@ -334,14 +334,18 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Gives every restorable layer its own internal file (3b-5, the shared parts):
-     *  - layers with a blob: [WallpaperBackupBlobs.extract] copies each referenced blob once, then
-     *    [WallpaperBackupBlobs.assignOwnFiles] gives every further layer of the same image its own
-     *    copy (O2) — removing a layer deletes its file, so a shared file would break the other;
-     *  - layers without a blob but with an `imageUri` (a file of another device, a content URI):
-     *    copied in through the store; if that fails (dead path, unreadable) the layer is dropped and
-     *    reported (B9), never stored as a reference to a file that does not exist.
-     * A layer left out of [extracted] is dropped. Every copy made is added to [copies].
+     * Gives every restorable layer its own internal file (3b-5, the shared parts). First the file of
+     * every layer is settled, then [WallpaperBackupBlobs.assignOwnFiles] runs ONCE over all layers,
+     * so "one file per layer" (O2) holds for both sources, as in Kolibri (3b-5b):
+     *  - a layer with a blob: [WallpaperBackupBlobs.extract] copies each referenced blob once;
+     *  - a layer without a blob but with an `imageUri` (a file of another device, a content URI, or
+     *    a path of this device): copied in through the store — `copyIn` hands back a source that
+     *    already lies in the wallpaper directory UNCHANGED, so two such layers can share one file
+     *    until assignOwnFiles gives the second its own copy; if the copy-in fails (dead path,
+     *    unreadable) the layer is dropped and reported (B9), never stored as a missing reference.
+     * A layer left out of [extracted] is dropped. Every file of this import is added to [copies] —
+     * possibly an internal source URI from copyIn's early exit too, which is safe: the cleanup
+     * (release) decides through the store against what is persisted, so a still-referenced file stays.
      */
     private suspend fun restoreLayerImages(
         layers: List<WallpaperLayerBackup>,
@@ -353,21 +357,20 @@ class BackupRepositoryImpl @Inject constructor(
         val byHash = HashMap<String, String>()
         wallpaperBlobs.extract(layers.mapNotNull { it.imageFileName }, blobs::claim, staging, into = byHash)
         copies += byHash.values
-        val perLayer: List<String?> = layers.map { layer -> layer.imageFileName?.let { byHash[it] } }
+        val perLayer: List<String?> = layers.map { layer ->
+            val hash = layer.imageFileName
+            val uri = layer.imageUri
+            when {
+                hash != null -> byHash[hash]
+                !uri.isNullOrBlank() -> imageStore.copyIn(Uri.parse(uri))?.toString()?.also { copies += it }
+                else -> null
+            }
+        }
         val own = wallpaperBlobs.assignOwnFiles(perLayer) { uri -> localFileOrNull(uri)?.inputStream() }
         own.forEachIndexed { index, uri ->
             if (uri != null) {
                 extracted[index] = uri
                 copies += uri
-            }
-        }
-        layers.forEachIndexed { index, layer ->
-            val uri = layer.imageUri
-            if (layer.imageFileName == null && !uri.isNullOrBlank()) {
-                imageStore.copyIn(Uri.parse(uri))?.toString()?.let {
-                    extracted[index] = it
-                    copies += it
-                }
             }
         }
     }
