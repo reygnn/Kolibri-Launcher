@@ -7,8 +7,8 @@
 # evaluates it into one CSV line (tools/nyx-flicker-eval.py):
 #   first_paint_ms   wallpaper_first_paint of the run's cold start
 #   change_paint_ms  median of the wallpaper_change_paint spans (one per editor save)
-#   missing_frames   DIFFERENCE of the monotonic counter wallpaper_layer_missing_frames over the run
-#   counter_track    present / absent (dry run: tells "0 affected frames" from "never traced")
+#   missing_frames   DIFFERENCE of the monotonic counter wallpaper_layer_missing_frames, per process
+#   counter_track    present / absent (absent = not instrumented / no multi-layer frame)
 # The script only reads; on the device it records the trace and force-stops Nyx for the cold
 # start — nothing else changes.
 #
@@ -23,7 +23,9 @@
 #   - Fixed test wallpaper (Kolibri's benchmark backup is a Kolibri backup; Nyx cannot restore it):
 #     ONCE, set the two 3a-8 photos (4000x3000 and 3000x4000, from kolibri-benchmark-wallpaper.zip)
 #     as two layers in Nyx's editor and export a Nyx backup as nyx-benchmark-wallpaper.zip; before
-#     each session restore that backup in Nyx's settings. Same wallpaper for every run.
+#     each session restore that backup in Nyx's settings. Same wallpaper for every run: its SHA-256
+#     is recorded in SPEC_NYX_REWRITE (3b-0) once created — check it before each session:
+#         sha256sum nyx-benchmark-wallpaper.zip
 #
 # Steps of one run (the script prompts for the manual ones; gestures are device-specific):
 #   1. cold start (automatic: force-stop, then HOME)
