@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 107: 3b-0 – 12c, Ausgangslage vor dem Erhöhen melden (Kaltstart-Frame zählt mit); 13b freigegeben.
+Stand: 03.10.2026 (Revision 108: 3b-0 abgeschlossen – E3-Kriterien Flacker-Zähler und first_paint (change_paint informativ), Probelauf, SHA-256 des Nyx-Test-Backups, Python-Alternative.
+Revision 107: 3b-0 – 12c, Ausgangslage vor dem Erhöhen melden (Kaltstart-Frame zählt mit); 13b freigegeben.
 Revision 106: 3b-0 – Zähler bei jedem Mehr-Ebenen-Frame (12b), Auswertung je Prozess (13b), SHA-256 des Nyx-Test-Backups.
 Revision 105: 3b-0 Patch C – Messskript und Perfetto-Konfiguration; offener Punkt lintRelease NotificationPermission.
 Revision 104: 3b-0 – `WallpaperPaintTrace` geteilt, Nyx-Messpunkte, Flacker-Zähler, profileable.
@@ -1102,14 +1103,28 @@ den alten Wert, dann den erhöhten. Ohne das begänne die Spur eines frischen Pr
 nach dem Kaltstart ist meist betroffen, die Bitmaps laden noch), und `max − min` zählte genau das Kaltstart-Flackern
 nicht mit, das E3 mit dem Composite beheben soll – der Vergleich wäre zugunsten von „vorher“ verzerrt.
 Der erste gemeldete Wert jedes Prozesses ist damit immer die Ausgangslage; die Auswertung (13b) bleibt unverändert.
+Python-Weg (Patch phase3b/13c, nur Kommentar im Skriptkopf): venv (`python3 -m venv build/venv`, `pip install perfetto==0.58.2`)
+oder, wenn kein venv möglich ist (PEP 668 / ensurepip fehlt), `pip install --target build/pyenv perfetto==0.58.2` und Aufruf mit
+`PYTHONPATH=build/pyenv`, `trace_processor_shell` aus dem lokalen Perfetto-Prebuilt-Cache – gleichwertig;
+vorher und nachher nutzen denselben Weg.
+**Abnahme von Patch C – Probelauf (A17, Release-Build, Stand mit 11–13b):** `probe,1,299.81,13848.76,0,present` –
+alle drei Werte erscheinen (first_paint 299,81 ms, change_paint siehe P6, missing_frames 0, counter_track present).
+**3b-0 ist abgeschlossen** (gepusht, 2c186963). Die E3-Vorher-Messung läuft direkt vor 3b-6, mit den Kriterien aus P6.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
 (atrace_apps zeichnet nur Nyx auf, die Sektionen entstehen nur im neu gestarteten Prozess).
 Das einmal angelegte `nyx-benchmark-wallpaper.zip` wird hier mit SHA-256 festgehalten, damit vorher und nachher
-nachweislich dieselbe Datei nutzen: SHA-256 = (wird bei der Anlage durch die Repo-Session eingetragen).
-P6: Kriterien wie L10 – Median von first_paint und change_paint (mehr als 10 % schlechter ist ein Rückschritt),
-Flacker-Zähler auf der Differenz je Lauf (nachher nicht mehr als vorher, plus eins als Rauschen).
+nachweislich dieselbe Datei nutzen: `nyx-benchmark-wallpaper.zip` SHA-256 =
+`5c7001ff26ac32ed2485eebb12c8f061fa21d5a1b1d9544a71ede35f0511383a`
+(zwei Ebenen: quer 4000×3000, scale 1.56; hoch 3000×4000, scale 1.17; angelegt von der Repo-Session).
+P6 – Kriterien für E3 (Urteil Senior nach dem Probelauf): E3 ist eine Frage des Flackerns; maßgeblich sind
+(1) missing_frames (Differenz je Prozess, summiert): nachher nicht mehr als vorher, ein einzelner zusätzlicher Frame gilt als Rauschen;
+(2) first_paint (Median): mehr als 10 % schlechter gilt als Rückschritt.
+change_paint wird weiter aufgezeichnet, aber nur zur Information und nicht vergleichbar: Der Span schließt im ersten Frame,
+nachdem der Binder einen NEUEN Zustand anwendet – in Nyx zeigt der Editor den übernommenen Stand schon an, und mit
+`WallpaperComposite.None` baut nach dem Übernehmen nichts neu, also bleibt der Span offen bis zu einem späteren Neuaufbau
+(Probelauf: ein Span, 13,8 s); nach 3b-6 endet er über den Composite-Anschluss schnell. Kein neuer Messcode dafür.
 
 **Offene Punkte für 3b (Nyx zieht nach), gesammelt:**
 - *Edit-Session/Operations:* `NyxWallpaperEditCoordinator` auf `WallpaperEditSession` + `WallpaperOperations` (Port aufs Repository);
