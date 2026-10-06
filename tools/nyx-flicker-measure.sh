@@ -13,9 +13,15 @@
 # start — nothing else changes.
 #
 # Prerequisites (all of them, before the first run):
-#   - Host: bash, adb (Android platform-tools), python3 with the Perfetto package pinned:
-#         pip install perfetto==0.58.2
-#     (its trace_processor binary is fetched on first use; no network → set it up beforehand).
+#   - Host: bash, adb (Android platform-tools), python3 with the Perfetto package pinned, in one of
+#     two equivalent ways — use the SAME way for "before" and "after":
+#       a) venv:   python3 -m venv build/venv && build/venv/bin/pip install perfetto==0.58.2
+#                  then run with PATH="$PWD/build/venv/bin:$PATH" tools/nyx-flicker-measure.sh ...
+#       b) no venv possible (PEP 668 / ensurepip missing):
+#                  pip install --target build/pyenv perfetto==0.58.2
+#                  then run with PYTHONPATH=build/pyenv tools/nyx-flicker-measure.sh ...
+#                  (trace_processor_shell comes from the local Perfetto prebuilt cache).
+#     The trace_processor binary is fetched on first use; no network → set it up beforehand.
 #   - Device: Samsung A17 (the 3a/3b reference device), USB debugging on, display awake
 #     (adb shell svc power stayon true), Nyx set as the default home app.
 #   - Build: the family-signed RELEASE build of Nyx (profileable since 3b-0, so Perfetto records
