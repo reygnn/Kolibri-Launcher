@@ -1,5 +1,9 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import org.robolectric.RobolectricTestRunner
+import org.junit.runner.RunWith
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import android.net.Uri
@@ -52,6 +56,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.zip.ZipEntry
@@ -62,9 +67,11 @@ import kotlin.random.Random
 /**
  * Round-trips a backup through the shared E5a container (export → import, 2b-1) with mocked
  * repos, pinning the assembler both directions. Containers for the import-only cases are
- * written by the real engine ([containerOf]) or, for hostile archives, by hand. Uri is
- * mocked, not parsed (pure JVM).
+ * written by the real engine ([containerOf]) or, for hostile archives, by hand. Runs under
+ * Robolectric since 3b-5: the shared wallpaper parts parse internal file URIs (own file per layer,
+ * copying in a layer without blob); most Uris are still mocks.
  */
+@RunWith(RobolectricTestRunner::class)
 class BackupRepositoryImplTest {
 
     @get:Rule
@@ -101,6 +108,9 @@ class BackupRepositoryImplTest {
     }
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true)
 
+    // The shared wallpaper parts (3b-5): the store decides the cleanup against what is persisted.
+    private val imageStore = WallpaperImageStore(fileManager, wallpaperRepository, mainDispatcherRule.testDispatcher)
+
     private val drawerFoldersRepository = FakeDrawerFoldersRepository()
     private val hiddenAppsRepository = FakeHiddenAppsRepository()
 
@@ -115,7 +125,7 @@ class BackupRepositoryImplTest {
     // NyxBackupSavePathTest's.
     private val manager = BackupRepositoryImpl(
         SafDocuments(mockk<Context>()), homeLayoutRepository, drawerFoldersRepository, hiddenAppsRepository, preferences, displaySettings,
-        wallpaperRepository, fabPositionStore, fileManager, serializer,
+        wallpaperRepository, fabPositionStore, WallpaperBackupBlobs(fileManager, imageStore), imageStore, serializer,
         reconcileHomeLayout, engine, appVersionName = "0.2.0", ioDispatcher = mainDispatcherRule.testDispatcher,
     )
 
@@ -425,6 +435,8 @@ class BackupRepositoryImplTest {
         // the engine's cleanup and never lands in internal storage.
         val used = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns used
+        // The store decides the cleanup against what is persisted (3b-5): the restored state.
+        coEvery { wallpaperRepository.readPersistedImageUris() } answers { setOf(used.toString()) }
         val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
 
         manager.importFrom(opener(containerOf(backup, listOf(image(0), image(1)))), ImportOptions())
@@ -439,8 +451,10 @@ class BackupRepositoryImplTest {
     fun layers_sharing_one_image_get_one_file_each() = runTest(mainDispatcherRule.testDispatcher) {
         // The container stores an image once, but removing a layer deletes its file right away —
         // so each layer gets its own copy, or deleting one would break the other.
-        val first = mockk<Uri>()
-        val second = mockk<Uri>()
+        // Since 3b-5 the shared parts copy the blob once (extract) and give the second layer its own
+        // copy by READING the first file (assignOwnFiles) — so the first copy is a real temp file.
+        val first = Uri.fromFile(File.createTempFile("first", ".img").apply { writeBytes(image(0)); deleteOnExit() })
+        val second = Uri.fromFile(File.createTempFile("second", ".img").apply { deleteOnExit() })
         every { fileManager.copyFromInputStream(any()) } returns first andThen second
         val saved = slot<WallpaperState>()
         coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
@@ -459,6 +473,7 @@ class BackupRepositoryImplTest {
         // failure AFTER that save must not delete a file the persisted wallpaper now points at.
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
+        coEvery { wallpaperRepository.readPersistedImageUris() } answers { setOf(uri.toString()) }
         coEvery { homeLayoutRepository.save(any()) } throws java.io.IOException("disk full")
         val backup = NyxBackup(layout = layout.toDto(), wallpaperLayers = listOf(layerBackup(0)))
 
@@ -477,6 +492,7 @@ class BackupRepositoryImplTest {
         // (at worst an orphan for the startup sweep).
         val uri = mockk<Uri>()
         every { fileManager.copyFromInputStream(any()) } returns uri
+        coEvery { wallpaperRepository.readPersistedImageUris() } answers { setOf(uri.toString()) }
         coEvery { wallpaperRepository.saveWallpaperState(any()) } throws kotlinx.coroutines.CancellationException("left settings")
         val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
 
@@ -485,6 +501,101 @@ class BackupRepositoryImplTest {
         }
 
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    // ---- 3b-5: the shared wallpaper parts (extract, own files, copy-in, cleanup through the store) ----
+
+    @Test
+    fun a_layer_without_blob_and_a_dead_file_uri_is_dropped_and_reported() = runTest(mainDispatcherRule.testDispatcher) {
+        // B9 (3b-5): a layer whose image was not embedded and whose file does not exist on this
+        // device is dropped and counted — never stored as a reference to a missing file.
+        coEvery { fileManager.copyToInternal(any()) } returns null
+        val backup = NyxBackup(wallpaperLayers = listOf(WallpaperLayerBackup(id = "L-dead", imageUri = "file:///other/device/a.jpg")))
+
+        val result = manager.importFrom(opener(containerOf(backup, emptyList())), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success(droppedWallpaperLayers = 1))
+        coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
+    }
+
+    @Test
+    fun a_layer_without_blob_and_a_readable_uri_is_copied_in() = runTest(mainDispatcherRule.testDispatcher) {
+        val internal = Uri.parse("file:///internal/wallpapers/copied.jpg")
+        coEvery { fileManager.copyToInternal(any()) } returns internal
+        val saved = slot<WallpaperState>()
+        coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
+        val backup = NyxBackup(wallpaperLayers = listOf(WallpaperLayerBackup(id = "L-uri", imageUri = "content://picker/a.jpg")))
+
+        val result = manager.importFrom(opener(containerOf(backup, emptyList())), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success(droppedWallpaperLayers = 0))
+        assertThat(saved.captured.layers.single().imageUri).isEqualTo(internal.toString()) // its own internal file
+    }
+
+    @Test
+    fun the_cleanup_deletes_nothing_when_the_persisted_state_cannot_be_read() = runTest(mainDispatcherRule.testDispatcher) {
+        // Fail closed (3b-5): an unclaimed copy goes to the store, which deletes nothing it cannot check.
+        every { fileManager.copyFromInputStream(any()) } returns mockk<Uri>()
+        coEvery { wallpaperRepository.readPersistedImageUris() } returns null
+        coEvery { preferences.setIconStyle(any()) } throws java.io.IOException("disk full") // abort before the save
+        val backup = NyxBackup(prefs = NyxBackupPrefs(iconStyle = "COLOR"), wallpaperLayers = listOf(layerBackup(0)))
+
+        runCatching { manager.importFrom(opener(containerOf(backup, listOf(image(0)))), ImportOptions()) }
+
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    @Test
+    fun two_layers_of_one_blob_are_both_stored_with_own_files() = runTest(mainDispatcherRule.testDispatcher) {
+        val first = Uri.fromFile(File.createTempFile("own-a", ".img").apply { writeBytes(image(0)); deleteOnExit() })
+        val second = Uri.fromFile(File.createTempFile("own-b", ".img").apply { deleteOnExit() })
+        every { fileManager.copyFromInputStream(any()) } returns first andThen second
+        val saved = slot<WallpaperState>()
+        coEvery { wallpaperRepository.saveWallpaperState(capture(saved)) } returns Unit
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0), layerBackup(0).copy(id = "L-twin")))
+
+        val result = manager.importFrom(opener(containerOf(backup, listOf(image(0)))), ImportOptions())
+
+        assertThat(result).isEqualTo(ImportResult.Success(droppedWallpaperLayers = 0))
+        assertThat(saved.captured.layers.map { it.imageUri }.toSet()).hasSize(2) // two distinct files
+    }
+
+    @Test
+    fun a_silently_failed_save_keeps_the_claimed_copy() = runTest(mainDispatcherRule.testDispatcher) {
+        // Test 5, first half (3b-5, as Kolibri's 3a-7 case): the save returns normally but persists
+        // nothing — the OLD state stays persisted. The claimed copy never goes to release: if it
+        // did, the store would delete it, because the old persisted state does not reference it.
+        val claimed = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns claimed
+        coEvery { wallpaperRepository.saveWallpaperState(any()) } returns Unit // swallowed, nothing persisted
+        coEvery { wallpaperRepository.readPersistedImageUris() } returns setOf("file:///internal/old.jpg")
+        val backup = NyxBackup(wallpaperLayers = listOf(layerBackup(0)))
+
+        manager.importFrom(opener(containerOf(backup, listOf(image(0)))), ImportOptions())
+
+        val claimedUri = claimed.toString()
+        verify(exactly = 1) { fileManager.copyFromInputStream(any()) } // the copy exists
+        verify(exactly = 0) { fileManager.deleteFile(claimedUri) }
+    }
+
+    @Test
+    fun an_import_aborted_after_extraction_releases_its_real_copy() = runTest(mainDispatcherRule.testDispatcher) {
+        // Test 5, second half — the natural "extracted but not adopted" copy in Nyx's format: the
+        // import fails after the blob was copied and before the wallpaper is saved. The copy goes
+        // to release, which checks against the old persisted state and deletes it.
+        // Counter-check when writing: without the release in `finally` this test turns red.
+        val orphan = mockk<Uri>()
+        every { fileManager.copyFromInputStream(any()) } returns orphan
+        coEvery { wallpaperRepository.readPersistedImageUris() } returns setOf("file:///internal/old.jpg")
+        coEvery { preferences.setIconStyle(any()) } throws java.io.IOException("disk full") // after extraction, before the save
+        val backup = NyxBackup(prefs = NyxBackupPrefs(iconStyle = "COLOR"), wallpaperLayers = listOf(layerBackup(0)))
+
+        runCatching { manager.importFrom(opener(containerOf(backup, listOf(image(0)))), ImportOptions()) }
+
+        val orphanUri = orphan.toString()
+        verify(exactly = 1) { fileManager.copyFromInputStream(any()) } // the copy existed
+        coVerify(exactly = 0) { wallpaperRepository.saveWallpaperState(any()) }
+        verify(exactly = 1) { fileManager.deleteFile(orphanUri) }
     }
 
     // ---- B11 clamping and non-finite values (2b-2, 2b-2b). Round trip, E1, B14, U4 and E2

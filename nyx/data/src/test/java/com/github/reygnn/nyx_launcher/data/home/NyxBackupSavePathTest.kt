@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.ContentResolver
 import android.content.Context
@@ -67,31 +69,37 @@ class NyxBackupSavePathTest {
 
     private val layout = HomeLayout(grid = GridSpec(columns = 4, rows = 6), pages = 1, items = emptyList(), dock = emptyList())
 
-    private fun manager(homeLayoutRepository: HomeLayoutRepository = FakeHomeLayoutRepository(layout)) = BackupRepositoryImpl(
-        safDocuments = SafDocuments(context),
-        homeLayoutRepository = homeLayoutRepository,
-        drawerFoldersRepository = FakeDrawerFoldersRepository(),
-        hiddenAppsRepository = FakeHiddenAppsRepository(),
-        preferences = FakePreferencesRepository(),
-        displaySettings = mockk<WallpaperDisplaySettings>(relaxed = true) {
-            // A relaxed mock's Flow never emits; first() would throw.
-            every { wallpaperScrimAlphaStateFlow } returns flowOf(0.1f)
-            every { wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.BLACK)
-            every { wallpaperSurfaceModeFlow } returns flowOf(WallpaperSurfaceMode.AUTO)
-        },
-        wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
+    private fun manager(homeLayoutRepository: HomeLayoutRepository = FakeHomeLayoutRepository(layout)): BackupRepositoryImpl {
+        val wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
             coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
-        },
-        fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
-            every { fabPositionFlow } returns flowOf(FabPosition.DEFAULT)
-        },
-        fileManager = mockk<WallpaperFileManager>(relaxed = true),
-        serializer = NyxBackupSerializer(),
-        reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
-        engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet()),
-        appVersionName = "0.2.0",
-        ioDispatcher = mainDispatcherRule.testDispatcher,
-    )
+        }
+        val fileManager = mockk<WallpaperFileManager>(relaxed = true)
+        val imageStore = WallpaperImageStore(fileManager, wallpaperRepository, mainDispatcherRule.testDispatcher)
+        return BackupRepositoryImpl(
+            safDocuments = SafDocuments(context),
+            homeLayoutRepository = homeLayoutRepository,
+            drawerFoldersRepository = FakeDrawerFoldersRepository(),
+            hiddenAppsRepository = FakeHiddenAppsRepository(),
+            preferences = FakePreferencesRepository(),
+            displaySettings = mockk<WallpaperDisplaySettings>(relaxed = true) {
+                // A relaxed mock's Flow never emits; first() would throw.
+                every { wallpaperScrimAlphaStateFlow } returns flowOf(0.1f)
+                every { wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.BLACK)
+                every { wallpaperSurfaceModeFlow } returns flowOf(WallpaperSurfaceMode.AUTO)
+            },
+            wallpaperRepository = wallpaperRepository,
+            fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
+                every { fabPositionFlow } returns flowOf(FabPosition.DEFAULT)
+            },
+            wallpaperBlobs = WallpaperBackupBlobs(fileManager, imageStore),
+            imageStore = imageStore,
+            serializer = NyxBackupSerializer(),
+            reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
+            engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet()),
+            appVersionName = "0.2.0",
+            ioDispatcher = mainDispatcherRule.testDispatcher,
+        )
+    }
 
     /** The document CreateDocument has just made for the export. */
     private fun createdDocument(): Uri = Uri.fromFile(tmp.newFile("nyx-backup.zip"))

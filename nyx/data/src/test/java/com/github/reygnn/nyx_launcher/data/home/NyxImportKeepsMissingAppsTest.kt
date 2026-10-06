@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
@@ -53,6 +55,9 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
         val layout = FakeHomeLayoutRepository(HomeLayout(GridSpec(4, 6), pages = 1, items = emptyList(), dock = emptyList()))
         val hidden = FakeHiddenAppsRepository()
         val folders = FakeDrawerFoldersRepository()
+        val wallpaperRepository = mockk<WallpaperRepository>(relaxed = true)
+        val fileManager = mockk<WallpaperFileManager>(relaxed = true)
+        val imageStore = WallpaperImageStore(fileManager, wallpaperRepository, mainDispatcherRule.testDispatcher)
         val manager = BackupRepositoryImpl(
             safDocuments = SafDocuments(mockk<Context>()), // the stream-level importFrom never touches it
             homeLayoutRepository = layout,
@@ -60,9 +65,10 @@ class NyxImportKeepsMissingAppsTest : ImportKeepsMissingAppsContract() {
             hiddenAppsRepository = hidden,
             preferences = FakePreferencesRepository(),
             displaySettings = mockk<WallpaperDisplaySettings>(relaxed = true),
-            wallpaperRepository = mockk<WallpaperRepository>(relaxed = true),
+            wallpaperRepository = wallpaperRepository,
             fabPositionStore = mockk<FabPositionRepository>(relaxed = true),
-            fileManager = mockk<WallpaperFileManager>(relaxed = true),
+            wallpaperBlobs = WallpaperBackupBlobs(fileManager, imageStore),
+            imageStore = imageStore,
             serializer = NyxBackupSerializer(),
             reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
             engine = engine,

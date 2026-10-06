@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.ContentResolver
 import android.content.Context
@@ -117,6 +119,18 @@ class NyxBackupFormatTest : BackupFormatContract() {
                 }
             }
         }
+        val wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
+                coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
+            }
+        // Imported images would land here, like the production file manager's directory.
+        val fileManager = mockk<WallpaperFileManager>(relaxed = true) {
+                every { copyFromInputStream(any()) } answers {
+                    val file = File(images, "image-${System.nanoTime()}")
+                    file.writeBytes(firstArg<InputStream>().readBytes())
+                    Uri.fromFile(file)
+                }
+            }
+        val imageStore = WallpaperImageStore(fileManager, wallpaperRepository, mainDispatcherRule.testDispatcher)
         return BackupRepositoryImpl(
             safDocuments = SafDocuments(mockk<Context> { every { contentResolver } returns resolver }),
             homeLayoutRepository = layoutStore,
@@ -128,20 +142,12 @@ class NyxBackupFormatTest : BackupFormatContract() {
                 every { wallpaperBackdropFlow } returns flowOf(WallpaperBackdrop.BLACK)
                 every { wallpaperSurfaceModeFlow } returns flowOf(WallpaperSurfaceMode.AUTO)
             },
-            wallpaperRepository = mockk<WallpaperRepository>(relaxed = true) {
-                coEvery { getWallpaperStateSync() } returns WallpaperState.NONE
-            },
+            wallpaperRepository = wallpaperRepository,
             fabPositionStore = mockk<FabPositionRepository>(relaxed = true) {
                 every { fabPositionFlow } returns flowOf(FabPosition.DEFAULT)
             },
-            // Imported images would land here, like the production file manager's directory.
-            fileManager = mockk<WallpaperFileManager>(relaxed = true) {
-                every { copyFromInputStream(any()) } answers {
-                    val file = File(images, "image-${System.nanoTime()}")
-                    file.writeBytes(firstArg<InputStream>().readBytes())
-                    Uri.fromFile(file)
-                }
-            },
+            wallpaperBlobs = WallpaperBackupBlobs(fileManager, imageStore),
+            imageStore = imageStore,
             serializer = NyxBackupSerializer(),
             reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
             engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet()),

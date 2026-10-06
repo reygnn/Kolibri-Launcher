@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.content.Context
 import android.net.Uri
@@ -148,6 +150,8 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
 
     // ---- harness ----
 
+    private fun imageStore() = WallpaperImageStore(fileManager, stores.wallpaper, mainDispatcherRule.testDispatcher)
+
     private fun manager() = BackupRepositoryImpl(
         safDocuments = SafDocuments(mockk<Context>()), // the stream-level writeBackup/importFrom never touch it
         homeLayoutRepository = stores.recordingLayout,
@@ -157,7 +161,8 @@ class NyxBackupRoundTripTest : BackupRoundTripContract<ImportOptions>() {
         displaySettings = stores.display,
         wallpaperRepository = stores.wallpaper,
         fabPositionStore = stores.fabStore,
-        fileManager = fileManager,
+        wallpaperBlobs = WallpaperBackupBlobs(fileManager, imageStore()),
+        imageStore = imageStore(),
         serializer = NyxBackupSerializer(),
         reconcileHomeLayout = mockk<ReconcileHomeLayoutUseCase>(relaxed = true),
         engine = BackupEngine(mainDispatcherRule.testDispatcher, emptySet()),

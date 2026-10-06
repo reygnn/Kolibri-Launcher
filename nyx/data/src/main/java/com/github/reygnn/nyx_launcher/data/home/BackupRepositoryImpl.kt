@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperBackupBlobs
 import com.github.reygnn.launcher.core.wallpaper.FabPositionRepository
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.saf.SafDocuments
@@ -69,7 +71,10 @@ class BackupRepositoryImpl @Inject constructor(
     private val displaySettings: WallpaperDisplaySettings,
     private val wallpaperRepository: WallpaperRepository,
     private val fabPositionStore: FabPositionRepository,
-    private val fileManager: WallpaperFileManager,
+    // The shared wallpaper parts of an import (3b-5): blob extraction, own file per layer and the
+    // cleanup through the store; the store also copies in a layer that has no blob.
+    private val wallpaperBlobs: WallpaperBackupBlobs,
+    private val imageStore: WallpaperImageStore,
     private val serializer: NyxBackupSerializer,
     private val reconcileHomeLayout: ReconcileHomeLayoutUseCase,
     private val engine: BackupEngine,
@@ -250,15 +255,15 @@ class BackupRepositoryImpl @Inject constructor(
 
     private suspend fun apply(read: BackupRead.Ok, staging: File, options: ImportOptions): ImportResult {
         val backup = backupOf(read) ?: return ImportResult.InvalidFormat
-        // Layer index → internal file copied from its blob. Every layer gets its OWN file, also
-        // when two layers share one blob: removing a layer deletes its file right away, so a
-        // file shared between layers would take the other layer's image with it.
+        // Layer index → its own internal file (blob extracted, or a layer without blob copied in).
         val extracted = HashMap<Int, String>()
+        // Every internal copy this import made — the cleanup candidates.
+        val copies = HashSet<String>()
         // Copied files the restored wallpaper state references, claimed BEFORE its save is
-        // attempted. Every other copied file is deleted in `finally` (§Audit-3 A3-05).
+        // attempted. Every other copy goes to the store's cleanup in `finally` (§Audit-3 A3-05).
         var adopted: Set<String> = emptySet()
         try {
-            if (options.importWallpaper) extractLayerImages(backup.wallpaperLayers, read.blobs, staging, extracted)
+            if (options.importWallpaper) restoreLayerImages(backup.wallpaperLayers, read.blobs, staging, extracted, copies)
 
             // Apply the home layout LAST. Cross-DataStore atomicity isn't available,
             // so if a settings/wallpaper write throws mid-import, doing layout last
@@ -307,42 +312,63 @@ class BackupRepositoryImpl @Inject constructor(
                     reconcileHomeLayout()
                 }
             }
+            // B9 (3b-5, as in Kolibri): every layer that carried an image — a blob or an imageUri —
+            // and could not be restored is reported, not silently lost.
             val dropped = if (options.importWallpaper) {
-                backup.wallpaperLayers.indices.count { backup.wallpaperLayers[it].imageFileName != null && it !in extracted }
+                backup.wallpaperLayers.indices.count { index ->
+                    val layer = backup.wallpaperLayers[index]
+                    (layer.imageFileName != null || !layer.imageUri.isNullOrBlank()) && index !in extracted
+                }
             } else {
                 0
             }
             return ImportResult.Success(droppedWallpaperLayers = dropped)
         } finally {
-            // A copied file no restored layer ended up referencing (a failed write, cancellation,
-            // every layer dropped) must not sit orphaned in internal storage until the next
-            // startup sweep. Drop it now (§Audit-3 A3-05).
-            (extracted.values - adopted).forEach { fileManager.deleteFile(it) }
+            // A copy no restored layer ended up referencing (a failed write, cancellation, every
+            // layer dropped) must not sit orphaned until the next startup sweep (§Audit-3 A3-05):
+            // ONLY the unclaimed copies, through the store (3b-5, as Kolibri since 3a-7) — against
+            // what is persisted, fail closed, under NonCancellable. Claimed copies may be missing
+            // from the persisted state after a silently failed save and must never be passed in.
+            wallpaperBlobs.release(copies - adopted)
         }
     }
 
     /**
-     * Copies each blob-backed layer's image into internal storage, one file per layer. A
-     * blob that was rejected (hash/size) or is missing leaves its layer out of [extracted];
-     * the layer is then dropped. The staged blob is claimed once and deleted after its copies.
+     * Gives every restorable layer its own internal file (3b-5, the shared parts):
+     *  - layers with a blob: [WallpaperBackupBlobs.extract] copies each referenced blob once, then
+     *    [WallpaperBackupBlobs.assignOwnFiles] gives every further layer of the same image its own
+     *    copy (O2) — removing a layer deletes its file, so a shared file would break the other;
+     *  - layers without a blob but with an `imageUri` (a file of another device, a content URI):
+     *    copied in through the store; if that fails (dead path, unreadable) the layer is dropped and
+     *    reported (B9), never stored as a reference to a file that does not exist.
+     * A layer left out of [extracted] is dropped. Every copy made is added to [copies].
      */
-    private fun extractLayerImages(
+    private suspend fun restoreLayerImages(
         layers: List<WallpaperLayerBackup>,
         blobs: StagedBlobs,
         staging: File,
         extracted: MutableMap<Int, String>,
+        copies: MutableSet<String>,
     ) {
-        val claimed = HashMap<String, File>()
-        try {
-            layers.forEachIndexed { index, layer ->
-                val hash = layer.imageFileName ?: return@forEachIndexed
-                val file = claimed[hash]
-                    ?: blobs.claim(hash, File(staging, "claimed-$hash"))?.also { claimed[hash] = it }
-                    ?: return@forEachIndexed
-                file.inputStream().use { fileManager.copyFromInputStream(it) }?.let { extracted[index] = it.toString() }
+        val byHash = HashMap<String, String>()
+        wallpaperBlobs.extract(layers.mapNotNull { it.imageFileName }, blobs::claim, staging, into = byHash)
+        copies += byHash.values
+        val perLayer: List<String?> = layers.map { layer -> layer.imageFileName?.let { byHash[it] } }
+        val own = wallpaperBlobs.assignOwnFiles(perLayer) { uri -> localFileOrNull(uri)?.inputStream() }
+        own.forEachIndexed { index, uri ->
+            if (uri != null) {
+                extracted[index] = uri
+                copies += uri
             }
-        } finally {
-            claimed.values.forEach { it.delete() }
+        }
+        layers.forEachIndexed { index, layer ->
+            val uri = layer.imageUri
+            if (layer.imageFileName == null && !uri.isNullOrBlank()) {
+                imageStore.copyIn(Uri.parse(uri))?.toString()?.let {
+                    extracted[index] = it
+                    copies += it
+                }
+            }
         }
     }
 
@@ -391,9 +417,10 @@ class BackupRepositoryImpl @Inject constructor(
         // Rebind each blob-backed layer to its freshly copied internal URI. A blob-backed
         // layer whose blob is missing/failed is DROPPED (its source file:// path is dead on
         // the restore target) — all-or-nothing per layer.
+        // A layer without blob is only restored with its copied-in file (3b-5), never with its
+        // raw imageUri. A layer that carried no image at all is dropped, as before.
         val restored = layers.mapIndexedNotNull { index, layer ->
-            val uri = if (layer.imageFileName != null) extracted[index] else layer.imageUri
-            uri?.let { layer.toLayerState().copy(imageUri = it) }
+            extracted[index]?.let { layer.toLayerState().copy(imageUri = it) }
         }
         // Only overwrite when at least one layer survived; if every blob failed
         // (corrupt backup) keep the current wallpaper rather than wiping it.

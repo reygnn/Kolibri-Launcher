@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * ([resync]) with the latest persisted state, read after all of the session's writes; until then
  * emissions stay ignored too, so a late one (delivered after commit) cannot flash the old state.
  * A future second writer during a session breaks this assumption and must be noticed here.
+ * Known today (3b-5, Q5): the backup import writes the wallpaper state past this mechanism; that it
+ * never runs during a session is excluded only by the UI (from the editor one cannot reach the
+ * settings), not by the code — see SPEC_NYX_REWRITE 3b-5 Q5 before making the import reachable.
  *
  * Decisions (02.10.): re-entering a running session is ignored (E3) — overwriting the snapshot
  * would make a cancel restore the already-edited state; commit does NOT bump the generation (E2) —
