@@ -15,6 +15,8 @@ import android.os.Trace
  * adding to it) on EVERY multi-layer frame while tracing, affected or not (3b-0, 12b) — so the
  * counter track exists as soon as anything is drawn in multi-layer mode, and a trace without it
  * unambiguously means "not instrumented / no multi-layer frame", never "nothing flickered".
+ * An affected frame reports the old value first, then the raised one (12c): every process's first
+ * reported value is thus its starting point, and max − min counts the cold-start frame too.
  * An evaluation takes the DIFFERENCE per process (max − min of the reported values, the first
  * reported value being the starting point; tools/nyx-flicker-eval.py), never a sum of values.
  *
@@ -32,8 +34,14 @@ object WallpaperFlickerTrace {
     /** One multi-layer frame is about to be drawn with [layers]. Main thread only. */
     fun onMultiLayerFrame(layers: List<WallpaperLayer>) {
         if (!Trace.isEnabled()) return
-        if (hasLayerWithoutBitmap(layers)) frames++
-        Trace.setCounter(COUNTER, frames) // every frame, affected or not: the track always exists
+        // Report the starting point BEFORE raising it (3b-0, 12c): a fresh process starts at 0 and
+        // its first multi-layer frame is usually affected (bitmaps still loading) — without this
+        // first report the track would begin at 1 and max − min would miss the cold-start frame.
+        Trace.setCounter(COUNTER, frames)
+        if (hasLayerWithoutBitmap(layers)) {
+            frames++
+            Trace.setCounter(COUNTER, frames)
+        }
     }
 
     /** True if at least one of [layers] has no drawable bitmap (null or recycled). Pure. */
