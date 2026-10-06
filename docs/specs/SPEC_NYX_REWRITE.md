@@ -1,6 +1,8 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 108: 3b-0 abgeschlossen – E3-Kriterien Flacker-Zähler und first_paint (change_paint informativ), Probelauf, SHA-256 des Nyx-Test-Backups, Python-Alternative.
+Stand: 03.10.2026 (Revision 110: 3b-5b – O2 auch auf dem Einhol-Weg (assignOwnFiles einmal über alle Ebenen).
+Revision 109: 3b-5 – Nyx-Backup auf die geteilten Teile (Q1–Q3), H5 bewusst nicht (L7), Import bei offener Session als Einschränkung (Q5).
+Revision 108: 3b-0 abgeschlossen – E3-Kriterien Flacker-Zähler und first_paint (change_paint informativ), Probelauf, SHA-256 des Nyx-Test-Backups, Python-Alternative.
 Revision 107: 3b-0 – 12c, Ausgangslage vor dem Erhöhen melden (Kaltstart-Frame zählt mit); 13b freigegeben.
 Revision 106: 3b-0 – Zähler bei jedem Mehr-Ebenen-Frame (12b), Auswertung je Prozess (13b), SHA-256 des Nyx-Test-Backups.
 Revision 105: 3b-0 Patch C – Messskript und Perfetto-Konfiguration; offener Punkt lintRelease NotificationPermission.
@@ -260,6 +262,7 @@ Diese Liste ist die Grundlage für die Golden-Soll-Zustände und für die Releas
 | Nyx | Harte ANRs werden beim nächsten Start gemeldet (vorher No-op-Drainer, keine ANR-Reports) | 1c-1 |
 | Nyx | Beim Wiederherstellen sind versteckte Apps ein eigener Schalter (nur angeboten, wenn das Backup mindestens eine enthält); an: die Menge wird ersetzt, ein Backup ohne das Feld lässt sie stehen | 2b-3b, B13 |
 | Nyx | Abgelehnte Backup-Dateien melden ihren Grund sofort (andere App, ältere Version, nicht unterstützte Version, ungültig); ein Wiederherstellen meldet verworfene Wallpaper-Ebenen | 2b-3b |
+| Nyx | Beim Wiederherstellen eines Backups meldet Nyx auch Ebenen als nicht verfügbar, deren Bild nicht im Backup lag und auf dem Gerät fehlt, statt sie still wegzulassen (keine Referenz auf eine fehlende Datei mehr) | 3b-5 |
 | Nyx | Beim Wählen eines Hintergrunds in den Einstellungen und im Anpassen-Sheet öffnet sich die Dateiauswahl des Systems statt des reinen Foto-Pickers; Downloads, Dateimanager und Cloud-Anbieter werden erreichbar | 3b-4 |
 | Nyx | Ein Bild, das im Wallpaper-Editor kurz vor „Speichern“ als Ebene gewählt wurde und noch kopiert wird, erscheint nach dem Speichern (bisher wurde es verworfen); nur „Abbrechen“ verwirft es (wie Kolibri, E2) | 3b-3 |
 | Nyx | Wird der Hintergrund von außen (Einstellungen, Anpassen-Sheet) gewählt, während der Editor offen ist, bleibt das nach dem Speichern erhalten (bisher überschrieb der Editor es wieder); „Abbrechen“ macht es rückgängig | 3b-3 |
@@ -936,7 +939,7 @@ zuerst der Nachweis), 3b-5 (Backup), **dann die E3-Vorher-Messung auf dem Stand 
 L2 Setter verschlucken (vorher prüfen, ob Nyx beim Speichern einen Fehler-Toast zeigt → dann Zeile);
 L3 D5 erst nach dem Audit (eigene Vorlage);
 L4 FAB je Koordinate, ohne Zeile; L5 FAB im Backup unverändert (offener Punkt);
-L6 B9 breiter für Nyx, mit Zeile; L7 H5 für beide Apps in 3b-5 (Kolibri-Teil in der Patchbeschreibung genannt, mit eigenem Fall);
+L6 B9 breiter für Nyx, mit Zeile; L7 H5 – bewusst nicht umgesetzt (3b-5 Q4);
 L8 Messpunkte (a) wie `WallpaperPaintTrace`, Flacker-Zähler als Trace-Counter, (b) Ablauf als Skript im Repo (`tools/nyx-flicker-measure.sh`:
 adb-Eingaben, Perfetto-Konfiguration, Auswertung per trace_processor), (c) Bildschirmaufnahme;
 kein Macrobenchmark-Modul; festes Test-Wallpaper über Backup;
@@ -1110,6 +1113,40 @@ vorher und nachher nutzen denselben Weg.
 **Abnahme von Patch C – Probelauf (A17, Release-Build, Stand mit 11–13b):** `probe,1,299.81,13848.76,0,present` –
 alle drei Werte erscheinen (first_paint 299,81 ms, change_paint siehe P6, missing_frames 0, counter_track present).
 **3b-0 ist abgeschlossen** (gepusht, 2c186963). Die E3-Vorher-Messung läuft direkt vor 3b-6, mit den Kriterien aus P6.
+
+**3b-5 – Backup in Nyx (Urteil Senior: Q1–Q6 frei; Patch phase3b/14):**
+Q1: Nyx packt die Blobs mit `WallpaperBackupBlobs.extract` aus und gibt mit `assignOwnFiles` jeder Ebene ihre eigene Datei (O2,
+eine Stelle für beide Apps); die eigene Auspack-Schleife entfällt.
+Q2: Nicht übernommene Kopien räumt `wallpaperBlobs.release` auf – über den Store, gegen das Persistierte, unter `NonCancellable`,
+nur die unbeanspruchten. Damit ist die letzte direkte Löschstelle in Nyx' Wallpaper-Pfaden zu
+(grep-Beleg: kein `deleteFile`/`clearAll`/`gcOrphans` in `nyx/*/src/main` außerhalb des Stores).
+Q3 (L6): Eine Ebene ohne Blob, aber mit `imageUri` (eine Datei eines anderen Geräts, eine Content-URI) wird über den Store
+eingeholt (`copyIn`, eigene Datei); gelingt das nicht, wird sie verworfen und zählt in `droppedWallpaperLayers` (B9 breiter) –
+nie mehr eine gespeicherte Referenz auf eine fehlende Datei. Eine Ebene ganz ohne Bild wird wie bisher verworfen.
+Q4 – H5 bewusst nicht umgesetzt (L7 zurückgenommen): Die Dateien des alten Wallpapers nach einem Import sammelt der GC beim nächsten
+Start ein (fail-closed, Edit-Schutz, Schonfrist, auf dem Gerät belegt); ein sofortiges Löschen bräuchte das Wissen um eine offene
+Session (deren Snapshot die alten Dateien noch referenzieren kann), das Kolibris Daten-Layer nicht hat – Gewinn: Speicher bis zum
+nächsten Start, Risiko: eine hängende Referenz.
+Q5 – bekannte Einschränkung beider Apps, heute über die Oberfläche nicht erreichbar: Der Import schreibt den Wallpaper-Zustand am
+Session-Mechanismus vorbei; bei offener Session ignoriert sie die Emission (E4) und schreibt beim Übernehmen oder Abbrechen ihren
+Stand zurück (kein Datenverlust, die Dateien bleiben als Waisen). Die KDoc der `WallpaperEditSession` („Single writer during a
+session“) nennt das jetzt mit Verweis hierher. Lösung, falls der Import je erreichbar wird: den Wallpaper-Teil bei offener Session
+ablehnen (analog `clear`).
+Q6: Format unverändert (F3), FAB im Backup unverändert (L5).
+Tests: keine bestehende Erwartung ändert ihren Wert; Aufbau: Konstruktoren mit den geteilten Teilen, der Haupttest unter Robolectric
+(echte Datei-URIs), echte Stubs für `readPersistedImageUris` in den „nichts gelöscht“-Fällen; neu sechs Fälle – tote URI verworfen
+und gezählt, lesbare URI eingeholt, Aufräumen fail-closed, zwei Ebenen eines Blobs mit eigenen Dateien, still scheiterndes
+Speichern behält die übernommene Kopie, Abbruch nach dem Auspacken räumt die echte, nicht übernommene Kopie auf (Gegenprobe:
+ohne `release` rot). Ein kombinierter Fall „still scheiterndes Speichern plus nicht übernommene Kopie“ entsteht in Nyx' Format
+nicht natürlich (jede ausgepackte Kopie gehört zu einer überlebenden Ebene), daher die zwei Hälften.
+3b-5b (Patch phase3b/14b, Befund des Seniors): O2 galt im Q3-Weg nicht – `copyIn` gibt eine Quelle, die schon im
+Wallpaper-Verzeichnis liegt, unverändert zurück (früher Ausstieg von `copyToInternal`), und `assignOwnFiles` lief nur über die
+Blob-Dateien; zwei Ebenen ohne Blob mit demselben internen `imageUri` hätten dieselbe Datei bekommen (kein Datenverlust, weil
+`deleteUnreferenced` vor jedem Löschen die Referenzen prüft, aber gegen die Regel „eine Datei je Ebene“ an einer Stelle, H2).
+Jetzt wird erst die Datei jeder Ebene bestimmt (Blob-Datei oder `copyIn`-Ergebnis), danach läuft `assignOwnFiles` einmal über
+alle Ebenen – O2 gilt für beide Quellen wie bei Kolibri. `copies` kann dabei eine interne Quell-URI enthalten; sicher, weil
+`release` über den Store gegen das Persistierte prüft. Neuer Test: zwei Ebenen ohne Blob auf derselben internen Datei →
+zwei verschiedene Dateien, beide gespeichert, dropped 0.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
