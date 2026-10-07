@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 112: 3b-6b – Hilt-Bindung `@WallpaperFlattenTheme` für Nyx; Lesehinweis „Composite beim nächsten Rendern“; DI-Regel.
+Stand: 03.10.2026 (Revision 113: 3b-6c – ein geteiltes Flatten-Theme in `:common-ui`, Qualifier und App-Provider entfallen; 15b-Begründung korrigiert.
+Revision 112: 3b-6b – Hilt-Bindung `@WallpaperFlattenTheme` für Nyx; Lesehinweis „Composite beim nächsten Rendern“; DI-Regel.
 Revision 111: 3b-6 – Nyx-Anzeige auf CachedWallpaperComposite (Ebenen-Cache bleibt im Editor), Speicherdruck, Vorher-APK.
 Revision 110: 3b-5b – O2 auch auf dem Einhol-Weg (assignOwnFiles einmal über alle Ebenen).
 Revision 109: 3b-5 – Nyx-Backup auf die geteilten Teile (Q1–Q3), H5 bewusst nicht (L7), Import bei offener Session als Einschränkung (Q5).
@@ -1183,9 +1184,18 @@ Kolibri; der Messschritt 4 (Drawer, zurück nach Home) erfasst genau so ein Rend
 `WallpaperFlattener` setzt damit den losgelösten Ebenen-Views beim Flatten das App-Theme; Kolibri liefert ihn in `di/AppModule`,
 Nyx bisher nicht, weil es vor 3b-6 nie geflattet hat. Ein Typfehler des Graphen, den nur Hilts Annotation-Processing sieht.
 Jetzt `WallpaperFlattenThemeModule` (Nyx, object-Modul) mit `R.style.Theme_Nyx` – bewusst das Theme der `MainActivity`, die das
-Wallpaper zeigt, nicht `Theme.Nyx.Settings`.
+Wallpaper zeigt, nicht `Theme.Nyx.Settings`. **Korrigiert durch 3b-6c:** Die Begründung „dieselben Styles wie in der echten Ansicht“
+war falsch – laut KDoc des `WallpaperFlattener` beeinflusst das Theme keine Pixel; 15b ist durch 3b-6c ersetzt.
 **Regel für DI-Umzüge (ab jetzt):** Bindet eine App ein geteiltes `@Inject`-Objekt neu, nennt die Ankündigung alle qualifizierten
 Abhängigkeiten seines Graphen (transitiv) und wo jede in DIESER App bereitgestellt wird.
+3b-6c (Patch phase3b/15c, Vorschlag der Repo-Session, Urteil Senior: vor der Messung): Das Theme des Flatteners existiert nur
+für AppCompats Theme-Prüfung der losgelösten Ansicht und beeinflusst keine Pixel – ein Theme je App war eine vermeidbare Naht.
+Jetzt ein geteiltes `Theme.LauncherWallpaperFlatten` in `:common-ui` (parent `Theme.Material3.DayNight.NoActionBar`), der
+`WallpaperFlattener` nutzt es selbst; der Qualifier `WallpaperFlattenTheme`, Kolibris Provider in `AppModule` und Nyx'
+`WallpaperFlattenThemeModule` (15b) entfallen (Code, der durch das gemeinsame Theme ersetzt wird). Graph des Flatteners
+danach: nur `@ApplicationContext` und `@MainDispatcher`, beide in beiden Apps vorhanden. Bleiben dürfen genau die zwei
+legitimen Nähte: die Composite-`@Binds` und der Host-Adapter (`WallpaperDelegate` bzw. `NyxWallpaperEditing`).
+Vor der Messung, weil „gemessen = ausgeliefert“: Das Nachher-APK wird neu gebaut, der Vorher-Build bleibt gültig.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
