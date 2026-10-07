@@ -7,7 +7,6 @@ import android.net.Uri
 import androidx.core.graphics.createBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.reygnn.kolibri_launcher.R
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
@@ -47,7 +46,7 @@ class WallpaperFlattenerInstrumentedTest {
                     ),
                 ),
             )
-            val flattener = WallpaperFlattener(context, Dispatchers.Main, R.style.AppTheme)
+            val flattener = WallpaperFlattener(context, Dispatchers.Main)
 
             val composite = flattener.flatten(state, width = 200, height = 400)
 
@@ -66,7 +65,7 @@ class WallpaperFlattenerInstrumentedTest {
     fun flattenReturnsNullForSingleLayerState() = runBlocking {
         // Single-layer wallpapers are already one bitmap — nothing to flatten.
         val state = WallpaperState.single("file:///does/not/matter.png")
-        val flattener = WallpaperFlattener(context, Dispatchers.Main, R.style.AppTheme)
+        val flattener = WallpaperFlattener(context, Dispatchers.Main)
         assertThat(flattener.flatten(state, width = 200, height = 400)).isNull()
     }
 

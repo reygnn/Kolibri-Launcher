@@ -10,8 +10,6 @@ import com.github.reygnn.launcher.core.AppsUpdateTrigger
 import com.github.reygnn.kolibri_launcher.BuildConfig
 import com.github.reygnn.kolibri_launcher.ui.util.MonotonicClock
 import com.github.reygnn.kolibri_launcher.ui.util.TestMode
-import com.github.reygnn.kolibri_launcher.R
-import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattenTheme
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -59,11 +57,6 @@ object AppModule {
     @AppsUpdateTrigger
     fun provideAppsUpdateTrigger(): MutableSharedFlow<Unit> =
         MutableSharedFlow(replay = 0, extraBufferCapacity = 1)
-
-    // Theme for the shared WallpaperFlattener's off-screen AppCompat view.
-    @Provides
-    @WallpaperFlattenTheme
-    fun provideWallpaperFlattenTheme(): Int = R.style.AppTheme
 
     // The app-launch seam (provideAppLauncher) moved to AppLauncherModule so an
     // instrumented test can replace just that binding without uninstalling the

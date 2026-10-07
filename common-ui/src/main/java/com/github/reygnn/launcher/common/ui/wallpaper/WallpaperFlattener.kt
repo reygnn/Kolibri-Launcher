@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.common.ui.wallpaper
 
+import com.github.reygnn.launcher.common.ui.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -38,7 +39,6 @@ import javax.inject.Inject
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
-    @param:WallpaperFlattenTheme private val themeResId: Int,
 ) {
     /**
      * The off-screen [ZoomableImageView] used for flattening is an AppCompat
@@ -47,12 +47,13 @@ class WallpaperFlattener @Inject constructor(
      * used with a Theme.AppCompat theme"), which logs an error and, on some
      * platform versions, spams `Invalid resource ID 0x00000000` per unresolved
      * tint attribute. The live view avoids this by inflating under the activity
-     * theme; here we give the detached view the app-supplied [themeResId]
-     * (Material3 → AppCompat descendant) explicitly. Theme-only — it does not
+     * theme; here we give the detached view one shared theme,
+     * [R.style.Theme_LauncherWallpaperFlatten] (Material3 → AppCompat descendant), for both apps
+     * (3b-6c — before, each app supplied its own through a qualifier). Theme-only — it does not
      * affect the composited pixels (the view just draws bitmaps via its matrix).
      */
     private val themedContext: Context by lazy {
-        ContextThemeWrapper(context, themeResId)
+        ContextThemeWrapper(context, R.style.Theme_LauncherWallpaperFlatten)
     }
     /**
      * Flattens [state]'s layers into one software bitmap at [width]x[height]
