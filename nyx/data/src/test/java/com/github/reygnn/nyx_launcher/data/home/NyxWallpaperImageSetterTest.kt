@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
@@ -52,6 +53,8 @@ class NyxWallpaperImageSetterTest {
         NyxWallpaperEditing(
             repository = repository,
             imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+            composite = WallpaperComposite.None(), // placeholder: no composite in these tests (3b-6)
+            context = androidx.test.core.app.ApplicationProvider.getApplicationContext(),
             appScope = appScope,
             mainDispatcher = mainDispatcherRule.testDispatcher,
         )

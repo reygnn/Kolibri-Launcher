@@ -40,9 +40,10 @@
 #   4. open the drawer, back to home               (manual)
 #
 # Method (SPEC_NYX_REWRITE, from 3b): 3 runs "vorher" and 3 runs "nachher" in ONE session,
-# alternating inside and between rounds (A,B / B,A / A,B). Criteria fixed in advance (L10/P6):
-# medians of first_paint and change_paint (more than 10 % worse is a regression); missing_frames
-# per run: after not more than before, plus one as noise.
+# alternating inside and between rounds (A,B / B,A / A,B). Criteria for E3 (SPEC_NYX_REWRITE
+# P6, Revision 108): missing_frames per run (after not more than before, plus one as noise) and
+# the median of first_paint (more than 10 % worse is a regression); change_paint is recorded for
+# information only — not comparable before/after (its span closes on the next NEWLY applied state).
 #
 # Usage:
 #   tools/nyx-flicker-measure.sh <label> <run>      e.g.  vorher 1   — one run, appends to the CSV

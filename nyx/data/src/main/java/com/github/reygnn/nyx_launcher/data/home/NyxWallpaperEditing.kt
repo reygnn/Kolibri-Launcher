@@ -1,5 +1,7 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import com.github.reygnn.launcher.core.ApplicationScope
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
@@ -32,12 +34,16 @@ import javax.inject.Singleton
  * when `MainActivity` ends — like leaving the editor without saving — so no orphaned session keeps
  * the GC locked and the display frozen.
  *
- * No composite yet: [WallpaperComposite.None] until Nyx switches to the composite in 3b-6.
+ * The display composite (3b-6, E3): the injected shared [WallpaperComposite] — the
+ * `CachedWallpaperComposite` singleton, read by the home's render source. Its key uses the display
+ * size from the app context's resources, which follow configuration changes (as in Kolibri).
  */
 @Singleton
 class NyxWallpaperEditing @Inject constructor(
     repository: WallpaperRepository,
     imageStore: WallpaperImageStore,
+    composite: WallpaperComposite,
+    @param:ApplicationContext private val context: Context,
     @param:ApplicationScope private val appScope: CoroutineScope,
     @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
 ) {
@@ -52,7 +58,8 @@ class NyxWallpaperEditing @Inject constructor(
     private val compositeHost = object : WallpaperComposite.Host {
         override fun currentState(): WallpaperState = session.state.value
         override fun isEditing(): Boolean = session.isEditMode.value
-        override fun displaySize(): Pair<Int, Int> = 0 to 0 // unused by WallpaperComposite.None
+        override fun displaySize(): Pair<Int, Int> =
+            context.resources.displayMetrics.let { it.widthPixels to it.heightPixels }
         override fun launch(block: suspend () -> Unit) = launchOnMain("Error refilling the wallpaper composite", block)
     }
 
@@ -60,7 +67,7 @@ class NyxWallpaperEditing @Inject constructor(
         session = session,
         persistence = persistence,
         imageStore = imageStore,
-        composite = WallpaperComposite.None(),
+        composite = composite,
         compositeHost = compositeHost,
         launch = ::launchOnMain,
     )
@@ -73,6 +80,13 @@ class NyxWallpaperEditing @Inject constructor(
         started = true
         operations.start()
     }
+
+    /**
+     * The home became visible again (`MainActivity.onStart`, 3b-6): re-warm the composite for what
+     * is shown — a no-op on a cache hit and while editing; after an invalidation under memory
+     * pressure it warms anew, so home does not stay on the slow per-layer path. Main only.
+     */
+    fun onHostStarted() = operations.refillCurrent()
 
     /** The editing host (`MainActivity`) ended: an open session is cancelled — snapshot back, re-sync. Main only. */
     fun onHostDestroyed() {

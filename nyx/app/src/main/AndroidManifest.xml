@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Home-info calendar events (HIE Phase C3). Requested at runtime when the
          "show calendar events" toggle is enabled; alarms need no permission. -->
@@ -33,7 +32,7 @@
         <!-- Profileable from the shell (3b-0, E3), like Kolibri: lets Perfetto record the app's
              trace sections (wallpaper paint spans, flicker counter) in the release build.
              No runtime cost when nobody is tracing. -->
-        <profileable android:shell="true" tools:targetApi="29" />
+        <profileable android:shell="true" />
 
         <activity
             android:name=".home.MainActivity"

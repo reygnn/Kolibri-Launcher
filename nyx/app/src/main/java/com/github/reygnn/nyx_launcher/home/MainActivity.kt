@@ -1,5 +1,8 @@
 package com.github.reygnn.nyx_launcher.home
 
+import android.content.res.Configuration
+import com.github.reygnn.nyx_launcher.home.wallpaper.NyxWallpaperRenderSource
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import com.github.reygnn.launcher.common.ui.WallpaperPaintTrace
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.app.Activity
@@ -159,6 +162,7 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // also turns the delete-a-layer FullRebuild into cache hits. Cleared when the
     // wallpaper is removed (see renderWallpaper).
     @Inject lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
+    @Inject lateinit var wallpaperComposite: WallpaperComposite
 
     // First-run defaults (dock apps + Play Store on the grid, and the Google drawer
     // folder) so a fresh install isn't a blank screen. One-shot; each seed no-ops on a
@@ -249,35 +253,18 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
     // Serial, latest-wins wallpaper render. The binder decodes off the main
     // thread; a single job at a time avoids overlapping rebuilds of the view.
     private val wallpaperBinder by lazy {
-        WallpaperViewBinder(bitmapLoader = { uri: Uri ->
-            // Cache hit → return the already-decoded layer instantly (no IO hop),
-            // so deleting one layer doesn't re-decode the rest and flash.
-            val key = uri.toString()
-            wallpaperLayerCache.get(key) ?: run {
-                // Capture the cache generation BEFORE the decode: if a clear() lands
-                // during the IO hop (wallpaper removed mid-flight), putIfCurrent drops
-                // the result instead of stranding it in the app-scoped cache.
-                val generation = wallpaperLayerCache.generation()
-                withContext(ioDispatcher) {
-                    // BitmapLoader contract: return null on failure, let only cancellation
-                    // escape. decodeBoundedWallpaperBitmap does NOT catch internally —
-                    // openInputStream can throw FileNotFoundException/SecurityException and
-                    // decode can OOM (Throwable). Without this guard the throw would escape
-                    // bind() → the unguarded collect/launch → crash the HOME activity
-                    // (mirrors Kolibri's loadBitmapFromUri).
-                    try {
-                        decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) }
-                            ?.also { wallpaperLayerCache.putIfCurrent(key, it, generation) }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        // Catch kept — expected error at the decode boundary (I/O, OOM); cancellation rethrown above.
-                        TimberWrapper.silentError(e, "Error loading wallpaper bitmap from $uri")
-                        null
-                    }
-                }
-            }
-        })
+        // The read side lives in NyxWallpaperRenderSource since 3b-6 (composite in display mode,
+        // the layer cache for everything else — the loader body moved there unchanged).
+        WallpaperViewBinder(bitmapLoader = { uri: Uri -> wallpaperRenderSource.load(uri) })
+    }
+
+    private val wallpaperRenderSource by lazy {
+        NyxWallpaperRenderSource(
+            composite = wallpaperComposite,
+            layerCache = wallpaperLayerCache,
+            ioDispatcher = ioDispatcher,
+            decode = { uri -> decodeBoundedWallpaperBitmap { contentResolver.openInputStream(uri) } },
+        )
     }
 
     // Single-slot latest-wins render: BOTH the state collector and rerenderWallpaper
@@ -632,9 +619,12 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
      * Consumes the one-shot focus hint and re-syncs the edit toolbar after a rebuild.
      */
     private fun renderWallpaper(state: WallpaperState) {
-        // Wallpaper removed / reset → drop the cached layer bitmaps; nothing renders
-        // them again, so they would otherwise sit in memory until LRU eviction.
-        if (!state.hasWallpaper) wallpaperLayerCache.clear()
+        // Wallpaper removed / reset → drop the cached layer bitmaps and the composite (3b-6, as
+        // Kolibri); nothing renders them again, so they would otherwise sit in memory.
+        if (!state.hasWallpaper) {
+            wallpaperLayerCache.clear()
+            wallpaperComposite.invalidate(dropLuminance = false)
+        }
         val focusId = wallpaperEditCoordinator.consumePendingFocusLayerId()
         wallpaperRenderScheduler.render(lifecycleScope) {
             // The scheduler launches this on the bare lifecycleScope, NOT under the
@@ -643,9 +633,13 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             // handler and crash the launcher. Cancellation (latest-wins supersede) still
             // propagates, preserving the scheduler's single-slot semantics.
             try {
+                val metrics = resources.displayMetrics
                 wallpaperBinder.bind(
                     wallpaperView,
-                    state,
+                    // Display mode on a cache hit: the composite as one image; the editor never (R1).
+                    wallpaperRenderSource.displayTargetFor(
+                        state, wallpaperEditCoordinator.isEditMode.value, metrics.widthPixels, metrics.heightPixels,
+                    ),
                     preferredActiveLayerId = focusId,
                     onRebuildComplete = {
                         // Measurement point only (3b-0, E3): closes the paint spans a frame later —
@@ -806,6 +800,24 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
             .setPositiveButton(android.R.string.ok, null)
             .create()
         showTrackedDialog(dialog)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Display metrics changed (rotation, fold) → the composite key changed, so a cached
+        // composite misses. Re-render the current state (a miss falls to the per-layer path) and
+        // warm at the new resolution — no DataStore emission fires on a config change (3b-6, as Kolibri).
+        if (::wallpaperView.isInitialized && ::wallpaperEditCoordinator.isInitialized) {
+            renderWallpaper(wallpaperEditCoordinator.wallpaperState.value)
+        }
+        wallpaperEditing.operations.refillCurrent()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Re-warm the composite when home becomes visible (3b-6): a no-op on a hit; after an
+        // invalidation under memory pressure it warms anew instead of staying per-layer.
+        wallpaperEditing.onHostStarted()
     }
 
     override fun onResume() {

@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
@@ -43,6 +44,9 @@ class NyxApplication : Application() {
     // that are only needed while the home screen is visible.
     @Inject
     lateinit var wallpaperLayerCache: WallpaperLayerBitmapCache
+
+    @Inject
+    lateinit var wallpaperComposite: WallpaperComposite
 
     @Inject
     @IoDispatcher // without `field:` (Lint FieldSiteTargetOnQualifierAnnotation: redundant with KSP)
@@ -117,6 +121,12 @@ class NyxApplication : Application() {
         // waiting for the later BACKGROUND level that only fires under memory pressure.
         if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
             wallpaperLayerCache.clear()
+        }
+        // Under real memory pressure (BACKGROUND and up, 3b-6) also drop the display composite
+        // (~10 MB HARDWARE bitmap; the reference only, never recycled). Not at UI_HIDDEN: nothing
+        // would re-warm it after every app switch — MainActivity.onStart re-warms after this.
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            wallpaperComposite.invalidate(dropLuminance = false)
         }
     }
 

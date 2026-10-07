@@ -18,7 +18,6 @@ nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/HomeViewModel.kt	* Rea
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	* First-launch ACRA consent (all builds), mirroring Kolibri: show the shared dialog
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	* Toggle the two subtle indicators next to the clock (mirrors Kolibri): the
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	/** Drawer slide-up/down duration, mirroring Kolibri's anim_duration_drawer_slide. */
-nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// (mirrors Kolibri's loadBitmapFromUri).
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// First-launch ACRA consent (shared dialog, mirrors Kolibri) for all builds: resolve
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// Intent construction mirrors Kolibri's app-info action (Uri.fromParts +
 nyx/app/src/main/java/com/github/reygnn/nyx_launcher/home/MainActivity.kt	// can never run two concurrent binds that would duplicate layers (mirrors Kolibri).

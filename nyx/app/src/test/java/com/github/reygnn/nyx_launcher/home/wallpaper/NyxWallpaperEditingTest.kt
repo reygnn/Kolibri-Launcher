@@ -1,5 +1,11 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import com.github.reygnn.launcher.core.CompositeLuminanceSignal
+import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperFlattener
+import com.github.reygnn.launcher.feature.wallpaper.CachedWallpaperComposite
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
@@ -51,6 +57,8 @@ class NyxWallpaperEditingTest {
         NyxWallpaperEditing(
             repository = repository,
             imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+            composite = WallpaperComposite.None(), // placeholder: no composite in these tests (3b-6)
+            context = androidx.test.core.app.ApplicationProvider.getApplicationContext(),
             appScope = scope,
             mainDispatcher = main,
         )
@@ -134,5 +142,93 @@ class NyxWallpaperEditingTest {
         repository.currentState = WallpaperState.single(uri = "file:///w/later")
         advanceUntilIdle()
         assertThat(e.session.state.value.referencedUris).containsExactly("file:///w/later")
+    }
+
+    // ---- 3b-6: the injected composite (E3) ----
+
+    private val software = mockk<android.graphics.Bitmap>(relaxed = true)
+    private val hardware = mockk<android.graphics.Bitmap>(relaxed = true)
+    private val flattener = mockk<WallpaperFlattener> {
+        io.mockk.coEvery { flatten(any(), any(), any()) } returns software
+    }
+
+    private fun cachedComposite(): CachedWallpaperComposite {
+        io.mockk.every { software.copy(android.graphics.Bitmap.Config.HARDWARE, false) } returns hardware
+        return CachedWallpaperComposite(
+            cache = WallpaperCompositeCache(),
+            flattener = flattener,
+            luminance = mockk<WallpaperBitmapLuminanceImpl>(relaxed = true),
+            luminanceSignal = mockk<CompositeLuminanceSignal>(relaxed = true),
+            ioDispatcher = mainDispatcherRule.testDispatcher,
+        )
+    }
+
+    private fun editingWith(composite: WallpaperComposite) = NyxWallpaperEditing(
+        repository = repository,
+        imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+        composite = composite,
+        context = androidx.test.core.app.ApplicationProvider.getApplicationContext(),
+        appScope = appScope,
+        mainDispatcher = mainDispatcherRule.testDispatcher,
+    )
+
+    private val twoLayers = WallpaperState.multiLayer(
+        listOf(
+            com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState(id = "a", imageUri = "file:///w/a"),
+            com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState(id = "b", imageUri = "file:///w/b"),
+        ),
+    )
+
+    private fun displaySize(): Pair<Int, Int> =
+        androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+            .resources.displayMetrics.let { it.widthPixels to it.heightPixels }
+
+    @Test
+    fun the_injected_composite_is_used_and_refilled_after_commit() = runTest(mainDispatcherRule.testDispatcher) {
+        // The shared edit session warms the injected composite (start and the commit's leave):
+        // one flatten in total, and the read side finds the composite afterwards.
+        repository.currentState = twoLayers
+        val composite = cachedComposite()
+        val e = editingWith(composite)
+        e.start()
+        advanceUntilIdle()
+
+        e.session.enter()
+        e.operations.commit(onImageChanged = {})
+        advanceUntilIdle()
+
+        val (w, h) = displaySize()
+        io.mockk.coVerify(exactly = 1) { flattener.flatten(any(), any(), any()) }
+        assertThat(composite.cachedKeyFor(twoLayers, w, h)).isNotNull()
+    }
+
+    @Test
+    fun on_host_started_rewarms_after_an_invalidate() = runTest(mainDispatcherRule.testDispatcher) {
+        // R2: memory pressure dropped the composite; home becoming visible warms it anew.
+        repository.currentState = twoLayers
+        val composite = cachedComposite()
+        val e = editingWith(composite)
+        e.start()
+        advanceUntilIdle()
+
+        composite.invalidate(dropLuminance = false)
+        e.onHostStarted()
+        advanceUntilIdle()
+
+        io.mockk.coVerify(exactly = 2) { flattener.flatten(any(), any(), any()) }
+    }
+
+    @Test
+    fun on_host_started_with_a_valid_cache_does_not_flatten() = runTest(mainDispatcherRule.testDispatcher) {
+        repository.currentState = twoLayers
+        val composite = cachedComposite()
+        val e = editingWith(composite)
+        e.start()
+        advanceUntilIdle()
+
+        e.onHostStarted()
+        advanceUntilIdle()
+
+        io.mockk.coVerify(exactly = 1) { flattener.flatten(any(), any(), any()) }
     }
 }

@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
 import kotlinx.coroutines.flow.first
@@ -57,6 +58,8 @@ class NyxWallpaperEditCoordinatorTest {
     private fun editing() = NyxWallpaperEditing(
         repository = repository,
         imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
+        composite = WallpaperComposite.None(), // placeholder: no composite in these tests (3b-6)
+        context = androidx.test.core.app.ApplicationProvider.getApplicationContext(),
         appScope = kotlinx.coroutines.CoroutineScope(mainDispatcherRule.testDispatcher),
         mainDispatcher = mainDispatcherRule.testDispatcher,
     )
