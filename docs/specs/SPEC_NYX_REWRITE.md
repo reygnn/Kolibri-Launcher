@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 113: 3b-6c – ein geteiltes Flatten-Theme in `:common-ui`, Qualifier und App-Provider entfallen; 15b-Begründung korrigiert.
+Stand: 03.10.2026 (Revision 114: 3b-6d – E3 für Nyx revidiert, Nyx bindet `WallpaperComposite.None`; 3b-6 ohne E3-Messung abgeschlossen; Ebenen-Cache für Nyx wesentlich.
+Revision 113: 3b-6c – ein geteiltes Flatten-Theme in `:common-ui`, Qualifier und App-Provider entfallen; 15b-Begründung korrigiert.
 Revision 112: 3b-6b – Hilt-Bindung `@WallpaperFlattenTheme` für Nyx; Lesehinweis „Composite beim nächsten Rendern“; DI-Regel.
 Revision 111: 3b-6 – Nyx-Anzeige auf CachedWallpaperComposite (Ebenen-Cache bleibt im Editor), Speicherdruck, Vorher-APK.
 Revision 110: 3b-5b – O2 auch auf dem Einhol-Weg (assignOwnFiles einmal über alle Ebenen).
@@ -1174,8 +1175,8 @@ Kolibri unverändert (Befund in dessen Baseline).
 Tests: keine geänderte Erwartung (Aufbau: None und Kontext in vier Testklassen); neu drei Composite-Fälle in `NyxWallpaperEditingTest`
 (gewärmt und gelesen, Neu-Wärmen nach Invalidieren, kein Flatten bei gültigem Cache) und `NyxWallpaperRenderSourceTest` (3, darunter
 „im Editor nie ein Composite-Ziel“, das R1 festschreibt).
-Offen nach 3b-6, unabhängig von E3: `WallpaperLayerBitmapCache` als geteilter Baustein für den Editor beider Apps (Kolibris Editor
-dekodiert heute live und würde profitieren) oder löschen. Kolibris Asymmetrie bei Speicherdruck (das Composite bleibt resident,
+Offen (niedrige Priorität, seit 3b-6d neu gefasst): `WallpaperLayerBitmapCache` als geteilter Baustein auch für Kolibris Editor
+(der heute live dekodiert)? Für Nyx ist er wesentlich – nicht mehr „teilen oder löschen“. Kolibris Asymmetrie bei Speicherdruck (das Composite bleibt resident,
 kein Invalidieren) – angleichen oder bewusst so lassen.
 Lesehinweis für die E3-Zahlen (Senior): Weder Kolibri noch Nyx rendern nach dem Wärmen eigens neu; das Composite wird beim
 NÄCHSTEN Rendern genutzt (Zustandsemission, nach dem Editor, `onResume`, zurück aus dem Drawer, Drehen) – Nyx folgt damit 1:1
@@ -1196,6 +1197,23 @@ Jetzt ein geteiltes `Theme.LauncherWallpaperFlatten` in `:common-ui` (parent `Th
 danach: nur `@ApplicationContext` und `@MainDispatcher`, beide in beiden Apps vorhanden. Bleiben dürfen genau die zwei
 legitimen Nähte: die Composite-`@Binds` und der Host-Adapter (`WallpaperDelegate` bzw. `NyxWallpaperEditing`).
 Vor der Messung, weil „gemessen = ausgeliefert“: Das Nachher-APK wird neu gebaut, der Vorher-Build bleibt gültig.
+**3b-6d – E3 für Nyx revidiert (Entscheidung des Users: Option A; Patch phase3b/15d):** Bei der Pfad-Analyse vor der Messung
+(Repo-Session, am Code bestätigt durch den Senior) zeigte sich: Das Composite zahlt sich nur bei Hosts aus, die ihre Render-Fläche
+neu aufbauen (Kolibris HomeFragment bei drawer → home). Nyx hostet das Wallpaper in einer dauerhaften Activity-View, rendert nur bei
+Zustandsänderung, nach dem Editor und bei Konfigurationswechsel, und hatte den drawer → home-Flash nie; `onStart` wärmt, rendert aber
+nicht. Mit dem Composite hätte Nyx bei jedem Kaltstart auf dem Main-Thread geflattet (genau im first_paint-Fenster) und ein
+zusätzliches Vollbild-Bitmap gehalten, ohne dass das Composite praktisch je auf den Schirm kommt – E3 hätte nur diese Kosten
+gemessen. Daher bindet Nyx `WallpaperComposite.None` (object-Modul, `@Provides @Singleton`): eine Bindung je App des geteilten
+Interfaces, keine abweichende Logik; Schreib- und Leseseite bleiben wie in 3b-6 gebaut, die Anzeige macht der Ebenen-Cache wie
+vor 3b-6. Die Stellen `invalidate` bei Speicherdruck, `onHostStarted` in `onStart` und `refillCurrent` in `onConfigurationChanged`
+bleiben, mit None ohne Wirkung und ohne Kosten (je eine Zeile „with Nyx' WallpaperComposite.None a no-op (3b-6d)“); sie zu entfernen
+hieße Tests löschen, für null Gewinn, und Nyx bleibt bereit, falls ein Host je seine Fläche neu aufbaut (dann ist die Bindung von
+`CachedWallpaperComposite` die eine Änderung). `NyxWallpaperEditingTest` behält `CachedWallpaperComposite` als Test-Double – die
+Tests prüfen die Verdrahtung der Komponente mit einem echten Composite, unabhängig von Nyx' Produktionsbindung.
+**3b-6 wird OHNE E3-Messung abgeschlossen:** Mit None ist die Anzeige strukturell identisch zu 6a348ff4; die Messinfrastruktur
+(Trace-Punkte, Flacker-Zähler, Skript) bleibt für spätere Fragen, das gesicherte Vorher-APK wird nicht mehr gebraucht.
+Die Commits 15, 15b, 15c bleiben, 15d kommt darauf – die Historie erzählt, was passiert ist: gebaut, bei der Pfad-Analyse vor der
+Messung erkannt, für Nyx zurückgestellt. Dank an die Repo-Session und den User für die Pfad-Analyse vor der investierten Gerätestunde.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
@@ -1234,7 +1252,7 @@ nachdem der Binder einen NEUEN Zustand anwendet – in Nyx zeigt der Editor den 
   Umstellung auf `extract` + `assignOwnFiles`;
   Nyx' still verschwindende Ebenen mit totem `imageUri` (B9, die gewichtigere Hälfte);
   H5 Löschen des alten Wallpapers nach einem Import, für beide Apps.
-- *Composite (3a-8, E3):* Nyx zeigt im Anzeigemodus `WallpaperComposite` (3b-6); `WallpaperLayerBitmapCache` bleibt im Editor-Pfad (Entscheidung nach 3b-6, siehe unten);
+- *Composite (3a-8, E3):* Nyx bindet `WallpaperComposite.None` (3b-6d, E3 für Nyx revidiert); `WallpaperLayerBitmapCache` bleibt für Anzeige und Editor wesentlich;
   **Flacker-Messpunkt vor 3b**; O5-Prüfung für Nyx.
 - *Messung:* je 3 Läufe vorher/nachher in einer Sitzung, Reihenfolge innerhalb und zwischen den Runden wechseln.
 - *Außerhalb von 3b, Priorität niedrig, nicht blockierend (Befund Repo-Session, 3b-0):* `lintRelease` meldet
@@ -1265,7 +1283,7 @@ nachdem der Binder einen NEUEN Zustand anwendet – in Nyx zeigt der Editor den 
   Alle vier Trace-Sektionen besser, der Frame-Tail gleich bis besser:
   **3a-8 ist verhaltensneutral bis besser, F4 erfüllt, 3a-8 abgeschlossen** (13 und 13b je als eigener Commit).
   3a-9 beginnt.
-    - **3b Nyx:** Anzeige über Kolibris Composite-Pfad (E3); `home/wallpaper/*`, `NyxWallpaperImageSetter`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore` löschen; `WallpaperLayerBitmapCache` nicht in 3b-6 (Urteil R1, siehe 3b-6).
+    - **3b Nyx:** Anzeige über Kolibris Composite-Pfad (E3); `home/wallpaper/*`, `NyxWallpaperImageSetter`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore` löschen; `WallpaperLayerBitmapCache` bleibt (für Nyx wesentlich, 3b-6d).
       E3-Messpunkt gegen die Referenz aus Phase 0.
 4. **Storage-Cleanup.**
     - **4a Kolibri:** `DataStoreMaintenanceRepositoryImpl` (115 Zeilen, hängt nur an `:core`) nach `:common-data`, Kolibri umstellen.
@@ -1513,7 +1531,7 @@ Das braucht Kolibri, weil die Home-View beim Wechsel Drawer → Home neu entsteh
 Nyx flattet bisher nie; seine View wird nie abgebaut, alle Layer werden live gezeichnet, deshalb cached Nyx pro Layer.
 
 **Entscheidung:** Nyx übernimmt Kolibris Render-Strategie – im Anzeigemodus ein geflattetes Composite aus `WallpaperCompositeCache`,
-einzelne Layer nur im Edit-Modus. `WallpaperLayerBitmapCache` bleibt in 3b-6 im Editor-Pfad; ob er gelöscht oder ein geteilter Baustein wird, entscheidet sich nach 3b-6 (3b-6, R1).
+einzelne Layer nur im Edit-Modus. `WallpaperLayerBitmapCache` bleibt; für Nyx wesentlich (Anzeige und Editor, 3b-6d), offen nur noch, ob er ein geteilter Baustein auch für Kolibris Editor wird.
 
 **Begründung, ehrlich:** Nyx braucht den Composite technisch nicht.
 Der Gewinn ist ein Render-Pfad statt zwei und damit ein Ort für jede künftige Korrektur;
