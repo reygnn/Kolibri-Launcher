@@ -126,6 +126,7 @@ class NyxApplication : Application() {
         // (~10 MB HARDWARE bitmap; the reference only, never recycled). Not at UI_HIDDEN: nothing
         // would re-warm it after every app switch — MainActivity.onStart re-warms after this.
         if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            // With Nyx' WallpaperComposite.None a no-op (3b-6d).
             wallpaperComposite.invalidate(dropLuminance = false)
         }
     }

@@ -810,14 +810,14 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         if (::wallpaperView.isInitialized && ::wallpaperEditCoordinator.isInitialized) {
             renderWallpaper(wallpaperEditCoordinator.wallpaperState.value)
         }
-        wallpaperEditing.operations.refillCurrent()
+        wallpaperEditing.operations.refillCurrent() // with Nyx' WallpaperComposite.None a no-op (3b-6d)
     }
 
     override fun onStart() {
         super.onStart()
         // Re-warm the composite when home becomes visible (3b-6): a no-op on a hit; after an
         // invalidation under memory pressure it warms anew instead of staying per-layer.
-        wallpaperEditing.onHostStarted()
+        wallpaperEditing.onHostStarted() // with Nyx' WallpaperComposite.None a no-op (3b-6d)
     }
 
     override fun onResume() {
