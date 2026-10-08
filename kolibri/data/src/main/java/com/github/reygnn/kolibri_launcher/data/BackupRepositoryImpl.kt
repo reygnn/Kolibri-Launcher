@@ -223,11 +223,14 @@ class BackupRepositoryImpl @Inject constructor(
     private suspend fun restoreWallpaperFromBackup(
         settings: LauncherSettings,
         onClaim: (Collection<String>) -> Unit = {},
+        // Every internal file this restore makes or adopts (copyToInternal, O2 copies) — the
+        // container import releases the unclaimed ones on failure (audit A5, as Nyx' `copies`).
+        onCopy: (String) -> Unit = {},
     ): Int {
         return if (settings.wallpaperLayers.isNotEmpty()) {
-            importMultiLayerWallpaper(settings.wallpaperLayers, onClaim)
+            importMultiLayerWallpaper(settings.wallpaperLayers, onClaim, onCopy)
         } else {
-            importSingleLayerWallpaper(settings, onClaim)
+            importSingleLayerWallpaper(settings, onClaim, onCopy)
         }
     }
 
@@ -235,6 +238,7 @@ class BackupRepositoryImpl @Inject constructor(
     private suspend fun importMultiLayerWallpaper(
         layerBackups: List<WallpaperLayerBackup>,
         onClaim: (Collection<String>) -> Unit,
+        onCopy: (String) -> Unit,
     ): Int {
         val validLayerStates = mutableListOf<WallpaperLayerState>()
         // Layers whose image reached internal storage, before O2 gives each its own file.
@@ -260,6 +264,7 @@ class BackupRepositoryImpl @Inject constructor(
                 if (canAccess) {
                     val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                     if (internalUri != null) {
+                        onCopy(internalUri.toString())
                         copied += layerBackup to internalUri.toString()
                     } else {
                         Timber.w("Failed to copy layer $index to internal storage, skipping")
@@ -288,6 +293,7 @@ class BackupRepositoryImpl @Inject constructor(
         val ownFiles = wallpaperBlobs.assignOwnFiles(copied.map { it.second }) { uri ->
             context.contentResolver.openInputStream(uri.toUri())
         }
+        ownFiles.filterNotNull().forEach(onCopy)
         copied.forEachIndexed { i, (layerBackup, _) ->
             val own = ownFiles[i]
             if (own != null) {
@@ -326,6 +332,7 @@ class BackupRepositoryImpl @Inject constructor(
     private suspend fun importSingleLayerWallpaper(
         settings: LauncherSettings,
         onClaim: (Collection<String>) -> Unit,
+        onCopy: (String) -> Unit,
     ): Int {
         val wallpaperUri = settings.wallpaperUri
         if (wallpaperUri.isNullOrBlank()) return 0
@@ -343,6 +350,7 @@ class BackupRepositoryImpl @Inject constructor(
             if (canAccess) {
                 val internalUri = wallpaperFileManager.copyToInternal(sourceUri)
                 if (internalUri != null) {
+                    onCopy(internalUri.toString())
                     val wallpaperState = WallpaperState.single(
                         uri = internalUri.toString(),
                         scale = settings.wallpaperScale ?: 1.0f,
@@ -583,6 +591,8 @@ class BackupRepositoryImpl @Inject constructor(
         val settings = settingsOf(read) ?: return ImportResult.InvalidFormat
         val backup = backupDataOf(read.manifest.producer, settings)
         val extracted = mutableMapOf<String, String>() // blob hash → internal wallpaper URI
+        // Every other internal file the restore made or adopted (copyToInternal, O2 copies, A5).
+        val copies = HashSet<String>()
         val claimed = HashSet<String>()
         try {
             if (options.importWallpaper) {
@@ -593,7 +603,7 @@ class BackupRepositoryImpl @Inject constructor(
             val resolved = serializer.resolveZipImages(backup, extracted)
             val restorer = object : WallpaperRestorer {
                 override suspend fun restoreFromBackup(settings: LauncherSettings) =
-                    restoreWallpaperFromBackup(settings, onClaim = claimed::addAll)
+                    restoreWallpaperFromBackup(settings, onClaim = claimed::addAll, onCopy = { copies += it })
             }
             val result = assembler.performImport(resolved, options, restorer)
             // A layer whose blob was rejected (hash/size) or missing never reaches the restorer:
@@ -611,7 +621,10 @@ class BackupRepositoryImpl @Inject constructor(
         } finally {
             // Only the UNCLAIMED copies, through the store (3a-7): claimed ones may be missing
             // from the persisted state after a silently failed save and must never be passed in.
-            wallpaperBlobs.release(extracted.values - claimed)
+            // Since audit A5 ALL copies, not only the extracted blobs: also what copyToInternal
+            // made or adopted and the O2 copies. An adopted internal source is safe here — the
+            // store deletes only what nothing persisted references (as in Nyx' import).
+            wallpaperBlobs.release((extracted.values + copies) - claimed)
         }
     }
 

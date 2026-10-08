@@ -239,6 +239,33 @@ class BackupRepositoryImplContainerOrphanTest {
         verify(exactly = 1) { wallpaperFileManager.deleteFile(extracted1) } // NonCancellable cleanup ran
     }
 
+    @Test
+    fun `an import aborted after copyToInternal releases that copy too`() = runTest {
+        // Audit A5: a layer without blob is copied in through copyToInternal; the next layer's copy
+        // is interrupted, the import aborts before anything is claimed. The first copy must go
+        // to the cleanup like an extracted blob (before A5 only `extracted` was released).
+        // Counter-check when writing: without the copies in `release` this test turns red.
+        serve(
+            container(imageA) {
+                LauncherSettings(
+                    wallpaperLayers = listOf(
+                        WallpaperLayerBackup(id = "c0", imageUri = "content://picker/c0"),
+                        WallpaperLayerBackup(id = "c1", imageUri = "content://picker/c1"),
+                    ),
+                )
+            },
+        )
+        val copied = "file:///data/wallpapers/wp_c0"
+        coEvery { wallpaperFileManager.copyToInternal(Uri.parse("content://picker/c0")) } returns Uri.parse(copied)
+        coEvery { wallpaperFileManager.copyToInternal(Uri.parse("content://picker/c1")) } throws CancellationException("left the screen")
+
+        assertFailsWith<CancellationException> {
+            repository().loadBackupFromFile(backupUri.toString(), ImportOptions())
+        }
+
+        verify(exactly = 1) { wallpaperFileManager.deleteFile(copied) } // released through the store
+    }
+
     // ---- one file per layer (SPEC_NYX_REWRITE O2) ----
 
     @Test
