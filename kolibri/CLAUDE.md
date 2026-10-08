@@ -10,6 +10,9 @@ For deep test conventions, see `app/src/test/CLAUDE.md` and
 `../core/src/testFixtures/java/com/github/reygnn/launcher/core/testing/TESTING_CONVENTIONS.kt`
 (shared by all modules since SPEC_NYX_REWRITE 1a).
 
+> **New or extended module?** Before creating or extending a shared/feature module, read
+> `../docs/FEATURE_MODULE_GUIDE.md` (module map, gates, DI, data, concurrency, tests, process, checklist).
+
 ---
 
 ## Build & test

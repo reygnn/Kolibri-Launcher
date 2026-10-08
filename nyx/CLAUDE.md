@@ -5,6 +5,9 @@ edit + drag engine, and a wallpaper edit session). Loaded automatically when
 working under `nyx/`. The monorepo-wide rules come from the root `../CLAUDE.md`; this file carries
 only Nyx specifics.
 
+> **New or extended module?** Before creating or extending a shared/feature module, read
+> `../docs/FEATURE_MODULE_GUIDE.md` (module map, gates, DI, data, concurrency, tests, process, checklist).
+
 ---
 
 ## Shared rules — one set for both apps

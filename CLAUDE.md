@@ -16,6 +16,9 @@ rules here so they are written once — a rule that exists twice is a drift clas
 Examples inside the rules name Kolibri classes where Kolibri was the first to hit a
 problem; the rule itself applies to both apps and the shared modules.
 
+> **New or extended module?** Before creating or extending a shared/feature module, read
+> `docs/FEATURE_MODULE_GUIDE.md` (module map, gates, DI, data, concurrency, tests, process, checklist).
+
 ---
 
 ## Stack
