@@ -1,6 +1,8 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 118: O7-K – Entscheidung des Users „Kolibri ist der Maßstab“: Ebenen-Cache samt Test abbauen, Bild-Handling in Nyx wie Kolibri; Ladeweg teilen als Prüfpunkt.
+Stand: 03.10.2026 (Revision 120: Kolibri-Aufräum-Patch – `SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase` samt toter Parameter und Test entfernt.
+Revision 119: 3b-7 – Ergebnis der vollen Abschluss-Geräteprüfung (11 Punkte grün), Commits; Phase 3b abgeschlossen.
+Revision 118: O7-K – Entscheidung des Users „Kolibri ist der Maßstab“: Ebenen-Cache samt Test abbauen, Bild-Handling in Nyx wie Kolibri; Ladeweg teilen als Prüfpunkt.
 Revision 117: O7-K – Kolibris Composite-Handling 1:1 für Nyx plus Neu-Rendern nach dem Wärmen in beiden Apps (bevorzugte Option, Vorschlag des Users).
 Revision 116: O7 – viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite (Priorität hoch).
 Revision 115: 3b-7 – Phase 3b abgeschlossen: Bestandsaufnahme, Gemeinsamkeiten und Nähte, offene Punkte, volle Abschluss-Geräteprüfung.
@@ -1249,7 +1251,7 @@ die Edit-UI (`WallpaperEditController` bzw. `NyxWallpaperEditController`); der L
 - Q5 Import bei offener Session (bekannte Einschränkung beider Apps) – niedrig, solange die UI den Weg ausschließt.
 - FAB im Backup „beide oder keine“ (L5) – niedrig.
 - Aufräumen: das Kolibri-Use-Case-Paket (`SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase`, tote Parameter, `SetWallpaperBackdropUseCaseTest`)
-  – vom User zum Löschen freigegeben, eigener Patch nach 3b-7; weiter nur mit dem Wort des Users: gemeinsamer In-Memory-DataStore-Fake,
+  – vom User freigegeben, **erledigt mit Patch phase3b/17**; weiter nur mit dem Wort des Users: gemeinsamer In-Memory-DataStore-Fake,
   `androidx.activity` in `:feature-wallpaper` auf `api`, `gradle/gradle-daemon-jvm.properties` beobachten.
 
 **Abschließende Geräteprüfung für 3b in Nyx – läuft VOLL (Entscheidung des Users):**
@@ -1267,6 +1269,22 @@ die Edit-UI (`WallpaperEditController` bzw. `NyxWallpaperEditController`); der L
 9. Neustart (Kaltstart) – keine Absturz-, FATAL-, SILENT_ERROR- oder ACRA-Einträge. (Drehen entfällt: Nyx ist auf Hochformat festgelegt.)
 10. Waisen-Check: `ls files/wallpapers` passt zum gespeicherten Zustand; nach einem weiteren Neustart mit gealterter künstlicher
     Waise ist diese weg, die referenzierten Dateien bleiben.
+**Ergebnis der vollen Abschluss-Geräteprüfung (A17, Debug-Build, run-as): alle 11 Punkte GRÜN.**
+1. Bildauswahl (Einstellungen und Sheet): zwei frische Dateien, die alte beim Ersetzen gelöscht, keine Waise.
+2. Editor (hinzufügen, entfernen, tauschen, verschieben, skalieren, übernehmen): 2 Referenzen = 2 Dateien, die entfernte Ebene gelöscht.
+3. Hinzufügen und Abbrechen: die verworfene Kopie gelöscht, keine Waise.
+4.–6. Backdrop-Umschalter, Scrim und Stil, FAB: im `home_layout`-Store geändert und persistiert, die Wallpaper-Dateien unangetastet.
+7. Backup-Export: E5a-Container, beide Blob-MD5 identisch zu den Gerätedateien.
+8. Werkszustand: `files/wallpapers` leer, Store leer, keine Referenzen.
+9. Wiederherstellen: zwei getrennte Dateien (O2), MD5 gleich der Referenz, Referenzen = Dateien, Anzeige und FAB zurück.
+10. Kaltstart mit echtem Prozesswechsel: alles erhalten, kein Absturz.
+11. Waisen-Check: durchgängig 1:1 Dateien zu Referenzen.
+Drehen entfällt (Nyx im Hochformat), E2 nicht erzwungen (von Hand nicht reproduzierbar).
+Kein FATAL, SILENT_ERROR oder ACRA_REPORT im ganzen Lauf.
+Commits auf `refactor/wallpaper-3a`: Patch 16 = `a4ba516d`, docs Revision 118 = `ba128026`.
+Der User hat den Push von 16 bewusst VOR der Geräteprüfung freigegeben; die Prüfung kam danach grün.
+**Phase 3b ist abgeschlossen.** Weiter: Kolibri-Aufräum-Patch, dann der Leitfaden für neue Feature-Module
+(`docs/FEATURE_MODULE_GUIDE.md`, Auftrag des Users), dann O7.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
