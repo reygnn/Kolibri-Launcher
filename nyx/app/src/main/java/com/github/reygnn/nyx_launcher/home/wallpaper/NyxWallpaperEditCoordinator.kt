@@ -32,7 +32,6 @@ class NyxWallpaperEditCoordinator(
 
     val wallpaperState: StateFlow<WallpaperState> = session.state
     val isEditMode: StateFlow<Boolean> = session.isEditMode
-    val pendingFocusLayerId: StateFlow<String?> = session.pendingFocusLayerId
 
     fun consumePendingFocusLayerId(): String? {
         val id = session.pendingFocusLayerId.value
