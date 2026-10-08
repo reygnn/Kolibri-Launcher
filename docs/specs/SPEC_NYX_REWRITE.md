@@ -1,6 +1,9 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 121: Leitfaden für neue Feature-Module (`docs/FEATURE_MODULE_GUIDE.md`, Patch phase3b/18).
+Stand: 03.10.2026 (Revision 124: 3b/27b – Rest von A10 (veraltete KDocs und Kommentare, Liste aus dem Auditor-Bericht).
+Revision 123: Audit-Übernahme Teil 2 – 3b/24–27; Doku-Korrekturen A14, A17, A18, A19; offene Punkte auf neuem Stand.
+Revision 122: Audit-Übernahme vor dem Merge, Teil 1 – 3b/19–23 (A1, A4/A15, A16, A9b, A2/A6, A5, A3, A7/A8).
+Revision 121: Leitfaden für neue Feature-Module (`docs/FEATURE_MODULE_GUIDE.md`, Patch phase3b/18).
 Revision 120: Kolibri-Aufräum-Patch – `SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase` samt toter Parameter und Test entfernt.
 Revision 119: 3b-7 – Ergebnis der vollen Abschluss-Geräteprüfung (11 Punkte grün), Commits; Phase 3b abgeschlossen.
 Revision 118: O7-K – Entscheidung des Users „Kolibri ist der Maßstab“: Ebenen-Cache samt Test abbauen, Bild-Handling in Nyx wie Kolibri; Ladeweg teilen als Prüfpunkt.
@@ -266,7 +269,6 @@ Diese Liste ist die Grundlage für die Golden-Soll-Zustände und für die Releas
 | Nyx | Importierte Werte außerhalb des gültigen Bereichs werden begrenzt | B11 |
 | Nyx | Backup-UI mit Preview, selektiven Optionen und ausführlichem Ergebnis | B9, B10 |
 | Nyx | Wallpaper-Auswahl erreicht überall auch Downloads | W8 |
-| Nyx | Im Anzeigemodus ein geflattetes Wallpaper; im Edit-Modus kann Löschen kurz flackern (Messpunkt vor 3b) | E3 |
 | Kolibri | Ungezippte Legacy-JSON-Backups werden nicht mehr importiert; gültige Backups sind heute alle gezippt | E5a |
 | Nyx | Backups aus Versionen vor 2b werden nicht gelesen (Meldung „ältere Version“); es gibt keine Nyx-Nutzer mit Backups | E5a |
 | Kolibri | Nach dem Update werden ANRs, die Android noch in der Exit-Historie hält, einmal erneut an ACRA gemeldet (der Watermark startet im neuen Store bei null) – nur im ACRA-Backend sichtbar | 1c-1 |
@@ -277,7 +279,7 @@ Diese Liste ist die Grundlage für die Golden-Soll-Zustände und für die Releas
 | Nyx | Beim Wählen eines Hintergrunds in den Einstellungen und im Anpassen-Sheet öffnet sich die Dateiauswahl des Systems statt des reinen Foto-Pickers; Downloads, Dateimanager und Cloud-Anbieter werden erreichbar | 3b-4 |
 | Nyx | Ein Bild, das im Wallpaper-Editor kurz vor „Speichern“ als Ebene gewählt wurde und noch kopiert wird, erscheint nach dem Speichern (bisher wurde es verworfen); nur „Abbrechen“ verwirft es (wie Kolibri, E2) | 3b-3 |
 | Nyx | Wird der Hintergrund von außen (Einstellungen, Anpassen-Sheet) gewählt, während der Editor offen ist, bleibt das nach dem Speichern erhalten (bisher überschrieb der Editor es wieder); „Abbrechen“ macht es rückgängig | 3b-3 |
-| Nyx | Wird Nyx beendet, während der Wallpaper-Editor offen ist, gilt das wie „Editor ohne Speichern verlassen“: die Zwischenstände werden auf den Stand vor dem Editor zurückgesetzt | 3b-3 |
+| Nyx | Endet `MainActivity` bei laufendem Prozess, während der Wallpaper-Editor offen ist, gilt das wie „Editor ohne Speichern verlassen“ (Zwischenstände zurückgesetzt); stirbt der Prozess (etwa beim Schließen aus den letzten Apps), steht nach dem Neustart der zuletzt gespeicherte Zwischenstand; eine Neuerzeugung nur wegen eines Konfigurationswechsels (Sprache, Schriftgröße) lässt den Editor offen (3b/22) | 3b-3 |
 | Nyx | Scheitert beim Wiederherstellen eines Backups nur das Speichern eines Anzeige-Werts (Scrim, Backdrop, Stil), meldet Nyx den Import nicht mehr als fehlgeschlagen; der Wert bleibt dann beim alten (wie Kolibri seit jeher; O4 (e)) | 3b-2 |
 | Nyx | Scheitert „Hintergrund entfernen“, meldet Nyx das jetzt („Hintergrund konnte nicht entfernt werden“), statt „entfernt“ zu sagen; das Wallpaper bleibt dann, der Dialog bleibt offen | 3b-1b |
 | Kolibri | Nach einem Zurücksetzen auf Werkszustand zeigt Kolibri wieder die kuratierten Default-Favoriten (Telefon, SMS, E-Mail, Browser, Kamera) statt der ersten installierten Apps | 2b/29 |
@@ -855,7 +857,7 @@ bleibt es dabei, wird die Ursache gesucht, bevor gemergt wird.
 Ab hier sind die Benchmarks eingefroren;
 nach 3a-8 laufen dieselben Messungen unverändert auf dem A17.
 **3a-8 – Entscheidungen (03.10.):** J1 Schnittstelle `WallpaperComposite` in `:feature-wallpaper`, Implementierung als `@Singleton` (Lese- und Schreibseite teilen den Cache).
-J2 **nicht** die Session als Quelle: die Session ist seit 3a-3 auf den Main-Thread beschränkt, das Aufwärmen flattet auf IO
+J2 **nicht** die Session als Quelle: die Session ist seit 3a-3 auf den Main-Thread beschränkt, das Aufwärmen läuft außerhalb von ihr (das Flatten selbst läuft auf Main, nur die Decodes auf IO – korrigiert nach Audit A19)
 – stattdessen `refill(target, isCurrent: (WallpaperState) -> Boolean, …)` plus Edit-Modus als Argument oder zweite Funktion;
 die KDoc legt fest, dass `isCurrent` **immer auf Main** aufgerufen wird, die Implementierung stellt das sicher;
 Kolibri übergibt `{ it == session.state.value }`, Nyx in 3b dasselbe;
@@ -1243,6 +1245,14 @@ die Edit-UI (`WallpaperEditController` bzw. `NyxWallpaperEditController`); der L
 - O4 gemeinsame Backup-Typen mit den Unterpunkten (a)–(e), darunter (e) Teilfehler beim Import – mittel.
 - O5 Landscape-Deckung mehrschichtiger Wallpaper – niedrig, nach 3b, beide Apps.
 - O6 Sammler im Startpfad ohne Exception-Handler – mittel (für die Display-Werte durch D5 entschärft, für andere Flows offen).
+- **A2b Werkszustand während einer laufenden Kopie – mittel** (gleiches Muster wie A2, nicht gepatcht): die saubere Lösung braucht
+  D2 (beim Entfernen und beim Reset nur die Dateien des vorherigen Zustands löschen) oder einen Reset über `WallpaperOperations` –
+  Designentscheidung, nach dem Merge, priorisiert.
+- **D1** (Entwurf getrennt, persistieren erst beim Commit) und **D3** (Platzierung der Composite-Bindung) – Designoptionen, nach dem Merge.
+- **audit-04 / Compose vom Main-Thread** – in O7: Stufe 1 (audit-04) und Stufe 2 (reiner Compositor ohne View, dann entfällt auch das
+  Flatten-Theme) als Optionen der O7-K-Vorlage; die Vorher-Messung bekommt die Sektion `wallpaper_compose` innerhalb von
+  `wallpaper_flatten` (Grenzen bleiben); Pixelgleichheit auf dem A17 über die instrumentierten Tests ist Pflicht vor der Übernahme.
+- Erledigt vor dem Merge (3b/19–26): A1, A2/A6, A3, A4/A15, A5, A7/A8, A9a–c, A11, A12, A13, A16; Doku A10, A14, A17–A20 (3b/27).
 - **O7 viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite – HOCH**, direkt nach 3b-7 und dem Kolibri-Aufräum-Patch,
   vor der allgemeinen Inventur (zuerst messen mit einer 12-Ebenen-Collage; bevorzugte Option O7-K: Kolibris Composite-Handling 1:1
   plus Neu-Rendern nach dem Wärmen in beiden Apps).
@@ -1292,6 +1302,53 @@ Bausteinen, erlaubten Abhängigkeiten; `build-logic`; Abhängigkeitsbild), dann 
 Daten, Nebenläufigkeit, Tests, Prozess, Checkliste. Pflegeregel: Wer ein Gate, eine Ratsche oder eine Konvention ändert, führt den
 Leitfaden im selben Patch nach. Hinweis zur Modulkarte: `:kolibri:backup-legacy` ist im Code ein Android-Modul
 (`launcher.android.library`), nicht JVM.
+
+**Audit-Übernahme vor dem Merge (Entscheidung des Users: Branch so sauber wie möglich; Auditor-Session, Urteile des Seniors).**
+Teil 1, je ein Patch:
+3b/19 (A1 + A4/A15 + A16 + A9b): `WallpaperFileManager.isInternalUri` vergleicht kanonische Pfade – nur eine Datei DIREKT im
+Wallpaper-Verzeichnis ist intern (vorher ließ ein Präfix-Vergleich `wallpapers/../datastore/…` und `wallpapers_old/…` durch; über
+eine präparierte Backup-URI erreichbar, `deleteFile` hätte gelöscht, was sie nennt) – inhaltlich aus audit-02 mit dessen Tests;
+der frühe Ausstieg von `copyToInternal` gibt eine interne URI nur zurück, wenn die Datei EXISTIERT, sonst null (eine tote interne
+Referenz wird verworfen und gezählt, B9, beide Apps); der Store-Contract prüft in `assertNoDanglingReference` kanonische Pfade
+direkt im Wallpaper-Verzeichnis statt Basisnamen (neuer Haken `savedLayerUris`); der assertionslose Test „deleteFile only touches
+internal URIs“ bekommt seine Zusicherung.
+3b/20 (A2 + A6): „Wallpaper entfernen“ gegen eine laufende Kopie – die Prüfung der Generation läuft UNTER `persistLock`
+(`applyCopied`), ein wirksames Entfernen erhöht die Generation (`invalidatePendingChanges`), nur wenn es gegriffen hat; eine
+Kopie, die vor oder während des Entfernens fertig wurde, wird verworfen statt eine gelöschte Datei zu referenzieren – audit-03
+unverändert, mit drei Tests.
+3b/21 (A5): Kolibris Container-Import gibt bei einem Fehlschlag ALLE unbeanspruchten Kopien frei, auch die aus `copyToInternal` und
+die O2-Kopien (`onCopy`, wie Nyx' `copies`); eine übernommene interne Quelle ist dabei sicher (der Store löscht nur, was nichts
+Persistiertes referenziert). Der Legacy-Pfad (vor E5a, mit Sunset) bleibt unverändert. Neuer Test mit Gegenprobe.
+3b/22 (A3): Nyx bricht eine offene Session NICHT ab, wenn `MainActivity` nur wegen eines nicht selbst behandelten
+Konfigurationswechsels neu erzeugt wird (Sprache, Schriftgröße): Vorab geprüft – die neue Activity stellt den Editor aus
+`session.isEditMode` wieder her (Sammeln in `onCreate`). `onHostDestroyed(changingConfigurations)`, Test.
+3b/23 (A7/A8, Werkzeuge): Die geteilten Positivlisten nehmen die Dateien mit breiten catches auf (Rule 11 und Cancel:
+`WallpaperBackupBlobs`, `WallpaperComposite`, `WallpaperOperations`, `WallpaperDisplaySettingsStore`, `FabPositionStore`,
+`WallpaperFlattener`; OOM: `WallpaperComposite`, `WallpaperFlattener`; Nyx: `NyxWallpaperEditing`), zwei fehlende Rule-11-Vermerke
+ergänzt; `PURGE_ROOTS` beider Apps um `:common-data`; der Purge-Detektor erkennt auch `private`/`const`-Schlüssel (er sah den
+`private val`-Schlüssel von `WallpaperRepositoryImpl` nicht) – mit Selbsttest-Fall, und `WallpaperRepositoryImpl` nennt den Schlüssel
+im Purge selbst; Kopf von `shared-lint-files.sh` und der Leitfaden (Purge-Gate, Positivlisten) nachgeführt. Je Liste eine
+Gegenprobe (vorübergehend gebrochen, vom Gate gemeldet, wiederhergestellt).
+Teil 2:
+3b/24 (A9a + A9c): ein Test schreibt Nyx' `WallpaperComposite.None`-Bindung fest (`WallpaperCompositeModuleTest`); die drei
+Lückenschalter des Store-Contracts (`deletesReplacedImageImmediately`, `decidesDeletesThroughTheStore`, `editsThroughSharedOperations`)
+samt der 12 `assumeTrue`-Zeilen entfernt – alle waren in beiden Apps `true`; es entfallen Schalter, keine Tests.
+3b/25 (A13, audit-01): Build-Warnungen, inhaltlich unverändert übernommen (33 Dateien: `@param:`-Ziele, `@OptIn`, überflüssige Casts
+und `toInt()`), ohne Verhaltensänderung.
+3b/26 (A11 + A12): `onToggleWallpaperEditMode` in `LauncherViewModel` und `WallpaperDelegate` entfernt (Entscheidung des Users), samt
+der fünf Fälle, die nur sie prüften (`LauncherViewModelTest` 1, `LauncherViewModelContractTest` 1, `WallpaperDelegateTest` 3); eine
+gezielte Suche im Wallpaper-Pfad (Delegate, VM-Fassade, Coordinator, Operations, Session, Store, `NyxWallpaperEditing`) fand keine
+weitere Funktion ohne Aufrufer; ein überholtes Warm recycelt sein nie veröffentlichtes HARDWARE-Bitmap sofort (Test).
+3b/27 (Doku/Kommentare): A10 (KDoc von `WallpaperComposite.None`), A14 (Nutzersichtbare Zeile zu 3b-3), A17 (E3-Abschnitt und -Tabelle
+auf 3b-6d/O7-K, Flatten-Theme, Nyx-Zeile „geflattetes Wallpaper“ entfernt, E3-Messpunkt nach O7), A18 (Export-Guard nicht umgesetzt,
+Schutz durch die zweite Hash-Prüfung), A19 (J2: Flatten auf Main, nur Decodes auf IO), A20 (`kolibri/CLAUDE.md`: ein Cache-Toast);
+Leitfaden Zeile 76 bereits mit 3b/23; offene Punkte nach 3b auf neuem Stand.
+3b/27b (Rest von A10, nur Kommentare und KDoc, Liste aus dem Bericht des auditor über den Senior): `WallpaperDisplaySettingsStore`
+(D4 in beiden Apps seit 3b-2), `FabPositionStore` (Nyx nutzt ihn seit 3b-2, je Koordinate), Klassen-KDoc von `WallpaperDelegate`
+(keine alpha/blend/visibility mehr), Kolibris `DataStoreModule` (drei DataStores: settings, usage, consent in `:feature-crashreporting`),
+`WallpaperRepositoryImpl.layersToJson` (Beispiel mit den heutigen Feldern, KDoc englisch), `WallpaperRepository.saveWallpaperState`
+(kein isEditMode, KDoc englisch nach Rule 13), `WallpaperImagePicker` (Nyx seit 3b-4), `NyxWallpaperEditing` (gebunden ist `None`,
+3b-6d), `WallpaperOperations` und `WallpaperComposite.Host` (Nyx seit 3b-3, nicht mehr im Futur).
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
@@ -1361,8 +1418,8 @@ nachdem der Binder einen NEUEN Zustand anwendet – in Nyx zeigt der Editor den 
   Alle vier Trace-Sektionen besser, der Frame-Tail gleich bis besser:
   **3a-8 ist verhaltensneutral bis besser, F4 erfüllt, 3a-8 abgeschlossen** (13 und 13b je als eigener Commit).
   3a-9 beginnt.
-    - **3b Nyx:** Anzeige über Kolibris Composite-Pfad (E3); `home/wallpaper/*`, `NyxWallpaperImageSetter`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore` löschen; `WallpaperLayerBitmapCache` bleibt (für Nyx wesentlich, 3b-6d).
-      E3-Messpunkt gegen die Referenz aus Phase 0.
+    - **3b Nyx:** Anzeige mit `WallpaperComposite.None` (3b-6d; Kolibris Composite-Handling für Nyx kommt mit O7-K); `home/wallpaper/*`, `NyxWallpaperImageSetter`, `NyxWallpaperDisplaySettings`, `NyxFabPositionStore` löschen; `WallpaperLayerBitmapCache` bleibt (für Nyx wesentlich, 3b-6d).
+      E3-Messpunkt nach O7 (verschoben, Audit A17).
 4. **Storage-Cleanup.**
     - **4a Kolibri:** `DataStoreMaintenanceRepositoryImpl` (115 Zeilen, hängt nur an `:core`) nach `:common-data`, Kolibri umstellen.
       Dazu eine DataStore-Fabrik für alle Stores:
@@ -1420,7 +1477,7 @@ Nyx-Rundläufe im neuen Format prüft der `BackupRoundTripContract`.
 - [ ] Keine harten `Dispatchers.IO/Default` in den neuen Feature-Modulen und in Nyx.
 - [ ] Device-Rundlauf auf beiden Apps: Export → Factory-Reset → Import über TAPL-lite.
 - [ ] Ein Test-Crash aus dem Release-Build beider Apps kommt beim ACRA-Server an, mit Zeilennummern im zurückübersetzten Stacktrace – nach 0 (Hotfix) und nach 1b (Endform).
-- [ ] E3-Messpunkt nach 3b dokumentiert: Lösch-Flackern im Edit-Modus und Wallpaper-Speicher auf dem A17 im Vergleich zur Referenz aus Phase 0.
+- [ ] E3-Messpunkt nach O7 dokumentiert (verschoben von „nach 3b“, Audit A17): Lösch-Flackern im Edit-Modus und Wallpaper-Speicher auf dem A17, gemessen mit der O7-Vorher-/Nachher-Messung.
 
 ### Geteilte Contract-Tests (je App eine Subklasse, Muster `NoAutoPruneContract`)
 
@@ -1609,7 +1666,7 @@ backup.zip
 Der Export läuft deshalb in zwei Durchgängen:
 erst jede Blob-Datei hashen und die Tabelle bauen, dann Manifest schreiben, dann jeden Blob kopieren und dabei erneut hashen.
 Weicht der zweite Hash ab (Datei hat sich zwischen den Durchgängen geändert), bricht der Export ab und `writeOrDiscard` löscht das Dokument.
-Damit das praktisch nie passiert, läuft der Export unter demselben Edit-Session-Guard wie der GC (Ü5).
+Ein Export-Guard über die Edit-Session (Ü5) ist NICHT umgesetzt (korrigiert nach Audit A18); geschützt wird durch diese zweite Hash-Prüfung – eine Datei, die sich zwischen den Durchgängen ändert, führt zum Abbruch statt zu einem inkonsistenten Backup.
 Wallpaper-Dateien sind lokal und wenige MiB groß;
 der zweite Lesedurchgang ist vernachlässigbar.
 
@@ -1663,7 +1720,10 @@ Das braucht Kolibri, weil die Home-View beim Wechsel Drawer → Home neu entsteh
 Nyx flattet bisher nie; seine View wird nie abgebaut, alle Layer werden live gezeichnet, deshalb cached Nyx pro Layer.
 
 **Entscheidung:** Nyx übernimmt Kolibris Render-Strategie – im Anzeigemodus ein geflattetes Composite aus `WallpaperCompositeCache`,
-einzelne Layer nur im Edit-Modus. `WallpaperLayerBitmapCache` bleibt; für Nyx wesentlich (Anzeige und Editor, 3b-6d), offen nur noch, ob er ein geteilter Baustein auch für Kolibris Editor wird.
+einzelne Layer nur im Edit-Modus.
+**Stand nach 3b (Audit A17):** In 3b-6d für Nyx revidiert – Nyx bindet `WallpaperComposite.None`, die Anzeige zeichnet die Ebenen
+über `WallpaperLayerBitmapCache`. Mit O7-K (Entscheidung des Users „Kolibri ist der Maßstab“) übernimmt Nyx Kolibris
+Composite-Handling 1:1 plus Neu-Rendern nach dem Wärmen in beiden Apps, und `WallpaperLayerBitmapCache` wird samt Test abgebaut.
 
 **Begründung, ehrlich:** Nyx braucht den Composite technisch nicht.
 Der Gewinn ist ein Render-Pfad statt zwei und damit ein Ort für jede künftige Korrektur;
@@ -1672,10 +1732,10 @@ Der Preis ist der Verlust des Flacker-Schutzes im Edit-Modus.
 
 Folgen:
 
-- `WallpaperFlattener` liegt bereits in `:common-ui` (samt `WallpaperFlattenTheme`);
+- `WallpaperFlattener` liegt bereits in `:common-ui`; seit 3b-6c mit einem geteilten Theme statt des Qualifiers `WallpaperFlattenTheme`;
   Nyx braucht nur den Flatten-Schritt des Delegates, der mit `:feature-wallpaper` kommt.
   Die WV4-Notiz im `WALLPAPER_SHARE_SPEC` ist damit überholt.
-- **Messpunkt:** Referenz in Phase 0, Vergleich nach 3b (Akzeptanzkriterium).
+- **Messpunkt:** Referenz in Phase 0, Vergleich nach O7 (Akzeptanzkriterium; verschoben von „nach 3b“, Audit A17).
   Stört das Flackern auf dem A17, wird es **einmal** in `:feature-wallpaper` gelöst (z.
   B. partielles Entfernen in `RebuildPlan`), nie wieder pro App.
   Die Entscheidung bleibt umkehrbar, solange die Render-Strategie hinter einer Schnittstelle in `:feature-wallpaper` liegt und keine App den Cache direkt anspricht.
