@@ -1,6 +1,7 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 120: Kolibri-Aufräum-Patch – `SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase` samt toter Parameter und Test entfernt.
+Stand: 03.10.2026 (Revision 121: Leitfaden für neue Feature-Module (`docs/FEATURE_MODULE_GUIDE.md`, Patch phase3b/18).
+Revision 120: Kolibri-Aufräum-Patch – `SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase` samt toter Parameter und Test entfernt.
 Revision 119: 3b-7 – Ergebnis der vollen Abschluss-Geräteprüfung (11 Punkte grün), Commits; Phase 3b abgeschlossen.
 Revision 118: O7-K – Entscheidung des Users „Kolibri ist der Maßstab“: Ebenen-Cache samt Test abbauen, Bild-Handling in Nyx wie Kolibri; Ladeweg teilen als Prüfpunkt.
 Revision 117: O7-K – Kolibris Composite-Handling 1:1 für Nyx plus Neu-Rendern nach dem Wärmen in beiden Apps (bevorzugte Option, Vorschlag des Users).
@@ -1285,6 +1286,12 @@ Commits auf `refactor/wallpaper-3a`: Patch 16 = `a4ba516d`, docs Revision 118 = 
 Der User hat den Push von 16 bewusst VOR der Geräteprüfung freigegeben; die Prüfung kam danach grün.
 **Phase 3b ist abgeschlossen.** Weiter: Kolibri-Aufräum-Patch, dann der Leitfaden für neue Feature-Module
 (`docs/FEATURE_MODULE_GUIDE.md`, Auftrag des Users), dann O7.
+**Leitfaden für neue Feature-Module (Patch phase3b/18, Auftrag des Users):** `docs/FEATURE_MODULE_GUIDE.md`, auf Englisch, verlinkt
+aus dem Root-`CLAUDE.md`, `kolibri/CLAUDE.md` und `nyx/CLAUDE.md`. Abschnitt 0 „Module map“ (alle Module mit Art, Plugin, Zuständigkeit,
+Bausteinen, erlaubten Abhängigkeiten; `build-logic`; Abhängigkeitsbild), dann Modultyp, Einrichtung, Gates und Ratschen, DI, API,
+Daten, Nebenläufigkeit, Tests, Prozess, Checkliste. Pflegeregel: Wer ein Gate, eine Ratsche oder eine Konvention ändert, führt den
+Leitfaden im selben Patch nach. Hinweis zur Modulkarte: `:kolibri:backup-legacy` ist im Code ein Android-Modul
+(`launcher.android.library`), nicht JVM.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
