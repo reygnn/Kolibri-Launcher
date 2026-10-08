@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -69,7 +70,11 @@ class WallpaperFileManager @Inject constructor(
     suspend fun copyToInternal(sourceUri: Uri): Uri? = withContext(ioDispatcher) {
         try {
             if (isInternalUri(sourceUri)) {
-                return@withContext sourceUri
+                // Already ours — but only if the file EXISTS (audit A4/A15): a dead internal
+                // reference (a backup layer naming a file this device no longer has) must not be
+                // adopted unchanged, or the caller saves a reference to a missing file. null lets
+                // the caller drop the layer and report it (B9).
+                return@withContext if (File(sourceUri.path!!).isFile) sourceUri else null
             }
 
             val fileName = nextFileName("wp")
@@ -123,12 +128,20 @@ class WallpaperFileManager @Inject constructor(
     }
 
     /**
-     * Prüft ob eine URI auf unseren internen Wallpaper-Speicher zeigt.
+     * Whether [uri] names a file directly inside our wallpaper directory. Compared on canonical
+     * paths: a string prefix test let `wallpapers/../datastore/…` and a sibling such as
+     * `wallpapers_old/…` count as internal, so [copyToInternal] adopted such a URI unchanged and
+     * [deleteFile] deleted whatever it named — reachable through a crafted backup layer URI.
      */
     fun isInternalUri(uri: Uri): Boolean {
         if (uri.scheme != "file") return false
         val path = uri.path ?: return false
-        return path.startsWith(getWallpaperDir().absolutePath)
+        return try {
+            File(path).canonicalFile.parentFile == getWallpaperDir().canonicalFile
+        } catch (e: IOException) {
+            // canonicalFile resolves symlinks on disk; a path it cannot resolve is not ours.
+            false
+        }
     }
 
     /**

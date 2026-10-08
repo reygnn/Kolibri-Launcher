@@ -115,6 +115,9 @@ abstract class WallpaperImageStoreContract {
     /** Names of the files the persisted state's layers reference, in layer order. */
     protected abstract suspend fun savedLayerFiles(): List<String>
 
+    /** The image URIs the saved state references, as stored (for the containment check, A16). */
+    protected abstract suspend fun savedLayerUris(): List<String>
+
     /** From now on writes (save, clear) fail silently: the call returns, nothing is persisted (release behaviour). */
     protected abstract fun failSavesSilently()
 
@@ -436,8 +439,18 @@ abstract class WallpaperImageStoreContract {
         wallpaperDir.listFiles().orEmpty().forEach { it.setLastModified(old) }
     }
 
+    /**
+     * Every reference of the saved state names an EXISTING file DIRECTLY inside the wallpaper
+     * directory — compared on canonical paths (audit A16): a basename match let a reference to
+     * `wallpapers/../other/x.jpg` or to a file of the same name elsewhere pass.
+     */
     private suspend fun assertNoDanglingReference() {
-        assertWithMessage("every file the saved state references exists")
-            .that(storedFiles()).containsAtLeastElementsIn(savedLayerFiles())
+        val dir = wallpaperDir.canonicalFile
+        savedLayerUris().forEach { uri ->
+            val file = java.io.File(java.net.URI(uri)).canonicalFile
+            assertWithMessage("the saved reference $uri lies directly inside the wallpaper directory")
+                .that(file.parentFile).isEqualTo(dir)
+            assertWithMessage("the saved reference $uri names an existing file").that(file.isFile).isTrue()
+        }
     }
 }

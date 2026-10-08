@@ -136,4 +136,6 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
 
     override suspend fun savedLayerFiles(): List<String> =
         repository.currentState.layers.mapNotNull { layer -> layer.imageUri?.let { File(Uri.parse(it).path!!).name } }
+
+    override suspend fun savedLayerUris(): List<String> = repository.currentState.layers.mapNotNull { it.imageUri }
 }

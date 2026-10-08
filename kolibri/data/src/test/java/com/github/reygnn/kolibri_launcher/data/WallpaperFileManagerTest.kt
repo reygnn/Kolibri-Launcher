@@ -8,6 +8,7 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -196,8 +197,64 @@ class WallpaperFileManagerTest {
             every { scheme } returns "content"
             every { path } returns "/foo/bar"
         }
-        // Must not crash on non-internal URI.
+        val inside = createFileWithAge("wp_untouched", ageMillis = 0L)
+
+        // Must not crash on a non-internal URI — and must not touch our directory either (A9b).
         manager.deleteFile(external)
+
+        assertWithMessage("a non-internal URI deletes nothing in wallpapers/").that(inside.exists()).isTrue()
+        assertThat(wallpaperDir.listFiles().orEmpty().map { it.name }).containsExactly("wp_untouched")
+    }
+
+    // ---- early exit of copyToInternal only for a file that exists (audit A4/A15) ----
+
+    @Test
+    fun `copyToInternal hands an existing internal file back unchanged`() = runTest(mainDispatcherRule.testDispatcher) {
+        val inside = createFileWithAge("wp_existing", ageMillis = 0L)
+
+        assertThat(manager.copyToInternal(Uri.fromFile(inside))).isEqualTo(Uri.fromFile(inside))
+    }
+
+    @Test
+    fun `copyToInternal returns null for an internal uri whose file does not exist`() = runTest(mainDispatcherRule.testDispatcher) {
+        val missing = Uri.fromFile(java.io.File(wallpaperDir, "wp_gone"))
+
+        assertThat(manager.copyToInternal(missing)).isNull()
+    }
+
+    // ---- containment: only files directly inside wallpapers/ are internal (audit A1) ----
+
+    @Test
+    fun `isInternalUri rejects a dot-dot path that leaves the wallpaper directory`() {
+        val escaping = Uri.parse("file://${wallpaperDir.absolutePath}/../datastore/settings.preferences_pb")
+
+        assertThat(manager.isInternalUri(escaping)).isFalse()
+    }
+
+    @Test
+    fun `isInternalUri rejects a sibling directory that shares the prefix`() {
+        val sibling = File(tempFolder.root, "wallpapers_old/x.jpg").apply { parentFile!!.mkdirs(); writeText("x") }
+
+        assertThat(manager.isInternalUri(Uri.fromFile(sibling))).isFalse()
+    }
+
+    @Test
+    fun `isInternalUri accepts a file inside the wallpaper directory`() {
+        val inside = createFileWithAge("wp_inside", ageMillis = 0L)
+
+        assertThat(manager.isInternalUri(Uri.fromFile(inside))).isTrue()
+    }
+
+    @Test
+    fun `deleteFile never deletes a file outside the wallpaper directory`() {
+        val victim = File(tempFolder.root, "datastore/settings.preferences_pb").apply {
+            parentFile!!.mkdirs()
+            writeText("user settings")
+        }
+
+        manager.deleteFile("file://${wallpaperDir.absolutePath}/../datastore/settings.preferences_pb")
+
+        assertThat(victim.exists()).isTrue()
     }
 
     @Test
