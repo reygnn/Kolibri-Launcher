@@ -93,7 +93,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -192,7 +191,6 @@ class MonolithicLauncherViewModelTest {
     private val getTextShadowEnabledUseCase: GetTextShadowEnabledUseCase = mockk(relaxed = true)
     private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase = mockk(relaxed = true)
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase = mockk(relaxed = true)
-    private val setWallpaperImageUseCase: SetWallpaperImageUseCase = mockk(relaxed = true)
     private val clearWallpaperUseCase: ClearWallpaperUseCase = mockk(relaxed = true)
     private val getFabPositionUseCase: GetFabPositionUseCase = mockk<GetFabPositionUseCase>(relaxed = true).also {
         every { it.invoke() } returns emptyFlow()
@@ -243,7 +241,6 @@ class MonolithicLauncherViewModelTest {
         every { resolveAppDrawerSurfaceUseCase.invoke() } returns
                 flowOf(LuminanceClassification.DARK)
 
-        coEvery { setWallpaperImageUseCase.invoke(any()) } returns Unit
         coEvery { clearWallpaperUseCase.invoke() } returns Unit
     }
 
@@ -281,12 +278,10 @@ class MonolithicLauncherViewModelTest {
             resolveAppDrawerSurfaceUseCase,
             observeWallpaperStateUseCase,
             saveWallpaperStateUseCase,
-            setWallpaperImageUseCase,
             clearWallpaperUseCase,
             getFabPositionUseCase,
             saveFabPositionUseCase,
             mockk(relaxed = true), // observeWallpaperBackdropUseCase
-            mockk(relaxed = true), // setWallpaperBackdropUseCase
             WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
             CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher), // wallpaperComposite
             mockk(relaxed = true), // wallpaperDisplaySettingsStore

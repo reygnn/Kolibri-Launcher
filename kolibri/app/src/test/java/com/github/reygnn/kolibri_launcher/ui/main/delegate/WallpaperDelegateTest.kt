@@ -28,9 +28,7 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.GetFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
@@ -74,12 +72,10 @@ class WallpaperDelegateTest {
     private lateinit var context: Context
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
-    private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
     private lateinit var getFabPositionUseCase: GetFabPositionUseCase
     private lateinit var saveFabPositionUseCase: SaveFabPositionUseCase
     private lateinit var observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase
-    private lateinit var setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase
     private lateinit var wallpaperFileManager: WallpaperFileManager
 
     private val testUri: Uri = mockk()
@@ -97,7 +93,6 @@ class WallpaperDelegateTest {
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
 
         saveWallpaperStateUseCase = mockk(relaxed = true)
-        setWallpaperImageUseCase = mockk(relaxed = true)
         clearWallpaperUseCase = mockk(relaxed = true)
 
         getFabPositionUseCase = mockk(relaxed = true)
@@ -106,7 +101,6 @@ class WallpaperDelegateTest {
 
         observeWallpaperBackdropUseCase = mockk(relaxed = true)
         every { observeWallpaperBackdropUseCase.invoke() } returns emptyFlow()
-        setWallpaperBackdropUseCase = mockk(relaxed = true)
 
         wallpaperFileManager = mockk(relaxed = true)
         coEvery { wallpaperFileManager.copyToInternal(any()) } returns internalUri
@@ -158,12 +152,10 @@ class WallpaperDelegateTest {
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
-        setWallpaperImageUseCase = setWallpaperImageUseCase,
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
-        setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         imageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), ioDispatcher),
         // The composite since 3a-8: the real implementation around the same mocks, so every
         // composite expectation below (cache, flattener, luminance, IO hop) stays as it was.
@@ -688,7 +680,7 @@ class WallpaperDelegateTest {
     @Test
     fun `onSetWallpaperImage copies file and saves the single-image state`() = runTest {
         // 3a-9 (K2): the replace saves through the persistence port — the single-image state,
-        // exactly what SetWallpaperImageUseCase did.
+        // exactly what the former SetWallpaperImageUseCase did (removed after 3b-7).
         val delegate = createDelegate()
 
         delegate.onSetWallpaperImage(testUri)

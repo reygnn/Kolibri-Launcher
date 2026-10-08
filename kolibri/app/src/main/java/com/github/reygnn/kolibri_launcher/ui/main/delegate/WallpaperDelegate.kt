@@ -56,8 +56,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperBackdro
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveFabPositionUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.ui.base.UiEvent
 import com.github.reygnn.launcher.core.wallpaper.LayerTransform
 import android.widget.Toast
@@ -85,16 +83,10 @@ class WallpaperDelegate(
     private val context: Context,
     private val observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     private val saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
-    // Unused since 3a-9 (K2: replace saves the single-image state through the persistence port,
-    // which is what this use case did). Kept until its removal is approved (README cleanup list).
-    @Suppress("UNUSED_PARAMETER") setWallpaperImageUseCase: SetWallpaperImageUseCase,
     private val clearWallpaperUseCase: ClearWallpaperUseCase,
     private val getFabPositionUseCase: GetFabPositionUseCase,
     private val saveFabPositionUseCase: SaveFabPositionUseCase,
     private val observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
-    // Unused since 3a-9b (the toggle lives in the display-settings store). Kept until its removal
-    // is approved (README cleanup list).
-    @Suppress("UNUSED_PARAMETER") setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     /** Every file decision: copy in, delete what no layer needs, orphan GC (3a-2). */
     private val imageStore: WallpaperImageStore,
     /** The display composite since 3a-8: warm, cache, luminance, lock — behind one interface. */

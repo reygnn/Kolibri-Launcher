@@ -67,8 +67,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperScrimAlphaU
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperBackdropUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
@@ -137,12 +135,10 @@ class LauncherViewModel @Inject constructor(
     resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase,
     observeWallpaperStateUseCase: ObserveWallpaperStateUseCase,
     saveWallpaperStateUseCase: SaveWallpaperStateUseCase,
-    setWallpaperImageUseCase: SetWallpaperImageUseCase,
     clearWallpaperUseCase: ClearWallpaperUseCase,
     getFabPositionUseCase: GetFabPositionUseCase,
     saveFabPositionUseCase: SaveFabPositionUseCase,
     observeWallpaperBackdropUseCase: ObserveWallpaperBackdropUseCase,
-    setWallpaperBackdropUseCase: SetWallpaperBackdropUseCase,
     wallpaperImageStore: WallpaperImageStore,
     wallpaperComposite: WallpaperComposite,
     wallpaperDisplaySettingsStore: WallpaperDisplaySettingsStore,
@@ -235,12 +231,10 @@ class LauncherViewModel @Inject constructor(
         context = context,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
-        setWallpaperImageUseCase = setWallpaperImageUseCase,
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
-        setWallpaperBackdropUseCase = setWallpaperBackdropUseCase,
         imageStore = wallpaperImageStore,
         composite = wallpaperComposite,
         displaySettings = wallpaperDisplaySettingsStore,

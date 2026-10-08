@@ -6,7 +6,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.reygnn.kolibri_launcher.domain.usecase.ClearWallpaperUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ObserveWallpaperStateUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SaveWallpaperStateUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.kolibri_launcher.rule.TimberRule
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
@@ -70,12 +69,10 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
             context = context,
             observeWallpaperStateUseCase = ObserveWallpaperStateUseCase(repository),
             saveWallpaperStateUseCase = SaveWallpaperStateUseCase(repository),
-            setWallpaperImageUseCase = SetWallpaperImageUseCase(repository),
             clearWallpaperUseCase = ClearWallpaperUseCase(repository),
             getFabPositionUseCase = mockk(relaxed = true) { every { this@mockk.invoke() } returns emptyFlow() },
             saveFabPositionUseCase = mockk(relaxed = true),
             observeWallpaperBackdropUseCase = mockk(relaxed = true) { every { this@mockk.invoke() } returns emptyFlow() },
-            setWallpaperBackdropUseCase = mockk(relaxed = true),
             imageStore = WallpaperImageStore(fileManager, repository, mainDispatcherRule.testDispatcher),
             composite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
             displaySettings = mockk(relaxed = true),

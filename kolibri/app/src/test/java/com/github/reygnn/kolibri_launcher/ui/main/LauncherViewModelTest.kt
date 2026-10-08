@@ -47,7 +47,6 @@ import com.github.reygnn.kolibri_launcher.domain.usecase.SetLayoutScaleUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextColorUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetTextShadowEnabledUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.SetVerticalPaddingUseCase
-import com.github.reygnn.kolibri_launcher.domain.usecase.SetWallpaperImageUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ShowAppUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleFavoriteUseCase
 import com.github.reygnn.kolibri_launcher.domain.usecase.ToggleSortOrderUseCase
@@ -115,7 +114,6 @@ class LauncherViewModelTest {
     private lateinit var resolveAppDrawerSurfaceUseCase: ResolveWallpaperSurfaceUseCase
     private lateinit var observeWallpaperStateUseCase: ObserveWallpaperStateUseCase
     private lateinit var saveWallpaperStateUseCase: SaveWallpaperStateUseCase
-    private lateinit var setWallpaperImageUseCase: SetWallpaperImageUseCase
     private lateinit var clearWallpaperUseCase: ClearWallpaperUseCase
     private lateinit var getWallpaperScrimAlphaUseCase: GetWallpaperScrimAlphaUseCase
     private lateinit var getFabPositionUseCase: GetFabPositionUseCase
@@ -197,7 +195,6 @@ class LauncherViewModelTest {
         every { observeWallpaperStateUseCase.invoke() } returns emptyFlow()
 
         saveWallpaperStateUseCase = mockk(relaxed = true)
-        setWallpaperImageUseCase = mockk(relaxed = true)
         clearWallpaperUseCase = mockk(relaxed = true)
         getWallpaperScrimAlphaUseCase = mockk(relaxed = true)
         getFabPositionUseCase = mockk(relaxed = true)
@@ -247,12 +244,10 @@ class LauncherViewModelTest {
         resolveAppDrawerSurfaceUseCase = resolveAppDrawerSurfaceUseCase,
         observeWallpaperStateUseCase = observeWallpaperStateUseCase,
         saveWallpaperStateUseCase = saveWallpaperStateUseCase,
-        setWallpaperImageUseCase = setWallpaperImageUseCase,
         clearWallpaperUseCase = clearWallpaperUseCase,
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = mockk(relaxed = true),
-        setWallpaperBackdropUseCase = mockk(relaxed = true),
         wallpaperImageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
         wallpaperComposite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
         wallpaperDisplaySettingsStore = mockk(relaxed = true),
