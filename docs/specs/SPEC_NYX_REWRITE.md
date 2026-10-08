@@ -1,6 +1,10 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 114: 3b-6d – E3 für Nyx revidiert, Nyx bindet `WallpaperComposite.None`; 3b-6 ohne E3-Messung abgeschlossen; Ebenen-Cache für Nyx wesentlich.
+Stand: 03.10.2026 (Revision 118: O7-K – Entscheidung des Users „Kolibri ist der Maßstab“: Ebenen-Cache samt Test abbauen, Bild-Handling in Nyx wie Kolibri; Ladeweg teilen als Prüfpunkt.
+Revision 117: O7-K – Kolibris Composite-Handling 1:1 für Nyx plus Neu-Rendern nach dem Wärmen in beiden Apps (bevorzugte Option, Vorschlag des Users).
+Revision 116: O7 – viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite (Priorität hoch).
+Revision 115: 3b-7 – Phase 3b abgeschlossen: Bestandsaufnahme, Gemeinsamkeiten und Nähte, offene Punkte, volle Abschluss-Geräteprüfung.
+Revision 114: 3b-6d – E3 für Nyx revidiert, Nyx bindet `WallpaperComposite.None`; 3b-6 ohne E3-Messung abgeschlossen; Ebenen-Cache für Nyx wesentlich.
 Revision 113: 3b-6c – ein geteiltes Flatten-Theme in `:common-ui`, Qualifier und App-Provider entfallen; 15b-Begründung korrigiert.
 Revision 112: 3b-6b – Hilt-Bindung `@WallpaperFlattenTheme` für Nyx; Lesehinweis „Composite beim nächsten Rendern“; DI-Regel.
 Revision 111: 3b-6 – Nyx-Anzeige auf CachedWallpaperComposite (Ebenen-Cache bleibt im Editor), Speicherdruck, Vorher-APK.
@@ -1175,8 +1179,7 @@ Kolibri unverändert (Befund in dessen Baseline).
 Tests: keine geänderte Erwartung (Aufbau: None und Kontext in vier Testklassen); neu drei Composite-Fälle in `NyxWallpaperEditingTest`
 (gewärmt und gelesen, Neu-Wärmen nach Invalidieren, kein Flatten bei gültigem Cache) und `NyxWallpaperRenderSourceTest` (3, darunter
 „im Editor nie ein Composite-Ziel“, das R1 festschreibt).
-Offen (niedrige Priorität, seit 3b-6d neu gefasst): `WallpaperLayerBitmapCache` als geteilter Baustein auch für Kolibris Editor
-(der heute live dekodiert)? Für Nyx ist er wesentlich – nicht mehr „teilen oder löschen“. Kolibris Asymmetrie bei Speicherdruck (das Composite bleibt resident,
+Entschieden mit O7-K (Entscheidung des Users „Kolibri ist der Maßstab“, Revision 118): `WallpaperLayerBitmapCache` wird abgebaut. Kolibris Asymmetrie bei Speicherdruck (das Composite bleibt resident,
 kein Invalidieren) – angleichen oder bewusst so lassen.
 Lesehinweis für die E3-Zahlen (Senior): Weder Kolibri noch Nyx rendern nach dem Wärmen eigens neu; das Composite wird beim
 NÄCHSTEN Rendern genutzt (Zustandsemission, nach dem Editor, `onResume`, zurück aus dem Drawer, Drehen) – Nyx folgt damit 1:1
@@ -1214,6 +1217,56 @@ Tests prüfen die Verdrahtung der Komponente mit einem echten Composite, unabhä
 (Trace-Punkte, Flacker-Zähler, Skript) bleibt für spätere Fragen, das gesicherte Vorher-APK wird nicht mehr gebraucht.
 Die Commits 15, 15b, 15c bleiben, 15d kommt darauf – die Historie erzählt, was passiert ist: gebaut, bei der Pfad-Analyse vor der
 Messung erkannt, für Nyx zurückgestellt. Dank an die Repo-Session und den User für die Pfad-Analyse vor der investierten Gerätestunde.
+
+**3b-7 – Abschluss von Phase 3b (Urteil Senior; Patch phase3b/16):**
+Bestandsaufnahme (grep über alle Source-Sets): Jede Datei in Nyx' Wallpaper-Pfad hat Nutzer; die Altlasten verschwanden in
+3b-2 (`NyxWallpaperDisplaySettings`, `NyxFabPositionStore`), 3b-3 (`NyxWallpaperEditState`, die eigene Session-Logik des Coordinators)
+und 3b-5 (`extractLayerImages`, die direkten Löschstellen). Einziger toter Rest: `NyxWallpaperEditCoordinator.pendingFocusLayerId`
+(ersetzt durch `consumePendingFocusLayerId()`, kein Test) – entfernt. Keine ungenutzten Wallpaper-Strings. Dispatcher-Allowlist: 0 Nyx-Einträge.
+Bewusst bleiben: `WallpaperLayerBitmapCache` (trägt Nyx' Anzeige und Editor), `NyxWallpaperImageSetter` als Fassade (stabile API auf die
+eine geteilte Session), die drei No-op-Haken aus 3b-6d (kosten mit None nichts, Nyx bleibt bereit), die Messinfrastruktur (ohne
+Tracing kostenlos), `LaunchSafe.kt` (Nyx-eigene UI-Infrastruktur, Nyx hat kein BaseViewModel-`launchSafe`).
+
+**Was Nyx jetzt mit Kolibri teilt:**
+`:feature-wallpaper` – `WallpaperImageStore` mit Contract, `WallpaperEditSession`, `WallpaperOperations`, `WallpaperDisplaySettingsStore`
+(mit `toggleBackdrop` und dem D5-Typ-Schutz), `FabPositionStore`, `WallpaperImagePicker`, `WallpaperBackupBlobs`, die Schnittstelle
+`WallpaperComposite`; `:common-ui` – `WallpaperPaintTrace`, `WallpaperFlickerTrace`, das Flatten-Theme; `:core` – `FakeWallpaperRepository`.
+**Bewusste Nähte je App** (Maßstab für „Drift oder gewollt“): die Composite-Bindung (Kolibri `CachedWallpaperComposite`, Nyx `None`);
+der Host-Adapter (Kolibri `WallpaperDelegate`, Nyx `NyxWallpaperEditing` samt Coordinator); die Schlüsselnamen (`WallpaperDisplayKeys`);
+die Edit-UI (`WallpaperEditController` bzw. `NyxWallpaperEditController`); der Leseweg (Kolibri in `MainActivity`, Nyx in
+`NyxWallpaperRenderSource` mit Ebenen-Cache); die FAB-Position im Backup (L5).
+
+**Offene Punkte nach Phase 3b, mit Priorität:**
+- O4 gemeinsame Backup-Typen mit den Unterpunkten (a)–(e), darunter (e) Teilfehler beim Import – mittel.
+- O5 Landscape-Deckung mehrschichtiger Wallpaper – niedrig, nach 3b, beide Apps.
+- O6 Sammler im Startpfad ohne Exception-Handler – mittel (für die Display-Werte durch D5 entschärft, für andere Flows offen).
+- **O7 viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite – HOCH**, direkt nach 3b-7 und dem Kolibri-Aufräum-Patch,
+  vor der allgemeinen Inventur (zuerst messen mit einer 12-Ebenen-Collage; bevorzugte Option O7-K: Kolibris Composite-Handling 1:1
+  plus Neu-Rendern nach dem Wärmen in beiden Apps).
+- `lintRelease` NotificationPermission (`:feature-crashreporting`) – niedrig, nicht blockierend.
+- Backdrop-Umschalter in Nyx auffindbar machen (analog Kolibri) – niedrig, auf Aufruf des Users.
+- Kolibris Asymmetrie bei Speicherdruck (Composite bleibt resident) – niedrig.
+- Q5 Import bei offener Session (bekannte Einschränkung beider Apps) – niedrig, solange die UI den Weg ausschließt.
+- FAB im Backup „beide oder keine“ (L5) – niedrig.
+- Aufräumen: das Kolibri-Use-Case-Paket (`SetWallpaperImageUseCase`, `SetWallpaperBackdropUseCase`, tote Parameter, `SetWallpaperBackdropUseCaseTest`)
+  – vom User zum Löschen freigegeben, eigener Patch nach 3b-7; weiter nur mit dem Wort des Users: gemeinsamer In-Memory-DataStore-Fake,
+  `androidx.activity` in `:feature-wallpaper` auf `api`, `gradle/gradle-daemon-jvm.properties` beobachten.
+
+**Abschließende Geräteprüfung für 3b in Nyx – läuft VOLL (Entscheidung des Users):**
+1. Ausgangslage: Nyx-Debug-Build, Nyx als Standard-Home; `ls files/wallpapers` notieren.
+2. Bildauswahl: in den Einstellungen ein Bild aus Downloads, im Anpassen-Sheet eines aus Google Fotos bzw. einem Cloud-Anbieter –
+   beide als file:// kopiert, die alte Datei weg.
+3. Editor: zwei Ebenen hinzufügen, eine entfernen, tauschen, verschieben, skalieren; übernehmen; einmal abbrechen (keine Waise);
+   optional, falls reproduzierbar: ein Bild kurz vor „Speichern“ wählen (E2, per Unit-Test festgeschrieben).
+4. Backdrop über Speed-Dial → Befehle → Backdrop-Knopf; danach in den Einstellungen bzw. im Sheet ändern, zurück, umschalten –
+   Wechsel beim ersten Tipp.
+5. Anzeige-Einstellungen: Scrim und Stil ändern; die FAB verschieben.
+6. Backup exportieren (zwei Ebenen), Wallpaper ändern, wiederherstellen – beide Ebenen da, zwei Dateien.
+7. Zurücksetzen auf Werkszustand – Wallpaper, Display-Werte und FAB auf Default, Verzeichnis leer.
+8. Wiederherstellen nach dem Zurücksetzen – alles zurück.
+9. Neustart (Kaltstart) – keine Absturz-, FATAL-, SILENT_ERROR- oder ACRA-Einträge. (Drehen entfällt: Nyx ist auf Hochformat festgelegt.)
+10. Waisen-Check: `ls files/wallpapers` passt zum gespeicherten Zustand; nach einem weiteren Neustart mit gealterter künstlicher
+    Waise ist diese weg, die referenzierten Dateien bleiben.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
@@ -1427,6 +1480,60 @@ Noch zu prüfen: die Wege über `ResolveWallpaperSurfaceUseCase` (wer sammelt) u
 a. `wallpaperBackdropFlow`, Zeile ~595).
 Lösung separat, mit eigener Vorlage (Optionen etwa:
 Handler im `DelegateScope`, `catch` vor `stateIn` je Flow, eine Regel/ein Gate „kein `stateIn` im Startpfad ohne Fehlerpfad“).
+
+**O7 – Viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite (offen, Priorität HOCH; Befund des Users, 03.10.).**
+Zeitpunkt: direkt nach 3b-7 und dem Kolibri-Aufräum-Patch, vor der allgemeinen Inventur. Der User nutzt Collagen mit 12 Ebenen.
+*Befund (Senior und Junior, am Code):* Die Ansicht braucht zum Zeichnen ALLE Ebenen lebend; Nyx hält im Anzeigemodus deshalb alle
+Ebenen-Bitmaps dekodiert, solange das Wallpaper angezeigt wird – grob 10 MB je für den Schirm dekodierter Ebene (1080×2400×4),
+je nach Quellbild bis zum Render-Budget `RENDER_WALLPAPER_PIXELS` (10,5 MP, bis rund 42 MB als HARDWARE-Bitmap); ein 12-MP-Foto
+landet nach `inSampleSize` 2 bei rund 3 MP (etwa 12 MB). Bei 12 Ebenen hält Nyx damit grob 120–150 MB Grafikspeicher dauerhaft,
+Kolibri im Anzeigemodus rund 10 MB (ein Composite in Bildschirmgröße, die Ebenen nur kurz zum Flatten). Ein dauerhaft laufender
+Launcher mit so viel Speicher wird eher vom System beendet und neu aufgebaut. Der Ebenen-Cache verdoppelt nichts (er hält
+dieselben Objekte wie die Ansicht), ist aber auf 64 MB begrenzt (`DEFAULT_MAX_BYTES`): Es passen nur etwa 6 Ebenen hinein, bei
+jedem Neu-Rendern werden die übrigen neu dekodiert – I/O und genau die Flacker-Frames, die der Cache verhindern soll.
+Ein Composite reduzierte die Anzeige auf EIN Bitmap (~10 MB), sofern die Ebenen-Bitmaps außerhalb des Editors freigegeben werden.
+*Bezug:* Die Revision von E3 in 3b-6d bleibt für wenige Ebenen richtig (die Analyse hatte zwei Ebenen im Blick); für viele Ebenen
+ist sie offen.
+*Vorgehen:* (1) Zuerst messen mit einer 12-Ebenen-Collage in Nyx: Speicher (`dumpsys meminfo`, Graphics und Native), Flacker-Zähler
+und first_paint mit der vorhandenen Messinfrastruktur, je drei Läufe abwechselnd; ein Test-Backup mit 12 Ebenen gehört zur
+Vorbereitung (mit SHA-256 im Spec, wie das Zwei-Ebenen-Backup). (2) Dann über ein „Composite richtig für Nyx“ entscheiden: das
+Composite nach dem Wärmen anzeigen (Neu-Rendern bei gefülltem Cache), die Ebenen-Bitmaps im Anzeigemodus freigeben und die Ebenen
+erst beim Öffnen des Editors dekodieren – gegebenenfalls erst ab einer Zahl von Ebenen –, mit Blick auf die Kosten beim Kaltstart
+(Flatten auf dem Main-Thread, mit 12 Ebenen schwerer). (3) Prüfen, ob Kolibri bei 12 Ebenen ein eigenes Problem hat
+(Flatten-Dauer, Speicher während des Flattens).
+*Bevorzugte Option O7-K (Vorschlag des Users, angenommen vom Senior):* Kolibris Composite-Handling 1:1 für Nyx – Nyx bindet
+`CachedWallpaperComposite` wie Kolibri –, plus Neu-Rendern nach dem Wärmen in BEIDEN Apps über den vorhandenen
+`WallpaperComposite.Host.onCompositeFilled` (Kolibri nutzt ihn heute nur für den Debug-Toast). Damit verschwindet die letzte
+große Naht (Composite-Bindung je App), ohne Sonderregel „ab x Ebenen“. Der Haken des wörtlichen 1:1 (Nyx rendert selten neu,
+das Composite käme lange nicht auf den Schirm, die Ebenen blieben lebend) ist mit dem Neu-Rendern gelöst; Kolibri gewinnt dabei,
+weil das Composite sofort erscheint statt erst beim nächsten drawer → home. O7s Speicherproblem wäre gelöst (ein Bitmap von rund
+10 MB im Anzeigemodus); das geteilte Flatten-Theme (3b-6c) ist da, Nyx' Graph braucht nichts Neues.
+*Schicksal von `WallpaperLayerBitmapCache` – entscheidet die Messung:* Mit O7-K dekodiert Nyx' Editor live wie Kolibris, was dort
+sichtbar mehr flackern kann (in 3b-6 blieb der Cache deshalb für den Editor, R1). Die Vorher-Messung erfasst den Editor ausdrücklich
+(Schritte „Ebene entfernen und speichern“, Flacker-Zähler). Steigt Nyx' Editor-Flackern mit O7-K spürbar, wird der Cache NICHT
+gelöscht, sondern zum geteilten Baustein in `:common-ui` für den Editor BEIDER Apps – gefüllt nur im Editor, beim Verlassen geleert,
+damit der Anzeigemodus wirklich frei wird (eine Regel für beide, kein Drift). Steigt es nicht, entfällt der Cache, Klasse und Test
+werden mit dem Wort des Users gelöscht.
+*Weitere Punkte für die O7-K-Vorlage (nach der Messung):* Speicher wirklich frei – nach dem Neu-Rendern auf das Composite halten
+weder Ansicht noch Cache die Ebenen-Bitmaps (`dumpsys meminfo` vorher und nachher); der Wechsel vom Ebenen-Bild zum Composite ist
+visuell nahtlos (beide pixelgleich), in beiden Apps auf dem Gerät geprüft (der Flacker-Zähler zählt fehlende Ebenen, nicht diesen
+Wechsel); Kaltstart mit 12 Ebenen (Flatten auf dem Main-Thread, first_paint in beiden Apps); Zeilen unter „Nutzersichtbare
+Änderungen“ – Kolibri „Composite sofort nach dem Wärmen“, Nyx gegebenenfalls das Editor-Verhalten.
+*Reihenfolge:* 3b-7-Abschlussprüfung, Push, Kolibri-Aufräum-Patch, dann O7 – zuerst die Messvorbereitung (12-Ebenen-Test-Backup mit
+SHA-256) und die Vorher-Messung auf dem heutigen Stand (Nyx mit `None` und Ebenen-Cache, Kolibri wie es ist), dann die O7-K-Vorlage.
+*Entscheidung des Users (03.10.): „Kolibri ist der Maßstab.“* Wenn Kolibri den Cache nicht braucht, der Cache ohnehin nur bis etwa
+6 Ebenen hilft und eigene komplexe Regeln hat, wird der Editor-Cache abgebaut und beim Handling der Bilder in Nyx möglichst viel
+Logik von Kolibri verwendet. Damit: (1) `WallpaperLayerBitmapCache` wird abgebaut, Klasse und `WallpaperLayerBitmapCacheTest`
+entfallen (das Wort des Users zum Löschen dieses Tests liegt mit der Entscheidung vor) – der obige Absatz „Schicksal von
+`WallpaperLayerBitmapCache` – entscheidet die Messung“ ist damit entschieden; (2) Kolibri ist der Maßstab für das Bild-Handling in
+Nyx, in Anzeige und Editor – Abweichungen nur an den festgehaltenen Nähten, jede weitere mit Begründung; (3) die Messung ist Beleg
+und Absicherung, keine Entscheidung mehr – nur ein DEUTLICH sichtbares Editor-Problem (mehr als kurzes Nachladen) geht noch einmal
+an den User, der Standard ist das Abbauen.
+*Prüfpunkt für die O7-K-Vorlage (Konsequenz des Maßstabs):* Nach dem Abbau des Caches dekodiert Nyx Ziele ohne Composite live – genau
+das, was Kolibris Loader tut. Zu prüfen: ob Kolibris Ladeweg (composite:// aus dem Composite, sonst Dekodieren mit Kolibris Regeln für
+Größe, `inSampleSize` und HARDWARE) als geteilter Baustein nach `:common-ui` bzw. `:feature-wallpaper` ziehen kann, den BEIDE Apps
+nutzen; was dann von `NyxWallpaperRenderSource` bleibt (im Idealfall nur `displayTargetFor` als Host-Teil oder nichts); damit
+verschwindet die Naht „Leseseite je App“ oder schrumpft auf das, was der Host wirklich anders macht – je Rest mit Begründung.
 
 **O2 – Geteilte Wallpaper-Dateien nach Import (Kolibri, seit 2a-5).** Der Container speichert gleichen Inhalt einmal (B6).
 Kolibris Import legt pro Blob **eine** interne Datei an (`importContainer`, Schleife über `referenced.toSet()`);

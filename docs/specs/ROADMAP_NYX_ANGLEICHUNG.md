@@ -1,6 +1,10 @@
 # Roadmap: Nyx ↔ Kolibri – übrige Angleichung
 
-Stand: 29.09.2026 (Revision 3: D12 hart verdrahtete Dispatcher. Revision 2: Zählungen nachgeprüft)
+Stand: 03.10.2026 (Revision 4: Spec-Phase 3 (Wallpaper) abgeschlossen; D12 für Nyx erledigt.
+Revision 3: D12 hart verdrahtete Dispatcher. Revision 2: Zählungen nachgeprüft)
+
+**Spec-Phase 3 (Wallpaper) ist abgeschlossen (03.10.2026)** – Kolibri und Nyx teilen den Wallpaper-Kern in `:feature-wallpaper`
+(Zusammenfassung, bewusste Nähte und offene Punkte in `SPEC_NYX_REWRITE.md`, 3b-7).
 
 ## Zweck & Verhältnis zum Spec
 
@@ -117,7 +121,7 @@ Nyx ist an einer Stelle besser: es liest Datum und Zone für den Dialog einmal (
 | D8 | Paket-Event-Brücke | `PackageEventCoordinator` „mirrors Kolibri's `AppManagementDelegate`“ | ein geteilter Coordinator mit App-Hook (Nyx: Icon-Evict + Reconcile) | R8 |
 | D9 | Doppelte Repos samt Test-Infra | AppUsage (Kolibri 275 / Nyx 106 Zeilen) und HiddenApps (216 / 59) je mit Interface, Contract, Fake, Impl; dazu `RecordAppLaunchUseCase`, `GetDrawerAppsUseCase`, `UsageDataStore`, `AppLauncherModule` (19-Zeilen-Klon) | einmal in `:common-data`/`:core`, Contract-Triple dort | R5 |
 | D11 | Kleine Konstanten | Drawer-Slide-Dauer gespiegelt, Missing-Alpha (L4), Platzhalter für Uhr/Datum/Akku | geteilte `integers.xml`/`dimens.xml` in `:common-ui` | R10 |
-| D12 | Hart verdrahtete Dispatcher | Kolibri 30 Stellen (meist `Dispatchers.Main` als Scope-Kontext in Fragmenten), geteilte Module 7, Nyx 6 (verschwinden mit 2b/3b/1c). Seit 1a-10 verhindert A13 neue Stellen; die 43 bestehenden stehen in `tools/dispatcher-allowlist.txt` | injizierte `@IoDispatcher` / `@DefaultDispatcher` / `@MainDispatcher`; A13-Liste schrumpft auf 0 | R10 |
+| D12 | Hart verdrahtete Dispatcher | Kolibri 30 Stellen (meist `Dispatchers.Main` als Scope-Kontext in Fragmenten), geteilte Module 7, Nyx 6 (verschwinden mit 2b/3b/1c) – **für Nyx erledigt: 0 Einträge seit 3b**. Seit 1a-10 verhindert A13 neue Stellen; die 43 bestehenden stehen in `tools/dispatcher-allowlist.txt` | injizierte `@IoDispatcher` / `@DefaultDispatcher` / `@MainDispatcher`; A13-Liste schrumpft auf 0 | R10 |
 
 (D1, D2, D4 und D10 sind im Spec behandelt: Keep-Regeln, Crash-Bootstrap, Convention-Plugins, Spiegel-Detektor A8.)
 
