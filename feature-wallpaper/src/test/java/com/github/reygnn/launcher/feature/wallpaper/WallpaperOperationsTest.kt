@@ -13,6 +13,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -280,5 +281,64 @@ class WallpaperOperationsTest {
         assertThat(ops.session.state.value.referencedUris).containsExactly(b)
         verify(exactly = 1) { fileManager.gcOrphans(any<Set<String>>()) }
         assertThat(composite.refilled).hasSize(2)
+    }
+
+    // ---- "remove wallpaper" against a running copy (audit A2) ----
+    // The removal deletes every image file, a running copy's too. A replace or add that resumes
+    // afterwards must discard itself, never persist a reference to the deleted file.
+
+    @Test
+    fun clear_during_a_running_replace_discards_the_replace() = runTest(mainDispatcherRule.testDispatcher) {
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val copyGate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers { copyGate.await(); Uri.parse(b) }
+        val ops = operations(backgroundScope, persistence)
+
+        val replace = async { ops.replace(picked, ops.session.rollbackGeneration) }
+        runCurrent() // the copy is running
+        assertThat(ops.clear()).isTrue()
+        copyGate.complete(Unit)
+
+        assertThat(replace.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.state.value).isEqualTo(WallpaperState.NONE)
+        verify { fileManager.deleteFile(b) } // the discarded copy goes too
+    }
+
+    @Test
+    fun clear_during_a_running_add_discards_the_add() = runTest(mainDispatcherRule.testDispatcher) {
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val copyGate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers { copyGate.await(); Uri.parse(b) }
+        val ops = operations(backgroundScope, persistence)
+
+        val add = async { ops.addLayer(picked, ops.session.rollbackGeneration) }
+        runCurrent()
+        assertThat(ops.clear()).isTrue()
+        copyGate.complete(Unit)
+
+        assertThat(add.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.state.value).isEqualTo(WallpaperState.NONE)
+    }
+
+    @Test
+    fun a_replace_whose_copy_finished_while_the_clear_waited_is_discarded() = runTest(mainDispatcherRule.testDispatcher) {
+        // The narrower window: the copy is done, but the change waits for the persist lock that a
+        // clear (itself behind a pending save) holds next. The generation check must run under
+        // the lock, or the change passes first and saves after the removal.
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(backgroundScope, persistence)
+        persistence.saveGate = CompletableDeferred()
+        ops.persistLater("transform", ops.session.saveSingleTransform(2f, 0f, 0f, null))
+        runCurrent() // that save now holds the persist lock
+
+        val clear = async { ops.clear() }
+        runCurrent() // queued behind the save
+        val replace = async { ops.replace(picked, ops.session.rollbackGeneration) }
+        runCurrent() // copied, queued behind the clear
+        persistence.saveGate!!.complete(Unit)
+
+        assertThat(clear.await()).isTrue()
+        assertThat(replace.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.state.value).isEqualTo(WallpaperState.NONE)
     }
 }

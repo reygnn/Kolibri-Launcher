@@ -121,8 +121,8 @@ class WallpaperOperations(
     /**
      * "Choose wallpaper": copy in, apply as a session change (also inside a session), persist,
      * delete what is no longer referenced. [rollbackGenAtStart] is read at invocation time; a
-     * cancel during the copy discards the change — the copy is then an orphan for the GC.
-     * Saved through the port as the single-image state (3a-9, K2: what the old use case did).
+     * cancel or a "remove wallpaper" during the copy discards the change, and the store removes
+     * the unreferenced copy. Saved through the port as the single-image state (3a-9, K2).
      */
     suspend fun replace(imageUri: Uri, rollbackGenAtStart: Long): ImageResult {
         val internalUri = imageStore.copyIn(imageUri)
@@ -130,19 +130,14 @@ class WallpaperOperations(
             TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
             return ImageResult.CopyFailed
         }
-        val newUri = internalUri.toString()
-        val effect = session.replace(newUri, rollbackGenAtStart) ?: return ImageResult.Discarded
-        persistLock.withLock {
-            persistence.save(effect.persist)
-            imageStore.deleteUnreferenced(effect.deleteNow)
-        }
-        return ImageResult.Applied
+        return applyCopied(internalUri.toString()) { session.replace(it, rollbackGenAtStart) }
     }
 
     /**
      * Adds a layer: copy in, apply (re-validated through the rollback generation), persist. A
-     * cancel during the copy discards the add, and the store removes the unreferenced copy. A
-     * commit does NOT bump the generation (E2): an add resuming after a commit is applied.
+     * cancel or a "remove wallpaper" during the copy discards the add, and the store removes the
+     * unreferenced copy. A commit does NOT bump the generation (E2): an add resuming after a
+     * commit is applied.
      */
     suspend fun addLayer(imageUri: Uri, rollbackGenAtStart: Long): ImageResult {
         val internalUri = imageStore.copyIn(imageUri)
@@ -150,16 +145,28 @@ class WallpaperOperations(
             TimberWrapper.silentError("Failed to copy layer image to internal storage")
             return ImageResult.CopyFailed
         }
-        val internalUriString = internalUri.toString()
-        val effect = session.addLayer(internalUriString, rollbackGenAtStart)
-        if (effect == null) {
-            // Rolled back during the copy: nothing persisted references the new copy (3a-2c).
-            imageStore.deleteUnreferenced(listOf(internalUriString))
-            return ImageResult.Discarded
-        }
-        persist(effect)
-        return ImageResult.Applied
+        return applyCopied(internalUri.toString()) { session.addLayer(it, rollbackGenAtStart) }
     }
+
+    /**
+     * Applies a change for a freshly copied [copiedUri] and persists it — the generation check
+     * runs UNDER [persistLock] (audit A2): a "remove wallpaper" holds that lock while it deletes
+     * every image file and bumps the generation, so a copy that finished before or during the
+     * removal is discarded here instead of saving a reference to a file the removal deleted.
+     * Checked outside the lock, the change could pass, wait for the lock, and save after the
+     * removal. A discarded copy is not referenced by anything persisted (3a-2c).
+     */
+    private suspend fun applyCopied(copiedUri: String, change: (String) -> WallpaperEditSession.Effect?): ImageResult =
+        persistLock.withLock {
+            val effect = change(copiedUri)
+            if (effect == null) {
+                imageStore.deleteUnreferenced(listOf(copiedUri))
+                return@withLock ImageResult.Discarded
+            }
+            persistence.save(effect.persist)
+            imageStore.deleteUnreferenced(effect.deleteNow)
+            ImageResult.Applied
+        }
 
     // ---- remove wallpaper ----
 
@@ -194,7 +201,11 @@ class WallpaperOperations(
             // lock refuses the removal — nothing cleared, nothing deleted.
             if (session.isEditMode.value) return@exclusive false
             persistence.clear()
-            imageStore.deleteAllIfNothingPersisted()
+            imageStore.deleteAllIfNothingPersisted().also { tookEffect ->
+                // Every image file is gone: an add or replace still copying must not persist its
+                // copy afterwards (audit A2) — it checks the generation under this lock.
+                if (tookEffect) session.invalidatePendingChanges()
+            }
         }
         if (!removalTookEffect) return@exclusive false
         // Drop the composite and its luminance: nothing displays it after a clear.

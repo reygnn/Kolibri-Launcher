@@ -76,7 +76,10 @@ class WallpaperEditSession {
     private val pendingRemovalsOnCommit = mutableSetOf<String>()
     private val pendingRemovalsOnCancel = mutableSetOf<String>()
 
-    /** Bumped by every cancel; a suspended add or replace compares it and discards itself. */
+    /**
+     * Bumped by every cancel and by a "remove wallpaper" that took effect; a suspended add or
+     * replace compares it and discards itself.
+     */
     var rollbackGeneration: Long = 0L
         private set
 
@@ -116,6 +119,15 @@ class WallpaperEditSession {
         imageChangedInSession = false
         _isEditMode.value = true
         return true
+    }
+
+    /**
+     * "Remove wallpaper" took effect: an add or replace still copying must discard itself, because
+     * the removal deleted every image file — its copy may be among them (audit A2). Bumps the
+     * generation like a cancel; the displayed state is the caller's business.
+     */
+    fun invalidatePendingChanges() {
+        rollbackGeneration++
     }
 
     /** Keeps the edit: the files removed during the session go to the store. No generation bump (E2). */
