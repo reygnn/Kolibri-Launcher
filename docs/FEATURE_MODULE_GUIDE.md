@@ -61,7 +61,7 @@ apps (kolibri, nyx)  →  feature-*  →  common-ui / common-data  →  core
 **Principle:** new entries in a ratchet (allowlist, baseline, whitelist) are forbidden; a patch that removes the last use of an entry removes the entry (the gate reports stale entries).
 Every new detector comes with a counter-check (the bad case is flagged) in its self-test, and the counter-check belongs to the patch.
 
-- **Shared lint lists** (`tools/shared-lint-files.sh`): a shared file goes into
+- **Shared lint lists** (`tools/shared-lint-files.sh`; app-specific files in the app's `.conf`): the lists are POSITIVE lists — a file not on them is not checked at all, so every shared file with a broad catch must be added. A shared file goes into
   `SHARED_CANCEL_FILES` (launches/collects that must rethrow `CancellationException`),
   `SHARED_OOM_FILES` (allocation boundaries that may catch `OutOfMemoryError`),
   `SHARED_RULE11_FILES` (`catch` blocks that need the four-category note),
@@ -73,7 +73,9 @@ Every new detector comes with a counter-check (the bad case is flagged) in its s
 - **Rule 9** — `silentError` logs and THROWS in DEBUG (a wrong old value crashes a debug build on purpose); `reportToAcra` only in crash infrastructure.
 - **Apostrophe detector** — `res/values*/strings.xml` and `arrays.xml`: write `\'` or quote the value (AAPT2 rejects it, an XML parser and kotlinc do not).
 - **Keep list** — a store owning settings keys implements `OwnsSettingsStoreKeys` and is bound with `@IntoSet` in the app's binding file; its source root is in `KEEPLIST_ROOTS`; key properties are UPPERCASE so the gate sees each one.
-- **Purge gate** — sees only `*RepositoryImpl.kt`; any other `Purgeable` is covered by the app's `ResetCompletenessContract`.
+- **Purge gate** — checks `*RepositoryImpl.kt` under `PURGE_ROOTS` (the app's data module and `:common-data`; add a new shared module with repositories there);
+  a key counts only when named inside `purgeRepository()` itself (a helper call does not), `private`/`const` keys included;
+  any other `Purgeable` (a store that is not a `*RepositoryImpl`) is covered only by the app's `ResetCompletenessContract`.
 - **Naming** — data-layer file names follow the app's naming gate (`NAMING_*` in the app's `.conf`).
 
 ## 4. DI (Hilt)

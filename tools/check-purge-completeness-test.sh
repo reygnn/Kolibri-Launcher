@@ -102,6 +102,30 @@ else
   echo "✓ Fixture 2: camelCase dynamic key not required; wholesale .clear() exempts file."
 fi
 
+# ── Fixture 2b: a PRIVATE key missing from the purge body — MUST flag (audit A7) ──
+f2b="$tmpdir/PrivateKeyRepositoryImpl.kt"
+cat > "$f2b" <<'EOF'
+class PrivateKeyRepositoryImpl {
+    companion object {
+        private val KEY_HANDLED = stringPreferencesKey("handled")
+        private val KEY_FORGOTTEN = stringPreferencesKey("forgotten")
+    }
+
+    override suspend fun purgeRepository() {
+        safeEdit { preferences -> preferences.remove(KEY_HANDLED) }
+    }
+}
+EOF
+expected2b="$f2b:4:         private val KEY_FORGOTTEN = stringPreferencesKey(\"forgotten\")"
+actual2b=$(awk -f "$awk_script" "$f2b")
+if [ "$actual2b" != "$expected2b" ]; then
+  echo "✗ Fixture 2b (private key) regression:"
+  diff <(printf '%s\n' "$expected2b") <(printf '%s\n' "$actual2b") || true
+  fail=1
+else
+  echo "✓ Fixture 2b: a private key missing from the purge body flags; a handled one does not."
+fi
+
 # ── Fixture 3: no purgeRepository() at all — MUST be skipped (silent) ──
 f3="$tmpdir/NoPurgeRepositoryImpl.kt"
 cat > "$f3" <<'EOF'

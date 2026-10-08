@@ -76,6 +76,8 @@ class FabPositionStore @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): log the failed write, then
+            // rethrow so the caller sees it; OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Error saving FAB position")
             throw e
         }

@@ -11,7 +11,9 @@
 # that file's `purgeRepository()`.
 #
 # == WHAT IS A "DECLARED KEY" ==
-#   A constant-style declaration `val UPPER_SNAKE = <...>PreferencesKey(...)`
+#   A constant-style declaration `val UPPER_SNAKE = <...>PreferencesKey(...)`, also with
+#   modifiers (`private`, `internal`, `protected`, `const` — audit A7: a `private val` key in
+#   the shared WallpaperRepositoryImpl went unseen)
 #   (string/boolean/int/long/float/double/stringSet). The UPPER_SNAKE filter is
 #   deliberate: dynamic per-entity keys are built inline from a prefix as local
 #   `camelCase` vals (`val usageKey = stringSetPreferencesKey(PREFIX + pkg)` in
@@ -84,7 +86,7 @@ END {
     # ---- collect declared keys and flag any absent from the purge body ----
     for (n = 1; n <= NR; n++) {
         line = lines[n]
-        if (line !~ /^[[:space:]]*val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*=/) continue
+        if (line !~ /^[[:space:]]*((private|internal|protected|const)[[:space:]]+)*val[[:space:]]+[A-Z][A-Z0-9_]*[[:space:]]*=/) continue
 
         # confirm the RHS is a preferences-key factory (this line or the next,
         # since some declarations wrap: `val NAME =` \n `booleanPreferencesKey(`)
@@ -94,7 +96,7 @@ END {
 
         # extract the key name
         name = line
-        sub(/^[[:space:]]*val[[:space:]]+/, "", name)
+        sub(/^[[:space:]]*((private|internal|protected|const)[[:space:]]+)*val[[:space:]]+/, "", name)
         sub(/[[:space:]]*=.*$/, "", name)
 
         # a declaration inside the purge body itself is not a "key to purge"

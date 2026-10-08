@@ -102,8 +102,9 @@ class WallpaperFlattener @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // Throwable: the parallel decodes + compose are an allocation
-                // boundary (OOM). A failed flatten just means no composite this time.
+                // Catch kept (Expected error, four-category frame): the parallel decodes +
+                // compose are an allocation boundary (OOM extends Error → Throwable). A failed
+                // flatten just means no composite this time.
                 TimberWrapper.silentError(e, "Wallpaper flatten failed")
                 null
             }
@@ -120,6 +121,8 @@ class WallpaperFlattener @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                // Catch kept (Expected error, four-category frame): a decode is an allocation
+                // boundary (OOM extends Error → Throwable); one unreadable layer means no flatten.
                 TimberWrapper.silentError(e, "Software layer decode failed for flatten")
                 null
             }

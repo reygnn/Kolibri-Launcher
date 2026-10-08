@@ -256,7 +256,8 @@ class WallpaperRepositoryImpl @Inject constructor(
         var failure: Throwable? = null
         try {
             dataStore.safePurge("WallpaperRepositoryImpl") { preferences ->
-                removeAllKeys(preferences)
+                // The key by name, so the purge gate sees it (audit A7) — same as removeAllKeys.
+                preferences.remove(KEY_LAYERS_JSON)
             }
         } catch (e: CancellationException) {
             throw e
