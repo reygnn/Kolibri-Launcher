@@ -57,8 +57,8 @@ import androidx.activity.result.contract.ActivityResultContracts
  * // later:
  * WallpaperImagePicker.launch(picker)
  * ```
- * Shared since 3a-6 (moved from Kolibri's `ui.util`, behaviour unchanged); Nyx switches its
- * remaining `PickVisualMedia` paths to it in 3b. [WallpaperImagePickerTest] pins the choice.
+ * Shared since 3a-6 (moved from Kolibri's `ui.util`, behaviour unchanged); Nyx uses it on all
+ * three paths since 3b-4. [WallpaperImagePickerTest] pins the choice.
  * =====================================================================================
  */
 object WallpaperImagePicker {

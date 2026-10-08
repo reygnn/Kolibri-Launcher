@@ -18,8 +18,8 @@ interface WallpaperRepository : Purgeable {
     val wallpaperState: Flow<WallpaperState>
 
     /**
-     * Speichert den Wallpaper-Zustand.
-     * @param state Der zu speichernde Zustand (isEditMode wird ignoriert)
+     * Saves the wallpaper state.
+     * @param state The state to persist (its layers with their transforms).
      */
     suspend fun saveWallpaperState(state: WallpaperState)
 

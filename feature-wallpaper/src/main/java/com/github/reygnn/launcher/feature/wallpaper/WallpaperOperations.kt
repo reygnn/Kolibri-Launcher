@@ -24,7 +24,7 @@ interface WallpaperPersistence {
  * around the pure [WallpaperEditSession] — persist and delete in order, the re-sync after a
  * session, replace and add with the rollback generation, "remove wallpaper", and the start-up
  * wiring (persisted state → session, orphan GC once per process, composite refill). The caller
- * (Kolibri's `WallpaperDelegate`, Nyx's coordinator in 3b) keeps only intents and the mapping of
+ * (Kolibri's `WallpaperDelegate`, Nyx's `NyxWallpaperEditing` with its coordinator since 3b-3) keeps only intents and the mapping of
  * results to its UI. Moved unchanged from Kolibri's delegate.
  *
  * One instance per host, never a singleton: it belongs to exactly one [session].

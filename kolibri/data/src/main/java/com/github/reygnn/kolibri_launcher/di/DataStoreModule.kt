@@ -17,12 +17,13 @@ import javax.inject.Singleton
 
 /**
  * The app's general settings / user-config store (favorites, layout, colours,
- * …) — one of two Preferences DataStores. The ACRA crash-report consent flag is
- * NOT here; it lives in the separate [consentDataStore] (its own file, excluded
+ * …) — one of three Preferences DataStores (the others: [usageDataStore] below, and the
+ * crash-report consent store in :feature-crashreporting). The ACRA crash-report consent flag is
+ * NOT here; it lives in the separate `consentDataStore` (its own file, excluded
  * from Auto Backup). `private` because nothing outside this file touches the
  * extension: runtime consumers inject `DataStore<Preferences>` from
  * [DataStoreModule.provideSettingsDataStore], and the pre-Hilt bootstrap only
- * ever reaches [consentDataStore], never this store.
+ * ever reaches `consentDataStore`, never this store.
  */
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = AppConstants.SETTINGS_DATASTORE_NAME

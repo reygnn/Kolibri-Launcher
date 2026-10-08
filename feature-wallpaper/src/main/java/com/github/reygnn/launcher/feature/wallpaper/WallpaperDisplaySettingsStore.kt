@@ -55,8 +55,7 @@ data class WallpaperDisplayKeys(
  *    wrong type crashes a debug build on purpose (house rule); release reads the default.
  *  Why: these flows are collected via `stateIn` on Home's start path; an exception there would
  *  end the process on every start (O6 tracks that wider question).
- *  - **Writes** swallow their failure after logging (D4); whether Nyx keeps throwing is decided
- *    in 3b.
+ *  - **Writes** swallow their failure after logging (D4) — in both apps since 3b-2.
  *  - **Purge** rethrows (F1), so the reset reports a partial failure. Who purges it differs per
  *    app: Kolibri through `SettingsRepositoryImpl`, Nyx directly in its `ResetRepositoryImpl`
  *    (Nyx has no `SettingsRepository`). Never both — the store would be purged twice.

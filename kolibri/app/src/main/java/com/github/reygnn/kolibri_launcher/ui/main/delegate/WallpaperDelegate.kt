@@ -69,7 +69,7 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * Delegate responsible for wallpaper management:
  * single-image wallpaper, multi-layer wallpaper,
- * edit mode, transforms, layer properties (alpha, blend, visibility).
+ * edit mode, layer transforms.
  *
  * == EDIT SESSION ==
  * The delegate exposes a transactional edit-session API:

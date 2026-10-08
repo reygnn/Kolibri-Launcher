@@ -28,8 +28,8 @@ import javax.inject.Singleton
 interface WallpaperComposite {
 
     /**
-     * What the composite needs from its caller — Kolibri's delegate today, Nyx's coordinator in
-     * 3b — as plain functions, no session (J2). **Every member is called on the main thread**, the
+     * What the composite needs from its caller — Kolibri's delegate, Nyx's `NyxWallpaperEditing`
+     * (since 3b-3) — as plain functions, no session (J2). **Every member is called on the main thread**, the
      * implementation guarantees it (its checks run after returning from the I/O context), so a
      * host may read main-confined state such as a `WallpaperEditSession`.
      */

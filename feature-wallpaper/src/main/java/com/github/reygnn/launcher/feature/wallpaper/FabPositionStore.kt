@@ -38,7 +38,8 @@ import javax.inject.Singleton
  * **Shared since 3a-5** (was Kolibri's `FabPositionRepositoryImpl`): in `:feature-wallpaper`, on
  * the app's settings store ([SettingsStore]), behaviour unchanged — a missing value falls back
  * per coordinate, a failed save is logged and rethrown, reads fail open on `IOException`.
- * Unifying with Nyx's "both or default" rule is open for 3b. The key names are the same in both
+ * Nyx uses this store since 3b-2 (per coordinate, its former "both or default" rule is gone; see
+ * NyxFabPositionStoreTest). The key names are the same in both
  * apps, so they stay literals (the keep-list gate sees them). It is purged exactly once — in both
  * apps by `ResetRepositoryImpl` (Kolibri always, Nyx since 2b-4c) — never additionally elsewhere.
  */

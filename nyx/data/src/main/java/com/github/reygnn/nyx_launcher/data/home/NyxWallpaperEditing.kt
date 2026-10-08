@@ -34,9 +34,10 @@ import javax.inject.Singleton
  * when `MainActivity` ends — like leaving the editor without saving — so no orphaned session keeps
  * the GC locked and the display frozen.
  *
- * The display composite (3b-6, E3): the injected shared [WallpaperComposite] — the
- * `CachedWallpaperComposite` singleton, read by the home's render source. Its key uses the display
- * size from the app context's resources, which follow configuration changes (as in Kolibri).
+ * The display composite: the injected shared [WallpaperComposite] — Nyx binds
+ * `WallpaperComposite.None` (3b-6d) until O7-K decides otherwise; the wiring is the one of 3b-6, so
+ * binding `CachedWallpaperComposite` is the one change. Its key would use the display size from the
+ * app context's resources, which follow configuration changes (as in Kolibri).
  */
 @Singleton
 class NyxWallpaperEditing @Inject constructor(

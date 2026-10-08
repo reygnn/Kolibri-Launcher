@@ -289,9 +289,9 @@ class WallpaperRepositoryImpl @Inject constructor(
     // ===========================================
 
     /**
-     * Serialisiert eine Layer-Liste in ein JSONArray.
+     * Serializes a layer list into a JSONArray (`captureSampleSize` -1 = absent).
      *
-     * Format pro Layer:
+     * Format per layer:
      * ```json
      * {
      *   "id": "layer_123_0",
@@ -299,10 +299,7 @@ class WallpaperRepositoryImpl @Inject constructor(
      *   "scale": 2.5,
      *   "translateX": -100.0,
      *   "translateY": -50.0,
-     *   "alpha": 0.85,
-     *   "blendModeName": "MULTIPLY",
-     *   "isVisible": true,
-     *   "label": "Oben"
+     *   "captureSampleSize": 2
      * }
      * ```
      */
