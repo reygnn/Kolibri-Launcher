@@ -629,22 +629,6 @@ class LauncherViewModelContractTest {
     }
 
     @Test
-    fun `WallpaperFragment - edit mode toggles correctly`() = runTest {
-        val vm = createViewModel()
-
-        assertThat(vm.isWallpaperEditMode.value).isFalse()
-
-        vm.onSetWallpaperEditMode(true)
-        assertThat(vm.isWallpaperEditMode.value).isTrue()
-
-        vm.onToggleWallpaperEditMode()
-        assertThat(vm.isWallpaperEditMode.value).isFalse()
-
-        vm.onToggleWallpaperEditMode()
-        assertThat(vm.isWallpaperEditMode.value).isTrue()
-    }
-
-    @Test
     fun `WallpaperFragment - clear wallpaper calls through`() = runTest {
         val vm = createViewModel()
         advanceUntilIdle()

@@ -111,6 +111,28 @@ class CachedWallpaperCompositeTest {
         }
 
     @Test
+    fun a_superseded_warm_recycles_its_unpublished_hardware_bitmap() = runTest(mainDispatcherRule.testDispatcher) {
+        // Audit A12: the stale warm's HARDWARE copy is never published — it is recycled at once;
+        // the published one of the follow-up warm is not (the cache never recycles).
+        val staleHw = mockk<Bitmap>(relaxed = true) { every { isRecycled } returns false }
+        val freshHw = mockk<Bitmap>(relaxed = true) { every { isRecycled } returns false }
+        every { software.copy(Bitmap.Config.HARDWARE, false) } returns staleHw andThen freshHw
+        val host = TestHost(this, current = twoLayers)
+        coEvery { flattener.flatten(twoLayers, any(), any()) } answers {
+            host.current = otherTwoLayers
+            software
+        }
+
+        composite.refill(twoLayers, host)
+        advanceUntilIdle()
+
+        verify(exactly = 1) { staleHw.recycle() }
+        verify(exactly = 0) { freshHw.recycle() }
+        assertThat(composite.cachedBitmap(checkNotNull(composite.cachedKeyFor(otherTwoLayers, 1080, 2340)))?.bitmap)
+            .isSameInstanceAs(freshHw)
+    }
+
+    @Test
     fun one_warm_at_a_time() = runTest(mainDispatcherRule.testDispatcher) {
         val host = TestHost(this, current = twoLayers)
 

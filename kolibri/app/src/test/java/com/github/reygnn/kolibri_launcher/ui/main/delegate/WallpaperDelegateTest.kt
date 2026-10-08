@@ -909,39 +909,6 @@ class WallpaperDelegateTest {
         assertThat(delegate.isWallpaperEditMode.value).isFalse()
     }
 
-    @Test
-    fun `onToggleWallpaperEditMode toggles from false to true`() {
-        val delegate = createDelegate()
-
-        assertThat(delegate.isWallpaperEditMode.value).isFalse()
-        delegate.onToggleWallpaperEditMode()
-        assertThat(delegate.isWallpaperEditMode.value).isTrue()
-    }
-
-    @Test
-    fun `onToggleWallpaperEditMode toggles from true to false`() {
-        val delegate = createDelegate()
-
-        delegate.onSetWallpaperEditMode(true)
-        delegate.onToggleWallpaperEditMode()
-
-        assertThat(delegate.isWallpaperEditMode.value).isFalse()
-    }
-
-    @Test
-    fun `onToggleWallpaperEditMode toggles multiple times`() {
-        val delegate = createDelegate()
-
-        delegate.onToggleWallpaperEditMode() // false -> true
-        assertThat(delegate.isWallpaperEditMode.value).isTrue()
-
-        delegate.onToggleWallpaperEditMode() // true -> false
-        assertThat(delegate.isWallpaperEditMode.value).isFalse()
-
-        delegate.onToggleWallpaperEditMode() // false -> true
-        assertThat(delegate.isWallpaperEditMode.value).isTrue()
-    }
-
     // ===========================================
     // MULTI-LAYER: ADD LAYER
     // ===========================================

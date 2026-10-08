@@ -238,6 +238,11 @@ class CachedWallpaperComposite @Inject constructor(
                 )
                 luminanceSignal.emit(lum)
                 host.onCompositeFilled(width, height)
+            } else {
+                // Superseded (audit A12): this HARDWARE bitmap was never published, so nothing
+                // draws or caches it — release its graphics memory now instead of waiting for the
+                // GC. The cache's never-recycle invariant concerns PUBLISHED bitmaps only.
+                hardware.recycle()
             }
         } finally {
             LaunchTrace.endAsync(LaunchTrace.Names.WALLPAPER_WARM, WARM_TRACE_COOKIE)

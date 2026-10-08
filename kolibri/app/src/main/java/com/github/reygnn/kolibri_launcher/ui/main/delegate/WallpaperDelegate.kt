@@ -380,10 +380,6 @@ class WallpaperDelegate(
         if (enabled) onEnterWallpaperEditMode() else onCommitWallpaperEditMode()
     }
 
-    fun onToggleWallpaperEditMode() {
-        if (session.isEditMode.value) onCommitWallpaperEditMode() else onEnterWallpaperEditMode()
-    }
-
     // ===========================================
     // MULTI-LAYER: MANAGEMENT
     // ===========================================

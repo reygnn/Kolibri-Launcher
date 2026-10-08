@@ -626,20 +626,6 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `onToggleWallpaperEditMode toggles state`() = runTest {
-        val vm = createViewModel()
-        advanceUntilIdle()
-
-        assertThat(vm.isWallpaperEditMode.value).isFalse()
-
-        vm.onToggleWallpaperEditMode()
-        assertThat(vm.isWallpaperEditMode.value).isTrue()
-
-        vm.onToggleWallpaperEditMode()
-        assertThat(vm.isWallpaperEditMode.value).isFalse()
-    }
-
-    @Test
     fun `onClearWallpaper delegates to wallpaperDelegate`() = runTest {
         val vm = createViewModel()
         advanceUntilIdle()

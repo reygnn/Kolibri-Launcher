@@ -412,7 +412,6 @@ class LauncherViewModel @Inject constructor(
     fun onClearWallpaper() = wallpaperDelegate.onClearWallpaper()
     fun onDisplayConfigChanged() = wallpaperDelegate.onDisplayConfigChanged()
     fun onSetWallpaperEditMode(enabled: Boolean) = wallpaperDelegate.onSetWallpaperEditMode(enabled)
-    fun onToggleWallpaperEditMode() = wallpaperDelegate.onToggleWallpaperEditMode()
     fun onCommitWallpaperEditMode() = wallpaperDelegate.onCommitWallpaperEditMode()
     fun onCancelWallpaperEditMode() = wallpaperDelegate.onCancelWallpaperEditMode()
     fun onAddWallpaperLayer(imageUri: Uri) = wallpaperDelegate.onAddWallpaperLayer(imageUri)
