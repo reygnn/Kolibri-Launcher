@@ -210,9 +210,9 @@ can only ever produce a public-safe build, never leak. The read-only
 always show all four. Details in `app/build.gradle.kts` (the `devCommandsInRelease`
 val) and `SettingsFragment` (the `SHOW_DEV_COMMANDS` branch).
 
-**The `cacheToasts` flag.** The three wallpaper cache-diagnostic toasts in
-`WallpaperDelegate` (single-layer hit / single-layer fill / composite fill, F10)
-follow the exact same public-safe model via `BuildConfig.SHOW_CACHE_TOASTS`: a
+**The `cacheToasts` flag.** The wallpaper cache-diagnostic toast in
+`WallpaperDelegate` (composite fill, F10 — the single-layer hit/fill toasts no longer
+exist) follows the exact same public-safe model via `BuildConfig.SHOW_CACHE_TOASTS`: a
 plain release compiles them out (so the public AAB never toasts on every cache
 op), a personal build re-enables them with `-PcacheToasts` (bare, or `=true`),
 and debug always shows them. In a public release the field is a compile-time

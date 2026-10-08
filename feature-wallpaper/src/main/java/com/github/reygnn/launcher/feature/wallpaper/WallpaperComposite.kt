@@ -75,7 +75,8 @@ interface WallpaperComposite {
     suspend fun <T> exclusive(block: suspend () -> T): T
 
     /**
-     * A placeholder for tests and hosts without a composite (3b-3, M2; Nyx used it until 3b-6):
+     * For hosts without a composite and for tests (3b-3, M2). Nyx binds it (3b-6d, its long-lived
+     * activity view would pay the flatten without showing the result) until O7-K decides otherwise:
      * [refill] and [invalidate] do nothing, the read side finds nothing, so no flatten runs in the
      * background for a result nobody draws. [exclusive] is a REAL lock, so the lock order of 3a-3b
      * (this lock before the persist lock) holds as well. One instance per [WallpaperOperations].
