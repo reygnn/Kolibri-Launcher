@@ -88,8 +88,14 @@ class NyxWallpaperEditing @Inject constructor(
      */
     fun onHostStarted() = operations.refillCurrent()
 
-    /** The editing host (`MainActivity`) ended: an open session is cancelled — snapshot back, re-sync. Main only. */
-    fun onHostDestroyed() {
+    /**
+     * The editing host (`MainActivity`) ended: an open session is cancelled — snapshot back,
+     * re-sync. Main only. NOT when the host is only being recreated for a configuration change
+     * Nyx does not handle itself (locale, font scale — audit A3): the new activity restores the
+     * editor from [session]'s `isEditMode`, so the user's edit survives the recreation.
+     */
+    fun onHostDestroyed(changingConfigurations: Boolean = false) {
+        if (changingConfigurations) return
         if (session.isEditMode.value) operations.cancel()
     }
 

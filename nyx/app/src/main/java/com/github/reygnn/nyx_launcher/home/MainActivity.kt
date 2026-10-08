@@ -844,8 +844,9 @@ class MainActivity : BaseActivity<Nothing, HomeViewModel>(), AppDrawerFragment.H
         currentDialog?.dismiss()
         currentDialog = null
         // The edit session stays bound to this activity (3b-3): an open one is cancelled here,
-        // like leaving the editor without saving.
-        wallpaperEditing.onHostDestroyed()
+        // like leaving the editor without saving — unless the activity is only recreated for a
+        // configuration change; the new one restores the editor from the session (audit A3).
+        wallpaperEditing.onHostDestroyed(changingConfigurations = isChangingConfigurations)
         super.onDestroy()
     }
 

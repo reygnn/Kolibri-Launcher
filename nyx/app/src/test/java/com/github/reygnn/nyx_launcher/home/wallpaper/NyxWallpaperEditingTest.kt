@@ -132,7 +132,7 @@ class NyxWallpaperEditingTest {
         coordinator.onAddLayer(uri("content://picker/added"))
         advanceUntilIdle()
 
-        e.onHostDestroyed()
+        e.onHostDestroyed(changingConfigurations = false)
         advanceUntilIdle()
 
         assertThat(e.session.isEditMode.value).isFalse() // no orphaned session
@@ -142,6 +142,27 @@ class NyxWallpaperEditingTest {
         repository.currentState = WallpaperState.single(uri = "file:///w/later")
         advanceUntilIdle()
         assertThat(e.session.state.value.referencedUris).containsExactly("file:///w/later")
+    }
+
+    @Test
+    fun a_recreation_for_a_configuration_change_keeps_the_open_session() = runTest(mainDispatcherRule.testDispatcher) {
+        // Audit A3: locale or font scale recreate MainActivity; the new activity restores the
+        // editor from the session, so the old one must not cancel it on its way out.
+        repository.currentState = WallpaperState.single(uri = "file:///w/old")
+        coEvery { fileManager.copyToInternal(any()) } returns uri("file:///w/added")
+        val e = editing()
+        val coordinator = NyxWallpaperEditCoordinator(e, mockk(relaxed = true), appScope).also { it.start() }
+        advanceUntilIdle()
+        coordinator.onEnterEditMode()
+        coordinator.onAddLayer(uri("content://picker/added"))
+        advanceUntilIdle()
+
+        e.onHostDestroyed(changingConfigurations = true)
+        advanceUntilIdle()
+
+        assertThat(e.session.isEditMode.value).isTrue() // still editing
+        assertThat(e.session.state.value.referencedUris).containsExactly("file:///w/old", "file:///w/added")
+        verify(exactly = 0) { fileManager.deleteFile("file:///w/added") } // nothing rolled back
     }
 
     // ---- 3b-6: the injected composite (E3) ----
