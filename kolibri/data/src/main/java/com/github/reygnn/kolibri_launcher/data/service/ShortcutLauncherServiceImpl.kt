@@ -17,7 +17,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ShortcutLauncherServiceImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ShortcutLauncherService {
 
     private val launcherApps: LauncherApps? by lazy {

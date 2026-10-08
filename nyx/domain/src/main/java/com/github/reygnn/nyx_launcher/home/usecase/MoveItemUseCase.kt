@@ -19,7 +19,7 @@ import javax.inject.Inject
 class MoveItemUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
     private val idFactory: ItemIdFactory,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(moving: ItemId, target: DropTarget): MoveResult =
         repository.runLayoutEdit(dispatcher, MoveResult.NoOp) { current ->

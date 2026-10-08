@@ -75,13 +75,13 @@ import javax.inject.Singleton
  */
 @Singleton
 class PackageEventCoordinator @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val iconLoader: IconLoader,
     private val folderRenderer: FolderIconRenderer,
     private val reconcile: ReconcileHomeLayoutUseCase,
     private val appUpdateSignal: AppUpdateSignal,
     private val installedAppsRepository: InstalledAppsRepository,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 

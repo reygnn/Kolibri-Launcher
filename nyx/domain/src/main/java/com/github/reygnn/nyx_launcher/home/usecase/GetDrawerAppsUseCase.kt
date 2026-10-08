@@ -36,7 +36,7 @@ import javax.inject.Inject
  */
 class GetDrawerAppsUseCase @Inject constructor(
     private val stateRepository: InstalledAppsStateRepository,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): List<LauncherApp> = withContext(dispatcher) {
         // Fast path: the holder already has a snapshot (warm pump, or a last-good from a

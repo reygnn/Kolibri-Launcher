@@ -12,7 +12,7 @@ import javax.inject.Inject
 class ExportLayoutUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
     private val serializer: LayoutSerializer,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): String = withContext(dispatcher) {
         serializer.serialize(repository.layout().first())

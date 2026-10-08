@@ -16,7 +16,7 @@ import javax.inject.Inject
  * normal. Runs on the caller's IO dispatcher.
  */
 class LauncherAppsIconSource @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val rasterizer: IconRasterizer,
 ) : IconSource {
 

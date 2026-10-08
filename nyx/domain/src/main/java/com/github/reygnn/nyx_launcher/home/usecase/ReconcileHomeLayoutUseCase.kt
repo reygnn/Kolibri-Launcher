@@ -39,7 +39,7 @@ import javax.inject.Inject
 class ReconcileHomeLayoutUseCase @Inject constructor(
     private val layoutRepository: HomeLayoutRepository,
     private val idFactory: ItemIdFactory,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(): ReconcileResult = withContext(dispatcher) {
         try {

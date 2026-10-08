@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
@@ -31,6 +32,7 @@ import org.robolectric.RobolectricTestRunner
  * (ported from Kolibri's WallpaperDelegate): commit keeps, cancel reverts + cleans
  * up added files, in-edit removals defer their file delete to commit.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class NyxWallpaperEditCoordinatorTest {
 

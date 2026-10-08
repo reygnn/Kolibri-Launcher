@@ -11,7 +11,7 @@ import javax.inject.Inject
 /** Sets a folder's title (unchanged title / non-folder id ⇒ no save). */
 class RenameFolderUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(folder: ItemId, title: String): LayoutEdit =
         repository.runLayoutEdit(dispatcher, LayoutEdit.NoOp) { current ->

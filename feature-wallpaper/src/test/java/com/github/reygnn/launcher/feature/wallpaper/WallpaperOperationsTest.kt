@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.feature.wallpaper
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
 import com.github.reygnn.launcher.common.ui.wallpaper.DecodedWallpaperBitmap
@@ -34,6 +35,7 @@ import org.robolectric.annotation.Config
  * and the start-up wiring. Real session and image store; the persistence port and the composite
  * are small fakes.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class) // android.net.Uri
 @Config(sdk = [36])
 class WallpaperOperationsTest {

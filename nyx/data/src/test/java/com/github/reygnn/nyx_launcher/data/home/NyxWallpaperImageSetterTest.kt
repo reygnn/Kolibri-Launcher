@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import android.net.Uri
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperFileManager
@@ -34,6 +35,7 @@ import org.robolectric.RobolectricTestRunner
  * remove rules (state first, refused during an open session) and the start-up GC of the shared
  * component, without touching real files.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class NyxWallpaperImageSetterTest {
 

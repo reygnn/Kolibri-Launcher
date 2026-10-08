@@ -434,7 +434,7 @@ class BackupSerializer @Inject constructor() {
                         Timber.w("Type validation failed: $field is not a number")
                         return false
                     }
-                    val doubleVal = (value as Number).toDouble()
+                    val doubleVal = value.toDouble()
                     if (!doubleVal.isFinite()) {
                         Timber.w("Type validation failed: $field is Infinity or NaN")
                         return false
@@ -481,7 +481,7 @@ class BackupSerializer @Inject constructor() {
                         Timber.w("Type validation failed: $field is not an array")
                         return false
                     }
-                    if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
+                    if (value.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                         Timber.w("Array size limit exceeded for $field")
                         return false
                     }
@@ -494,7 +494,7 @@ class BackupSerializer @Inject constructor() {
                     Timber.w("Type validation failed: customAppNames is not an object")
                     return false
                 }
-                if ((value as JSONObject).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
+                if (value.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                     Timber.w("Map size limit exceeded for customAppNames")
                     return false
                 }
@@ -511,7 +511,7 @@ class BackupSerializer @Inject constructor() {
                     Timber.w("Type validation failed: $layersKey is not an array")
                     return false
                 }
-                if ((value as JSONArray).length() > AppConstants.MAX_ARRAY_ELEMENTS) {
+                if (value.length() > AppConstants.MAX_ARRAY_ELEMENTS) {
                     Timber.w("Array size limit exceeded for $layersKey")
                     return false
                 }
@@ -545,7 +545,7 @@ class BackupSerializer @Inject constructor() {
                         Timber.w("Type validation failed: wallpaperLayers[$i].$field is not a number")
                         return false
                     }
-                    val doubleVal = (value as Number).toDouble()
+                    val doubleVal = value.toDouble()
                     if (!doubleVal.isFinite()) {
                         Timber.w("Type validation failed: wallpaperLayers[$i].$field is Infinity or NaN")
                         return false

@@ -53,7 +53,7 @@ import javax.inject.Singleton
 @Singleton
 class InstalledAppsHolderPump @Inject constructor(
     private val sync: SyncInstalledAppsToHolder,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val started = AtomicBoolean(false)

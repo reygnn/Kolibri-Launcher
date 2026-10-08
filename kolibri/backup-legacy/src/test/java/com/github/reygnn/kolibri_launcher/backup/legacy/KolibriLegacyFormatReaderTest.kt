@@ -153,5 +153,6 @@ class KolibriLegacyFormatReaderTest {
 
     private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
-    private fun goldenDir(): File = File(checkNotNull(javaClass.classLoader?.getResource("golden/README.md")) { "golden resources missing" }.toURI()).parentFile
+    private fun goldenDir(): File =
+        checkNotNull(File(checkNotNull(javaClass.classLoader?.getResource("golden/README.md")) { "golden resources missing" }.toURI()).parentFile)
 }

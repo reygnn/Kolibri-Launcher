@@ -1,5 +1,6 @@
 package com.github.reygnn.kolibri_launcher.data
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -25,6 +26,7 @@ import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertFailsWith
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HiddenAppsRepositoryImplTest {
 
     @get:Rule

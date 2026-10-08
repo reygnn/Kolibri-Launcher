@@ -8,6 +8,7 @@ import com.github.reygnn.launcher.core.InstalledAppsRepository
 import com.github.reygnn.launcher.core.AppsUpdateTrigger
 import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,8 +70,8 @@ import javax.inject.Singleton
 @Singleton
 class InstalledAppsRepositoryImpl @Inject constructor(
     private val enumerator: AppEnumerator,
-    @AppsUpdateTrigger private val appsUpdateTrigger: MutableSharedFlow<Unit>,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @param:AppsUpdateTrigger private val appsUpdateTrigger: MutableSharedFlow<Unit>,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : InstalledAppsRepository {
 
     // Own sharing scope on IO. Built from the injected dispatcher so a virtual-time
@@ -113,6 +114,7 @@ class InstalledAppsRepositoryImpl @Inject constructor(
      * StateFlow. `@VisibleForTesting internal` so the debounce/priming can be
      * pinned on a virtual-time dispatcher.
      */
+    @OptIn(FlowPreview::class) // debounce
     @VisibleForTesting
     internal fun reloadTriggers(trigger: Flow<Unit>): Flow<Unit> =
         merge(

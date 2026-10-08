@@ -130,7 +130,7 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `setTextColor reflects in flow`() = runTest {
         val repo = createRepository()
-        val newColor = 0x11223344.toInt()
+        val newColor = 0x11223344
         assertThat(newColor).isNotEqualTo(AppConstants.DEFAULT_TEXT_COLOR)
         repo.setTextColor(newColor)
         assertThat(repo.textColorFlow.first()).isEqualTo(newColor)
@@ -190,9 +190,9 @@ abstract class SettingsRepositoryContract {
     @Test
     fun `setter overwrites previous value`() = runTest {
         val repo = createRepository()
-        repo.setTextColor(0x11111111.toInt())
-        repo.setTextColor(0x22222222.toInt())
-        assertThat(repo.textColorFlow.first()).isEqualTo(0x22222222.toInt())
+        repo.setTextColor(0x11111111)
+        repo.setTextColor(0x22222222)
+        assertThat(repo.textColorFlow.first()).isEqualTo(0x22222222)
     }
 
     // ---------- onboardingCompleted: einseitig ----------

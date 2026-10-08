@@ -37,7 +37,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WallpaperFileManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     // Injected since SPEC_NYX_REWRITE 3a-1 (W7); copyToInternal used a hard Dispatchers.IO.
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {

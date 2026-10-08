@@ -43,7 +43,7 @@ import javax.inject.Inject
  */
 class IconLoaderImpl @Inject constructor(
     @ApplicationContext context: Context,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
     private val source: IconSource,
     preferences: PreferencesRepository,
 ) : IconLoader {

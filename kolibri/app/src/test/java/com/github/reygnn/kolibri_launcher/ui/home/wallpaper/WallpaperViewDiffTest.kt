@@ -95,7 +95,6 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(), target)
 
         assertIs<RebuildPlan.SwitchToSingleLayer>(plan)
-        plan as RebuildPlan.SwitchToSingleLayer
         assertThat(plan.transform).isNull()
     }
 
@@ -110,7 +109,6 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(), target)
 
         assertIs<RebuildPlan.SwitchToSingleLayer>(plan)
-        plan as RebuildPlan.SwitchToSingleLayer
         assertThat(plan.transform).isEqualTo(LayerPropertyUpdate.Transform(2.5f, -100f, 50f))
     }
 
@@ -124,7 +122,6 @@ class WallpaperViewDiffTest {
         val plan = WallpaperViewDiff.diff(snapshot(ids = emptyList(), isMulti = false), target)
 
         assertIs<RebuildPlan.FullRebuild>(plan)
-        plan as RebuildPlan.FullRebuild
         assertThat(plan.layers.map { it.id }).isEqualTo(listOf("L1", "L2"))
     }
 
@@ -305,7 +302,6 @@ class WallpaperViewDiffTest {
 
         assertIs<RebuildPlan.UpdatePropertiesOnly>(plan, "image-less layers are invisible to the diff; matching ids → UpdatePropertiesOnly")
 
-        plan as RebuildPlan.UpdatePropertiesOnly
         // The updates should only reference the view indices that
         // actually exist (0 and 1), not 0/1/2.
         assertThat(plan.updates.size).isEqualTo(2)

@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home.wallpaper
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.core.CompositeLuminanceSignal
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
@@ -38,6 +39,7 @@ import kotlin.coroutines.ContinuationInterceptor
  * everything it launches on Main, the session bound to MainActivity's lifetime, and the end of the
  * 3b-1 interim (a choose from outside during an open session survives the commit, M5).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class NyxWallpaperEditingTest {
 

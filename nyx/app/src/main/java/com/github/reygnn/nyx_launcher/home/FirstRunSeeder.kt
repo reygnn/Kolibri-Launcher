@@ -31,7 +31,7 @@ class FirstRunSeeder @Inject constructor(
     private val defaultAppsResolver: DefaultAppsResolver,
     private val getDrawerApps: GetDrawerAppsUseCase,
     private val drawerFolderIdFactory: DrawerFolderIdFactory,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) {
     /** Seed dock defaults + Play Store on the grid. Returns true only if it wrote. */
     suspend fun seedHomeLayout(): Boolean = homeLayoutRepository.seedInitialLayout(

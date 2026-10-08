@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.settings
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.core.AppConstants
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.testing.recordEmissions
@@ -19,6 +20,7 @@ import org.junit.Test
  * [NyxBackupViewModel] (2b-3b, the form of Kolibri's 2a-7b): a refused file is reported at once
  * and never opens the restore dialog; a readable one opens it; the import reports its outcome.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class NyxBackupViewModelTest {
 
     @get:Rule

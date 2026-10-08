@@ -19,7 +19,7 @@ import javax.inject.Inject
 class DeleteFromFolderUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
     private val idFactory: ItemIdFactory,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(folder: ItemId, member: ComponentKey): LayoutEdit =
         repository.runLayoutEdit(dispatcher, LayoutEdit.NoOp) { current ->

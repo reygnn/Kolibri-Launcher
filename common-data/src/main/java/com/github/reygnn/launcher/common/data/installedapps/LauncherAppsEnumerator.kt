@@ -55,7 +55,7 @@ import javax.inject.Singleton
 @Singleton
 class LauncherAppsEnumerator @Inject constructor(
     private val launcherApps: LauncherApps,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) : AppEnumerator {
 
     override suspend fun enumerate(): List<AppInfo> = withContext(dispatcher) {

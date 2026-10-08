@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.feature.wallpaper
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.wallpaper.WallpaperLayerState
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
@@ -17,6 +18,7 @@ import org.junit.Test
  * [WallpaperComposite.None] (3b-3, M2): no composite work and nothing to read — but [exclusive] is
  * a real lock, so "remove wallpaper" keeps its lock order in an app without a composite.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class WallpaperCompositeNoneTest {
 
     @get:Rule

@@ -25,7 +25,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class SafDocuments @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     /**
      * The document URI for [uriString], or [InvalidDocumentLocationException] naming why not —

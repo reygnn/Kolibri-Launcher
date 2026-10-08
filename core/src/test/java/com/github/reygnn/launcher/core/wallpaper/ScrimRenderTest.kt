@@ -25,7 +25,7 @@ class ScrimRenderTest {
     @Test
     fun `typical alpha bakes into the alpha byte over opaque black`() {
         // 0.2 * 255 = 51 → 0x33; RGB stays 0x000000.
-        assertThat(ScrimRender.colorOrNull(alpha = 0.2f, isEditMode = false)).isEqualTo(0x33000000.toInt())
+        assertThat(ScrimRender.colorOrNull(alpha = 0.2f, isEditMode = false)).isEqualTo(0x33000000)
     }
 
     @Test

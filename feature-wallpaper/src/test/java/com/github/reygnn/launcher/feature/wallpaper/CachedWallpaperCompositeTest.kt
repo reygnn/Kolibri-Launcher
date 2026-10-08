@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.feature.wallpaper
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import android.graphics.Bitmap
 import com.github.reygnn.launcher.common.data.wallpaper.WallpaperBitmapLuminanceImpl
 import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperCompositeCache
@@ -31,6 +32,7 @@ import org.robolectric.annotation.Config
  * new state, single-flight, the edit guard and the read side. No session involved — the host is
  * plain functions.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class) // Bitmap.Config
 @Config(sdk = [36])
 class CachedWallpaperCompositeTest {

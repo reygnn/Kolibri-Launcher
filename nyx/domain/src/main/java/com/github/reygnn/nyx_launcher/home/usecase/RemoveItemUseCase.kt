@@ -11,7 +11,7 @@ import javax.inject.Inject
 /** Removes a top-level item from the home (HEU-INV-2: member apps aren't lost). */
 class RemoveItemUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(id: ItemId): LayoutEdit =
         repository.runLayoutEdit(dispatcher, LayoutEdit.NoOp) { current ->

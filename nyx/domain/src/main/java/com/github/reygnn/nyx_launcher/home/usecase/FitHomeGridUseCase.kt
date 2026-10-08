@@ -21,7 +21,7 @@ import javax.inject.Inject
  */
 class FitHomeGridUseCase @Inject constructor(
     private val repository: HomeLayoutRepository,
-    @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(target: GridSpec) = withContext(dispatcher) {
         repository.update { current -> // atomic RMW (A1-03)
