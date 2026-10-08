@@ -31,13 +31,9 @@ import java.io.File
  * in a release build: writes swallowed when told to, and an unreadable store reads as NONE through
  * `getWallpaperStateSync()` and as "can't tell" through `readPersistedImageUris()`.
  *
- * Gaps are switched off visibly (the contract skips those cases), each switched on by its fix:
- *  - [decidesDeletesThroughTheStore]: on since 3b-1 — the setter and the GC decide every delete
- *    through the shared store (against what is persisted, fail closed, edit guard). Before, they
- *    deleted directly and the GC read "nothing referenced" on a read error.
- *  - [editsThroughSharedOperations]: on since 3b-3 — replace is a session change, and a commit
- *    deletes only what no persisted layer references (before: Nyx's own session code).
- * W1 (replace deletes the old file right away) Nyx has always done.
+ * Every case runs: the gap switches of 3b-1/3b-3 were removed after both apps passed all of
+ * them (3b/24, audit A9c) — the setter and the GC decide every delete through the shared store
+ * (3b-1), and the edit session runs on the shared session/operations (3b-3).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -59,9 +55,6 @@ class NyxWallpaperImageStoreTest : WallpaperImageStoreContract() {
         coordinatorScope.cancel()
     }
 
-    override val deletesReplacedImageImmediately = true // Nyx's setter always did (W1)
-    override val decidesDeletesThroughTheStore = true // since 3b-1
-    override val editsThroughSharedOperations = true // since 3b-3
 
     override val wallpaperDir: File get() = File(context.filesDir, "wallpapers")
 

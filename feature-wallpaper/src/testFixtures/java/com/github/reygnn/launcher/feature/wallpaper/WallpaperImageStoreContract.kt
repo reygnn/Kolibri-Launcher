@@ -7,7 +7,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -41,9 +40,9 @@ import java.nio.file.Files
  *    reference only existing files and no layer the session removed. That the export reads that
  *    state is covered by the backup tests.
  *
- * Cases that only make sense with immediate deletion on replace are SKIPPED (not absent) while
- * [deletesReplacedImageImmediately] is false — JUnit reports them, so every run shows what is
- * still open. Kolibri flips it with 3a-2; Nyx's subclass sets it from the start.
+ * Every case runs for every subclass. While an app still ran older code, gap switches skipped the
+ * affected cases visibly (assumeTrue); they were removed once both apps passed all cases (3b/24,
+ * audit A9c). A future app starting on this contract adds such a switch again only for a known gap.
  *
  * The contract ages files itself, so the GC's protection of young files (60 s) does not hide a
  * wrong decision, and settles the scheduler after every step (apps finish work in launched
@@ -62,24 +61,6 @@ abstract class WallpaperImageStoreContract {
     fun deleteSources() {
         sources.deleteRecursively()
     }
-
-    /** W1: replacing deletes the old file right away (outside an edit session). */
-    protected abstract val deletesReplacedImageImmediately: Boolean
-
-    /**
-     * Every delete decision goes through the shared [WallpaperImageStore] — against what is
-     * persisted, fail closed, and the orphan GC respects an open edit session (3a-2c/2d; Nyx since
-     * 3b-1). False only while a subclass still runs older code: those cases are then skipped,
-     * visibly, and switched on with the fix.
-     */
-    protected abstract val decidesDeletesThroughTheStore: Boolean
-
-    /**
-     * The edit session runs on the shared session/operations: replace is a session change, and a
-     * commit deletes only what no persisted layer references (Kolibri since 3a-3/3a-9; Nyx from
-     * 3b-3). False while a subclass still runs its own session code: those cases are skipped.
-     */
-    protected abstract val editsThroughSharedOperations: Boolean
 
     /** Where the launcher keeps its wallpaper image files. */
     protected abstract val wallpaperDir: File
@@ -128,7 +109,6 @@ abstract class WallpaperImageStoreContract {
 
     @Test
     fun `replacing the wallpaper deletes the old file`() = runTest(mainDispatcherRule.testDispatcher) {
-        assumeTrue("W1 immediate deletion comes with 3a-2", deletesReplacedImageImmediately)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val old = savedLayerFiles().single()
@@ -155,7 +135,6 @@ abstract class WallpaperImageStoreContract {
 
     @Test
     fun `the GC never deletes a file of an open edit session`() = runTest(mainDispatcherRule.testDispatcher) {
-        assumeTrue("the edit guard of the GC comes with the store", decidesDeletesThroughTheStore)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val file = savedLayerFiles().single()
@@ -221,8 +200,6 @@ abstract class WallpaperImageStoreContract {
 
     @Test
     fun `replacing during an edit session keeps the old file until commit`() = runTest(mainDispatcherRule.testDispatcher) {
-        assumeTrue("W1 immediate deletion comes with 3a-2", deletesReplacedImageImmediately)
-        assumeTrue("replace as a session change comes with the shared operations", editsThroughSharedOperations)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val old = savedLayerFiles().single()
@@ -240,8 +217,6 @@ abstract class WallpaperImageStoreContract {
     @Test
     fun `replacing during an edit session and cancelling keeps the old file and orphans the new one`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            assumeTrue("W1 immediate deletion comes with 3a-2", deletesReplacedImageImmediately)
-            assumeTrue("replace as a session change comes with the shared operations", editsThroughSharedOperations)
             step { startStore() }
             step { setWallpaper(image("a")) }
             val old = savedLayerFiles().single()
@@ -262,8 +237,6 @@ abstract class WallpaperImageStoreContract {
     fun `a file is deleted only once no layer references it anymore`() = runTest(mainDispatcherRule.testDispatcher) {
         // O2 safeguard: no file is shared between layers — but if that ever breaks, removing one of
         // two layers on the same file must not take the other layer's image with it.
-        assumeTrue("the reference check before deleting comes with 3a-2", deletesReplacedImageImmediately)
-        assumeTrue("a commit deletes only unreferenced files with the shared operations", editsThroughSharedOperations)
         step { startStore() }
         step { saveTwoLayersOnOneFile(image("a")) }
         val shared = savedLayerFiles().distinct().single()
@@ -280,7 +253,6 @@ abstract class WallpaperImageStoreContract {
     @Test
     fun `a save that fails silently keeps the old file`() = runTest(mainDispatcherRule.testDispatcher) {
         // The release case of 3a-2c: the save swallows its failure and returns normally.
-        assumeTrue("deciding against the persisted state comes with the store", decidesDeletesThroughTheStore)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val old = savedLayerFiles().single()
@@ -295,7 +267,6 @@ abstract class WallpaperImageStoreContract {
 
     @Test
     fun `an unreadable persisted state deletes nothing and stops the GC`() = runTest(mainDispatcherRule.testDispatcher) {
-        assumeTrue("failing closed on an unreadable state comes with the store", decidesDeletesThroughTheStore)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val old = savedLayerFiles().single()
@@ -315,7 +286,6 @@ abstract class WallpaperImageStoreContract {
     fun `a removal whose clear fails silently keeps the files`() = runTest(mainDispatcherRule.testDispatcher) {
         // 3a-2d: state first, files second, and only against what is persisted. A clear that is
         // swallowed leaves the old state on disk — its files must stay with it.
-        assumeTrue("state first, files only against an empty persisted state, comes with the store", decidesDeletesThroughTheStore)
         step { startStore() }
         step { setWallpaper(image("a")) }
         val file = savedLayerFiles().single()
@@ -402,7 +372,6 @@ abstract class WallpaperImageStoreContract {
         runTest(mainDispatcherRule.testDispatcher) {
             // The most dangerous variant of a future deduplication: "delete the old file" would hit
             // exactly the file the new state points to.
-            assumeTrue("W1 immediate deletion comes with 3a-2", deletesReplacedImageImmediately)
             step { startStore() }
             val source = image("same")
             step { setWallpaper(source) }

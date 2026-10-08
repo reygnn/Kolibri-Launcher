@@ -35,9 +35,8 @@ import java.io.File
  *
  * The orphan GC runs in [WallpaperDelegate.start] on the first state emission, skipped while an
  * edit session is open — so "trigger the GC" is another `start()`. Every file decision goes
- * through [WallpaperImageStore] since 3a-2, which deletes a replaced file right away (W1), hence
- * [deletesReplacedImageImmediately] is true; before 3a-2 Kolibri left it for the next cold-start
- * GC and the contract skipped those cases.
+ * through [WallpaperImageStore] since 3a-2, which deletes a replaced file right away (W1); the
+ * contract's gap switches were removed once both apps passed every case (3b/24, audit A9c).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -56,10 +55,6 @@ class KolibriWallpaperImageStoreTest : WallpaperImageStoreContract() {
     fun stopDelegate() {
         delegateScope.cancel()
     }
-
-    override val deletesReplacedImageImmediately = true // since 3a-2: the lifecycle class in :feature-wallpaper
-    override val decidesDeletesThroughTheStore = true // since 3a-2c/2d
-    override val editsThroughSharedOperations = true // since 3a-3 / 3a-9
 
     override val wallpaperDir: File get() = File(context.filesDir, "wallpapers")
 
