@@ -219,6 +219,7 @@ dependencies {
     // Shared TAPL-lite test-support fassade (BasePage/awaitUntil/page objects).
     // src/main of the library, pulled in ONLY on the androidTest classpath.
     androidTestImplementation(project(":common-testing-android"))
+    androidTestImplementation(testFixtures(project(":common-ui"))) // WallpaperParityScenes (3b/35)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)

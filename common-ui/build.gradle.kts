@@ -10,6 +10,15 @@ plugins {
 
 android {
     namespace = "com.github.reygnn.launcher.common.ui"
+
+    // WallpaperParityScenes (SPEC_NYX_REWRITE 3b/35): one source of the parity scenes for the
+    // Robolectric test here and the instrumented test in :kolibri:app. AGP wires the fixtures into
+    // this module's own unit tests (as in :nyx:data). Kotlin needs the testFixtures flag in
+    // gradle.properties.
+    @Suppress("UnstableApiUsage")
+    testFixtures {
+        enable = true
+    }
 }
 
 dependencies {
@@ -46,6 +55,13 @@ dependencies {
     // AppLauncher builds for startMainActivity.
     testImplementation(libs.robolectric)
     testImplementation(testFixtures(project(":core"))) // shared MainDispatcherRule + recordEmissions
+
+    // WallpaperParityScenes: WallpaperState in its API (:core), the uniform guard asserts with Truth
+    // (A12), createBitmap (core-ktx), and it builds the detached ZoomableImageView (appcompat).
+    testFixturesApi(project(":core"))
+    testFixturesImplementation(libs.truth)
+    testFixturesImplementation(libs.androidx.core.ktx)
+    testFixturesImplementation(libs.androidx.appcompat)
 }
 
 // `material` MUST resolve before `appcompat` (appcompat drags an older
