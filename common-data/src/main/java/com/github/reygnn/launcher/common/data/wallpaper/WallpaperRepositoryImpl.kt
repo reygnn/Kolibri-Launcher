@@ -250,9 +250,18 @@ class WallpaperRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * The factory reset's wipe (2b-4c, F1 honest purge; 3b/29, D2): remove the key, then delete
+     * exactly the files the state referenced BEFORE (read first), then one orphan sweep with the
+     * normal grace period. What counts as "incomplete" (and throws): a REFERENCED file that is
+     * still there afterwards, or a state that could not be read (then nothing is deleted and no
+     * sweep runs — fail closed). Aged orphans go with the sweep; fresh files under the grace
+     * period (a copy still running) stay on purpose and are NOT incomplete.
+     */
     override suspend fun purgeRepository() {
         // Every independent cleanup step runs, and only then is an error reported (2b-4c, F1):
         // a failed key removal must not keep the files from being deleted.
+        val previous = readPersistedImageUris() // before the removal; null = can't tell (fail closed)
         var failure: Throwable? = null
         try {
             dataStore.safePurge("WallpaperRepositoryImpl") { preferences ->
@@ -264,13 +273,17 @@ class WallpaperRepositoryImpl @Inject constructor(
         } catch (e: Throwable) {
             failure = e // already logged by safePurge
         }
-        // Delete the on-disk wallpaper images as well, not just the DataStore
-        // keys. Otherwise a factory reset leaves orphaned files in
-        // filesDir/wallpapers/ until the next cold-start gcOrphans sweep (a
-        // 60s-cutoff, best-effort net — not a prompt guarantee). IO-wrapped
-        // because clearAll() does blocking file deletion.
+        // Delete the on-disk wallpaper images as well, not just the DataStore key — but only the
+        // previous state's files (D2: a copy still running is never hit), then sweep the aged
+        // orphans now instead of leaving them for the next cold start. IO-wrapped: blocking I/O.
         val filesCleared = withContext(ioDispatcher) {
-            wallpaperFileManager.clearAll()
+            if (previous == null) {
+                false // the state could not be read: keep every file, no sweep
+            } else {
+                val left = previous.filterNot { wallpaperFileManager.deleteFile(it) }
+                wallpaperFileManager.gcOrphans(emptySet<String>())
+                left.isEmpty()
+            }
         }
         if (!filesCleared) {
             val incomplete = IOException("Not every wallpaper file could be deleted")

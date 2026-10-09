@@ -46,9 +46,12 @@ class ResetRepositoryImplTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val fileManager = mockk<WallpaperFileManager>(relaxed = true) {
-        every { clearAll() } returns true // a relaxed Boolean is false: "files left"
+        every { deleteFile(any<String>()) } returns true // a relaxed Boolean is false: "file left"
     }
     private val usageRepository = FakeAppUsageRepository()
+
+    /** The wallpaper the seeded layer list references (3b/29: the purge deletes exactly it). */
+    private val WALLPAPER = "file:///data/wallpapers/wp_seeded"
     private val oldApp = ComponentKey.of("com.old", "com.old.Main")
     private val newApp = ComponentKey.of("com.new", "com.new.Main")
     private val other = ComponentKey.of("com.other", "com.other.Main")
@@ -90,7 +93,8 @@ class ResetRepositoryImplTest {
             store.edit {
                 it[stringPreferencesKey("home_layout_v1")] = "{...}"
                 it[booleanPreferencesKey("monochrome_icons")] = true
-                it[stringPreferencesKey("wallpaper_layers_json")] = "[...]"
+                // A valid layer list: since D2 the purge reads the references to delete exactly them.
+                it[stringPreferencesKey("wallpaper_layers_json")] = """[{"id":"l1","imageUri":"$WALLPAPER","scale":1.0,"translateX":0.0,"translateY":0.0}]"""
                 it[booleanPreferencesKey("home_dock_seeded_v1")] = true
             }
             usageRepository.recordPackageLaunch("com.a")
@@ -101,15 +105,20 @@ class ResetRepositoryImplTest {
             assertThat(store.data.first().asMap()).isEmpty()
             // Usage lives in a separate store, so reset must purge it explicitly.
             assertThat(usageRepository.current).isEmpty()
-            verify(exactly = 1) { fileManager.clearAll() }
+            verify(exactly = 1) { fileManager.deleteFile(WALLPAPER) } // the previous state's file (D2)
+            verify(exactly = 1) { fileManager.gcOrphans(emptySet<String>()) } // then the aged orphans
         }
 
     @Test
     fun reset_is_incomplete_when_wallpaper_files_are_left() =
         runTest(mainDispatcherRule.testDispatcher) {
-            every { fileManager.clearAll() } returns false
+            val store = FakeDataStore()
+            store.edit {
+                it[stringPreferencesKey("wallpaper_layers_json")] = """[{"id":"l1","imageUri":"$WALLPAPER","scale":1.0,"translateX":0.0,"translateY":0.0}]"""
+            }
+            every { fileManager.deleteFile(WALLPAPER) } returns false // the referenced file stays
 
-            assertThat(reset(FakeDataStore()).factoryReset()).isFalse()
+            assertThat(reset(store).factoryReset()).isFalse()
         }
 
     @Test
@@ -127,7 +136,7 @@ class ResetRepositoryImplTest {
 
             assertThat(ok).isFalse()
             assertThat(store.data.first().asMap()).isEmpty()
-            verify(exactly = 1) { fileManager.clearAll() }
+            verify(exactly = 1) { fileManager.gcOrphans(emptySet<String>()) } // the file step ran (nothing referenced)
         }
 
     @Test
@@ -146,7 +155,7 @@ class ResetRepositoryImplTest {
 
             assertThat(ok).isFalse()
             assertThat(store.data.first().asMap()).isEmpty()
-            verify(exactly = 1) { fileManager.clearAll() }
+            verify(exactly = 1) { fileManager.gcOrphans(emptySet<String>()) } // the file step ran (nothing referenced)
         }
 
     // ---- R2: seeding after an incomplete reset (2b-4c, step 3) ----

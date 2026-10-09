@@ -93,29 +93,4 @@ class WallpaperImageStoreTest {
         verify(exactly = 0) { fileManager.gcOrphans(any<Set<String>>()) }
     }
 
-    @Test
-    fun remove_deletes_every_file_once_nothing_is_persisted() = runTest(mainDispatcherRule.testDispatcher) {
-        persisted(emptySet())
-        every { fileManager.clearAll() } returns false // a file that won't go is only an orphan
-
-        assertThat(store.deleteAllIfNothingPersisted()).isTrue()
-        verify(exactly = 1) { fileManager.clearAll() }
-    }
-
-    @Test
-    fun remove_keeps_the_files_while_the_persisted_state_still_references_any() = runTest(mainDispatcherRule.testDispatcher) {
-        // 3a-2d: the clear did not land, so the files stay with the state that still needs them.
-        persisted(setOf(a))
-
-        assertThat(store.deleteAllIfNothingPersisted()).isFalse()
-        verify(exactly = 0) { fileManager.clearAll() }
-    }
-
-    @Test
-    fun remove_keeps_the_files_when_the_persisted_state_cant_be_read() = runTest(mainDispatcherRule.testDispatcher) {
-        persisted(null)
-
-        assertThat(store.deleteAllIfNothingPersisted()).isFalse()
-        verify(exactly = 0) { fileManager.clearAll() }
-    }
 }

@@ -30,7 +30,6 @@ import javax.inject.Singleton
  * - copyToInternal(sourceUri): Kopiert ein Bild → gibt interne URI zurück
  * - copyFromInputStream(inputStream): Schreibt Bytes aus Stream → interne URI (für ZIP-Import)
  * - deleteFile(uri): Löscht eine interne Datei (z.B. beim Layer-Entfernen)
- * - clearAll(): Löscht alle Wallpaper-Dateien (z.B. beim Wallpaper-Reset)
  * - gcOrphans(referencedUris): Entfernt verwaiste Dateien, die nicht mehr
  *   von einem aktuellen State referenziert werden
  * - isInternalUri(uri): Prüft ob eine URI auf unseren internen Speicher zeigt
@@ -158,50 +157,34 @@ class WallpaperFileManager @Inject constructor(
     fun fileExists(uriString: String): Boolean = fileExists(uriString.toUri())
 
     /**
-     * Löscht eine interne Wallpaper-Datei.
-     * Ignoriert URIs die nicht auf unseren internen Speicher zeigen.
+     * Deletes one internal wallpaper file. Returns whether that file is NOT in the wallpaper
+     * directory afterwards (3b/29, D2 — the honest reset counts it):
+     *  - true when it was deleted, or did not exist anyway;
+     *  - true for a URI that is no internal file ([isInternalUri] false): there is nothing of ours
+     *    to delete, and A1 refuses to delete outside the directory anyway — one odd reference must
+     *    not mark every reset as incomplete;
+     *  - false only when an internal file existed and could not be deleted.
+     * Never throws.
      */
-    fun deleteFile(uri: Uri) {
-        if (!isInternalUri(uri)) return
-        try {
-            val path = uri.path ?: return
+    fun deleteFile(uri: Uri): Boolean {
+        if (!isInternalUri(uri)) return true
+        return try {
+            val path = uri.path ?: return true
             val file = File(path)
-            if (file.exists() && file.delete()) {
-                Timber.d("Deleted wallpaper file: ${file.name}")
-            }
+            if (!file.exists()) return true
+            val deleted = file.delete()
+            if (deleted) Timber.d("Deleted wallpaper file: ${file.name}") else Timber.w("Could not delete wallpaper file: ${file.name}")
+            deleted
         } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): a failed delete is reported as
+            // "still there"; OOM extends Error → Throwable.
             TimberWrapper.silentError(e, "Error deleting wallpaper file: $uri")
+            false
         }
     }
 
     /** String overload — see [fileExists] for the rationale. */
-    fun deleteFile(uriString: String) = deleteFile(uriString.toUri())
-
-    /**
-     * Deletes ALL wallpaper files in internal storage ("remove wallpaper" and the factory reset).
-     * Never throws. Returns true when the directory holds no file afterwards, false otherwise —
-     * also when it can't even be listed (2b-4c, F1): the reset's purge turns false into an error,
-     * other callers may ignore it.
-     */
-    fun clearAll(): Boolean {
-        return try {
-            val dir = getWallpaperDir()
-            val files = dir.listFiles() ?: return false.also { Timber.w("Could not list the wallpaper directory") }
-            var deleted = 0
-            for (file in files) {
-                if (file.delete()) deleted++
-            }
-            if (deleted > 0) {
-                Timber.d("Cleared $deleted wallpaper files from internal storage")
-            }
-            val left = files.size - deleted
-            if (left > 0) Timber.w("$left wallpaper files could not be deleted")
-            left == 0
-        } catch (e: Throwable) {
-            TimberWrapper.silentError(e, "Error clearing wallpaper files")
-            false
-        }
-    }
+    fun deleteFile(uriString: String): Boolean = deleteFile(uriString.toUri())
 
     /**
      * =====================================================================================

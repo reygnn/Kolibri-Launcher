@@ -64,6 +64,17 @@ class WallpaperDelegateTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    /**
+     * The persisted references the image store reads (3a-2c; 3b/29, D2). Empty by default — every
+     * delete candidate counts as unreferenced; a "remove" test sets the references before the
+     * removal, and the clear use case empties them, like the real repository.
+     */
+    private var persistedRefs: () -> Set<String> = { emptySet() }
+
+    private fun persistedRefsRepository(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
+        io.mockk.coEvery { readPersistedImageUris() } answers { persistedRefs() }
+    }
+
     @get:Rule
     val timberRule = TimberRule()
 
@@ -156,7 +167,7 @@ class WallpaperDelegateTest {
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = observeWallpaperBackdropUseCase,
-        imageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), ioDispatcher),
+        imageStore = WallpaperImageStore(wallpaperFileManager, persistedRefsRepository(), ioDispatcher),
         // The composite since 3a-8: the real implementation around the same mocks, so every
         // composite expectation below (cache, flattener, luminance, IO hop) stays as it was.
         composite = CachedWallpaperComposite(compositeCache, wallpaperFlattener, bitmapLuminance, compositeLuminanceSignal, ioDispatcher),
@@ -789,12 +800,15 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onClearWallpaper clears files and calls clearUseCase`() = runTest {
+        var refs = setOf("file:///data/wallpapers/wp_old")
+        persistedRefs = { refs }
+        coEvery { clearWallpaperUseCase.invoke() } answers { refs = emptySet() }
         val delegate = createDelegate()
 
         delegate.onClearWallpaper()
         advanceUntilIdle()
 
-        coVerify { wallpaperFileManager.clearAll() }
+        coVerify { wallpaperFileManager.deleteFile("file:///data/wallpapers/wp_old") } // the previous state's file (D2)
         coVerify { clearWallpaperUseCase.invoke() }
     }
 
@@ -810,7 +824,10 @@ class WallpaperDelegateTest {
 
     @Test
     fun `onClearWallpaper shows error toast on exception`() = runTest {
-        every { wallpaperFileManager.clearAll() } throws RuntimeException("IO error")
+        var refs = setOf("file:///data/wallpapers/wp_old")
+        persistedRefs = { refs }
+        coEvery { clearWallpaperUseCase.invoke() } answers { refs = emptySet() }
+        every { wallpaperFileManager.deleteFile(any<String>()) } throws RuntimeException("IO error")
 
         val delegate = createDelegate()
 
@@ -821,19 +838,22 @@ class WallpaperDelegateTest {
     }
 
     /**
-     * AUDIT-9 #N1 regression guard: `clearAll` does blocking file deletion and
-     * must run OFF the main dispatcher (the launchSafe block starts on it).
+     * AUDIT-9 #N1 regression guard: deleting the files is blocking I/O and must run OFF the main
+     * dispatcher (the launchSafe block starts on it) — since D2 the previous state's files.
      */
     @Test
     fun `onClearWallpaper deletes files off the main dispatcher`() = runTest {
+        var refs = setOf("file:///data/wallpapers/wp_old")
+        persistedRefs = { refs }
+        coEvery { clearWallpaperUseCase.invoke() } answers { refs = emptySet() }
         val io = CountingDispatcher(StandardTestDispatcher(testScheduler))
         val delegate = createDelegate(ioDispatcher = io)
 
         delegate.onClearWallpaper()
         advanceUntilIdle()
 
-        coVerify { wallpaperFileManager.clearAll() }
-        assertWithMessage("clearAll must run on the injected io dispatcher, not the main thread").that(io.count > 0).isTrue()
+        coVerify { wallpaperFileManager.deleteFile("file:///data/wallpapers/wp_old") }
+        assertWithMessage("deleting must run on the injected io dispatcher, not the main thread").that(io.count > 0).isTrue()
     }
 
     /**
@@ -2162,6 +2182,7 @@ class WallpaperDelegateTest {
             stateFlow.value = firstArg()
         }
         coEvery { clearWallpaperUseCase.invoke() } coAnswers { stateFlow.value = WallpaperState.NONE }
+        persistedRefs = { stateFlow.value.referencedUris } // the store reads what is persisted
         val delegate = createDelegate(observeWallpaperStateUseCase = useCase)
         delegate.start()
         advanceUntilIdle()
@@ -2181,7 +2202,7 @@ class WallpaperDelegateTest {
             clearWallpaperUseCase.invoke()
         }
         assertThat(stateFlow.value).isEqualTo(WallpaperState.NONE) // nothing references a deleted file
-        verify { wallpaperFileManager.clearAll() }
+        twoLayers().referencedUris.forEach { verify { wallpaperFileManager.deleteFile(it) } } // the previous files (D2)
     }
 
     @Test
@@ -2203,10 +2224,3 @@ class WallpaperDelegateTest {
     }
 }
 
-/**
- * A repository for [WallpaperImageStore] whose persisted state references nothing (3a-2c): every
- * delete candidate counts as unreferenced, as before the store read the persisted state itself.
- */
-private fun persistedNothing(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
-    io.mockk.coEvery { readPersistedImageUris() } returns emptySet()
-}

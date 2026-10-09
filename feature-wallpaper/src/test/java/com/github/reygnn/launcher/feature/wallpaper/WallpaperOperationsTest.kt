@@ -86,10 +86,13 @@ class WallpaperOperationsTest {
         coEvery { copyToInternal(any()) } returns Uri.parse(b)
     }
 
+    /** When set, the store reads this instead of the persisted state (null = unreadable). */
+    private var persistedRead: (() -> Set<String>?)? = null
+
     private fun operations(scope: CoroutineScope, persistence: FakePersistence, composite: FakeComposite = FakeComposite()): WallpaperOperations {
         // The store reads what the fake persisted, like the real repository would.
         val repository = mockk<WallpaperRepository>(relaxed = true) {
-            coEvery { readPersistedImageUris() } answers { persistence.state.value.referencedUris }
+            coEvery { readPersistedImageUris() } answers { persistedRead.let { r -> if (r != null) r() else persistence.state.value.referencedUris } }
         }
         val session = WallpaperEditSession().apply { onPersistedState(persistence.state.value) }
         val host = object : WallpaperComposite.Host {
@@ -188,7 +191,7 @@ class WallpaperOperationsTest {
 
         assertThat(removed).isFalse()
         assertThat(persistence.writes).isEmpty()
-        verify(exactly = 0) { fileManager.clearAll() }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
         assertThat(composite.invalidated).isEqualTo(0)
         assertThat(ops.session.isEditMode.value).isTrue()
         assertThat(ops.session.state.value.referencedUris).containsExactly(a, b)
@@ -214,9 +217,119 @@ class WallpaperOperationsTest {
 
         assertThat(removed).isFalse()
         assertThat(persistence.writes).containsExactly("save") // no "clear"
-        verify(exactly = 0) { fileManager.clearAll() }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
         assertThat(composite.invalidated).isEqualTo(0)
         assertThat(ops.session.isEditMode.value).isTrue()
+    }
+
+    // ---- 3b/29, D2: "remove" deletes exactly the previous state's files ----
+
+    @Test
+    fun remove_deletes_exactly_the_previous_states_files() = runTest(mainDispatcherRule.testDispatcher) {
+        // Never the whole directory: a foreign file (an orphan, a copy still running) is untouched.
+        val twoLayers = WallpaperState.multiLayer(listOf(WallpaperLayerState(id = "1", imageUri = a), WallpaperLayerState(id = "2", imageUri = b)))
+        val persistence = FakePersistence(twoLayers)
+        val ops = operations(this, persistence)
+
+        assertThat(ops.clear()).isTrue()
+
+        verify(exactly = 1) { fileManager.deleteFile(a) }
+        verify(exactly = 1) { fileManager.deleteFile(b) }
+        verify(exactly = 2) { fileManager.deleteFile(any<String>()) } // nothing else
+    }
+
+    @Test
+    fun remove_with_an_unreadable_previous_state_empties_it_and_deletes_nothing() = runTest(mainDispatcherRule.testDispatcher) {
+        // Fail closed: which files were the wallpaper's can't be told — they stay as GC orphans.
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(this, persistence)
+        var reads = 0
+        persistedRead = { if (reads++ == 0) null else persistence.state.value.referencedUris }
+
+        assertThat(ops.clear()).isTrue() // the state is empty afterwards: the removal took effect
+
+        assertThat(persistence.state.value.hasWallpaper).isFalse()
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    // ---- 3b/29, d′: outside a session the last CHOSEN image wins, a foreign writer discards ----
+
+    @Test
+    fun an_older_replace_finishing_after_a_newer_one_is_discarded() = runTest(mainDispatcherRule.testDispatcher) {
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(this, persistence)
+        val olderGate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(Uri.parse("content://picker/older")) } coAnswers { olderGate.await(); Uri.parse("file:///w/older") }
+        coEvery { fileManager.copyToInternal(Uri.parse("content://picker/newer")) } returns Uri.parse("file:///w/newer")
+
+        val older = async { ops.replace(Uri.parse("content://picker/older"), ops.session.rollbackGeneration) }
+        runCurrent() // the older copy waits
+        val newer = ops.replace(Uri.parse("content://picker/newer"), ops.session.rollbackGeneration)
+        olderGate.complete(Unit)
+
+        assertThat(newer).isEqualTo(WallpaperOperations.ImageResult.Applied)
+        assertThat(older.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.state.value.referencedUris).containsExactly("file:///w/newer")
+        verify(exactly = 1) { fileManager.deleteFile("file:///w/older") }
+    }
+
+    @Test
+    fun two_replaces_the_older_finishing_first_both_apply_and_the_newer_wins() = runTest(mainDispatcherRule.testDispatcher) {
+        // The newer replace finds the older one's result, not its own start state: only the
+        // remembered last applied refs let it through (d′), and it removes the older file.
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(this, persistence)
+        val olderGate = CompletableDeferred<Unit>()
+        val newerGate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(Uri.parse("content://picker/older")) } coAnswers { olderGate.await(); Uri.parse("file:///w/older") }
+        coEvery { fileManager.copyToInternal(Uri.parse("content://picker/newer")) } coAnswers { newerGate.await(); Uri.parse("file:///w/newer") }
+
+        val older = async { ops.replace(Uri.parse("content://picker/older"), ops.session.rollbackGeneration) }
+        val newer = async { ops.replace(Uri.parse("content://picker/newer"), ops.session.rollbackGeneration) }
+        runCurrent() // both copies wait at their gates
+        olderGate.complete(Unit)
+        runCurrent() // the older one applies first
+        newerGate.complete(Unit)
+
+        assertThat(older.await()).isEqualTo(WallpaperOperations.ImageResult.Applied)
+        assertThat(newer.await()).isEqualTo(WallpaperOperations.ImageResult.Applied)
+        assertThat(persistence.state.value.referencedUris).containsExactly("file:///w/newer")
+        verify(exactly = 1) { fileManager.deleteFile("file:///w/older") }
+    }
+
+    @Test
+    fun a_foreign_writer_during_the_copy_discards_the_replace() = runTest(mainDispatcherRule.testDispatcher) {
+        // A reset or an import writes past the operations: the copy must not set the wallpaper again.
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(this, persistence)
+        val gate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers { gate.await(); Uri.parse(b) }
+
+        val result = async { ops.replace(picked, ops.session.rollbackGeneration) }
+        runCurrent()
+        persistence.state.value = WallpaperState.NONE // the foreign writer (a reset)
+        gate.complete(Unit)
+
+        assertThat(result.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.state.value.hasWallpaper).isFalse()
+        verify(exactly = 1) { fileManager.deleteFile(b) }
+    }
+
+    @Test
+    fun an_unreadable_state_when_applying_discards_without_deleting() = runTest(mainDispatcherRule.testDispatcher) {
+        val persistence = FakePersistence(WallpaperState.single(uri = a))
+        val ops = operations(this, persistence)
+        val gate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers { gate.await(); Uri.parse(b) }
+
+        val result = async { ops.replace(picked, ops.session.rollbackGeneration) }
+        runCurrent()
+        persistedRead = { null }
+        gate.complete(Unit)
+
+        assertThat(result.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(persistence.writes).isEmpty()
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) } // the copy is a GC orphan
     }
 
     @Test
@@ -227,7 +340,7 @@ class WallpaperOperationsTest {
         val ops = operations(this, persistence, composite)
 
         assertThat(ops.clear()).isFalse()
-        verify(exactly = 0) { fileManager.clearAll() }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
         assertThat(composite.invalidated).isEqualTo(0)
         assertThat(ops.session.state.value.referencedUris).containsExactly(a)
     }

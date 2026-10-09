@@ -81,6 +81,17 @@ class LauncherViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    /**
+     * The persisted references the image store reads (3a-2c; 3b/29, D2). Empty by default — every
+     * delete candidate counts as unreferenced; a "remove" test sets the references before the
+     * removal, and the clear use case empties them, like the real repository.
+     */
+    private var persistedRefs: () -> Set<String> = { emptySet() }
+
+    private fun persistedRefsRepository(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
+        io.mockk.coEvery { readPersistedImageUris() } answers { persistedRefs() }
+    }
+
     @get:Rule
     val timberRule = TimberRule()
 
@@ -248,7 +259,7 @@ class LauncherViewModelTest {
         getFabPositionUseCase = getFabPositionUseCase,
         saveFabPositionUseCase = saveFabPositionUseCase,
         observeWallpaperBackdropUseCase = mockk(relaxed = true),
-        wallpaperImageStore = WallpaperImageStore(wallpaperFileManager, persistedNothing(), mainDispatcherRule.testDispatcher),
+        wallpaperImageStore = WallpaperImageStore(wallpaperFileManager, persistedRefsRepository(), mainDispatcherRule.testDispatcher),
         wallpaperComposite = CachedWallpaperComposite(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mainDispatcherRule.testDispatcher),
         wallpaperDisplaySettingsStore = mockk(relaxed = true),
         appUpdateSignal = appUpdateSignal,
@@ -627,13 +638,16 @@ class LauncherViewModelTest {
 
     @Test
     fun `onClearWallpaper delegates to wallpaperDelegate`() = runTest {
+        var refs = setOf("file:///data/wallpapers/wp_old")
+        persistedRefs = { refs }
+        coEvery { clearWallpaperUseCase.invoke() } answers { refs = emptySet() }
         val vm = createViewModel()
         advanceUntilIdle()
 
         vm.onClearWallpaper()
         advanceUntilIdle()
 
-        coVerify { wallpaperFileManager.clearAll() }
+        coVerify { wallpaperFileManager.deleteFile("file:///data/wallpapers/wp_old") } // the previous state's file (D2)
         coVerify { clearWallpaperUseCase.invoke() }
     }
 
@@ -740,10 +754,3 @@ class LauncherViewModelTest {
     }
 }
 
-/**
- * A repository for [WallpaperImageStore] whose persisted state references nothing (3a-2c): every
- * delete candidate counts as unreferenced, as before the store read the persisted state itself.
- */
-private fun persistedNothing(): WallpaperRepository = io.mockk.mockk(relaxed = true) {
-    io.mockk.coEvery { readPersistedImageUris() } returns emptySet()
-}

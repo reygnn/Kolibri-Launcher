@@ -79,8 +79,8 @@ class WallpaperRepositoryImplTest {
         // Default: every file exists on disk. Individual tests override.
         every { fileManager.fileExists(any<Uri>()) } returns true
         // Default: every wallpaper file deleted. A relaxed Boolean is false, which the purge would
-        // report as "files left" (2b-4c, F1).
-        every { fileManager.clearAll() } returns true
+        // report as "file left" (2b-4c, F1; per referenced file since 3b/29, D2).
+        every { fileManager.deleteFile(any<String>()) } returns true
 
         manager = WallpaperRepositoryImpl(dataStore, fileManager, mainDispatcherRule.testDispatcher)
     }
@@ -373,31 +373,34 @@ class WallpaperRepositoryImplTest {
 
     @Test
     fun `purgeRepository also deletes on-disk wallpaper files`() = runTest {
-        // AUDIT-9 #7: a factory reset (which routes through purgeRepository)
-        // must clear the wallpaper image files too, not just the DataStore
-        // keys — otherwise orphaned files linger in filesDir/wallpapers/ until
-        // the next cold-start gcOrphans sweep. Pins the wiring to clearAll().
+        // AUDIT-9 #7: a factory reset (which routes through purgeRepository) must delete the
+        // wallpaper image files too, not just the DataStore key. Since 3b/29 (D2): exactly the
+        // files the state referenced, then one orphan sweep with the normal grace period.
+        manager.saveWallpaperState(WallpaperState.single("file:///w/a"))
         manager.purgeRepository()
         advanceUntilIdle()
 
-        verify(exactly = 1) { fileManager.clearAll() }
+        verify(exactly = 1) { fileManager.deleteFile("file:///w/a") }
+        verify(exactly = 1) { fileManager.gcOrphans(emptySet<String>()) }
     }
 
     // ---- an incomplete purge is reported, and every step still runs (2b-4c, F1) ----
 
     @Test
     fun `purgeRepository still deletes the files when removing the key fails, then throws`() = runTest {
+        manager.saveWallpaperState(WallpaperState.single("file:///w/a"))
         dataStore.makeEditFail()
 
         val error = assertFailsWith<IOException> { manager.purgeRepository() }
 
         assertThat(error).hasMessageThat().contains("Simulated edit failure")
-        verify(exactly = 1) { fileManager.clearAll() } // the independent step ran anyway
+        verify(exactly = 1) { fileManager.deleteFile("file:///w/a") } // the independent step ran anyway
     }
 
     @Test
     fun `purgeRepository throws when wallpaper files are left`() = runTest {
-        every { fileManager.clearAll() } returns false
+        manager.saveWallpaperState(WallpaperState.single("file:///w/a"))
+        every { fileManager.deleteFile("file:///w/a") } returns false // a referenced file stays
 
         val error = assertFailsWith<IOException> { manager.purgeRepository() }
 
@@ -407,13 +410,27 @@ class WallpaperRepositoryImplTest {
 
     @Test
     fun `purgeRepository keeps both failures, the first thrown and the second suppressed`() = runTest {
+        manager.saveWallpaperState(WallpaperState.single("file:///w/a"))
         dataStore.makeEditFail()
-        every { fileManager.clearAll() } returns false
+        every { fileManager.deleteFile("file:///w/a") } returns false
 
         val error = assertFailsWith<IOException> { manager.purgeRepository() }
 
         assertThat(error).hasMessageThat().contains("Simulated edit failure")
         assertThat(error.suppressed.map { it.message }).containsExactly("Not every wallpaper file could be deleted")
+    }
+
+    @Test
+    fun `purgeRepository with an unreadable state deletes nothing and runs no sweep`() = runTest {
+        // Fail closed (3b/29, D2): which files were the wallpaper's can't be told — keep them all,
+        // no orphan sweep either, and report the reset as incomplete.
+        dataStore.seed { it[KEY_LAYERS_JSON] = "not json" }
+
+        val error = assertFailsWith<IOException> { manager.purgeRepository() }
+
+        assertThat(error).hasMessageThat().isEqualTo("Not every wallpaper file could be deleted")
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+        verify(exactly = 0) { fileManager.gcOrphans(any<Set<String>>()) }
     }
 
     @Test

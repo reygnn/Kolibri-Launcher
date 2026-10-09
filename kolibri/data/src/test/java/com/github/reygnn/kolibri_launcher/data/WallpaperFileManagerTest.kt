@@ -267,29 +267,33 @@ class WallpaperFileManagerTest {
         assertThat(f.exists()).isFalse()
     }
 
-    // ---- clearAll reports whether everything is gone (2b-4c, F1) ----
+    // ---- deleteFile reports whether the file is gone (3b/29, D2 — the honest reset counts it) ----
 
     @Test
-    fun `clearAll deletes every file and reports true`() {
-        File(wallpaperDir, "a.jpg").writeBytes(byteArrayOf(1))
-        File(wallpaperDir, "b.jpg").writeBytes(byteArrayOf(2))
+    fun `deleteFile reports true for a deleted file`() {
+        val inside = createFileWithAge("wp_delete_me", ageMillis = 0L)
 
-        assertThat(manager.clearAll()).isTrue()
-        assertThat(wallpaperDir.list().orEmpty()).isEmpty()
+        assertThat(manager.deleteFile(Uri.fromFile(inside))).isTrue()
+        assertThat(inside.exists()).isFalse()
     }
 
     @Test
-    fun `clearAll on an empty directory reports true`() {
-        assertThat(manager.clearAll()).isTrue()
+    fun `deleteFile reports true for an internal file that does not exist`() {
+        assertThat(manager.deleteFile(Uri.fromFile(java.io.File(wallpaperDir, "wp_never_there")))).isTrue()
     }
 
     @Test
-    fun `clearAll reports false when an entry can't be deleted, and still deletes the rest`() {
-        File(wallpaperDir, "a.jpg").writeBytes(byteArrayOf(1))
-        // A non-empty directory can't be deleted with File.delete() — the stand-in for a locked file.
-        File(wallpaperDir, "stuck").apply { mkdirs() }.resolve("inner").writeBytes(byteArrayOf(2))
+    fun `deleteFile reports true for a uri that is no internal file`() {
+        // Nothing of ours to delete — and A1 refuses to delete outside the directory anyway.
+        assertThat(manager.deleteFile(Uri.parse("content://media/external/images/media/1"))).isTrue()
+    }
 
-        assertThat(manager.clearAll()).isFalse()
-        assertThat(wallpaperDir.list().orEmpty().toList()).containsExactly("stuck")
+    @Test
+    fun `deleteFile reports false for an internal file that cannot be deleted`() {
+        // A non-empty directory under the wallpaper name stands in for an undeletable file.
+        val stuck = java.io.File(wallpaperDir, "wp_stuck").apply { mkdirs(); java.io.File(this, "child").writeText("x") }
+
+        assertThat(manager.deleteFile(Uri.fromFile(stuck))).isFalse()
+        assertThat(stuck.exists()).isTrue()
     }
 }

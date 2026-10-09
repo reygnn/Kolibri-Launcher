@@ -67,6 +67,16 @@ class WallpaperOperations(
      */
     private val persistLock = Mutex()
 
+    // "Last chosen wins" for a replace OUTSIDE a session (3b/29, d′): every replace takes a start
+    // number on Main; the number and the references of the last APPLIED own replace live under
+    // [persistLock].
+    private var startedSeq = 0L
+    private var appliedSeq = 0L
+    private var lastAppliedRefs: Set<String>? = null
+
+    /** What a replace outside a session remembered at its start (d′). */
+    private class ReplaceGuard(val seq: Long, val startRefs: Set<String>?)
+
     // ---- start-up ----
 
     /** Persisted state → session (ignored during a session), orphan GC once per process, refill. */
@@ -123,14 +133,24 @@ class WallpaperOperations(
      * delete what is no longer referenced. [rollbackGenAtStart] is read at invocation time; a
      * cancel or a "remove wallpaper" during the copy discards the change, and the store removes
      * the unreferenced copy. Saved through the port as the single-image state (3a-9, K2).
+     *
+     * Outside a session also optimistic concurrency on the persisted state (3b/29, d′): the
+     * replace takes a start number and remembers the persisted references; when applying, a NEWER
+     * own replace already applied, or a foreign writer (reset, import, removal) changed the state
+     * meanwhile → Discarded. So the LAST CHOSEN image wins, not the last copied one. Main only.
      */
     suspend fun replace(imageUri: Uri, rollbackGenAtStart: Long): ImageResult {
+        val guard = if (session.isEditMode.value) {
+            null // inside a session only the generation decides — the session itself writes there
+        } else {
+            ReplaceGuard(seq = ++startedSeq, startRefs = imageStore.readPersistedImageUris())
+        }
         val internalUri = imageStore.copyIn(imageUri)
         if (internalUri == null) {
             TimberWrapper.silentError("Failed to copy wallpaper to internal storage")
             return ImageResult.CopyFailed
         }
-        return applyCopied(internalUri.toString()) { session.replace(it, rollbackGenAtStart) }
+        return applyCopied(internalUri.toString(), guard) { session.replace(it, rollbackGenAtStart) }
     }
 
     /**
@@ -156,8 +176,27 @@ class WallpaperOperations(
      * Checked outside the lock, the change could pass, wait for the lock, and save after the
      * removal. A discarded copy is not referenced by anything persisted (3a-2c).
      */
-    private suspend fun applyCopied(copiedUri: String, change: (String) -> WallpaperEditSession.Effect?): ImageResult =
+    private suspend fun applyCopied(
+        copiedUri: String,
+        guard: ReplaceGuard? = null,
+        change: (String) -> WallpaperEditSession.Effect?,
+    ): ImageResult =
         persistLock.withLock {
+            // d′ (3b/29), only for a replace started outside a session and still outside one.
+            if (guard != null && !session.isEditMode.value) {
+                if (guard.seq < appliedSeq) {
+                    // A newer own replace is applied already: the last chosen image wins.
+                    imageStore.deleteUnreferenced(listOf(copiedUri))
+                    return@withLock ImageResult.Discarded
+                }
+                // Unreadable → discard without deleting (fail closed; the copy is a GC orphan).
+                val current = imageStore.readPersistedImageUris() ?: return@withLock ImageResult.Discarded
+                if (current != guard.startRefs && current != lastAppliedRefs) {
+                    // A foreign writer (reset, import, removal) changed the state meanwhile.
+                    imageStore.deleteUnreferenced(listOf(copiedUri))
+                    return@withLock ImageResult.Discarded
+                }
+            }
             val effect = change(copiedUri)
             if (effect == null) {
                 imageStore.deleteUnreferenced(listOf(copiedUri))
@@ -165,16 +204,22 @@ class WallpaperOperations(
             }
             persistence.save(effect.persist)
             imageStore.deleteUnreferenced(effect.deleteNow)
+            if (guard != null) {
+                appliedSeq = guard.seq
+                lastAppliedRefs = effect.persist.referencedUris
+            }
             ImageResult.Applied
         }
 
     // ---- remove wallpaper ----
 
     /**
-     * "Remove wallpaper": state first, files second, only against an empty persisted state
-     * (3a-2d), under the composite lock and then [persistLock] (3a-3b) — a save still pending from
-     * a session just committed lands BEFORE the clear. Returns whether the removal took effect;
-     * if not, the wallpaper stays as it is on disk.
+     * "Remove wallpaper": state first, then exactly the files of the PREVIOUS state (3b/29, D2:
+     * the persisted references read before emptying it — never the whole directory, so a copy
+     * still running is not hit; orphans are the GC's), under the composite lock and then
+     * [persistLock] (3a-3b) — a save still pending from a session just committed lands BEFORE the
+     * clear. Returns whether the removal took effect (the persisted state is empty afterwards); if
+     * not, the wallpaper stays as it is on disk.
      *
      * **Refused while an edit session is open (3b-3)** — checked first, before any lock: the
      * session and its snapshot still reference the files, emissions are ignored during it (E4),
@@ -200,12 +245,19 @@ class WallpaperOperations(
             // The deciding check (see clear()): a session opened while this call waited for the
             // lock refuses the removal — nothing cleared, nothing deleted.
             if (session.isEditMode.value) return@exclusive false
+            val previous = imageStore.readPersistedImageUris()
             persistence.clear()
-            imageStore.deleteAllIfNothingPersisted().also { tookEffect ->
-                // Every image file is gone: an add or replace still copying must not persist its
-                // copy afterwards (audit A2) — it checks the generation under this lock.
-                if (tookEffect) session.invalidatePendingChanges()
+            val after = imageStore.readPersistedImageUris()
+            val tookEffect = after != null && after.isEmpty()
+            if (tookEffect) {
+                // The intent guard (3b/20, role since D2): an add or replace still copying must not
+                // set the wallpaper again after the removal — it checks the generation under this
+                // lock. Its file is no longer at risk (D2 deletes only the previous state's files).
+                session.invalidatePendingChanges()
+                // Exactly the previous state's files; unreadable before → nothing (GC orphans).
+                if (previous != null) imageStore.deleteUnreferenced(previous)
             }
+            tookEffect
         }
         if (!removalTookEffect) return@exclusive false
         // Drop the composite and its luminance: nothing displays it after a clear.

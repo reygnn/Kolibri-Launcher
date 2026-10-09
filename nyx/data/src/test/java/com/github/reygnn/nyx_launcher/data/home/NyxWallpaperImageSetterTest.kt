@@ -162,9 +162,11 @@ class NyxWallpaperImageSetterTest {
 
     @Test
     fun clear_clears_state_and_deletes_the_files_once_nothing_is_persisted() = runTest(mainDispatcherRule.testDispatcher) {
-        // State first, then the files — all of them, through the store, but only once the
-        // persisted state references nothing (as in Kolibri, 3a-2d).
-        persisted()
+        // State first, then exactly the previous state's files (3b/29, D2), through the store, once
+        // the persisted state references nothing (as in Kolibri, 3a-2d).
+        var refs = setOf("file:///a", "file:///b")
+        coEvery { repository.readPersistedImageUris() } answers { refs }
+        coEvery { repository.clearWallpaper() } answers { refs = emptySet() }
         startedWith(
             WallpaperState.multiLayer(listOf(WallpaperLayerState(imageUri = "file:///a"), WallpaperLayerState(imageUri = "file:///b"))),
         )
@@ -173,7 +175,8 @@ class NyxWallpaperImageSetterTest {
 
         assertThat(removed).isTrue()
         coVerify(exactly = 1) { repository.clearWallpaper() }
-        verify(exactly = 1) { fileManager.clearAll() }
+        verify(exactly = 1) { fileManager.deleteFile("file:///a") }
+        verify(exactly = 1) { fileManager.deleteFile("file:///b") }
     }
 
     @Test
@@ -242,7 +245,7 @@ class NyxWallpaperImageSetterTest {
         val removed = setter.clear()
 
         assertThat(removed).isFalse()
-        verify(exactly = 0) { fileManager.clearAll() }
+        verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
     }
 
     @Test
@@ -257,7 +260,6 @@ class NyxWallpaperImageSetterTest {
 
         assertThat(removed).isFalse()
         coVerify(exactly = 0) { repository.clearWallpaper() }
-        verify(exactly = 0) { fileManager.clearAll() }
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
         assertThat(editing.session.isEditMode.value).isTrue()
         assertThat(editing.session.state.value.referencedUris).containsExactly("file:///a")

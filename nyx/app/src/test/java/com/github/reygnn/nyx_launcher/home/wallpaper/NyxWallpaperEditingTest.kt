@@ -13,19 +13,23 @@ import com.github.reygnn.launcher.core.testing.MainDispatcherRule
 import com.github.reygnn.launcher.core.wallpaper.FakeWallpaperRepository
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImageStore
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperOperations
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperEditing
 import com.github.reygnn.nyx_launcher.data.home.NyxWallpaperImageSetter
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
@@ -165,6 +169,28 @@ class NyxWallpaperEditingTest {
         assertThat(e.session.isEditMode.value).isTrue() // still editing
         assertThat(e.session.state.value.referencedUris).containsExactly("file:///w/old", "file:///w/added")
         verify(exactly = 0) { fileManager.deleteFile("file:///w/added") } // nothing rolled back
+    }
+
+    @Test
+    fun a_factory_reset_during_a_running_copy_discards_it() = runTest(mainDispatcherRule.testDispatcher) {
+        // A2b (3b/29, D2 + d′): the reset writes past the operations. Its file deletion no longer
+        // hits the running copy (only the previous state's files), and the copy notices the foreign
+        // writer when applying — Discarded, no reference, its file removed through the store.
+        repository.currentState = WallpaperState.single(uri = "file:///w/old")
+        val gate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers { gate.await(); uri("file:///w/new") }
+        val e = editing()
+        e.start()
+        advanceUntilIdle()
+
+        val result = async { NyxWallpaperImageSetter(e).setFromUri(uri("content://picker/new")) }
+        runCurrent() // the copy waits at the gate
+        repository.purgeRepository() // the factory reset
+        gate.complete(Unit)
+
+        assertThat(result.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        assertThat(repository.currentState.hasWallpaper).isFalse()
+        verify(exactly = 1) { fileManager.deleteFile("file:///w/new") }
     }
 
     // ---- 3b-6: the injected composite (E3) ----
