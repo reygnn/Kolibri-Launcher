@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.view.ContextThemeWrapper
 import android.view.View
+import com.github.reygnn.launcher.core.DefaultDispatcher
 import com.github.reygnn.launcher.core.MainDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
@@ -40,6 +41,8 @@ import javax.inject.Inject
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
+    /** Runs the compose of the finished, detached view off Main (the costly part, grows with the layer count). */
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) {
     /**
      * The off-screen [ZoomableImageView] used for flattening is an AppCompat
@@ -60,7 +63,12 @@ class WallpaperFlattener @Inject constructor(
      * Flattens [state]'s layers into one software bitmap at [width]x[height]
      * (default: display resolution), or `null` if [state] has fewer than two
      * layers, the size is invalid, or nothing rendered. View construction/mutation runs on the
-     * Main thread; the binder decodes off-Main internally.
+     * Main thread (the view's constructor creates a `ScaleGestureDetector`, whose handler needs a
+     * Looper); the binder decodes off-Main internally. The compose — a full-size bitmap and one
+     * filtered draw per layer — runs on [defaultDispatcher]: the view is detached and owned by
+     * this call alone, and `composeToBitmap` draws with its own Paint/Matrix on its own Canvas.
+     * If the caller is cancelled during the compose, the finished software bitmap is left to the
+     * GC (a rare path, no leak).
      */
     suspend fun flatten(
         state: WallpaperState,
@@ -93,8 +101,12 @@ class WallpaperFlattener @Inject constructor(
                     }
                 }
                 binder.bind(view, state)
-                val composite = LaunchTrace.section(LaunchTrace.Names.WALLPAPER_COMPOSE) {
-                    view.composeToBitmap(width, height)
+                val composite = withContext(defaultDispatcher) {
+                    // Sync section inside the hop: it measures the compose alone, on the thread
+                    // that runs it (the trace shows a DefaultDispatcher worker).
+                    LaunchTrace.section(LaunchTrace.Names.WALLPAPER_COMPOSE) {
+                        view.composeToBitmap(width, height)
+                    }
                 }
                 if (anyLayerFailed.get()) {
                     composite?.recycle()

@@ -771,10 +771,10 @@ class ZoomableImageView @JvmOverloads constructor(
      * software `Canvas`, which cannot draw the HARDWARE bitmaps that
      * `BoundedBitmapDecoder` produces for the live view (it throws "unable to draw
      * hardware bitmaps"). Callers decode/copy layers to a software config first
-     * (§9.2/§9.3). Not yet wired into production — Option D Phase 2/3 will;
-     * `@Suppress("unused")` stays until then.
+     * (§9.2/§9.3). Used in production by `WallpaperFlattener`, which calls it on a
+     * background dispatcher for a detached view it owns alone — the compose touches only its
+     * own Paint/Matrix/Canvas, never the view's draw-time members.
      */
-    @Suppress("unused")
     fun composeToBitmap(
         targetWidth: Int = width,
         targetHeight: Int = height

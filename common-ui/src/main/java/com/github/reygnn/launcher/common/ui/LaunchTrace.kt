@@ -140,8 +140,9 @@ object LaunchTrace {
         const val WALLPAPER_SAVE = "wallpaper_save"
 
         // --- Composite warm (in-memory fill, WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4) ---
-        // ASYNC sections: the warm suspends / hops threads (flatten on Main, decodes on IO),
-        // so the sync `section` (thread-local begin/end) would mis-report. Measured on device
+        // ASYNC sections: the warm suspends / hops threads (flatten view built on Main, compose
+        // on Default, decodes on IO), so the sync `section` (thread-local begin/end) would
+        // mis-report. Measured on device
         // via the `:macrobenchmark` TraceSectionMetric.
 
         /** The whole background composite warm: flatten -> luminance -> HARDWARE copy ->
