@@ -55,6 +55,9 @@ class WallpaperCompositeBenchmark {
         metrics = listOf(
             TraceSectionMetric(SECTION_WARM, TraceSectionMetric.Mode.Sum),
             TraceSectionMetric(SECTION_FLATTEN, TraceSectionMetric.Mode.Sum),
+            // Info only (Stufe 1, audit-04): the compose inside the flatten. The one allowed
+            // change to this frozen benchmark — before and after measure with the same metrics.
+            TraceSectionMetric(SECTION_COMPOSE, TraceSectionMetric.Mode.Sum),
         ),
         iterations = ITERATIONS,
         compilationMode = CompilationMode.Partial(),
@@ -125,6 +128,7 @@ class WallpaperCompositeBenchmark {
         const val SWIPE_STEPS = 8
         const val SECTION_WARM = "wallpaper_warm"     // LaunchTrace.Names.WALLPAPER_WARM
         const val SECTION_FLATTEN = "wallpaper_flatten" // LaunchTrace.Names.WALLPAPER_FLATTEN
+        const val SECTION_COMPOSE = "wallpaper_compose" // LaunchTrace.Names.WALLPAPER_COMPOSE
         const val DRAWER_LIST_ID = "apps_recycler_view"
         // The wallpaper view lives in activity_main.xml since §25 (the old fragment id
         // "wallpaperView" no longer exists, so the waits silently timed out; fixed in 3a-8a).

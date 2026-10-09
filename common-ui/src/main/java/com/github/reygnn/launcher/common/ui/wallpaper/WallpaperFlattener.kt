@@ -1,5 +1,6 @@
 package com.github.reygnn.launcher.common.ui.wallpaper
 
+import com.github.reygnn.launcher.common.ui.LaunchTrace
 import com.github.reygnn.launcher.common.ui.R
 import android.content.Context
 import android.graphics.Bitmap
@@ -92,7 +93,9 @@ class WallpaperFlattener @Inject constructor(
                     }
                 }
                 binder.bind(view, state)
-                val composite = view.composeToBitmap(width, height)
+                val composite = LaunchTrace.section(LaunchTrace.Names.WALLPAPER_COMPOSE) {
+                    view.composeToBitmap(width, height)
+                }
                 if (anyLayerFailed.get()) {
                     composite?.recycle()
                     null

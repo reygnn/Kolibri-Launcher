@@ -152,6 +152,12 @@ object LaunchTrace {
          * [WALLPAPER_WARM]. */
         const val WALLPAPER_FLATTEN = "wallpaper_flatten"
 
+        /** Just the compose inside [WALLPAPER_FLATTEN]: the full-size bitmap and one filtered draw
+         * per layer (`ZoomableImageView.composeToBitmap`). A SYNC section — the compose does not
+         * suspend, so begin and end land on the same thread, and the trace shows which thread ran
+         * it. Info only (SPEC_NYX_REWRITE Stufe 1, audit-04); the warm/flatten bounds are unchanged. */
+        const val WALLPAPER_COMPOSE = "wallpaper_compose"
+
         // --- Wallpaper paint (SPEC_NYX_REWRITE F4: the 3a-8 before/after measurement) ---
         // ASYNC sections, ended in a pre-draw callback one frame after the wallpaper view
         // applied a state (the thread-local sync `section` would mis-report). Measured by the
