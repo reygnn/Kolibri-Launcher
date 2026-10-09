@@ -60,7 +60,9 @@ import kotlin.math.abs
  * - **bit-identical to the view's math** — a detached [ZoomableImageView], bound by the real
  *   [WallpaperViewBinder] with SOFTWARE decodes and drawn with `view.draw(Canvas)`, is exactly
  *   what the flatten computed before Stufe 2 (measure, layout, bind, `drawLayers`). `sameAs`.
- *   This is the proof that the new placement and drawing change no pixel.
+ *   Introduced while the view still had its own math (3b/33), it proved that the new placement
+ *   and drawing change no pixel; since the view calls the same placement and painter (3b/34) it
+ *   guards the rest of the path — the same plan, decode sample sizes and view size.
  * - **the real live view on screen** — a [ZoomableImageView] in a window, bound like Kolibri's
  *   live view (HARDWARE decodes, GPU), read back with [PixelCopy] after a committed frame. Two
  *   rasterizers (Skia CPU vs. GPU), so a tolerance: per channel max ≤ 2 and mean ≤ 0.5 (the A36

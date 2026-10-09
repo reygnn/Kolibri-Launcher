@@ -18,6 +18,10 @@ import androidx.appcompat.widget.AppCompatImageView
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryRow
 import com.github.reygnn.launcher.common.ui.LaunchTrace
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperLayerPlacement.MULTI_LAYER_MAX_SCALE
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperLayerPlacement.MULTI_LAYER_MIN_SCALE
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperLayerPlacement.ZOOM_IN_MULTIPLIER
+import com.github.reygnn.launcher.common.ui.wallpaper.WallpaperLayerPlacement.ZOOM_OUT_MULTIPLIER
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -96,15 +100,9 @@ class ZoomableImageView @JvmOverloads constructor(
         private const val MAX_SCALE = 5.0f
         private const val DEFAULT_SCALE = 1.0f
 
-        // Multi-Layer erlaubt kleinere Scales (Bilder können Teil des Screens sein)
-        private const val MULTI_LAYER_MIN_SCALE = 0.1f
-        private const val MULTI_LAYER_MAX_SCALE = 10.0f
-
-        // Relativer Zoom-Faktor bezogen auf den CenterCrop-Scale (Base Scale).
-        // Erlaubt Rein-/Rauszoomen unabhängig von der absoluten Bildgröße.
-        // z.B. bei einem 50x50 Bild mit baseScale=40: maxScale = 40 * 3 = 120
-        private const val ZOOM_IN_MULTIPLIER = 3.0f   // Max 3x über Cover hinaus
-        private const val ZOOM_OUT_MULTIPLIER = 0.05f  // Min 5% of the reference scale
+        // The multi-layer scale range and the zoom multipliers relative to the base (center-crop)
+        // scale live in WallpaperLayerPlacement — one source for the gestures, the restore and the
+        // view-free flatten (Stufe 2).
 
         private const val DRAG_THRESHOLD_PX = 10f
         private const val EDGE_RESISTANCE_STRENGTH = 0.01f
@@ -178,12 +176,9 @@ class ZoomableImageView @JvmOverloads constructor(
      */
     private fun computeLayerBaseScale(layer: WallpaperLayer): Float {
         val bmp = layer.bitmap ?: return 1f
-        if (width == 0 || height == 0) return 1f
-        // Guard the bitmap dims too, mirroring updateSingleBaseScale's dw/dh <= 0
-        // check — a zero-dimension bitmap divides to +Infinity and would poison
-        // every effectiveMin/MaxScale and CenterCrop matrix derived from it.
-        if (bmp.width <= 0 || bmp.height <= 0) return 1f
-        return max(width.toFloat() / bmp.width, height.toFloat() / bmp.height)
+        // Guards view and bitmap dims (a zero dimension would divide to +Infinity and poison
+        // every effectiveMin/MaxScale and CenterCrop matrix derived from it).
+        return WallpaperLayerPlacement.baseScale(bmp.width, bmp.height, width, height)
     }
 
     // ===========================================
@@ -321,10 +316,7 @@ class ZoomableImageView @JvmOverloads constructor(
     // PAINT OBJECTS (Multi-Layer Rendering)
     // ===========================================
 
-    private val bitmapPaint = Paint().apply {
-        isAntiAlias = true
-        isFilterBitmap = true
-    }
+    private val bitmapPaint = WallpaperLayerPainter.newLayerPaint()
 
     private val selectionPaint = Paint().apply {
         style = Paint.Style.STROKE
@@ -724,18 +716,16 @@ class ZoomableImageView @JvmOverloads constructor(
         val layer = layers.getOrNull(layerIndex) ?: return
         cancelSnapBackAnimation()
 
-        // Scale-Grenzen basierend auf DIESEM Layer (nicht dem aktiven)
-        val baseScale = computeLayerBaseScale(layer)
-        val minS = minOf(MULTI_LAYER_MIN_SCALE, baseScale * ZOOM_OUT_MULTIPLIER)
-        val maxS = maxOf(MULTI_LAYER_MAX_SCALE, baseScale * ZOOM_IN_MULTIPLIER)
-
-        // Same corrupt-input guard as the active-layer applyTransform: coerceIn
-        // passes NaN through, so sanitize scale and translate before they reach
-        // the layer (and the image matrix).
-        val safeScale = if (scale.isFinite() && scale > 0f) scale else DEFAULT_SCALE
-        layer.scale = safeScale.coerceIn(minS, maxS)
-        layer.translateX = if (translateX.isFinite()) translateX else 0f
-        layer.translateY = if (translateY.isFinite()) translateY else 0f
+        // The range of THIS layer (not the active one), clamped and sanitized (coerceIn passes
+        // NaN through) by the shared placement — the same the view-free flatten uses.
+        val bmp = layer.bitmap
+        val placement = WallpaperLayerPlacement.clamped(
+            scale, translateX, translateY,
+            bmp?.width ?: 0, bmp?.height ?: 0, width, height,
+        )
+        layer.scale = placement.scale
+        layer.translateX = placement.translateX
+        layer.translateY = placement.translateY
         invalidate()
     }
 
@@ -792,37 +782,18 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     /**
-     * The live multi-layer compositing loop of [onDraw]. Fills the optional background, then
-     * draws every non-recycled layer with its transform, optionally scaled to a target size
-     * ([outputScaleX]/[outputScaleY] = 1f for the 1:1 live view). [drawSelection] draws the
-     * edit-mode highlight on the active layer.
-     *
-     * The view-free flatten draws with the same loop in [WallpaperLayerPainter] and places its
-     * layers with [WallpaperLayerPlacement] (SPEC_NYX_REWRITE Stufe 2); the bit-identity with this
-     * view is pinned by `WallpaperCompositorParityInstrumentedTest`. Until the dedupe step makes
-     * this view call them, keep both copies identical.
+     * The live multi-layer compositing loop of [onDraw]: the shared [WallpaperLayerPainter] (the
+     * same loop the view-free flatten draws with, SPEC_NYX_REWRITE Stufe 2), plus the edit-mode
+     * highlight right after the active layer when [drawSelection] is set. The painter is inline,
+     * so this per-frame path allocates nothing.
      */
     private fun drawLayers(
         canvas: Canvas,
         paint: Paint,
         matrix: Matrix,
-        outputScaleX: Float = 1f,
-        outputScaleY: Float = 1f,
         drawSelection: Boolean,
     ) {
-        if (layerBackgroundColor != Color.TRANSPARENT) {
-            canvas.drawColor(layerBackgroundColor)
-        }
-        val scaled = outputScaleX != 1f || outputScaleY != 1f
-        for ((index, layer) in layers.withIndex()) {
-            val bmp = layer.bitmap ?: continue
-            // Guard: skip a recycled bitmap
-            if (bmp.isRecycled) continue
-
-            layer.buildMatrixInto(matrix)
-            if (scaled) matrix.postScale(outputScaleX, outputScaleY)
-            canvas.drawBitmap(bmp, matrix, paint)
-
+        WallpaperLayerPainter.draw(canvas, layers, layerBackgroundColor, paint, matrix) { index, layer ->
             if (drawSelection && index == activeLayerIndex) {
                 drawSelectionHighlight(canvas, layer)
             }

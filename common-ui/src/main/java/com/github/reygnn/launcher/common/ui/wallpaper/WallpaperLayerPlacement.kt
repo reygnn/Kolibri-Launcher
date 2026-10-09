@@ -11,10 +11,10 @@ import kotlin.math.max
  * This is the placement the live multi-layer view applies when it binds a state: a saved
  * transform is compensated for the decode sample size and clamped to the per-layer zoom range; a
  * layer without a saved transform is center-cropped. The view-free flatten ([WallpaperFlattener])
- * places its layers with it. The live [ZoomableImageView] still runs its own copy of this math
- * until the dedupe step makes it call these functions; the bit-identity of the two is pinned by
+ * places its layers with it, and the live [ZoomableImageView] and [WallpaperViewBinder] call the
+ * same functions — one placement for both. That the flatten matches the live view is pinned by
  * `WallpaperCompositorParityInstrumentedTest`. Keep the operations and their order exactly as they
- * are — float results must match bit for bit.
+ * are — float results must stay bit for bit what they were.
  */
 object WallpaperLayerPlacement {
 
@@ -49,13 +49,32 @@ object WallpaperLayerPlacement {
         viewHeight: Int,
     ): Placement {
         if (transform == null) return centerCrop(bitmapWidth, bitmapHeight, viewWidth, viewHeight)
-        val sCaptured = resolveCaptureSampleSize(
-            transform.captureSampleSize,
+        val scale = compensatedScale(
+            transform,
+            sampleSize,
             if (originalWidth > 0) originalWidth else bitmapWidth * sampleSize,
             if (originalHeight > 0) originalHeight else bitmapHeight * sampleSize,
         )
-        val scale = compensateScaleForSampleSize(transform.scale, sCaptured, sampleSize)
         return clamped(scale, transform.translateX, transform.translateY, bitmapWidth, bitmapHeight, viewWidth, viewHeight)
+    }
+
+    /**
+     * Resolution-compensates a restored [transform]'s bitmap-absolute scale
+     * (WALLPAPER_RENDER_RES_SPEC §3.2/§4-Y): a scale saved against a bitmap downsampled by
+     * `S_captured` is multiplied by `S_render / S_captured` to render identically against the
+     * freshly decoded bitmap (downsampled by [sRender]). `S_captured` comes from the persisted
+     * `captureSampleSize`, or — for a legacy field-less transform — is backfilled from the
+     * original image dimensions (§7). Translate is view-space and unchanged. Used for the single
+     * image as well (the binder's single-layer path).
+     */
+    fun compensatedScale(
+        transform: LayerPropertyUpdate.Transform,
+        sRender: Int,
+        originalWidth: Int,
+        originalHeight: Int,
+    ): Float {
+        val sCaptured = resolveCaptureSampleSize(transform.captureSampleSize, originalWidth, originalHeight)
+        return compensateScaleForSampleSize(transform.scale, sCaptured, sRender)
     }
 
     /** Covers the view and centers the image (the default for an untransformed layer). */

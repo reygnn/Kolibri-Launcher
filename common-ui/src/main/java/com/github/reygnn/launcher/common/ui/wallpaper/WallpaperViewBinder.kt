@@ -1,6 +1,4 @@
 package com.github.reygnn.launcher.common.ui.wallpaper
-import com.github.reygnn.launcher.core.wallpaper.resolveCaptureSampleSize
-import com.github.reygnn.launcher.core.wallpaper.compensateScaleForSampleSize
 
 import android.graphics.Bitmap
 import android.net.Uri
@@ -149,7 +147,7 @@ class WallpaperViewBinder(
         transform: LayerPropertyUpdate.Transform?,
     ) {
         if (transform != null) {
-            val scale = compensatedScale(
+            val scale = WallpaperLayerPlacement.compensatedScale(
                 transform,
                 view.singleSampleSize,
                 view.singleOriginalWidth,
@@ -159,29 +157,6 @@ class WallpaperViewBinder(
         } else {
             view.centerCrop()
         }
-    }
-
-    /**
-     * Resolution-compensates a restored [transform]'s bitmap-absolute scale
-     * (WALLPAPER_RENDER_RES_SPEC §3.2/§4-Y): a scale saved against a bitmap
-     * downsampled by `S_captured` must be multiplied by `S_render / S_captured`
-     * to render identically against the freshly-decoded bitmap (downsampled by
-     * [sRender]). `S_captured` comes from the persisted `captureSampleSize`, or
-     * — for a legacy field-less transform — is backfilled from the original
-     * image dimensions (§7). Translate is view-space and unchanged.
-     */
-    private fun compensatedScale(
-        transform: LayerPropertyUpdate.Transform,
-        sRender: Int,
-        originalWidth: Int,
-        originalHeight: Int,
-    ): Float {
-        val sCaptured = resolveCaptureSampleSize(
-            transform.captureSampleSize,
-            originalWidth,
-            originalHeight,
-        )
-        return compensateScaleForSampleSize(transform.scale, sCaptured, sRender)
     }
 
     /**
@@ -196,7 +171,7 @@ class WallpaperViewBinder(
         if (transform != null) {
             val layer = view.getLayer(layerIndex)
             val scale = if (layer != null) {
-                compensatedScale(transform, layer.sampleSize, layer.originalWidth, layer.originalHeight)
+                WallpaperLayerPlacement.compensatedScale(transform, layer.sampleSize, layer.originalWidth, layer.originalHeight)
             } else {
                 transform.scale
             }

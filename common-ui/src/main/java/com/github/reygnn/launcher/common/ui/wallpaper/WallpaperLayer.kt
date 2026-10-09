@@ -131,12 +131,11 @@ data class WallpaperLayer(
      */
     fun applyCenterCrop(viewWidth: Int, viewHeight: Int) {
         val bmp = bitmap ?: return
-        val imgW = bmp.width.toFloat()
-        val imgH = bmp.height.toFloat()
-
-        scale = maxOf(viewWidth / imgW, viewHeight / imgH)
-        translateX = (viewWidth - imgW * scale) / 2f
-        translateY = (viewHeight - imgH * scale) / 2f
+        // One center-crop for the live view and the view-free flatten (Stufe 2).
+        val placement = WallpaperLayerPlacement.centerCrop(bmp.width, bmp.height, viewWidth, viewHeight)
+        scale = placement.scale
+        translateX = placement.translateX
+        translateY = placement.translateY
     }
 
     /**
