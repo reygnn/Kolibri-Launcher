@@ -140,10 +140,9 @@ object LaunchTrace {
         const val WALLPAPER_SAVE = "wallpaper_save"
 
         // --- Composite warm (in-memory fill, WALLPAPER_COMPOSITE_LIFECYCLE_SPEC v4) ---
-        // ASYNC sections: the warm suspends / hops threads (flatten view built on Main, compose
-        // on Default, decodes on IO), so the sync `section` (thread-local begin/end) would
-        // mis-report. Measured on device
-        // via the `:macrobenchmark` TraceSectionMetric.
+        // ASYNC sections: the warm suspends / hops threads (flatten off Main: compose on Default,
+        // decodes on IO), so the sync `section` (thread-local begin/end) would mis-report.
+        // Measured on device via the `:macrobenchmark` TraceSectionMetric.
 
         /** The whole background composite warm: flatten -> luminance -> HARDWARE copy ->
          * cache put. Off the critical path (once per process / edit / rotate). */
@@ -154,7 +153,7 @@ object LaunchTrace {
         const val WALLPAPER_FLATTEN = "wallpaper_flatten"
 
         /** Just the compose inside [WALLPAPER_FLATTEN]: the full-size bitmap and one filtered draw
-         * per layer (`ZoomableImageView.composeToBitmap`). A SYNC section — the compose does not
+         * per layer (`WallpaperLayerPainter`). A SYNC section — the compose does not
          * suspend, so begin and end land on the same thread, and the trace shows which thread ran
          * it. Info only (SPEC_NYX_REWRITE Stufe 1, audit-04); the warm/flatten bounds are unchanged. */
         const val WALLPAPER_COMPOSE = "wallpaper_compose"

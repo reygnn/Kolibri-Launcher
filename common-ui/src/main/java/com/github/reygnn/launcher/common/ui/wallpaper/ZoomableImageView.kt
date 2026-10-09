@@ -15,8 +15,6 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.animation.DecelerateInterpolator
 import androidx.appcompat.widget.AppCompatImageView
-import androidx.core.graphics.createBitmap
-import androidx.core.graphics.withMatrix
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperMemoryRow
 import com.github.reygnn.launcher.common.ui.LaunchTrace
@@ -43,7 +41,6 @@ import kotlin.math.sqrt
  * - Jedes Layer individuell zoom-/pannbar
  * - Tap selektiert Layer, aktives Layer empfängt Gesten
  * - Transparenter Hintergrund möglich → System-Wallpaper scheint durch
- * - composeToBitmap() exportiert alles als ein Wallpaper
  *
  * ```xml
  * <ZoomableImageView
@@ -759,88 +756,6 @@ class ZoomableImageView @JvmOverloads constructor(
         invalidate()
     }
 
-    /**
-     * Flattens all visible layers into a single bitmap via the shared [drawLayers]
-     * compositor — the offscreen flatten for Option D
-     * (WALLPAPER_DRAWER_HOME_REBUILD_SPEC §9.2, Approach A). Exercised by
-     * `WallpaperFlattenParityInstrumentedTest`, which measured a mean delta of
-     * ~0.1 / max 1 (0..255) vs. the hardware render on a Galaxy A36 — i.e. the
-     * software compose is faithful, so Approach A is viable.
-     *
-     * REQUIRES SOFTWARE (`ARGB_8888`) layer bitmaps: the compose targets a
-     * software `Canvas`, which cannot draw the HARDWARE bitmaps that
-     * `BoundedBitmapDecoder` produces for the live view (it throws "unable to draw
-     * hardware bitmaps"). Callers decode/copy layers to a software config first
-     * (§9.2/§9.3). Used in production by `WallpaperFlattener`, which calls it on a
-     * background dispatcher for a detached view it owns alone — the compose touches only its
-     * own Paint/Matrix/Canvas, never the view's draw-time members.
-     */
-    fun composeToBitmap(
-        targetWidth: Int = width,
-        targetHeight: Int = height
-    ): Bitmap? {
-        if (targetWidth <= 0 || targetHeight <= 0) return null
-
-        return try {
-            val result = createBitmap(targetWidth, targetHeight)
-            val canvas = Canvas(result)
-
-            val scaleX = targetWidth.toFloat() / width
-            val scaleY = targetHeight.toFloat() / height
-
-            // Export-Paint und -Matrix (eigene Instanzen, Thread-safe).
-            // Wichtig: NICHT das Klassen-Member `drawMatrix` benutzen —
-            // das wird gleichzeitig von onDraw() verwendet, und composeToBitmap
-            // kann von einem Hintergrund-Thread aufgerufen werden.
-            val exportPaint = Paint().apply {
-                isAntiAlias = true
-                isFilterBitmap = true
-            }
-            val exportMatrix = Matrix()
-
-            if (isMultiLayerMode) {
-                // Shared compositor (single source of truth with onDraw); it fills
-                // the background and scales each layer to the target size.
-                drawLayers(
-                    canvas = canvas,
-                    paint = exportPaint,
-                    matrix = exportMatrix,
-                    outputScaleX = scaleX,
-                    outputScaleY = scaleY,
-                    drawSelection = false,
-                )
-            } else {
-                // Single-Layer: Drawable rendern
-                val d = drawable
-                if (d != null) {
-                    exportMatrix.reset()
-                    exportMatrix.postScale(_singleScale * scaleX, _singleScale * scaleY)
-                    exportMatrix.postTranslate(_singleTranslateX * scaleX, _singleTranslateY * scaleY)
-
-                    if (d is BitmapDrawable && d.bitmap != null) {
-                        canvas.drawBitmap(d.bitmap, exportMatrix, exportPaint)
-                    } else {
-                        canvas.withMatrix(exportMatrix) {
-                            d.setBounds(0, 0, d.intrinsicWidth, d.intrinsicHeight)
-                            d.draw(this)
-                        }
-                    }
-                }
-            }
-
-            result
-        } catch (e: Throwable) {
-            // Catch kept (Expected error, four-category frame): the
-            // primary failure mode is OutOfMemoryError on createBitmap()
-            // or canvas.drawBitmap() with large dimensions / many layers.
-            // OOM extends Error → was missed by the previous Exception
-            // catch. Returning null lets the caller (export path) fall
-            // back gracefully.
-            TimberWrapper.silentError(e, "Error composing wallpaper bitmap")
-            null
-        }
-    }
-
     // ===========================================
     // DRAWING
     // ===========================================
@@ -877,18 +792,15 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     /**
-     * Shared multi-layer compositing loop — the single source of truth for both
-     * the live [onDraw] path and the offscreen [composeToBitmap] export. Fills the
-     * optional background, then draws every visible, non-recycled layer with its
-     * alpha, blend mode and transform, optionally scaled to a target size
-     * ([outputScaleX]/[outputScaleY] = 1f for the 1:1 live view). [drawSelection]
-     * draws the edit-mode highlight on the active layer (live path only).
+     * The live multi-layer compositing loop of [onDraw]. Fills the optional background, then
+     * draws every non-recycled layer with its transform, optionally scaled to a target size
+     * ([outputScaleX]/[outputScaleY] = 1f for the 1:1 live view). [drawSelection] draws the
+     * edit-mode highlight on the active layer.
      *
-     * The caller supplies [paint] and [matrix] so the two call sites stay
-     * thread-independent: [onDraw] passes the view's members (Main thread only),
-     * [composeToBitmap] passes local instances (may run off the Main thread).
-     * Keeping ONE loop here is what stops the live and export paths from drifting
-     * (the reason `composeToBitmap` used to duplicate this).
+     * The view-free flatten draws with the same loop in [WallpaperLayerPainter] and places its
+     * layers with [WallpaperLayerPlacement] (SPEC_NYX_REWRITE Stufe 2); the bit-identity with this
+     * view is pinned by `WallpaperCompositorParityInstrumentedTest`. Until the dedupe step makes
+     * this view call them, keep both copies identical.
      */
     private fun drawLayers(
         canvas: Canvas,

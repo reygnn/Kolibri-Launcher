@@ -1,22 +1,26 @@
 package com.github.reygnn.launcher.common.ui.wallpaper
 
 import com.github.reygnn.launcher.common.ui.LaunchTrace
-import com.github.reygnn.launcher.common.ui.R
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
 import android.net.Uri
-import android.view.ContextThemeWrapper
-import android.view.View
+import androidx.core.graphics.createBitmap
 import com.github.reygnn.launcher.core.DefaultDispatcher
-import com.github.reygnn.launcher.core.MainDispatcher
+import com.github.reygnn.launcher.core.IoDispatcher
 import com.github.reygnn.launcher.core.TimberWrapper
 import com.github.reygnn.launcher.core.wallpaper.WallpaperState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -24,12 +28,18 @@ import javax.inject.Inject
  * one SOFTWARE bitmap that the caller copies to HARDWARE and holds in the in-memory
  * [WallpaperCompositeCache]. There is no on-disk composite in v4 — no file, no WEBP, no store.
  *
- * Reuses the LIVE render path — [WallpaperViewBinder] on a detached
- * [ZoomableImageView] — so the composite is faithful to what the multi-layer view
- * shows (the parity test measured mean 0.11 / max 1 across all blend modes). The
- * only difference from the live path is the bitmap loader: it decodes SOFTWARE
- * (`ARGB_8888`) bitmaps, because `composeToBitmap` composes on a software `Canvas`
- * that cannot draw the HARDWARE bitmaps the live display uses.
+ * Draws without a View (SPEC_NYX_REWRITE Stufe 2): the layers come from the same plan the live
+ * view builds ([WallpaperViewDiff] from an empty view → [RebuildPlan.FullRebuild], so the same
+ * filter and order), are placed with [WallpaperLayerPlacement] and drawn with
+ * [WallpaperLayerPainter] — the live view's math, pinned bit-identical by
+ * `WallpaperCompositorParityInstrumentedTest`, which also compares against the real live view on
+ * screen. The only difference from the live path is the decode: SOFTWARE (`ARGB_8888`) bitmaps,
+ * because the compose draws on a software `Canvas`, which cannot draw the HARDWARE bitmaps the
+ * live display uses.
+ *
+ * Nothing runs on Main: the decodes run on [ioDispatcher] (in parallel, bounded like the live
+ * binder), placement and compose on [defaultDispatcher]. If the caller is cancelled during the
+ * compose, the finished software bitmap is left to the GC (a rare path, no leak).
  *
  * Returns a SOFTWARE bitmap — the caller (the caller's warm step) samples its
  * luminance, copies it to HARDWARE for the cache, and recycles this software temp — or `null`
@@ -40,35 +50,14 @@ import javax.inject.Inject
  */
 class WallpaperFlattener @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    @param:MainDispatcher private val mainDispatcher: CoroutineDispatcher,
-    /** Runs the compose of the finished, detached view off Main (the costly part, grows with the layer count). */
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) {
     /**
-     * The off-screen [ZoomableImageView] used for flattening is an AppCompat
-     * widget ([androidx.appcompat.widget.AppCompatImageView]). Created off the
-     * raw application context it trips AppCompat's theme check ("... can only be
-     * used with a Theme.AppCompat theme"), which logs an error and, on some
-     * platform versions, spams `Invalid resource ID 0x00000000` per unresolved
-     * tint attribute. The live view avoids this by inflating under the activity
-     * theme; here we give the detached view one shared theme,
-     * [R.style.Theme_LauncherWallpaperFlatten] (Material3 → AppCompat descendant), for both apps
-     * (3b-6c — before, each app supplied its own through a qualifier). Theme-only — it does not
-     * affect the composited pixels (the view just draws bitmaps via its matrix).
-     */
-    private val themedContext: Context by lazy {
-        ContextThemeWrapper(context, R.style.Theme_LauncherWallpaperFlatten)
-    }
-    /**
      * Flattens [state]'s layers into one software bitmap at [width]x[height]
      * (default: display resolution), or `null` if [state] has fewer than two
-     * layers, the size is invalid, or nothing rendered. View construction/mutation runs on the
-     * Main thread (the view's constructor creates a `ScaleGestureDetector`, whose handler needs a
-     * Looper); the binder decodes off-Main internally. The compose — a full-size bitmap and one
-     * filtered draw per layer — runs on [defaultDispatcher]: the view is detached and owned by
-     * this call alone, and `composeToBitmap` draws with its own Paint/Matrix on its own Canvas.
-     * If the caller is cancelled during the compose, the finished software bitmap is left to the
-     * GC (a rare path, no leak).
+     * layers, the size is invalid, a layer could not be decoded, or nothing rendered.
+     * The layers are placed for a view of exactly [width]x[height].
      */
     suspend fun flatten(
         state: WallpaperState,
@@ -76,59 +65,86 @@ class WallpaperFlattener @Inject constructor(
         height: Int = context.resources.displayMetrics.heightPixels,
     ): Bitmap? {
         if (state.layerCount < 2 || width <= 0 || height <= 0) return null
-        return withContext(mainDispatcher) {
-            try {
-                val view = ZoomableImageView(themedContext).apply {
-                    isEditMode = false
-                    measure(
-                        View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
-                    )
-                    layout(0, 0, width, height)
-                }
-                // Same binder the live view uses -> identical decode/transform
-                // logic, only with a software loader. Track per-layer decode failures:
-                // a partial composite (one layer skipped) is a decodable-but-INCOMPLETE
-                // artifact, and it must NOT reach the cache (WALLPAPER_COMPOSITE_LIFECYCLE_SPEC
-                // §3, all-or-nothing). parseWallpaperState already drops missing-file layers,
-                // so a null here is a TRANSIENT decode failure — returning null makes the warm
-                // skip caching and re-flatten on the next miss, exactly like the live path heals.
-                val imageUris = state.layers.mapNotNull { it.imageUri }.toSet()
-                val anyLayerFailed = AtomicBoolean(false)
-                val binder = WallpaperViewBinder { uri ->
-                    loadSoftware(uri).also {
-                        if (it == null && uri.toString() in imageUris) anyLayerFailed.set(true)
-                    }
-                }
-                binder.bind(view, state)
-                val composite = withContext(defaultDispatcher) {
-                    // Sync section inside the hop: it measures the compose alone, on the thread
-                    // that runs it (the trace shows a DefaultDispatcher worker).
-                    LaunchTrace.section(LaunchTrace.Names.WALLPAPER_COMPOSE) {
-                        view.composeToBitmap(width, height)
-                    }
-                }
-                if (anyLayerFailed.get()) {
-                    composite?.recycle()
-                    null
-                } else {
-                    composite
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                // Catch kept (Expected error, four-category frame): the parallel decodes +
-                // compose are an allocation boundary (OOM extends Error → Throwable). A failed
-                // flatten just means no composite this time.
-                TimberWrapper.silentError(e, "Wallpaper flatten failed")
-                null
+        // The live plan from an empty view: a multi-layer target is always a full rebuild.
+        val plan = WallpaperViewDiff.diff(ViewLayerSnapshot.EMPTY, state) as? RebuildPlan.FullRebuild
+            ?: return null
+        return try {
+            // Decode every layer in parallel, bounded like the live binder; awaitAll keeps the
+            // plan order (z-order). All-or-nothing: one failed layer means no composite (§3).
+            val decoded = coroutineScope {
+                val gate = Semaphore(WallpaperViewBinder.DEFAULT_MAX_PARALLEL_DECODES)
+                plan.layers
+                    .map { spec -> async { gate.withPermit { loadSoftware(spec.imageUri) } } }
+                    .awaitAll()
             }
+            val layers = decoded.filterNotNull()
+            if (layers.size != plan.layers.size) {
+                layers.forEach { it.bitmap.recycle() }
+                null
+            } else {
+                withContext(defaultDispatcher) { compose(layers, plan.updates, width, height) }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Catch kept (Expected error, four-category frame): the parallel decodes +
+            // compose are an allocation boundary (OOM extends Error → Throwable). A failed
+            // flatten just means no composite this time.
+            TimberWrapper.silentError(e, "Wallpaper flatten failed")
+            null
+        }
+    }
+
+    /**
+     * Places the decoded layers for a [width]x[height] view and draws them onto a new software
+     * bitmap. The decoded layer bitmaps belong to this call alone and are recycled afterwards.
+     */
+    private fun compose(
+        decoded: List<DecodedWallpaperBitmap>,
+        updates: List<LayerPropertyUpdate>,
+        width: Int,
+        height: Int,
+    ): Bitmap {
+        try {
+            val layers = decoded.mapIndexed { index, d ->
+                val placement = WallpaperLayerPlacement.place(
+                    transform = updates.getOrNull(index)?.transform,
+                    bitmapWidth = d.bitmap.width,
+                    bitmapHeight = d.bitmap.height,
+                    sampleSize = d.sampleSize,
+                    originalWidth = d.originalWidth,
+                    originalHeight = d.originalHeight,
+                    viewWidth = width,
+                    viewHeight = height,
+                )
+                WallpaperLayer(
+                    bitmap = d.bitmap,
+                    scale = placement.scale,
+                    translateX = placement.translateX,
+                    translateY = placement.translateY,
+                )
+            }
+            // Info section (Stufe 1): the allocation and the draw, as `composeToBitmap` measured
+            // it before; the decodes stay outside. Sync — the compose does not suspend.
+            return LaunchTrace.section(LaunchTrace.Names.WALLPAPER_COMPOSE) {
+                val result = createBitmap(width, height)
+                WallpaperLayerPainter.draw(
+                    canvas = Canvas(result),
+                    layers = layers,
+                    backgroundColor = Color.TRANSPARENT,
+                    paint = WallpaperLayerPainter.newLayerPaint(),
+                    matrix = Matrix(),
+                )
+                result
+            }
+        } finally {
+            decoded.forEach { it.bitmap.recycle() }
         }
     }
 
     /** SOFTWARE decode of one layer source, matching the binder's loader contract. */
     private suspend fun loadSoftware(uri: Uri): DecodedWallpaperBitmap? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             try {
                 decodeBoundedWallpaperBitmap(preferSoftware = true) {
                     context.contentResolver.openInputStream(uri)

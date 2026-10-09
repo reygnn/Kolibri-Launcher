@@ -17,7 +17,7 @@ same patch.
 |---|---|---|---|---|---|
 | `:core` | JVM | `launcher.jvm.library` | Domain types and contracts both apps share | `WallpaperState`, `WallpaperRepository`, `FabPositionRepository`, `Purgeable` + `purgeAll`, qualifiers (`@IoDispatcher`, `@MainDispatcher`, `@DefaultDispatcher`, `@ApplicationScope`, `@SettingsStore`), `DispatcherModule`, `CompositeLuminanceSignal`; testFixtures: `MainDispatcherRule`, `TESTING_CONVENTIONS.kt`, `FakeWallpaperRepository` | nothing |
 | `:common-data` | Android | `launcher.android.library` | Android data plumbing both apps share | `WallpaperFileManager`, `WallpaperRepositoryImpl`, `WallpaperBitmapLuminanceImpl`, `SafDocuments`, DataStore read helpers | `:core` (api) |
-| `:common-ui` | Android | `launcher.android.library` | Shared views and UI infrastructure | `ZoomableImageView`, `WallpaperViewBinder`, `WallpaperFlattener`, `WallpaperCompositeCache`, `LaunchTrace`, `WallpaperPaintTrace`, `WallpaperFlickerTrace`, `BaseViewModel`, the flatten theme | `:core` (api) |
+| `:common-ui` | Android | `launcher.android.library` | Shared views and UI infrastructure | `ZoomableImageView`, `WallpaperViewBinder`, `WallpaperFlattener` (view-free since Stufe 2), `WallpaperLayerPlacement`, `WallpaperLayerPainter`, `WallpaperCompositeCache`, `LaunchTrace`, `WallpaperPaintTrace`, `WallpaperFlickerTrace`, `BaseViewModel` | `:core` (api) |
 | `:common-testing-android` | Android | `launcher.android.library` | Android test support (its `src/main` IS test code) | instrumented-test helpers | — |
 | `:feature-crashreporting` | Android | `launcher.android.library` | ACRA, crash ingestion | `AnrReporter`, health notifier | `:core` (api), `:common-ui` |
 | `:feature-backup` | JVM | `launcher.jvm.library` | Backup container engine (Phase 2a) | E5a container, staged blobs, backup contracts in testFixtures | `:core` |
@@ -84,7 +84,7 @@ Every new detector comes with a counter-check (the bad case is flagged) in its s
 - Qualifiers live in `:core`: `@SettingsStore` (the app's settings DataStore), `@IoDispatcher`, `@MainDispatcher`, `@DefaultDispatcher`, `@ApplicationScope` — **runs on DEFAULT, not Main**; anything touching main-confined state launches with `@MainDispatcher` explicitly.
 - `@Singleton` for shared state (one cache, one session per process); `@Provides` for classes without `@Inject`; `@Binds` for interfaces.
 - **When an app newly binds a shared object** (3b-6b): the announcement lists every qualified dependency of its graph, transitively, and where each is provided in THAT app — Hilt's graph error appears only in the real build.
-- **No app-specific seam where one shared value suffices** (3b-6c: one flatten theme in `:common-ui` instead of a theme per app).
+- **No app-specific seam where one shared value suffices** (3b-6c: one flatten theme in `:common-ui` instead of a theme per app; since Stufe 2 the flatten needs no theme at all).
 
 ## 5. API design and unification
 
