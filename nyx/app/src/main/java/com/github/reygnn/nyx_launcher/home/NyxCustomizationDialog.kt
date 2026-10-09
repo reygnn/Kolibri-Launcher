@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.home
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperOperations
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.content.Intent
 import android.os.Bundle
@@ -60,9 +61,10 @@ class NyxCustomizationDialog : DialogFragment() {
             // recreated on rotation — broad configChanges — so this is robust.)
             if (uri != null) {
                 requireActivity().lifecycleScope.launchSafe("Error setting wallpaper") {
-                    val ok = wallpaperImageSetter.setFromUri(uri)
-                    if (!ok) activity?.let {
-                        it.showToastSafe(R.string.wallpaper_set_failed_toast)
+                    // Only a failed copy is an error; a discarded one (a removal won the race,
+                    // audit A21) is not reported.
+                    if (wallpaperImageSetter.setFromUri(uri) == WallpaperOperations.ImageResult.CopyFailed) {
+                        activity?.showToastSafe(R.string.wallpaper_set_failed_toast)
                     }
                     if (isAdded) dismissAllowingStateLoss()
                 }

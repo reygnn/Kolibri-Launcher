@@ -1,5 +1,6 @@
 package com.github.reygnn.nyx_launcher.settings
 
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperOperations
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperImagePicker
 import android.Manifest
 import android.content.Intent
@@ -472,9 +473,15 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun setWallpaperFromUri(uri: Uri) = lifecycleScope.launch {
-        val ok = wallpaperImageSetter.setFromUri(uri)
-        toast(getString(if (ok) R.string.wallpaper_set_toast else R.string.wallpaper_set_failed_toast))
-        if (ok) requireActivity().finish() // back to home, which re-renders from the saved state
+        when (wallpaperImageSetter.setFromUri(uri)) {
+            WallpaperOperations.ImageResult.Applied -> {
+                toast(getString(R.string.wallpaper_set_toast))
+                requireActivity().finish() // back to home, which re-renders from the saved state
+            }
+            WallpaperOperations.ImageResult.CopyFailed -> toast(getString(R.string.wallpaper_set_failed_toast))
+            // A removal won the race (audit A21): no error, and the user stays in Settings.
+            WallpaperOperations.ImageResult.Discarded -> Unit
+        }
     }
 
     override fun onResume() {

@@ -1,5 +1,9 @@
 package com.github.reygnn.nyx_launcher.data.home
 
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import com.github.reygnn.launcher.feature.wallpaper.WallpaperOperations
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.github.reygnn.launcher.feature.wallpaper.WallpaperComposite
 import android.net.Uri
@@ -92,7 +96,7 @@ class NyxWallpaperImageSetterTest {
 
         val ok = setter.setFromUri(sourceUri)
 
-        assertThat(ok).isTrue()
+        assertThat(ok).isEqualTo(WallpaperOperations.ImageResult.Applied)
         coVerify(exactly = 1) { repository.saveWallpaperState(match { it.layerCount == 1 && it.layers.single().imageUri == "file:///new" }) }
         verify(exactly = 1) { fileManager.deleteFile("file:///old") }
     }
@@ -105,7 +109,7 @@ class NyxWallpaperImageSetterTest {
 
         val ok = setter.setFromUri(sourceUri)
 
-        assertThat(ok).isTrue()
+        assertThat(ok).isEqualTo(WallpaperOperations.ImageResult.Applied)
         coVerify(exactly = 1) { repository.saveWallpaperState(match { it.layerCount == 1 && it.layers.single().imageUri == "file:///new" }) }
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
     }
@@ -122,16 +126,38 @@ class NyxWallpaperImageSetterTest {
     }
 
     @Test
-    fun setFromUri_returns_false_and_touches_nothing_when_the_copy_fails() = runTest(mainDispatcherRule.testDispatcher) {
+    fun setFromUri_returns_copy_failed_and_touches_nothing_when_the_copy_fails() = runTest(mainDispatcherRule.testDispatcher) {
         persisted("file:///old")
         startedWith(WallpaperState.single("file:///old"))
         coEvery { fileManager.copyToInternal(any()) } returns null
 
         val ok = setter.setFromUri(sourceUri)
 
-        assertThat(ok).isFalse()
+        assertThat(ok).isEqualTo(WallpaperOperations.ImageResult.CopyFailed)
         coVerify(exactly = 0) { repository.saveWallpaperState(any()) }
         verify(exactly = 0) { fileManager.deleteFile(any<String>()) }
+    }
+
+    @Test
+    fun setFromUri_returns_discarded_when_a_removal_lands_during_the_copy() = runTest(mainDispatcherRule.testDispatcher) {
+        // Audit A21: a removal wins the race with a running copy (3b/20) — the result is Discarded,
+        // not a failure, so neither Settings nor the sheet shows "couldn't set wallpaper".
+        persisted()
+        startedWith(WallpaperState.single("file:///old"))
+        val copyGate = CompletableDeferred<Unit>()
+        coEvery { fileManager.copyToInternal(any()) } coAnswers {
+            copyGate.await()
+            internalUri("file:///new")
+        }
+
+        val result = async { setter.setFromUri(sourceUri) }
+        runCurrent() // the copy waits at the gate
+        assertThat(setter.clear()).isTrue()
+        copyGate.complete(Unit)
+
+        assertThat(result.await()).isEqualTo(WallpaperOperations.ImageResult.Discarded)
+        coVerify(exactly = 0) { repository.saveWallpaperState(match { it.layers.any { l -> l.imageUri == "file:///new" } }) }
+        verify(exactly = 1) { fileManager.deleteFile("file:///new") } // the discarded copy goes through the store
     }
 
     @Test
@@ -197,7 +223,7 @@ class NyxWallpaperImageSetterTest {
         val ok = setter.setFromUri(sourceUri)
         advanceUntilIdle()
 
-        assertThat(ok).isTrue()
+        assertThat(ok).isEqualTo(WallpaperOperations.ImageResult.Applied)
         assertThat(editing.session.state.value.referencedUris).containsExactly("file:///new")
         verify(exactly = 0) { fileManager.deleteFile("file:///old") }
 

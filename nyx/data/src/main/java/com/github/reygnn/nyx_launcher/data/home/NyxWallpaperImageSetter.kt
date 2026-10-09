@@ -19,12 +19,13 @@ class NyxWallpaperImageSetter @Inject constructor(
     private val editing: NyxWallpaperEditing,
 ) {
     /**
-     * Copies [sourceUri] in and applies it as the single wallpaper layer. Returns true when it was
-     * applied, false if the copy failed (revoked permission / decode failure) or a cancel discarded
-     * it — the caller can surface a toast.
+     * Copies [sourceUri] in and applies it as the single wallpaper layer. Returns the shared
+     * [WallpaperOperations.ImageResult] (audit A21, the same mapping as Kolibri's): `Applied`;
+     * `CopyFailed` (revoked permission / decode failure — the caller shows its error); or
+     * `Discarded` (a removal or cancel won the race — no error, nothing to report).
      */
-    suspend fun setFromUri(sourceUri: Uri): Boolean =
-        editing.operations.replace(sourceUri, editing.session.rollbackGeneration) == WallpaperOperations.ImageResult.Applied
+    suspend fun setFromUri(sourceUri: Uri): WallpaperOperations.ImageResult =
+        editing.operations.replace(sourceUri, editing.session.rollbackGeneration)
 
     /**
      * "Remove wallpaper": state first, files second, only against an empty persisted state, and
