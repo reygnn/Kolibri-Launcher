@@ -1,6 +1,15 @@
 # Spec: Nyx-Rewrite – Anbindung an Kolibri
 
-Stand: 03.10.2026 (Revision 124: 3b/27b – Rest von A10 (veraltete KDocs und Kommentare, Liste aus dem Auditor-Bericht).
+Stand: 03.10.2026 (Revision 133: 3b/35 – Szenen als testFixtures von `:common-ui`, Robolectric-Bitgleich-Wächter (nativer Grafikmodus).
+Revision 132: 3b/29 neu geliefert (2) – Test-Helfer unterscheidet „kein Override“ von „Override liefert null“.
+Revision 131: 3b/35 geplant – Bitgleich-Fall zusätzlich als Robolectric-Test (nativer Grafikmodus), Szenen als gemeinsame testFixtures, Probe außerhalb der Kette.
+Revision 130: 3b/33 + 3b/34 – Stufe 2: Flatten ohne View (Placement und Painter), Paritätstests gegen die alte View-Mathematik und den echten Live-View, Dedupe im Live-View, Messvorschrift.
+Revision 129: 3b/31 + 3b/32 – Stufe 1 (audit-04): Messpunkt `wallpaper_compose`, Compose auf `@DefaultDispatcher`, Pixeltest, Messvorschrift mit K1–K4; 3b/30-Absatz an die richtige Stelle (nach 3b/29) gerückt.
+Revision 128: 3b/30 – D3, Kolibris Composite-Bindung im App-Modul `di/WallpaperCompositeModule` wie in Nyx.
+Revision 127: 3b/29 neu geliefert – Nachbesserungen aus dem Review (Compile-Fehler im Nyx-Test, d′-Test mit zwei Toren, strengere Purge-Erwartung); bekannte Grenze von d′ (ABA beim Werkszustand ohne vorheriges Wallpaper) festgehalten.
+Revision 126: 3b/29 – D2 (Entfernen und Werkszustand löschen nur die Dateien des vorherigen Zustands) und d′ („zuletzt gewählt gewinnt“, fremde Schreiber verwerfen).
+Revision 125: 3b/28 – A21, Nyx bildet „verworfen“ ab wie Kolibri; Umfang vor dem Merge erweitert (D2, D3, Stufe 1, Stufe 2), D1 verworfen.
+Revision 124: 3b/27b – Rest von A10 (veraltete KDocs und Kommentare, Liste aus dem Auditor-Bericht).
 Revision 123: Audit-Übernahme Teil 2 – 3b/24–27; Doku-Korrekturen A14, A17, A18, A19; offene Punkte auf neuem Stand.
 Revision 122: Audit-Übernahme vor dem Merge, Teil 1 – 3b/19–23 (A1, A4/A15, A16, A9b, A2/A6, A5, A3, A7/A8).
 Revision 121: Leitfaden für neue Feature-Module (`docs/FEATURE_MODULE_GUIDE.md`, Patch phase3b/18).
@@ -275,6 +284,8 @@ Diese Liste ist die Grundlage für die Golden-Soll-Zustände und für die Releas
 | Nyx | Harte ANRs werden beim nächsten Start gemeldet (vorher No-op-Drainer, keine ANR-Reports) | 1c-1 |
 | Nyx | Beim Wiederherstellen sind versteckte Apps ein eigener Schalter (nur angeboten, wenn das Backup mindestens eine enthält); an: die Menge wird ersetzt, ein Backup ohne das Feld lässt sie stehen | 2b-3b, B13 |
 | Nyx | Abgelehnte Backup-Dateien melden ihren Grund sofort (andere App, ältere Version, nicht unterstützte Version, ungültig); ein Wiederherstellen meldet verworfene Wallpaper-Ebenen | 2b-3b |
+| beide | Bei zwei schnell nacheinander gewählten Hintergründen gewinnt immer der zuletzt gewählte, nicht der zuletzt fertig kopierte | 3b/29 |
+| Nyx | Tippt man „Hintergrund entfernen“, während ein gewähltes Bild noch kopiert wird, erscheint keine falsche Meldung „konnte nicht gesetzt werden“ mehr, und die Einstellungen bleiben offen | 3b/28 |
 | Nyx | Beim Wiederherstellen eines Backups meldet Nyx auch Ebenen als nicht verfügbar, deren Bild nicht im Backup lag und auf dem Gerät fehlt, statt sie still wegzulassen (keine Referenz auf eine fehlende Datei mehr) | 3b-5 |
 | Nyx | Beim Wählen eines Hintergrunds in den Einstellungen und im Anpassen-Sheet öffnet sich die Dateiauswahl des Systems statt des reinen Foto-Pickers; Downloads, Dateimanager und Cloud-Anbieter werden erreichbar | 3b-4 |
 | Nyx | Ein Bild, das im Wallpaper-Editor kurz vor „Speichern“ als Ebene gewählt wurde und noch kopiert wird, erscheint nach dem Speichern (bisher wurde es verworfen); nur „Abbrechen“ verwirft es (wie Kolibri, E2) | 3b-3 |
@@ -1249,9 +1260,12 @@ die Edit-UI (`WallpaperEditController` bzw. `NyxWallpaperEditController`); der L
   D2 (beim Entfernen und beim Reset nur die Dateien des vorherigen Zustands löschen) oder einen Reset über `WallpaperOperations` –
   Designentscheidung, nach dem Merge, priorisiert.
 - **D1** (Entwurf getrennt, persistieren erst beim Commit) und **D3** (Platzierung der Composite-Bindung) – Designoptionen, nach dem Merge.
+  Später entschieden: D1 verworfen (Revision 125), D3 erledigt in 3b/30.
 - **audit-04 / Compose vom Main-Thread** – in O7: Stufe 1 (audit-04) und Stufe 2 (reiner Compositor ohne View, dann entfällt auch das
   Flatten-Theme) als Optionen der O7-K-Vorlage; die Vorher-Messung bekommt die Sektion `wallpaper_compose` innerhalb von
   `wallpaper_flatten` (Grenzen bleiben); Pixelgleichheit auf dem A17 über die instrumentierten Tests ist Pflicht vor der Übernahme.
+  Stufe 1 = 3b/31 + 3b/32, Stufe 2 = 3b/33 + 3b/34 (Übernahme jeweils nach Messung). `loadSoftware` über `@IoDispatcher`
+  ist in 3b/33 erledigt (A13 −1).
 - Erledigt vor dem Merge (3b/19–26): A1, A2/A6, A3, A4/A15, A5, A7/A8, A9a–c, A11, A12, A13, A16; Doku A10, A14, A17–A20 (3b/27).
 - **O7 viele Ebenen in Nyx: Speicher und Cache-Thrashing ohne Composite – HOCH**, direkt nach 3b-7 und dem Kolibri-Aufräum-Patch,
   vor der allgemeinen Inventur (zuerst messen mit einer 12-Ebenen-Collage; bevorzugte Option O7-K: Kolibris Composite-Handling 1:1
@@ -1349,6 +1363,139 @@ Leitfaden Zeile 76 bereits mit 3b/23; offene Punkte nach 3b auf neuem Stand.
 `WallpaperRepositoryImpl.layersToJson` (Beispiel mit den heutigen Feldern, KDoc englisch), `WallpaperRepository.saveWallpaperState`
 (kein isEditMode, KDoc englisch nach Rule 13), `WallpaperImagePicker` (Nyx seit 3b-4), `NyxWallpaperEditing` (gebunden ist `None`,
 3b-6d), `WallpaperOperations` und `WallpaperComposite.Host` (Nyx seit 3b-3, nicht mehr im Futur).
+
+**Erweiterter Umfang vor dem Merge (Entscheidung des Users):** A21, A2b über D2, D3, Stufe 1 (audit-04) und Stufe 2 kommen vor
+den Merge; am Ende eine gesammelte Geräteprüfung beider Apps, dann der Merge auf das Wort des Users.
+**D1 (Entwurf getrennt, persistieren erst beim Commit) ist verworfen:** Das Editor-Speicherverhalten bleibt, wie es in beiden Apps
+auf dem Gerät belegt ist (strukturelle Änderungen werden während der Session geschrieben, Transforms beim Übernehmen bzw. vor
+strukturellen Operationen).
+3b/28 (A21, Drift): Der geteilte Code unterscheidet `Applied`, `CopyFailed`, `Discarded`; Nyx' Setter machte daraus ein Boolean, und
+Einstellungen und Sheet zeigten bei `false` „wallpaper_set_failed_toast“ – auch bei einem seit 3b/20 möglichen VERWORFENEN Ersetzen.
+Jetzt liefert `NyxWallpaperImageSetter.setFromUri` das `ImageResult` (dieselbe Abbildung wie Kolibri): Applied → Meldung und zurück
+nach Home; CopyFailed → Fehlermeldung; Discarded → nichts, in den Einstellungen kein `finish()`, im Sheet nur `dismiss`.
+Tests: vier Erwartungen Boolean → `ImageResult` (Bedeutung gleich), neu der Discarded-Fall (Entfernen während einer gegateten Kopie).
+3b/29 (A2b über D2, mit d′; Urteile des Seniors): „Wallpaper entfernen“ (`WallpaperOperations.clear`) liest vor dem Leeren die
+persistierten Referenzen (unter `persistLock`) und löscht danach GENAU diese über den Store (fail-closed; nicht lesbar → nichts,
+Waisen für den GC); „gegriffen“ heißt: der Zustand ist danach leer. Der Werkszustand (`WallpaperRepositoryImpl.purgeRepository`,
+beide Apps) liest die Referenzen vor dem Entfernen, löscht genau diese und räumt danach einmal Waisen mit der normalen Schonfrist
+(`gcOrphans(emptySet())`) – alte Waisen gehen sofort, eine laufende Kopie (frische Datei) bleibt verschont; ehrlich (F1) zählt nur
+eine REFERENZIERTE Datei, die bleibt, oder ein nicht lesbarer Zustand (dann nichts löschen, kein GC). `WallpaperFileManager.deleteFile`
+gibt dafür zurück, ob die Datei danach nicht im Verzeichnis liegt (gelöscht oder nie da → true; keine interne URI → true; existierte
+und ließ sich nicht löschen → false). Damit trifft weder Entfernen noch Werkszustand eine laufende Kopie.
+Die Generationsprüfung aus 3b/20 bleibt mit neuer Rolle: Sie sichert die ABSICHT (eine Kopie, die nach dem Entfernen fertig wird,
+setzt das Wallpaper nicht wieder), nicht mehr die Datei.
+d′ (außerhalb einer Session; innerhalb gilt nur die Generation): jedes Ersetzen bekommt beim Start eine fortlaufende Nummer und merkt
+sich die persistierten Referenzen; beim Anwenden unter `persistLock` wird verworfen, wenn ein NEUERES eigenes Ersetzen schon
+angewendet ist (zuletzt gewählt gewinnt) oder ein fremder Schreiber (Werkszustand, Import, Entfernen) den Stand geändert hat;
+nicht lesbar → verwerfen ohne Löschen. Geprüft: beide Apps setzen über `WallpaperOperations.replace`; der einzige legitime fremde
+Schreiber, ein zweites Ersetzen des Users, ist durch die Start-Nummer abgedeckt. Deckt die Q5-Familie außerhalb der Session ab.
+Entfernt (Rahmen des Users, grep-Beleg): `WallpaperImageStore.deleteAllIfNothingPersisted` samt 3 Tests, `WallpaperFileManager.clearAll`
+samt 3 Tests (ungenutzter Löschcode für das ganze Verzeichnis bleibt nicht als Werkzeug liegen). Neu: 6 Fälle in
+`WallpaperOperationsTest`, 4 zum Rückgabewert von `deleteFile`, 1 „Werkszustand unlesbar“, 1 A2b-Race in Nyx.
+Bekannte Grenze von d′ (akzeptiert, Urteil des Seniors): ABA beim Werkszustand ohne vorheriges Wallpaper – war der Stand beim Start
+leer und ist er nach dem Werkszustand wieder leer, sieht das Anwenden keinen fremden Schreiber und setzt die Kopie;
+Lösung erst bei Bedarf, etwa über einen Generations-Bump im Reset.
+3b/29 neu geliefert (2), Befund repo: Der Test-Helfer in `WallpaperOperationsTest` fiel bei einem Override, das absichtlich
+null (unlesbar) liefert, per `?:` auf den Fake-Zustand zurück – „unlesbar“ war so nicht simulierbar, zwei Tests rot; jetzt prüft der
+Helfer „gesetzt“ statt „nicht null“. Impl unverändert. Regel: Ein Test-Override, der null als Wert transportiert, fällt nie per `?:` auf
+einen Standard.
+3b/30 (D3, Urteil des Seniors): Kolibris Composite-Bindung zieht aus `kolibri/data/.../di/RepositoryModule` in das App-Modul
+`kolibri/app/.../di/WallpaperCompositeModule` (`@Binds CachedWallpaperComposite`), gleicher Name und Ort wie in Nyx (dort `None`).
+Die Wahl des Composites ist eine Entscheidung des Hosts und gehört in die App, nicht in die Datenschicht.
+Reine Verschiebung: Graph und Scope unverändert (`@Singleton` an der Klasse), Nyx unverändert, kein Reflexions-Pin-Test.
+3b/31 (Stufe 1, Messpunkt, verhaltensneutral; Urteil des Seniors): neue synchrone Trace-Sektion `wallpaper_compose`
+(`LaunchTrace.Names.WALLPAPER_COMPOSE`) um `composeToBitmap` im `WallpaperFlattener`, vollständig innerhalb von `wallpaper_flatten`;
+die Grenzen von `wallpaper_warm` und `wallpaper_flatten` bleiben samt Cookies exakt (F4).
+Synchron, weil das Compose nicht suspendiert – Anfang und Ende auf demselben Thread, der Trace zeigt, welcher Thread es ausführt.
+`WallpaperCompositeBenchmark.compositeFlattenOnRotate` bekommt die Info-Metrik `TraceSectionMetric(wallpaper_compose, Sum)` –
+die eine erlaubte Änderung am eingefrorenen Benchmark; vorher und nachher messen mit denselben Metriken.
+3b/32 (Stufe 1, audit-04 übernommen, Prüfsumme des Auditor-Patches `5998318c…9baf`): `WallpaperFlattener` bekommt
+`@DefaultDispatcher` (`:core` `DispatcherModule`, ohne Scope, in beiden Apps schon genutzt) und setzt das Compose in
+`withContext(defaultDispatcher)`; die Sektion aus 31 liegt darin. Bau, `measure`/`layout` und `bind` des Views bleiben auf Main
+(`ScaleGestureDetector` braucht den Looper), die Decodes auf IO. Sicher, weil der View losgelöst ist und nur diesem Aufruf gehört,
+`bind` per `awaitAll` alle Decodes abwartet, `runWhenMeasured` nach `measure`/`layout` synchron läuft (kein `View.post`) und
+`composeToBitmap` eigene Paint/Matrix/Canvas nutzt (vom Senior nachgeprüft).
+Abbruch während des Compose: das fertige Software-Bitmap bleibt dem GC (seltener Pfad, kein Leck; `NonCancellable` bewusst nicht).
+`ZoomableImageView.composeToBitmap`: veraltetes `@Suppress("unused")` und KDoc „noch nicht verdrahtet“ entfernt.
+KDoc nachgezogen (`LaunchTrace`, Nyx' `WallpaperCompositeModule`). A13 unverändert; kein neuer Scope.
+Neu `WallpaperFlattenerInstrumentedTest.composeOffMainIsPixelIdenticalToComposeOnMain` (A17): dieselbe Szene (3 Ebenen mit
+Verläufen, zwei davon transformiert und teiltransparent, Zielgröße ungleich der Bildgrößen) mit Compose auf Main
+(`WallpaperFlattener(context, Main, Main)`) und auf Default – `sameAs`, bitgleich; dazu ein Schutz gegen ein triviales Paar.
+**Übernahme-Vorbehalt und Messvorschrift (Kriterien vorab festgelegt, Urteil des Seniors):** 31 und 32 zunächst lokal, je eigener
+Commit, kein Push; A = Kette bis 31, B = bis 32 (A17, benchmark-Build, family-signiert).
+Schritt 0: `WallpaperFlattenerInstrumentedTest` auf B über `:kolibri:app:connectedDebugAndroidTest` gefiltert auf die Klasse,
+3/3 grün, 0 übersprungen – sonst keine Messung.
+Ablauf: A, B, A, B, A, B; je Lauf App installieren → `pm clear` → Standard-Home → `compositeFlattenOnRotate` und
+`compositeReattachWarm` je als eigener `am instrument`-Aufruf, 10 Iterationen; vor jedem Lauf mindestens 3 min Abkühlpause bei
+ausgeschaltetem Bildschirm, Akkutemperatur am Laufbeginn höchstens 1 °C über dem ersten Lauf, Akku ≥ 50 %, gleiches Ladeverhalten.
+K1 Pixeltest grün.
+K2 Verschiebung belegt: in ALLEN B-Traces von `compositeFlattenOnRotate` liegt jede `wallpaper_compose`-Slice auf einem
+DefaultDispatcher-worker, in allen A-Traces auf Main (hart, keine Stichprobe).
+K3 `wallpaper_flatten` und `wallpaper_warm`, Median der Lauf-Mediane: B höchstens 10 % schlechter als A.
+K4 `compositeReattachWarm` `frame_duration_cpu` P50 und P90, Median über die Läufe: B höchstens 10 % schlechter.
+Info: `wallpaper_compose`-Dauer, P99, `frame_overrun`; wird `wallpaper_compose` in B um mehr als 25 % länger, wird die Ursache
+(etwa Konkurrenz mit Decodes auf Default) vor der Übernahme gezeigt – kein Ausschlusskriterium.
+Bei einem Rückschritt in K3/K4: zweiter Durchgang B, A, B, A, B, A; bleibt er, wird die Ursache vor der Übernahme gesucht.
+Nur bei K1–K4 grün bleibt 32; sonst wird 32 lokal verworfen und 31 bleibt als Messpunkt.
+3b/33 (Stufe 2, reiner Compositor; Vorlage und Entscheidungen (a)–(e) des Seniors, Bau auf Anweisung des Users vor dem
+Messergebnis von Stufe 1): `WallpaperFlattener` zeichnet ohne View. Die Ebenen kommen aus demselben Plan wie live
+(`WallpaperViewDiff` von einem leeren View → `FullRebuild`, gleiche Filter und Reihenfolge), werden mit dem neuen reinen
+`WallpaperLayerPlacement` platziert (Kompensation der Sample-Größe, Klemmen auf den Zoom-Bereich je Ebene, Schutz gegen
+NaN/Inf, sonst center-crop) und mit dem neuen `WallpaperLayerPainter` gezeichnet (die Schleife von `drawLayers`).
+Nichts läuft mehr auf Main: Decodes parallel und begrenzt (`DEFAULT_MAX_PARALLEL_DECODES`) auf `@IoDispatcher`, Platzierung und
+Compose auf `@DefaultDispatcher`; Konstruktor `(context, @IoDispatcher, @DefaultDispatcher)`, `@MainDispatcher` entfällt,
+`loadSoftware` über `@IoDispatcher` (A13 −1). All-or-nothing bleibt; die dekodierten Ebenen-Bitmaps gehören nur diesem Aufruf
+und werden danach recycelt (vorher dem GC überlassen). `wallpaper_compose` umschließt `createBitmap(W, H)` und das Zeichnen,
+die Decodes liegen außerhalb; warm und flatten unverändert (F4). Der Abbruch-Satz bleibt in der KDoc.
+Entfernt (Rahmen des Users, Grep-Beleg): `ZoomableImageView.composeToBitmap` (einziger Aufrufer war der Flattener),
+`Theme.LauncherWallpaperFlatten` samt `common-ui/res/values/themes.xml` (einziger Verwender war der Flattener); das
+material-Artefakt bleibt (`implementation`, weiter genutzt von `SpeedDialFabCluster`, `CommandsPanel`, `EventRowsAdapter` und zwei
+Layouts). Der Live-View bleibt in 33 unberührt; die Platzierungslogik existiert für diesen einen Schritt bewusst zweimal.
+Tests: neu `WallpaperLayerPlacementTest` (JVM, 8); neu `WallpaperCompositorParityInstrumentedTest` (A17, 10 Fälle = 5 Szenen ×
+2 Prüfungen): (a) bitgleich (`sameAs`) gegen die alte View-Mathematik – losgelöster `ZoomableImageView`, gebunden vom echten
+Binder mit SOFTWARE-Decodes, gezeichnet mit `view.draw(Canvas)`; (b) gegen den echten Live-View auf dem Bildschirm
+(`HiltTestActivity`, HARDWARE-Decodes, `PixelCopy` nach bestätigtem Frame) mit Toleranz max ≤ 2 je Kanal und Mittel ≤ 0,5;
+die Fehlermeldung nennt Mittel, Max und die Zahl der Pixel > 2 – bei einem Scheitern wird nicht aufgeweitet, der Senior
+entscheidet. Vorbedingungen werden geprüft, nicht angenommen: Animationen aus, Farbmodus Standard (sRGB), GPU, feste Größe,
+View innerhalb der Content-Fläche (Insets der Systemleisten und Cutouts). Szenen: (1) deckende Basis quer, (2) hoch,
+(3) zwei transformierte, teiltransparente Ebenen, (4) Kompensation (captureSampleSize 2 gegen Render 1), (5) Klemmen unten
+und oben. `WallpaperFlattenerInstrumentedTest` 2 (neuer Konstruktor); `composeOffMainIsPixelIdenticalToComposeOnMain` entfällt
+(freigegeben, ersetzt durch (a)). KDoc und die zwei Kosmetik-Punkte aus 31/32 (LaunchTrace, Nyx' `WallpaperCompositeModule`);
+Leitfaden: Modul-Tabelle von `:common-ui`.
+3b/34 (Stufe 2, Dedupe, verhaltensneutral): Der Live-View nutzt dieselben Bausteine – `ZoomableImageView.applyTransform(layerIndex, …)`
+über `WallpaperLayerPlacement.clamped`, `computeLayerBaseScale` über `baseScale`, `WallpaperLayer.applyCenterCrop` über
+`centerCrop`, `drawLayers` über `WallpaperLayerPainter.draw` (inline, der Auswahlrahmen nach der aktiven Ebene im Lambda,
+kein Objekt je Frame), `bitmapPaint` über `newLayerPaint()`; die Gesten-Grenzen lesen die Konstanten aus `WallpaperLayerPlacement`;
+die Kompensation des Binders (`compensatedScale`, Einzelbild und Ebenen) liegt jetzt dort. Die ungenutzten Parameter
+`outputScaleX/Y` des Painters entfallen. Einen geteilten Decode-Helfer gibt es nicht (der Binder behält seine Decode-Phase).
+Neutral über die Kette: 33 belegt Compositor = alte View-Mathematik (bitgleich, alle Szenen), 34 lässt den View genau diese
+Bausteine aufrufen; alle bestehenden Robolectric- und Unit-Tests bleiben unverändert grün. Keine eigene Messung; in die gesammelte
+Geräteprüfung kommt für beide Apps: Mehrebenen-Wallpaper im Editor ziehen, zoomen, Grenzen, Auswahlrahmen.
+**Übernahme und Messung Stufe 2 (Urteil des Seniors):** 33 und 34 lokal, je eigener Commit, kein Push.
+A = Ergebnis von Stufe 1 (bis 32, sonst bis 31), B = bis 33; Ablauf wie bei Stufe 1 (A17, A, B, A, B, A, B, je eigener
+`am instrument`-Aufruf, 10 Iterationen, Abkühlpausen, Temperatur, Akku).
+K1 `WallpaperCompositorParityInstrumentedTest` 10/10 und `WallpaperFlattenerInstrumentedTest` 2/2 auf B grün, 0 übersprungen.
+K2 in allen B-Traces liegt `wallpaper_compose` auf einem DefaultDispatcher-worker; der Flattener hat per Grep keinen
+`@MainDispatcher` mehr. K3/K4 wie in Stufe 1 (≤ 10 %), Info und die 25-%-Regel ebenso; Main-Zeit im flatten-Fenster nur Info.
+33 bleibt nur bei K1–K4 grün. 34 bleibt, wenn Gates und Instrumented-Tests grün sind; die Editor-Prüfung folgt in der
+gesammelten Geräteprüfung.
+3b/35 (geplant, Urteil des Seniors; Anregung des Users): der Bitgleich-Fall zusätzlich als Robolectric-Test
+(`WallpaperCompositorParityRobolectricTest`, 5 Fälle) mit `@GraphicsMode(NATIVE)` nur auf dieser Klasse – ein Wächter ohne Gerät
+bei jedem `test`; im Standardmodus LEGACY zeichnet Robolectric keine Pixel, dann macht der Uniform-Schutz den Test rot (gewollt).
+Kein Ersatz für den Gerätetest (Host-Skia ist nicht das Skia des A17; der Live-Vergleich braucht GPU und PixelCopy).
+Die Szenen kommen aus einer gemeinsamen Quelle (`WallpaperParityScenes` in den testFixtures von `:common-ui`), die beide Tests
+nutzen; keine Kopie. Zuerst eine Probe AUSSERHALB der Kette (`probes/35-probe-robolectric-native.patch`, Szene 1, Wegwerf-Branch
+nach 34): (1) nativer Modus mit sdk=36 auf dem Host, (2) `file://` über den ContentResolver für beide Seiten.
+Scheitert (1), entfällt 35 ersatzlos; scheitert (2), wird vor jedem Umbau gemeldet (kein Sonderweg nur für eine Seite).
+3b/35 gebaut (Probe grün bei repo: nativer Modus und bitgleich auf Linux x86_64, native Laufzeit gecacht): `:common-ui`
+`testFixtures { enable = true }` mit `WallpaperParityScenes` (die fünf Szenen, Bildschreiber mit Zielverzeichnis, die
+View-Mathematik als Referenz `viewMath`, Uniform-Schutz, W/H); Abhängigkeiten der Fixtures: `testFixturesApi(:core)`, Truth,
+core-ktx, appcompat. AGP verdrahtet die eigenen Fixtures in die Unit-Tests von `:common-ui` selbst (wie in `:nyx:data`), kein
+`testImplementation(testFixtures(…))` nötig. `:kolibri:app` bezieht sie per `androidTestImplementation(testFixtures(project(":common-ui")))`;
+`WallpaperCompositorParityInstrumentedTest` nutzt Szenen, Referenz und Uniform-Schutz daraus, die Prüflogik (Delta,
+PixelCopy, Vorbedingungen) bleibt dort. Neu `WallpaperCompositorParityRobolectricTest` (5, `@GraphicsMode(NATIVE)` nur auf
+dieser Klasse, ein Dispatcher); im LEGACY-Modus wird er über den Uniform-Schutz rot – gewollt, steht in der KDoc.
+Die Probe-Klasse ist nicht Teil der Kette.
 13b (Patch phase3b/13b): Die Auswertung rechnet je Prozess (upid) `max(value) − min(value)` und summiert über die Prozesse
 (jeder Lauf beendet den alten Prozess und startet einen neuen mit eigenem Zähler; eine Differenz über beide mischte sie);
 `counter_track` = present, sobald mindestens ein Prozess die Spur hat; die Slices bleiben über die Prozesse
