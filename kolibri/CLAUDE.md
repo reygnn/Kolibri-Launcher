@@ -96,9 +96,13 @@ in `:app`.
                           colorcustomization, layoutcustomization,
                           usageexport, appcontextmenu, main (with delegate/
                           subpackage)
-  di/                     AppModule (PackageManager, WallpaperManager,
-                          @Named("appVersionName") from BuildConfig),
-                          AppUpdateModule
+  di/                     AppModule (TestMode, PackageManager, WallpaperManager,
+                          LauncherApps, @AppsUpdateTrigger reload bus,
+                          MonotonicClock, @Named("appVersionName") from
+                          BuildConfig), AppLauncherModule (AppLauncher; own
+                          module so an instrumented test can replace just
+                          this binding), WallpaperCompositeModule
+                          (CachedWallpaperComposite; Nyx binds None there)
   KolibriLauncherApp.kt   @HiltAndroidApp entry, ACRA init, Timber trees,
                           ANR drain (AnrReporter lives in :feature-crashreporting)
 ```
